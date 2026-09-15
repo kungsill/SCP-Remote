@@ -68,6 +68,8 @@
     <script defer src="{{{domainurl}}}scripts/scp-files.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-ui.css" />
     <script defer src="{{{domainurl}}}scripts/scp-ui.js"></script>
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-transfer.css" />
+    <script defer src="{{{domainurl}}}scripts/scp-transfer.js"></script>
 </head>
 
 <body id="body" oncontextmenu="handleContextMenu(event)" style="display:none;min-width:495px"
@@ -3764,6 +3766,7 @@
 					break;
                 }
                 case 'msg': {
+                    if (window.ScpTransfer && window.ScpTransfer.handle(message)) break;
                     // Check if this is a message from a node
                     if (message.nodeid != null) {
                         var index = -1;

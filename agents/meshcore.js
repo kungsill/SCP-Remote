@@ -1653,14 +1653,14 @@ function handleServerCommand(data) {
                         break;
                     }
                     case 'setclip': {
-                        if (pendingSetClip) return;
+                        if (pendingSetClip) { mesh.SendCommand({ action: 'msg', type: 'setclip', sessionid: data.sessionid, tag: data.tag, success: false }); return; }
                         // Set the load clipboard to a user value
                         if (typeof data.data == 'string') {
                             MeshServerLogEx(22, [data.data.length], "Setting clipboard content, " + data.data.length + " byte(s)", data);
                             if (require('MeshAgent').isService) {
                                 if (process.platform != 'win32') {
                                     require('clipboard').dispatchWrite(data.data);
-                                    mesh.SendCommand({ action: 'msg', type: 'setclip', sessionid: data.sessionid, success: true });
+                                    mesh.SendCommand({ action: 'msg', type: 'setclip', sessionid: data.sessionid, tag: data.tag, success: true });
                                 }
                                 else {
                                     var clipargs = data.data;
@@ -1683,14 +1683,14 @@ function handleServerCommand(data) {
                                             try { this.root._dispatcher.close(); } catch (ex) { }
                                             this.root._dispatcher = null;
                                             this.root = null;
-                                            mesh.SendCommand({ action: 'msg', type: 'setclip', sessionid: data.sessionid, success: true });
+                                            mesh.SendCommand({ action: 'msg', type: 'setclip', sessionid: data.sessionid, tag: data.tag, success: true });
                                         });
                                     });
                                 }
                             }
                             else {
                                 require('clipboard')(data.data);
-                                mesh.SendCommand({ action: 'msg', type: 'setclip', sessionid: data.sessionid, success: true });
+                                mesh.SendCommand({ action: 'msg', type: 'setclip', sessionid: data.sessionid, tag: data.tag, success: true });
                             } // Set the clipboard
                         }
                         break;

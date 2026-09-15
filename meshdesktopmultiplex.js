@@ -1030,6 +1030,7 @@ function CreateMeshRelayEx2(parent, ws, req, domain, user, cookie) {
     obj.ruserid = null;
     obj.req = req; // Used in multi-server.js
     obj.viewOnly = ((cookie != null) && (cookie.vo == 1)); // set view only mode
+    if (req.query.viewonly === '1') { obj.viewOnly = true; } // SCP-Remote tiles never gain control in a shared desktop stream.
     if ((cookie != null) && (cookie.nouser == 1)) { obj.nouser = true; } // This is a relay without user authentication
 
     // If the domain has remote desktop viewonly set, force everyone to be in viewonly mode.

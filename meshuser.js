@@ -272,6 +272,24 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
         }
     }
 
+    // SCP-Remote: a desktop tunnel the caller marked view-only can never reach the
+    // keyboard or the mouse. The agent drops input on any tunnel carrying
+    // desktopviewonly, so the restriction holds even if the browser asking for it is
+    // lying about what it means to do. Watching a screen that way is not the same act
+    // as taking the machine over, so a domain may choose to skip the permission box
+    // for it alone. The notice and the on-screen bar are deliberately left in place:
+    // the person is still told it started and can still see it is going on. Both
+    // halves hang off the single flag that is forwarded to the agent, so no caller can
+    // obtain the quieter consent without also giving up every means of control.
+    function applyViewOnlyConsent(command, options) {
+        if ((options == null) || (options.desktopViewOnly !== true)) return;
+        // The multiplexor enforces the browser's view-only restriction per viewer;
+        // its shared agent stream must retain normal consent and control rights.
+        if (parent.parent.config.settings.desktopmultiplex === true || domain.desktopmultiplex === true) return;
+        command.desktopviewonly = true;
+        if (domain.desktopviewonlynoprompt === true) { command.consent &= ~8; }
+    }
+
     // Route a command to a target node
     function routeCommandToNode(command, requiredRights, requiredNonRights, func, options) {
         if (common.validateString(command.nodeid, 8, 128) == false) { if (func) { func(false); } return false; }
@@ -310,6 +328,7 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                                 }
                             }
                         }
+                        applyViewOnlyConsent(command, options);
 
                         command.username = user.name;       // Add user name
                         command.realname = user.realname;   // Add real name
@@ -350,6 +369,7 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                                     }
                                 }
                             }
+                            applyViewOnlyConsent(command, options);
 
                             command.username = user.name;           // Add user name
                             command.realname = user.realname;       // Add real name
@@ -626,6 +646,10 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                 }
             }
             if (typeof domain.userconsentflags == 'number') { serverinfo.consent = domain.userconsentflags; }
+            // SCP-Remote: the pages that show picture-only tiles tell the operator what the
+            // watched computer will see. Without this they would read the flags above and
+            // promise a permission box that these connections no longer raise.
+            if (domain.desktopviewonlynoprompt === true && parent.parent.config.settings.desktopmultiplex !== true && domain.desktopmultiplex !== true) { serverinfo.desktopviewonlynoprompt = true; }
             if ((typeof domain.usersessionidletimeout == 'number') && (domain.usersessionidletimeout > 0)) {serverinfo.timeout = (domain.usersessionidletimeout * 60 * 1000); }
             if (typeof domain.logoutonidlesessiontimeout == 'boolean') {
                 serverinfo.logoutonidlesessiontimeout = domain.logoutonidlesessiontimeout;
@@ -1040,6 +1064,14 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                         // If we are using the desktop multiplexor, remove the VIEWONLY limitation. The multiplexor will take care of enforcing that limitation when needed.
                         if (((parent.parent.config.settings.desktopmultiplex === true) || (domain.desktopmultiplex === true)) && (url.searchParams.get('p') == '2')) { routingOptions = { removeViewOnlyLimitation: true }; }
 
+                        // The browser can ask for a desktop tunnel that only ever shows a
+                        // picture. Carry that to the agent, which enforces it. See
+                        // applyViewOnlyConsent for what it changes and why.
+                        if ((url.searchParams.get('p') == '2') && (command.viewonly === true)) {
+                            if (routingOptions == null) { routingOptions = {}; }
+                            routingOptions.desktopViewOnly = true;
+                        }
+
                         // Add server TLS cert hash
                         var tlsCertHash = null;
                         if ((parent.parent.args.ignoreagenthashcheck == null) || (parent.parent.args.ignoreagenthashcheck === false)) { // TODO: If ignoreagenthashcheck is an array of IP addresses, not sure how to handle this.
@@ -1058,6 +1090,9 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                             if (typeof domain.agentcustomization.foregroundcolor == 'string') { command.soptions.consentForeground = domain.agentcustomization.foregroundcolor; }
                         }
                         if (typeof domain.consentmessages == 'object') {
+                            command.soptions.consentLanguage = domain.consentmessages.language === 'en' ? 'en' : 'th';
+                            if (typeof domain.consentmessages.backgroundcolor == 'string') { command.soptions.consentBackground = domain.consentmessages.backgroundcolor; }
+                            if (typeof domain.consentmessages.foregroundcolor == 'string') { command.soptions.consentForeground = domain.consentmessages.foregroundcolor; }
                             if (typeof domain.consentmessages.title == 'string') { command.soptions.consentTitle = domain.consentmessages.title; }
                             if (typeof domain.consentmessages.desktop == 'string') { command.soptions.consentMsgDesktop = domain.consentmessages.desktop; }
                             if (typeof domain.consentmessages.terminal == 'string') { command.soptions.consentMsgTerminal = domain.consentmessages.terminal; }

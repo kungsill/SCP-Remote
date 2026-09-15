@@ -2102,10 +2102,14 @@
               }
             }
           },
+          "desktopViewOnlyNoPrompt": { "type": "boolean", "default": false, "description": "SCP-Remote: skip only the desktop prompt on an agent-enforced picture-only tunnel. Notifications and privacy bar remain governed by consent flags. Shared desktop streams retain their prompt policy." },
           "consentMessages": {
             "type": "object",
             "description": "This section is used to customize user consent prompts, these show up when asking if a remote session is allowed or not.",
             "properties": {
+              "Language": { "type": "string", "enum": ["th", "en"], "default": "th", "description": "SCP-Remote native consent button language. Custom message strings are configured separately below." },
+              "BackgroundColor": { "type": "string", "description": "SCP-Remote consent window background in #RRGGBB or R,G,B format." },
+              "ForegroundColor": { "type": "string", "description": "SCP-Remote consent window text in #RRGGBB or R,G,B format." },
               "Title": {
                 "type": "string",
                 "description": "Title of the consent message."

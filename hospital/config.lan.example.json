@@ -33,11 +33,18 @@
         "desktopprompt": true,
         "terminalprompt": true,
         "fileprompt": true,
-        "desktopprivacybar": true
+        "desktopprivacybar": false
       },
+      "desktopViewOnlyNoPrompt": true,
       "consentMessages": {
-        "Title": "SCP-Remote",
-        "autoAcceptOnTimeout": false
+        "Title": "SCP-Remote · ขออนุญาตเข้าถึงเครื่อง",
+        "autoAcceptOnTimeout": false,
+        "Language": "th",
+        "BackgroundColor": "#F7F8FC",
+        "ForegroundColor": "#213547",
+        "Desktop": "{0} ขอดูหน้าจอและควบคุมเครื่องนี้\nสามารถใช้เมาส์และคีย์บอร์ดเพื่อช่วยแก้ปัญหา\nคุณต้องการอนุญาตหรือไม่?",
+        "Terminal": "{0} ขอใช้หน้าต่างคำสั่งบนเครื่องนี้\nสามารถเรียกใช้คำสั่งและแก้ไขระบบได้\nคุณต้องการอนุญาตหรือไม่?",
+        "Files": "{0} ขอจัดการไฟล์บนเครื่องนี้\nสามารถดู ดาวน์โหลด อัปโหลด และลบไฟล์ได้\nคุณต้องการอนุญาตหรือไม่?"
       },
       "footer": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล",
       "loginfooter": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล"

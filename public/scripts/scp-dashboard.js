@@ -228,6 +228,10 @@
     // server's own consent flags, so this sentence stays true if the policy changes.
     function consentNote() {
         var flags = (window.serverinfo && typeof window.serverinfo.consent === 'number') ? window.serverinfo.consent : 0;
+        // These tiles are picture-only connections. When the server lets those through
+        // without the permission box, saying otherwise here would promise a box that
+        // never appears, so drop it before describing what happens.
+        if (window.serverinfo && (window.serverinfo.desktopviewonlynoprompt === true)) { flags &= ~8; }
         // More than one of these can be set at once, and each is a separate thing the
         // person at that computer sees, so say all of them rather than only the first.
         var parts = [];
@@ -306,6 +310,7 @@
     function connectTile(entry, node) {
         var desk = window.CreateAgentRedirect(window.meshserver, window.CreateAgentRemoteDesktop(entry.canvas),
             window.serverPublicNamePort, window.authCookie, window.authRelayCookie, window.domainUrl);
+        desk.viewonly = true; // a tile shows a picture and nothing else
         desk.m.ImageType = liveSettings.encoding;
         desk.m.CompressionLevel = liveSettings.quality;
         desk.m.ScalingLevel = liveSettings.scaling;

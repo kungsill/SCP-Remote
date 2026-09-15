@@ -4393,11 +4393,22 @@ function tunnel_webrtc_OnFinalized()
 function onTunnelControlData(data, ws) {
     var obj;
     if (ws == null) { ws = this; }
+    if (ws.httprequest && ws.httprequest.desktopviewonly === true && Buffer.isBuffer(data)) {
+        if (ws.httprequest.protocol === 2 && require('scp-viewonly').isDisplayPacket(data) && ws.httprequest.desktop && ws.httprequest.desktop.kvm) {
+            ws.httprequest.desktop.kvm.write(data);
+        }
+        return;
+    }
     if (typeof data == 'string') { try { obj = JSON.parse(data); } catch (ex) { sendConsoleText('Invalid control JSON: ' + data); return; } }
     else if (typeof data == 'object') { obj = data; } else { return; }
     //sendConsoleText('onTunnelControlData(' + ws.httprequest.protocol + '): ' + JSON.stringify(data));
     //console.log('onTunnelControlData: ' + JSON.stringify(data));
 
+    if (obj == null) return;
+    if (ws.httprequest && ws.httprequest.desktopviewonly === true) {
+        if (obj.type === 'lock' || obj.type === 'autolock' || obj.type === 'offer') return;
+        if (obj.type === 'options') delete obj.autolock;
+    }
     switch (obj.type) {
         case 'lock': {
             // Look for a TSID

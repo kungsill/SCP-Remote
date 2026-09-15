@@ -14,6 +14,8 @@ function setup(t, options = {}) {
         '<html lang="' + lang + '"><body><div id=page_leftbar><div id=LeftMenuMyDevices class=lbbutton></div></div><div id=p1></div></body></html>',
         { url: 'https://hospital.example/', runScripts: 'outside-only' });
     const w = dom.window;
+    // jsdom has no bitmap renderer; captures are exercised using an explicit image stub.
+    w.HTMLCanvasElement.prototype.toDataURL = () => 'data:image/jpeg;base64,dGVzdA==';
     const connections = [];
 
     w.alert = () => {};
@@ -265,4 +267,23 @@ test('with both a prompt and a bar set, the page mentions both', (t) => {
     const hint = w.document.querySelector('.scp-dash-live-hint').textContent;
     assert.ok(hint.indexOf('อนุญาต') >= 0, 'it should say the computer asks first');
     assert.ok(hint.indexOf('แถบ') >= 0, 'it should also say a bar stays on that screen');
+});
+
+test('every tile connection is opened as picture-only', (t) => {
+    const { connections, api } = setup(t);
+    api.show();
+    api.setLive(true);
+    assert.ok(connections.length > 0);
+    connections.forEach(c => assert.equal(c.viewonly, true, 'the agent must be told to refuse input on this'));
+});
+
+test('the hint drops the box when the server lets picture-only connections through', (t) => {
+    const { w, api } = setup(t, { consent: 1 | 8 | 64 });
+    w.serverinfo.desktopviewonlynoprompt = true;
+    api.show();
+    api.setLive(true);
+    const hint = w.document.querySelector('.scp-dash-live-hint').textContent;
+    assert.equal(hint.indexOf('อนุญาต'), -1, 'it must not promise a box that will never appear here');
+    assert.ok(hint.indexOf('แจ้งเตือน') >= 0, 'the person is still told it started');
+    assert.ok(hint.indexOf('แถบ') >= 0, 'and the bar still stays on their screen');
 });

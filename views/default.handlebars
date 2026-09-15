@@ -5571,6 +5571,7 @@
                 } else if (contype == 1) {
                     // Setup the Mesh Agent remote desktop
                     desk = CreateAgentRedirect(meshserver, CreateAgentRemoteDesktop('kvmid_' + shortid), serverPublicNamePort, authCookie, authRelayCookie, domainUrl);
+                    desk.viewonly = true; // SCP-Remote: these tiles never send input, so say so
                     desk.m.UseExtendedKeyFlag = (node.agent.id < 5); // Only use extended keys on Windows agents for now
                     desk.m.mouseCursorActive(xxcurrentView == 11);
                     desk.shortid = shortid;

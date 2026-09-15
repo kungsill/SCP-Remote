@@ -21,6 +21,7 @@ var CreateAgentRedirect = function (meshserver, module, serverPublicNamePort, au
     obj.protocol = module.protocol; // 1 = SOL, 2 = KVM, 3 = IDER, 4 = Files, 5 = FileTransfer
     obj.onStateChanged = null;
     obj.ctrlMsgAllowed = true;
+    obj.viewonly = false; // SCP-Remote: ask for a tunnel that can only show a picture
     obj.attemptWebRTC = false;
     obj.webRtcActive = false;
     obj.webrtcconfig = null;
@@ -60,6 +61,7 @@ var CreateAgentRedirect = function (meshserver, module, serverPublicNamePort, au
         var url2, url = window.location.protocol.replace('http', 'ws') + '//' + window.location.host + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) + '/' + obj.urlname + '?browser=1&p=' + obj.protocol + (nodeid?('&nodeid=' + nodeid):'') + '&id=' + obj.tunnelid;
         //if (serverPublicNamePort) { url2 = window.location.protocol.replace('http', 'ws') + '//' + serverPublicNamePort + '/meshrelay.ashx?id=' + obj.tunnelid; } else { url2 = url; }
         if ((authCookie != null) && (authCookie != '')) { url += '&auth=' + authCookie; }
+        if (obj.protocol === 2 && obj.viewonly === true) { url += '&viewonly=1'; }
         if ((urlargs != null) && (urlargs.slowrelay != null)) { url += '&slowrelay=' + urlargs.slowrelay; }
         obj.nodeid = nodeid;
         obj.connectstate = 0;
@@ -74,7 +76,11 @@ var CreateAgentRedirect = function (meshserver, module, serverPublicNamePort, au
         if (obj.meshserver != null) {
             var rurl = '*' + domainUrl + 'meshrelay.ashx?p=' + obj.protocol + '&nodeid=' + nodeid + '&id=' + obj.tunnelid;
             if ((rauthCookie != null) && (rauthCookie != '')) { rurl += ('&rauth=' + rauthCookie); }
-            obj.meshserver.send({ action: 'msg', type: 'tunnel', nodeid: obj.nodeid, value: rurl, usage: obj.protocol });
+            var tunnelRequest = { action: 'msg', type: 'tunnel', nodeid: obj.nodeid, value: rurl, usage: obj.protocol };
+            // SCP-Remote: say so when this connection is only ever going to show a
+            // picture, so the agent refuses input on it rather than trusting us to.
+            if (obj.viewonly === true) { tunnelRequest.viewonly = true; }
+            obj.meshserver.send(tunnelRequest);
             //obj.debug('Agent Redir Start: ' + url);
         }
     }

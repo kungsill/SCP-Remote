@@ -141,24 +141,59 @@ namespace ScpRemoteSetup
         }
 
         // Out of the files given, the one this computer can run, best architecture first.
+        static readonly byte[] MeshPolicyGuid = { 0xB9, 0x96, 0x01, 0x58, 0x80, 0x54, 0x4A, 0x19, 0xB7, 0xF7, 0xE9, 0xBE, 0x44, 0x91, 0x4C, 0x19 };
+        static readonly byte[] JavaScriptGuid = { 0xB9, 0x96, 0x01, 0x58, 0x80, 0x54, 0x4A, 0x19, 0xB7, 0xF7, 0xE9, 0xBE, 0x44, 0x91, 0x4C, 0x18 };
+
+        // Only ever run a file that is genuinely one of our agents, identified by the
+        // settings block the server appends to every download: its length, its marker, and
+        // the server address inside it. This used to accept any program sitting in the same
+        // folder whose architecture matched, and then start it with administrator rights —
+        // so leaving the setup beside an AnyDesk download ran AnyDesk's installer instead.
+        public static bool IsOurAgent(string path)
+        {
+            try
+            {
+                using (FileStream stream = File.OpenRead(path))
+                {
+                    if (stream.Length < 1024) return false;
+                    byte[] tail = new byte[20];
+                    stream.Seek(-20, SeekOrigin.End);
+                    if (stream.Read(tail, 0, 20) != 20) return false;
+                    byte[] marker = new byte[16];
+                    Array.Copy(tail, 4, marker, 0, 16);
+                    if (!SameBytes(marker, MeshPolicyGuid) && !SameBytes(marker, JavaScriptGuid)) return false;
+                    long length = ((long)tail[0] << 24) | ((long)tail[1] << 16) | ((long)tail[2] << 8) | tail[3];
+                    if ((length <= 0) || (length > stream.Length - 20)) return false;
+                    int read = (int)Math.Min(length, 8192L);
+                    byte[] settings = new byte[read];
+                    stream.Seek(-20 - length, SeekOrigin.End);
+                    if (stream.Read(settings, 0, read) != read) return false;
+                    string text = Encoding.UTF8.GetString(settings);
+                    return (text.IndexOf("MeshServer=", StringComparison.OrdinalIgnoreCase) >= 0)
+                        || (text.IndexOf("MeshID=", StringComparison.OrdinalIgnoreCase) >= 0);
+                }
+            }
+            catch { return false; }
+        }
+
+        static bool SameBytes(byte[] a, byte[] b)
+        {
+            if ((a == null) || (b == null) || (a.Length != b.Length)) return false;
+            for (int i = 0; i < a.Length; i++) { if (a[i] != b[i]) return false; }
+            return true;
+        }
+
         static string PickForThisMachine(List<string> candidates)
         {
-            // Prefer files that look like an agent, but keep the rest as a fallback so a
-            // renamed download still works.
-            List<string> ordered = new List<string>();
+            // Everything that is not one of our agents is discarded here, not ranked lower.
+            List<string> agents = new List<string>();
             foreach (string file in candidates)
             {
-                string name = Path.GetFileName(file);
-                if ((name.IndexOf("agent", StringComparison.OrdinalIgnoreCase) >= 0) ||
-                    (name.IndexOf("scpremote", StringComparison.OrdinalIgnoreCase) >= 0)) ordered.Add(file);
-            }
-            foreach (string file in candidates)
-            {
-                if (!ordered.Contains(file)) ordered.Add(file);
+                if (IsOurAgent(file)) agents.Add(file);
             }
             foreach (ushort machine in PreferredMachines())
             {
-                foreach (string file in ordered)
+                foreach (string file in agents)
                 {
                     if (ReadMachineType(file) == machine) return file;
                 }
@@ -279,6 +314,7 @@ namespace ScpRemoteSetup
             foreach (string file in Directory.GetFiles(dir, "*.exe"))
             {
                 if (string.Equals(Path.GetFullPath(file), self, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!IsOurAgent(file)) continue; // another program in the folder is not our business
                 ushort machine = ReadMachineType(file);
                 if (machine == MachineX86 || machine == MachineX64 || machine == MachineArm64) return true;
             }

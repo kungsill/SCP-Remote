@@ -98,6 +98,127 @@
         node('scpTransferFiles').onclick = filePage; busy(false);
         node('scpTransferText').focus();
     }
+
+    /* Dropping a file on the remote screen showed a green marker and then did nothing
+       at all unless it was a script or a text file. A PDF, a photo, a zip — gone without
+       a word, which reads as "sent" to whoever dropped it. These now go to that
+       computer through the file page, which is where the permission for files belongs. */
+    var typesTheDesktopHandles = /\.(bat|ps1|sh|agentconsole|txt)$/i;
+    var toastTimer = null;
+
+    function toast(message, isError) {
+        var box = node('scpTransferToast');
+        if (!message) { if (box && box.parentElement) { box.parentElement.removeChild(box); } return; }
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'scpTransferToast';
+            box.className = 'scp-toast';
+            document.body.appendChild(box);
+        }
+        box.textContent = message;
+        box.dataset.error = isError ? 'true' : 'false';
+        if (toastTimer) { clearTimeout(toastTimer); }
+        toastTimer = setTimeout(function () { toast(''); toastTimer = null; }, isError ? 12000 : 6000);
+    }
+
+    function bytes(value) {
+        if (value >= 1073741824) { return (value / 1073741824).toFixed(1) + ' GB'; }
+        if (value >= 1048576) { return (value / 1048576).toFixed(1) + ' MB'; }
+        if (value >= 1024) { return Math.round(value / 1024) + ' KB'; }
+        return value + ' B';
+    }
+
+    // The upload dialog shows a bar and a file name but no number, so a large file that
+    // is moving looks the same as one that has stalled. Add the percentage, the bytes and
+    // which file of how many, alongside the dialog rather than inside its code.
+    function watchUploadProgress() {
+        if (watchUploadProgress.timer) { return; }
+        watchUploadProgress.timer = setInterval(function () {
+            var bar = node('d2progressBar'), label = node('p13dfileName');
+            if (!bar || !label) {
+                clearInterval(watchUploadProgress.timer);
+                watchUploadProgress.timer = null;
+                return;
+            }
+            var line = node('scpUploadPercent');
+            if (!line) {
+                line = document.createElement('div');
+                line.id = 'scpUploadPercent';
+                line.className = 'scp-upload-percent';
+                bar.parentElement.insertBefore(line, bar.nextSibling);
+            }
+            var max = Number(bar.max) || 0, value = Number(bar.value) || 0;
+            var parts = [(max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0) + '%'];
+            if (max > 0) { parts.push(bytes(value) + ' / ' + bytes(max)); }
+            var queue = window.uploadFile;
+            if (queue && queue.xfiles && (queue.xfiles.length > 1)) {
+                parts.push(t('file ', 'ไฟล์ที่ ') + Math.max(1, (queue.xfilePtr | 0) + 1) + t(' of ', ' จาก ') + queue.xfiles.length);
+            }
+            line.textContent = parts.join('   ·   ');
+        }, 200);
+    }
+
+    function sendDroppedFiles(files) {
+        var device = window.currentNode;
+        if (!device) { return; }
+        var target = device._id;
+        toast(t('Received ', 'รับไฟล์ ') + files.length + t(' file(s). Opening the file page…', ' รายการแล้ว กำลังเปิดหน้ารับส่งไฟล์…'));
+        if (typeof window.gotoDevice === 'function') { window.gotoDevice(target, 13); }
+
+        // The file page has its own connection and the person at that computer has to
+        // allow it, so wait for the folder listing rather than assuming it is there.
+        var waited = 0, pressedConnect = false;
+        var timer = setInterval(function () {
+            waited += 400;
+            if (!window.currentNode || (window.currentNode._id !== target)) {
+                clearInterval(timer);
+                toast(t('Stopped: the page moved to another computer.', 'หยุดส่ง เพราะเปลี่ยนไปเครื่องอื่นแล้ว'), true);
+                return;
+            }
+            if (window.p13filetree != null) {
+                clearInterval(timer);
+                if (window.xxdialogMode) {
+                    toast(t('Close the open window first, then drop the files again.', 'ปิดหน้าต่างที่เปิดอยู่ก่อน แล้วลากไฟล์มาวางใหม่'), true);
+                    return;
+                }
+                toast('');
+                window.p13doUploadFiles(files);
+                watchUploadProgress();
+                return;
+            }
+            if (!pressedConnect) {
+                // The page hides this button once connected, by setting display:none.
+                // Checking that rather than the rendered box keeps this testable.
+                var connect = node('p13Connect');
+                if (connect && !connect.hidden && (connect.style.display !== 'none') && !connect.disabled) {
+                    connect.click();
+                    pressedConnect = true;
+                    toast(t('Asking that computer to allow file access…', 'กำลังขออนุญาตเข้าถึงไฟล์จากเครื่องปลายทาง…'));
+                }
+            }
+            if (waited >= 90000) {
+                clearInterval(timer);
+                toast(t('No answer from that computer. Press Connect on the file page, then drop the files again.', 'เครื่องปลายทางยังไม่ตอบ กดเชื่อมต่อในหน้ารับส่งไฟล์ แล้วลากไฟล์มาวางใหม่'), true);
+            }
+        }, 400);
+    }
+
+    function desktopDrop(event) {
+        if (!event.dataTransfer || !event.dataTransfer.files || (event.dataTransfer.files.length === 0)) { return; }
+        var dropped = Array.prototype.slice.call(event.dataTransfer.files).filter(function (file) { return file && (file.size > 0); });
+        // Scripts and text files already do something useful here; leave those alone.
+        var forUpload = dropped.filter(function (file) { return !typesTheDesktopHandles.test(file.name); });
+        if (forUpload.length === 0) { return; }
+        event.preventDefault();
+        event.stopPropagation();
+        if (!window.currentNode) { return; }
+        if (!window.desktop || (window.desktop.State !== 3)) {
+            toast(t('Connect to this computer first.', 'เชื่อมต่อหน้าจอเครื่องนี้ก่อน'), true);
+            return;
+        }
+        sendDroppedFiles(forUpload);
+    }
+
     function init() {
         var clip = node('DeskClip');
         if (clip) {
@@ -115,7 +236,17 @@
             panel.insertBefore(help, panel.firstChild);
         }
         [['p13UploadButton', t('Upload → remote', 'อัปโหลด → เครื่องรีโมต')], ['p13DownloadButton', t('Download → this computer', 'ดาวน์โหลด → เครื่องเรา')]].forEach(function (item) { var button = node(item[0]); if (button) { button.value = item[1]; button.title = item[1]; } });
+
+        // Take dropped files that the remote screen would otherwise swallow. The page's
+        // own handler stays in place and still deals with scripts and text files.
+        var screen = node('deskarea0');
+        if (screen) { screen.addEventListener('drop', desktopDrop, false); }
+        // Uploads started any other way get the percentage too.
+        ['p13UploadButton', 'p13filetable'].forEach(function (id) {
+            var item = node(id);
+            if (item) { item.addEventListener(id === 'p13filetable' ? 'drop' : 'click', function () { setTimeout(watchUploadProgress, 300); }, false); }
+        });
     }
-    window.ScpTransfer = { handle: handle, show: show, filePage: filePage };
+    window.ScpTransfer = { handle: handle, show: show, filePage: filePage, desktopDrop: desktopDrop, watchUploadProgress: watchUploadProgress };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

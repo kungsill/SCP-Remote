@@ -10,3 +10,11 @@
 .scp-transfer #scpTransferStatus[data-error="true"] { color: #bf3945; }
 .scp-transfer-file-help { margin: 8px 0; padding: 12px 14px; background: var(--scp-surface,#fff); color: var(--scp-muted,#536879); border: 1px solid var(--scp-line,#dce5ed); border-radius: 9px; font: 13px/1.6 Sarabun,sans-serif; }
 .scp-transfer :focus-visible { outline: 3px solid #32aeb4; outline-offset: 2px; }
+
+/* A short message that does not steal focus, so dropping files says something even
+   while the file page is still asking the far end for permission. */
+.scp-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 2000; max-width: min(560px, 92vw); padding: 11px 18px; border-radius: 10px; border: 1px solid var(--scp-line, #d5dde5); background: var(--scp-surface, #fff); color: var(--scp-ink, #213547); font-size: 13px; line-height: 1.5; box-shadow: 0 8px 28px rgba(16, 32, 48, .18); }
+.scp-toast[data-error="true"] { border-color: #c0392b66; color: #a93226; background: #fdf3f2; }
+
+/* The number the upload dialog never showed. */
+.scp-upload-percent { margin-top: 6px; font-size: 12px; color: var(--scp-muted, #64748b); font-variant-numeric: tabular-nums; }

@@ -104,3 +104,25 @@
 
 /* What the computer is made of, under its name and quieter than it. */
 .scp-dash-specs { color: var(--scp-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* Which computer each department leans on hardest. A bar as well as a figure, because
+   the comparison between departments is the point and a column of numbers hides it. */
+.scp-dash-rank { border: 1px solid var(--scp-line); border-radius: 12px; background: var(--scp-surface);
+  box-shadow: var(--scp-shadow); padding: 16px 18px; margin-bottom: 26px; }
+.scp-dash-rank-head { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 13px; }
+.scp-dash-rank-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.scp-dash-rank-note { flex: 1 1 260px; font-size: 11.5px; line-height: 1.5; color: var(--scp-muted); }
+.scp-dash-rank-rows { display: flex; flex-direction: column; gap: 9px; }
+.scp-dash-rank-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) 104px minmax(0, 1.3fr);
+  gap: 12px; align-items: center; font-size: 12.5px; }
+.scp-dash-rank-room { color: var(--scp-muted); overflow-wrap: anywhere; }
+.scp-dash-rank-name { font-weight: 600; overflow-wrap: anywhere; }
+.scp-dash-rank-hours { font-variant-numeric: tabular-nums; text-align: right; color: var(--scp-muted); }
+.scp-dash-rank-hours em { font-style: normal; color: var(--scp-accent); }
+.scp-dash-rank-bar { height: 7px; border-radius: 4px; background: var(--scp-soft); overflow: hidden; }
+.scp-dash-rank-bar span { display: block; height: 100%; background: var(--scp-accent); border-radius: 4px; }
+@media (max-width: 760px) {
+  .scp-dash-rank-row { grid-template-columns: 1fr auto; gap: 3px 10px; }
+  .scp-dash-rank-hours { text-align: right; }
+  .scp-dash-rank-bar { grid-column: 1 / -1; }
+}

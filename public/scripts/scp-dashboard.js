@@ -57,6 +57,15 @@
         exportCsv: ['Export inventory', 'ออกรายการครุภัณฑ์'],
         exportNone: ['No specifications have been read yet. Open the page for a moment and try again.', 'ยังไม่ได้อ่านสเปกเครื่องเลย เปิดหน้านี้ทิ้งไว้สักครู่แล้วลองใหม่'],
         exportDone: ['Saved {0} computers.', 'บันทึกแล้ว {0} เครื่อง'],
+        mostUsed: ['Powered on longest, by department', 'เปิดใช้งานนานที่สุด แยกตามหน่วยงาน'],
+        hoursTotal: ['{0} hrs on', 'เปิดอยู่ {0} ชม.'],
+        rankingNote: ['Total hours each computer was powered on over the last {0} days. {1} are left out — those computers are left on around the clock on purpose.', 'รวมเวลาที่เครื่องเปิดอยู่ ย้อนหลัง {0} วัน ไม่นับ {1} เพราะตั้งใจเปิดทิ้งไว้ตลอดอยู่แล้ว'],
+        rankingThin: ['only {0} days of history so far', 'เพิ่งมีประวัติ {0} วัน ยังเทียบไม่เต็มที่'],
+        rankingYoung: ['less than a day of history', 'เพิ่งมีประวัติไม่ถึงวัน'],
+        rankingWait: ['Reading usage history…', 'กำลังอ่านประวัติการใช้งาน…'],
+        rankingNone: ['No usage history yet. It builds up as the computers stay connected.', 'ยังไม่มีประวัติการใช้งาน ข้อมูลจะสะสมขึ้นเองเมื่อเครื่องเชื่อมต่ออยู่'],
+        awayDays: ['Not seen for {0} days', 'ไม่ติดต่อมา {0} วัน'],
+        awayNever: ['Never connected since it was added', 'ไม่เคยเชื่อมต่อเลยตั้งแต่เพิ่มเข้ามา'],
         pickRooms: ['Show', 'เลือกดู'],
         everyRoom: ['Everywhere', 'ทุกที่'],
         roomHidden: ['Not selected', 'ไม่ได้เลือก'],
@@ -137,6 +146,17 @@
        Asked for once per computer per visit and kept here; nothing is collected that
        the server does not already hold. */
     var specs = {}, specsAsked = {}, listening = false, searchText = '';
+
+    /* How long each computer has been powered on, and when each was last heard from.
+       Both come from what the server already recorded; nothing extra is asked of the
+       computers themselves. */
+    var timelines = {}, timelinesAsked = {}, lastSeen = null, lastSeenAsked = false;
+
+    /* Departments left out of the ranking. Their computers are left running around the
+       clock on purpose, so hours powered on says nothing useful about them and they
+       would win every day. */
+    var departmentsNotRanked = ['ทดสอบ', 'ห้องสารสนเทศ'];
+    var rankingDays = 7, awayWarnDays = 7;
     var diskWarnPercent = 15, diskCriticalPercent = 8;
     var liveLimit = 12;
     var liveSettings = { encoding: 4, quality: 40, scaling: 384, framerate: 1000 };
@@ -198,6 +218,9 @@
             if (disk.percent <= diskCriticalPercent) { found.push({ level: 'high', text: format(t('diskFull'), disk.letter, disk.percent) }); }
             else if (disk.percent <= diskWarnPercent) { found.push({ level: 'warn', text: format(t('diskLow'), disk.letter, disk.percent) }); }
         });
+        var away = daysAway(node);
+        if (away === -1) { found.push({ level: 'warn', text: t('awayNever') }); }
+        else if ((away != null) && (away >= awayWarnDays)) { found.push({ level: 'warn', text: format(t('awayDays'), away) }); }
         var record = specs[node._id];
         if (record && record.pendingReboot) { found.push({ level: 'warn', text: t('rebootPending') }); }
         var scan = scanState[node._id];
@@ -260,6 +283,64 @@
             bar.appendChild(chip);
         });
         return bar;
+    }
+
+    // One line per department, naming the computer that has been powered on longest.
+    // Departments that run their computers overnight on purpose are left out rather than
+    // allowed to win every day.
+    function usageRanking(rooms, shownRooms) {
+        var panelEl = element('section', 'scp-dash-rank');
+        var head = element('div', 'scp-dash-rank-head');
+        head.appendChild(element('h3', '', t('mostUsed')));
+        head.appendChild(element('span', 'scp-dash-rank-note',
+            format(t('rankingNote'), rankingDays, departmentsNotRanked.join(' · '))));
+        panelEl.appendChild(head);
+
+        var rows = element('div', 'scp-dash-rank-rows'), drawn = 0, best = 0;
+        var ranked = shownRooms.filter(function (room) { return departmentsNotRanked.indexOf(room) < 0; })
+            .map(function (room) {
+                var top = null;
+                (rooms[room] || []).filter(matchesSearch).forEach(function (node) {
+                    var use = usageOf(node);
+                    if (use && (!top || (use.hours > top.use.hours))) { top = { node: node, use: use }; }
+                });
+                return top ? { room: room, node: top.node, use: top.use } : null;
+            }).filter(Boolean);
+
+        // Bars are drawn against the busiest computer on show, not against 24 hours, so
+        // that the difference between departments is what the eye picks up.
+        ranked.forEach(function (entry) { if (entry.use.hours > best) { best = entry.use.hours; } });
+        ranked.sort(function (a, b) { return b.use.hours - a.use.hours; });
+
+        ranked.forEach(function (entry) {
+            drawn++;
+            var row = element('div', 'scp-dash-rank-row');
+            row.appendChild(element('span', 'scp-dash-rank-room', entry.room));
+            row.appendChild(element('span', 'scp-dash-rank-name', entry.node.name || ''));
+            var hours = element('span', 'scp-dash-rank-hours', format(t('hoursTotal'), entry.use.hours.toFixed(1)));
+            // Say so when a total rests on less history than a full window, so a computer
+            // that was only added this week is not read as an idle one.
+            if (entry.use.days < (rankingDays - 0.5)) {
+                hours.title = (entry.use.days < 1)
+                    ? t('rankingYoung')
+                    : format(t('rankingThin'), Math.round(entry.use.days));
+                hours.appendChild(element('em', '', ' *'));
+            }
+            row.appendChild(hours);
+            var bar = element('div', 'scp-dash-rank-bar');
+            var fill = element('span', '');
+            fill.style.width = (best > 0 ? Math.max(3, Math.round((entry.use.hours / best) * 100)) : 0) + '%';
+            bar.appendChild(fill);
+            row.appendChild(bar);
+            rows.appendChild(row);
+        });
+
+        if (!drawn) {
+            var answered = Object.keys(timelines).length > 0;
+            rows.appendChild(element('div', 'scp-dash-note', t(answered ? 'rankingNone' : 'rankingWait')));
+        }
+        panelEl.appendChild(rows);
+        return panelEl;
     }
 
     function stat(label, value, tone) {
@@ -331,6 +412,19 @@
                 if (message && (message.action === 'getsysinfo') && message.nodeid) {
                     specs[message.nodeid] = (message.hardware || message.noinfo) ? message : null;
                     render();
+                } else if (message && (message.action === 'powertimeline') && message.nodeid) {
+                    timelines[message.nodeid] = message.timeline || [];
+                    render();
+                } else if (message && (message.action === 'lastconnects') && message.lastconnects) {
+                    // Keyed by node, each a moment in milliseconds.
+                    var seen = message.lastconnects, kept = {};
+                    Object.keys(seen).forEach(function (nodeid) {
+                        var when = Number(seen[nodeid]);
+                        if (!isFinite(when) || (when <= 0)) { when = Date.parse(seen[nodeid]); }
+                        if (isFinite(when) && (when > 0)) { kept[nodeid] = when; }
+                    });
+                    lastSeen = kept;
+                    render();
                 }
             } catch (error) { /* never let our own bookkeeping break the page */ }
             if (typeof original === 'function') { return original.apply(this, arguments); }
@@ -341,6 +435,87 @@
         if (specsAsked[node._id] || !window.meshserver) return;
         specsAsked[node._id] = true;
         try { window.meshserver.send({ action: 'getsysinfo', nodeid: node._id }); } catch (error) { specsAsked[node._id] = false; }
+    }
+
+    function askForTimeline(node) {
+        if (timelinesAsked[node._id] || !window.meshserver) return;
+        timelinesAsked[node._id] = true;
+        try { window.meshserver.send({ action: 'powertimeline', nodeid: node._id }); }
+        catch (error) { timelinesAsked[node._id] = false; }
+    }
+
+    function askForLastSeen() {
+        if (lastSeenAsked || !window.meshserver) return;
+        lastSeenAsked = true;
+        try { window.meshserver.send({ action: 'lastconnects' }); } catch (error) { lastSeenAsked = false; }
+    }
+
+    function overlap(fromA, toA, fromB, toB) {
+        var start = Math.max(fromA, fromB), end = Math.min(toA, toB);
+        return (end > start) ? (end - start) : 0;
+    }
+
+    /* Every moment in a real history is written in seconds. When the server has no power
+       records for a computer at all it falls back to the state it sees right now and writes
+       that moment in milliseconds instead. A number that large is therefore the server
+       saying "nothing recorded", not a history to read — and reading it as seconds would
+       put the machine tens of thousands of years in the future. */
+    function historyStart(timeline) {
+        var value = Number(timeline[1]);
+        if (!isFinite(value) || (value <= 0) || (value > 1e11)) return null;
+        return value * 1000;
+    }
+
+    /* The history arrives packed tight: the state before the first event, the time of
+       that event, the state after it, then pairs of how long a state lasted and what it
+       changed to. Walk it and add up the time spent powered on since the given moment.
+       Power state 1 is on; sleep and hibernate do not count, which is right — a sleeping
+       computer is not in use. */
+    function hoursPoweredOn(timeline, sinceMs) {
+        if (!timeline || (timeline.length < 3)) return null;
+        var at = historyStart(timeline);
+        if (at == null) return null;
+        var now = Date.now(), state = timeline[2], on = 0;
+        for (var i = 3; (i + 1) < timeline.length; i += 2) {
+            var next = at + (Number(timeline[i]) * 1000);
+            if (state === 1) { on += overlap(at, next, sinceMs, now); }
+            at = next;
+            state = timeline[i + 1];
+        }
+        if (state === 1) { on += overlap(at, now, sinceMs, now); }
+        return on / 3600000;
+    }
+
+    /* Total hours powered on within the window — a fact about what was observed, not a
+       rate. The distinction matters: dividing by the days of history we happen to have
+       turns half a day of watching a machine that was on the whole time into "24 hours
+       a day", which is an artifact of when we started looking, not a finding. A total
+       cannot lie that way. A computer added this week simply has fewer hours behind it
+       and says so, and it catches up on its own as the history fills in. */
+    function usageOf(node) {
+        var timeline = timelines[node._id];
+        if (!timeline || (timeline.length < 3)) return null;
+        var known = historyStart(timeline);
+        if (known == null) return null;
+        var now = Date.now();
+        var from = Math.max(now - (rankingDays * 86400000), known);
+        var days = (now - from) / 86400000;
+        // A window of no width means the server had no records and answered with the state
+        // it happens to see right now. There is nothing to measure in that.
+        if (!(days > 0)) return null;
+        var hours = hoursPoweredOn(timeline, from);
+        if (hours == null) return null;
+        return { hours: hours, days: days };
+    }
+
+    /* Days since the server last heard from a computer. Null while it is connected now,
+       and -1 for one that has never connected at all — which is the useful case: it means
+       the agent was installed but has never reached the server. */
+    function daysAway(node) {
+        if (isOnline(node) || (lastSeen == null)) return null;
+        var at = lastSeen[node._id];
+        if (at == null) return -1;
+        return Math.floor((Date.now() - at) / 86400000);
     }
 
     function gigabytes(value) {
@@ -668,6 +843,8 @@
         // Ask once per computer per visit. The server answers from what it already holds,
         // so this costs the computers themselves nothing.
         list.forEach(askForSpecs);
+        list.forEach(askForTimeline);
+        askForLastSeen();
         var counts = {};
         everyRoom.forEach(function (name) { counts[name] = rooms[name].length; });
         if (everyRoom.length > 1) { body.appendChild(roomChips(everyRoom, counts)); }
@@ -689,6 +866,7 @@
         stats.appendChild(stat(t('offline'), list.length - online.length, 'off'));
         stats.appendChild(stat(t('risky'), needing.length, needing.length ? 'risk' : 'ok'));
         body.appendChild(stats);
+        body.appendChild(usageRanking(rooms, shownRooms));
 
         // Filled in at the end of this pass, once the rows are built and it is known
         // whether the screen cap was reached.
@@ -842,7 +1020,8 @@
         loadRoomFilter();
         window.addEventListener('resize', fitHeight);
         window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
-            exportInventory: exportInventory, specLine: specLine, disksOf: disksOf };
+            exportInventory: exportInventory, specLine: specLine, disksOf: disksOf,
+            hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway };
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

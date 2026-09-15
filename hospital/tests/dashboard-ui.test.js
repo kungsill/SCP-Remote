@@ -509,3 +509,147 @@ test('the inventory export carries the columns an asset register needs', (t) => 
     assert.ok(csv.indexOf('To be filled') < 0, 'a placeholder serial is left blank rather than copied');
     assert.ok(csv.indexOf('09/04/2024') >= 0, 'the BIOS date as a date');
 });
+
+// How long each computer is actually powered on, and which one each department leans on
+// hardest. Two departments are deliberately left out of the ranking because their
+// computers are left running overnight on purpose.
+const wards = {
+    'mesh//opd': { _id: 'mesh//opd', name: 'OPD' },
+    'mesh//ward': { _id: 'mesh//ward', name: 'ตึกหญิง' },
+    'mesh//it': { _id: 'mesh//it', name: 'ห้องสารสนเทศ' }
+};
+const inWards = [
+    { _id: 'node//opd1', name: 'opd-1', conn: 1, meshid: 'mesh//opd', users: [] },
+    { _id: 'node//opd2', name: 'opd-2', conn: 1, meshid: 'mesh//opd', users: [] },
+    { _id: 'node//w1', name: 'ward-1', conn: 1, meshid: 'mesh//ward', users: [] },
+    { _id: 'node//it1', name: 'it-server', conn: 1, meshid: 'mesh//it', users: [] }
+];
+
+// The server packs the history as [ stateBefore, firstEventInSeconds, stateAfter ] then
+// pairs of [ secondsTheStateLasted, newState ]. 1 is on, 0 is off.
+function poweredOn(daysAgo, pattern) {
+    const start = Math.round((Date.now() - (daysAgo * 86400000)) / 1000);
+    return [0, start, 1].concat(pattern);
+}
+
+// A working day: on for `hoursOn`, off for the rest, repeated.
+function workingDays(count, hoursOn) {
+    const out = [];
+    for (let i = 0; i < count; i++) { out.push(hoursOn * 3600, 0, (24 - hoursOn) * 3600, 1); }
+    return out;
+}
+
+test('the ranking names the busiest computer in each department', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    s.api.show();
+    const asked = s.sent.filter(m => m.action === 'powertimeline').map(m => m.nodeid).sort();
+    assert.deepEqual(asked, ['node//it1', 'node//opd1', 'node//opd2', 'node//w1'], 'each computer once');
+
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//opd1', timeline: poweredOn(7, workingDays(7, 4)) });
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//opd2', timeline: poweredOn(7, workingDays(7, 9)) });
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//w1', timeline: poweredOn(7, workingDays(7, 6)) });
+
+    const rows = Array.from(s.w.document.querySelectorAll('.scp-dash-rank-row'));
+    assert.equal(rows.length, 2, 'one line per department, not one per computer');
+    const first = rows[0].textContent;
+    assert.ok(first.indexOf('OPD') >= 0 && first.indexOf('opd-2') >= 0, 'the busiest department leads: ' + first);
+    assert.ok(first.indexOf('63.0') >= 0, 'with its total hours on: ' + first);
+    assert.ok(rows[0].textContent.indexOf('opd-1') < 0, 'the quieter computer in the same department is not named');
+    assert.ok(rows[1].textContent.indexOf('ตึกหญิง') >= 0, 'then the next department');
+});
+
+test('departments that run around the clock are left out of the ranking', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    s.api.show();
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//it1', timeline: poweredOn(7, []) });
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//opd1', timeline: poweredOn(7, workingDays(7, 4)) });
+
+    const text = Array.from(s.w.document.querySelectorAll('.scp-dash-rank-row')).map(r => r.textContent).join(' | ');
+    assert.ok(text.indexOf('it-server') < 0, 'a 24-hour computer must not win: ' + text);
+    assert.ok(text.indexOf('opd-1') >= 0, 'while the wards are still ranked');
+    assert.ok(s.w.document.querySelector('.scp-dash-rank-note').textContent.indexOf('ห้องสารสนเทศ') >= 0,
+        'and the page says which departments it left out');
+});
+
+test('a total is reported, never a rate extrapolated from a short history', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    s.api.show();
+    // Half a day of history on a computer that never went off. Dividing by the history
+    // we happen to have would call that 24 hours a day — an artifact of when we started
+    // watching, not a finding about the computer.
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//opd1', timeline: poweredOn(0.5, []) });
+    const row = s.w.document.querySelector('.scp-dash-rank-row').textContent;
+    assert.ok(row.indexOf('24') < 0, 'no invented daily rate: ' + row);
+    assert.ok(row.indexOf('12.0') >= 0, 'the hours actually observed: ' + row);
+    const mark = s.w.document.querySelector('.scp-dash-rank-hours em');
+    assert.ok(mark, 'marked as resting on less history than a full window');
+    assert.equal(mark.parentNode.title, 'เพิ่งมีประวัติไม่ถึงวัน');
+});
+
+test('a computer added part way through the window still ranks on what it did', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    s.api.show();
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//opd1', timeline: poweredOn(2, workingDays(2, 8)) });
+    const row = s.w.document.querySelector('.scp-dash-rank-row').textContent;
+    assert.ok(row.indexOf('16.0') >= 0, 'two days of eight hours: ' + row);
+    assert.equal(s.w.document.querySelector('.scp-dash-rank-hours em').parentNode.title,
+        'เพิ่งมีประวัติ 2 วัน ยังเทียบไม่เต็มที่');
+});
+
+test('sleeping does not count as being used', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    s.api.show();
+    // On for four hours, then asleep (state 2) for the rest of each day.
+    const asleep = [];
+    for (let i = 0; i < 7; i++) { asleep.push(4 * 3600, 2, 20 * 3600, 1); }
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//opd1', timeline: poweredOn(7, asleep) });
+    const row = s.w.document.querySelector('.scp-dash-rank-row').textContent;
+    assert.ok(row.indexOf('28.0') >= 0, 'only the waking hours, seven times four: ' + row);
+});
+
+test('the ranking survives the server’s own no-history reply', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    s.api.show();
+    assert.ok(s.w.document.body.textContent.indexOf('กำลังอ่านประวัติการใช้งาน') >= 0, 'it waits before judging');
+    // With no records at all MeshCentral falls back to the current state and writes that
+    // moment in milliseconds, where every other entry is in seconds. Read as seconds it
+    // would land tens of thousands of years from now.
+    inWards.forEach(node => s.fromServer({ action: 'powertimeline', nodeid: node._id, timeline: [1, Date.now(), 1] }));
+    assert.equal(s.w.document.querySelectorAll('.scp-dash-rank-row').length, 0, 'nothing is invented from it');
+    assert.ok(s.w.document.body.textContent.indexOf('ยังไม่มีประวัติการใช้งาน') >= 0, 'and it says so plainly');
+});
+
+test('a computer that has never once connected is flagged', (t) => {
+    const s = setup(t);
+    s.api.show();
+    assert.ok(s.sent.some(m => m.action === 'lastconnects'), 'the page asks when each was last seen');
+
+    // node//3 is the offline one. Answer for the others only, the way the server does
+    // when a computer has no last-connect record at all.
+    s.fromServer({ action: 'lastconnects', lastconnects: { 'node//1': Date.now(), 'node//2': Date.now() } });
+    assert.ok(s.w.document.body.textContent.indexOf('ไม่เคยเชื่อมต่อเลย') >= 0,
+        'an agent installed but never heard from is the case worth catching');
+});
+
+test('a computer gone quiet for a week is flagged, one gone a day is not', (t) => {
+    const s = setup(t, { nodes: [
+        { _id: 'node//1', name: 'pc-one', conn: 0, meshid: 'mesh//a', users: [] },
+        { _id: 'node//2', name: 'pc-two', conn: 0, meshid: 'mesh//a', users: [] }
+    ] });
+    s.api.show();
+    s.fromServer({ action: 'lastconnects', lastconnects: {
+        'node//1': Date.now() - (9 * 86400000),
+        'node//2': Date.now() - (1 * 86400000)
+    } });
+    const text = s.w.document.body.textContent;
+    assert.ok(text.indexOf('ไม่ติดต่อมา 9 วัน') >= 0, 'nine days is worth knowing: ' + text.slice(0, 200));
+    assert.ok(text.indexOf('ไม่ติดต่อมา 1 วัน') < 0, 'yesterday is not');
+    assert.ok(text.indexOf('ไม่เคยเชื่อมต่อเลย') < 0, 'and neither is treated as never seen');
+});
+
+test('nothing is said about last contact until the server has answered', (t) => {
+    const s = setup(t);
+    s.api.show();
+    assert.ok(s.w.document.body.textContent.indexOf('ไม่เคยเชื่อมต่อเลย') < 0,
+        'an unanswered question must not read as bad news');
+});

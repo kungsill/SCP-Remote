@@ -322,6 +322,7 @@
                         <div tabindex=0 id=devViewPageButton2 class=viewSelector onclick=onDeviceViewPageChange(2) onkeypress="if (event.key == 'Enter') { onDeviceViewPageChange(2); }" title="Go to previous page" style="display:none"><div class="viewSelector10"></div></div>
                         <div tabindex=0 id=devViewPageButton3 class=viewSelector onclick=onDeviceViewPageChange(3) onkeypress="if (event.key == 'Enter') { onDeviceViewPageChange(3); }" title="Go to next page" style="display:none"><div class="viewSelector11"></div></div>
                         <div tabindex=0 id=devViewPageButton4 class=viewSelector onclick=onDeviceViewPageChange(4) onkeypress="if (event.key == 'Enter') { onDeviceViewPageChange(4); }" title="Go to last page" style="display:none;margin-right:12px"><div class="viewSelector8"></div></div>
+                        <div tabindex=0 role=button id=devLiveScreensButton class=scpLiveScreens onclick=scpToggleLiveScreens() onkeypress="if (event.key == 'Enter') { scpToggleLiveScreens(); }" title="Desktops">Desktops</div>
                         <div tabindex=0 id=devViewButton1 class=viewSelector onclick=onDeviceViewChange(1) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(1); }" title="Columns"><div class="viewSelector2"></div></div>
                         <div tabindex=0 id=devViewButton2 class=viewSelector onclick=onDeviceViewChange(2) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(2); }" title="List"><div class="viewSelector1"></div></div>
                         <div tabindex=0 id=devViewButton3 class=viewSelector onclick=onDeviceViewChange(3) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(3); }" title="Desktops Fixed Width"><div class="viewSelector3"></div></div>
@@ -1871,6 +1872,7 @@
             mainUpdate(3)
             for (var j = 1; j < 6; j++) { Q('devViewButton' + j).classList.remove('viewSelectorSel'); }
             Q('devViewButton' + Q('viewselect').value).classList.add('viewSelectorSel');
+            scpUpdateLiveScreensButton();
 
             // Setup upload drag & drop for server files
             Q('p5filetable').addEventListener('drop', p5fileDragDrop, false);
@@ -4360,10 +4362,25 @@
             }
         }
 
+        // The four icons beside this button are easy to miss, and the live screens view
+        // is the one people ask for by name, so give it one plainly labelled way in.
+        // Pressing it again goes back to the list rather than stranding anyone there.
+        function scpToggleLiveScreens() {
+            var view = Q('viewselect').value;
+            onDeviceViewChange(((view == 3) || (view == 5)) ? 1 : 3);
+        }
+        function scpUpdateLiveScreensButton() {
+            var button = Q('devLiveScreensButton');
+            if (button == null) return;
+            var view = Q('viewselect').value;
+            button.classList.toggle('scpLiveScreensOn', (view == 3) || (view == 5));
+        }
+
         function onDeviceViewChange(i) {
             if (i != null) { Q('viewselect').value = i; }
             for (var j = 1; j < 6; j++) { Q('devViewButton' + j).classList.remove('viewSelectorSel'); }
             Q('devViewButton' + Q('viewselect').value).classList.add('viewSelectorSel');
+            scpUpdateLiveScreensButton();
             putstore('deviceView', Q('viewselect').value);
             putstore('viewsize', Q('sizeselect').value);
             mainUpdate(4);

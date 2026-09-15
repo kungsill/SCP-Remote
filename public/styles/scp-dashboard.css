@@ -1,0 +1,70 @@
+/* SCP-Remote dashboard. Uses the tokens defined by scp-ui.css so it follows the
+   light and dark palettes without repeating any colour values. */
+/* The workspace column clips overflow, so this page provides its own scrolling.
+   The height itself is measured at runtime by scp-dashboard.js. */
+.scp-dash { padding: 0 24px 40px; color: var(--scp-ink); overflow-y: auto; overflow-x: hidden; }
+.scp-dash[hidden] { display: none; }
+.scp-dash-heading { position: relative; padding: 26px 0 18px; }
+.scp-dash-heading h2 { margin: 8px 0 6px; font-size: 26px; font-weight: 600; }
+.scp-dash-heading p { margin: 0; color: var(--scp-muted); font-size: 14px; }
+.scp-dash-refresh { position: absolute; top: 28px; right: 0; border: 1px solid var(--scp-line); background: var(--scp-surface); color: var(--scp-ink); border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
+.scp-dash-refresh:hover { background: var(--scp-soft); }
+
+.scp-dash-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 12px; margin-bottom: 26px; }
+.scp-dash-stat { border: 1px solid var(--scp-line); border-radius: 12px; background: var(--scp-surface); padding: 16px; box-shadow: var(--scp-shadow); }
+.scp-dash-stat-value { font-size: 28px; font-weight: 600; line-height: 1.2; }
+.scp-dash-stat-label { margin-top: 4px; font-size: 12px; color: var(--scp-muted); }
+.scp-dash-ok .scp-dash-stat-value { color: #1f8a5b; }
+.scp-dash-busy .scp-dash-stat-value { color: #0f766e; }
+.scp-dash-idle .scp-dash-stat-value { color: #b07d17; }
+.scp-dash-off .scp-dash-stat-value { color: var(--scp-muted); }
+.scp-dash-risk .scp-dash-stat-value { color: #c0392b; }
+
+.scp-dash-room { margin-bottom: 26px; border: 1px solid var(--scp-line); border-radius: 12px; background: var(--scp-surface); overflow: hidden; box-shadow: var(--scp-shadow); }
+.scp-dash-room-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--scp-line); background: var(--scp-bg); }
+.scp-dash-room-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.scp-dash-room-count { font-size: 12px; color: var(--scp-muted); }
+
+/* Five columns on a desktop; the same markup stacks into cards on a narrow screen. */
+.scp-dash-row { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(0, .9fr) minmax(0, 1fr) minmax(0, 2.4fr) minmax(0, 1.5fr); gap: 12px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--scp-line); }
+.scp-dash-row:last-child { border-bottom: 0; }
+.scp-dash-head { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--scp-muted); padding-top: 10px; padding-bottom: 10px; }
+.scp-dash-cell { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.scp-dash-name { display: flex; align-items: center; gap: 10px; }
+.scp-dash-label { display: flex; flex-direction: column; min-width: 0; }
+.scp-dash-label small { color: var(--scp-muted); font-size: 11px; }
+.scp-dash-user { color: var(--scp-muted); }
+
+.scp-dash-dot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: var(--scp-muted); }
+.scp-dash-dot.busy { background: #0f766e; box-shadow: 0 0 0 3px #0f766e22; }
+.scp-dash-dot.idle { background: #d4a017; box-shadow: 0 0 0 3px #d4a01722; }
+.scp-dash-dot.off { background: #b6c2cd; }
+
+.scp-dash-tag { display: inline-block; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600; border: 1px solid var(--scp-line); color: var(--scp-muted); }
+.scp-dash-tag.busy { color: #0f766e; border-color: #0f766e55; background: #0f766e12; }
+.scp-dash-tag.idle { color: #8a6410; border-color: #d4a01755; background: #d4a01712; }
+
+.scp-dash-risk { display: flex; flex-wrap: wrap; gap: 6px; }
+.scp-dash-flag { border-radius: 7px; padding: 3px 9px; font-size: 11px; line-height: 1.6; }
+.scp-dash-flag.high { background: #c0392b14; color: #a93226; border: 1px solid #c0392b40; }
+.scp-dash-flag.warn { background: #b07d1714; color: #8a6410; border: 1px solid #b07d1740; }
+.scp-dash-note { font-size: 11px; color: var(--scp-muted); }
+.scp-dash-note.ok { color: #1f8a5b; }
+
+.scp-dash-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.scp-dash-actions button { border-radius: 8px; padding: 6px 11px; font-size: 12px; cursor: pointer; border: 1px solid var(--scp-line); background: var(--scp-surface); color: var(--scp-ink); }
+.scp-dash-actions button:hover { background: var(--scp-soft); }
+.scp-dash-go { border-color: var(--scp-accent) !important; background: var(--scp-accent) !important; color: #fff !important; }
+.scp-dash-off:hover { border-color: #c0392b !important; color: #a93226 !important; background: #c0392b12 !important; }
+
+.scp-dash-empty { border: 1px dashed var(--scp-line); border-radius: 12px; padding: 40px 20px; text-align: center; color: var(--scp-muted); }
+
+@media (max-width: 900px) {
+    .scp-dash { padding: 0 12px 30px; }
+    .scp-dash-refresh { position: static; margin-top: 12px; }
+    .scp-dash-row { grid-template-columns: 1fr; gap: 8px; padding: 14px 14px; }
+    .scp-dash-head { display: none; }
+    .scp-dash-actions { padding-top: 4px; }
+}
+
+.scp-dash-empty-room { padding: 22px 18px; font-size: 13px; color: var(--scp-muted); }

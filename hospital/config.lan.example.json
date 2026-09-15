@@ -1,0 +1,45 @@
+{
+  "settings": {
+    "cert": "scp-remote.hospital.example",
+    "port": 8443,
+    "redirPort": 0,
+    "exactPorts": true,
+    "selfUpdate": false,
+    "webRTC": false,
+    "plugins": {
+      "enabled": false
+    },
+    "userAllowedIP": [
+      "10.10.1.0/24",
+      "10.10.2.0/24",
+      "10.10.3.0/24"
+    ],
+    "agentAllowedIP": [
+      "10.10.1.0/24",
+      "10.10.2.0/24",
+      "10.10.3.0/24"
+    ]
+  },
+  "domains": {
+    "": {
+      "title": "SCP-Remote",
+      "title2": "Hospital IT",
+      "newAccounts": false,
+      "minify": false,
+      "siteStyle": 1,
+      "meshMessengerTitle": "SCP-Remote",
+      "userConsentFlags": {
+        "desktopnotify": true,
+        "desktopprompt": true,
+        "terminalprompt": true,
+        "fileprompt": true
+      },
+      "consentMessages": {
+        "Title": "SCP-Remote",
+        "autoAcceptOnTimeout": false
+      },
+      "footer": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล",
+      "loginfooter": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล"
+    }
+  }
+}

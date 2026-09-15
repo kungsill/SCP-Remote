@@ -1,0 +1,53 @@
+{
+  "settings": {
+    "LANonly": true,
+    "port": 8443,
+    "portBind": "127.0.0.1",
+    "redirPort": 0,
+    "exactPorts": true,
+    "selfUpdate": false,
+    "webRTC": false,
+    "plugins": {
+      "enabled": false
+    },
+    "mpsPort": 0,
+    "amtScanner": false,
+    "webrtcConfig": {
+      "iceServers": []
+    },
+    "userAllowedIP": [
+      "127.0.0.1",
+      "::1"
+    ],
+    "agentAllowedIP": [
+      "127.0.0.1",
+      "::1"
+    ]
+  },
+  "domains": {
+    "": {
+      "title": "SCP-Remote",
+      "title2": "Hospital IT",
+      "newAccounts": false,
+      "minify": false,
+      "siteStyle": 1,
+      "meshMessengerTitle": "SCP-Remote",
+      "footer": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล",
+      "loginfooter": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล",
+      "userConsentFlags": {
+        "desktopnotify": true,
+        "desktopprompt": true,
+        "terminalprompt": true,
+        "fileprompt": true
+      },
+      "consentMessages": {
+        "Title": "SCP-Remote",
+        "autoAcceptOnTimeout": false
+      },
+      "agentTag": {
+        "ServerName": 1,
+        "ServerDesc": 2
+      }
+    }
+  }
+}

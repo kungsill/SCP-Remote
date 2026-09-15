@@ -1,0 +1,47 @@
+/* SCP-Remote hospital theme. Sarabun is served locally under the OFL. */
+@font-face { font-family: Sarabun; src: url('../fonts/sarabun/Sarabun-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: Sarabun; src: url('../fonts/sarabun/Sarabun-SemiBold.ttf') format('truetype'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: Sarabun; src: url('../fonts/sarabun/Sarabun-Bold.ttf') format('truetype'); font-weight: 700; font-style: normal; font-display: swap; }
+body, button, input, select, textarea, .title, .title2, .modal, .popover {
+    font-family: Sarabun, sans-serif;
+}
+body.login { background: #edf4f5; }
+#masthead { background: #125c63; }
+#masthead .title, #masthead .title2 { font-family: Sarabun, sans-serif; color: #fff; text-shadow: none; }
+#masthead font { font-family: Sarabun, sans-serif !important; }
+#page_leftbar { background: linear-gradient(to bottom, #176a70, #104b52); }
+body.login #masthead { background: #125c63; color: #fff; }
+body.login #topbar { background: #0c454b; }
+body.login #column_l { line-height: 1.65; }
+body.login .title { font-weight: 700; letter-spacing: .3px; }
+.scp-language { display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding: 6px 12px; background: #125c63; color: #fff; font: 14px Sarabun, sans-serif; }
+.scp-language a { color: #fff; padding: 3px 10px; border: 1px solid #b5d9dc; border-radius: 5px; text-decoration: none; }
+.scp-language a[aria-current="true"] { color: #12494e; background: #fff; font-weight: 700; }
+.scp-language a:focus-visible { outline: 3px solid #ffd166; outline-offset: 2px; }
+.scp-language .scp-brand { margin-right: auto; font-weight: 600; }
+.scp-language-inbar { float: right; height: 24px; box-sizing: border-box; padding: 0 36px 0 8px; background: transparent; }
+.scp-language-inbar a { padding: 0 8px; line-height: 20px; }
+body.login #welcomeimage img { max-width: 320px; width: 100%; }
+.scp-hospital-notice { margin: 12px 0; color: #125c63; font-weight: 600; }
+body.night .scp-hospital-notice { color: #a6e6e3; }
+/* Keep the monospace fonts used by remote terminals and code editors. */
+.xterm, .xterm textarea, pre, code, .ace_editor, .ace_editor textarea { font-family: monospace; }
+.scp-files-panel { margin: 10px; padding: 12px 14px; border: 1px solid #c9dcde; border-radius: 8px; background: #f0f7f7; color: #173f44; line-height: 1.5; }
+.scp-files-help { margin: 0 0 8px; }
+.scp-files-controls, .scp-upload-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.scp-files-panel button { border: 1px solid #6e9699; border-radius: 5px; padding: 4px 10px; background: white; color: #125c63; cursor: pointer; }
+.scp-files-panel button:focus-visible { outline: 3px solid #edb842; outline-offset: 2px; }
+.scp-files-summary { margin-top: 8px; font-weight: 600; }
+.scp-upload-list { max-height: 250px; overflow: auto; }
+.scp-upload-row { padding: 10px 0; border-top: 1px solid #c9dcde; }
+.scp-upload-heading { display: flex; justify-content: space-between; gap: 10px; overflow-wrap: anywhere; }
+.scp-upload-heading span { white-space: nowrap; }
+.scp-upload-status { margin: 4px 0; overflow-wrap: anywhere; }
+.scp-upload-row[data-state="success"] .scp-upload-status { color: #176039; }
+.scp-upload-row[data-state="error"] .scp-upload-status { color: #a22525; }
+.scp-upload-row progress { width: 100%; height: 12px; accent-color: #187d81; }
+.scp-files-empty { padding: 28px 16px; text-align: center; color: #527377; }
+.scp-file-new { background: #dcf4e8 !important; box-shadow: inset 3px 0 #25835b; }
+.night .scp-files-panel { background: #173236; color: #e2eeee; border-color: #527377; }
+.night .scp-upload-row[data-state="success"] .scp-upload-status { color: #9ce3b8; }
+.night .scp-upload-row[data-state="error"] .scp-upload-status { color: #ffb1b1; }

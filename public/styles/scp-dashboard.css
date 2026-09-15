@@ -33,7 +33,7 @@
 /* Five columns on a desktop; the same markup stacks into cards on a narrow screen. */
 .scp-dash-row { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(0, .9fr) minmax(0, 1fr) minmax(0, 2.4fr) minmax(0, 1.5fr); gap: 12px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--scp-line); }
 .scp-dash-row:last-child { border-bottom: 0; }
-.scp-dash-row-live { grid-template-columns: 144px minmax(0, 1.8fr) minmax(0, .8fr) minmax(0, .9fr) minmax(0, 2fr) minmax(0, 1.4fr); }
+.scp-dash-row-live { grid-template-columns: 176px minmax(0, 1.8fr) minmax(0, .8fr) minmax(0, .9fr) minmax(0, 2fr) minmax(0, 1.4fr); }
 .scp-dash-head { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--scp-muted); padding-top: 10px; padding-bottom: 10px; }
 .scp-dash-cell { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
 .scp-dash-name { display: flex; align-items: center; gap: 10px; }
@@ -63,7 +63,7 @@
 .scp-dash-go { border-color: var(--scp-accent) !important; background: var(--scp-accent) !important; color: #fff !important; }
 .scp-dash-off:hover { border-color: #c0392b !important; color: #a93226 !important; background: #c0392b12 !important; }
 
-.scp-dash-tile { position: relative; width: 144px; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; border: 1px solid var(--scp-line); background: #0d1520; cursor: pointer; }
+.scp-dash-tile { position: relative; width: 176px; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; border: 1px solid var(--scp-line); background: #0d1520; cursor: pointer; }
 /* The picture never takes a click or a key press: events belong to the box around
    it, which opens the full session. A tile can only ever look. */
 .scp-dash-tile-canvas { display: block; width: 100%; height: 100%; object-fit: contain; background: #0d1520; pointer-events: none; }

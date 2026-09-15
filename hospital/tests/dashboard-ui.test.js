@@ -35,7 +35,10 @@ function setup(t, options = {}) {
         return {
             canvas: canvas,
             ImageType: 1, CompressionLevel: 50, ScalingLevel: 1024, FrameRateTimer: 100,
+            State: 0, tilesReceived: 0, levels: [], refreshes: 0,
             grabbedMouse: false, grabbedKeys: false,
+            SendCompressionLevel: function (type, level, scaling, frametimer) { this.levels.push([type, level, scaling, frametimer]); },
+            SendRefresh: function () { this.refreshes++; },
             GrabMouseInput: function () { this.grabbedMouse = true; },
             GrabKeyInput: function () { this.grabbedKeys = true; }
         };
@@ -44,17 +47,25 @@ function setup(t, options = {}) {
         const conn = { m: module, nodeid: null, starts: 0, stops: 0, onStateChanged: null };
         conn.Start = function (nodeid) {
             conn.nodeid = nodeid; conn.starts++;
+            conn.m.State = 3;
             if (conn.onStateChanged) { conn.onStateChanged(conn, 3); }
         };
-        conn.Stop = function () { conn.stops++; };
+        conn.Stop = function () { conn.stops++; conn.m.State = 0; };
         connections.push(conn);
         return conn;
     };
 
+    // Drive the page's own intervals by hand, so a test never has to wait in real time.
+    const timers = [];
+    let nextTimer = 1;
+    w.setInterval = (fn, ms) => { const id = nextTimer++; timers.push({ id, fn, ms }); return id; };
+    w.clearInterval = (id) => { const i = timers.findIndex(timer => timer.id === id); if (i >= 0) { timers.splice(i, 1); } };
+    const tick = (times = 1) => { for (let i = 0; i < times; i++) { timers.slice().forEach(timer => timer.fn()); } };
+
     w.eval(fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-dashboard.js'), 'utf8'));
     w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
     t.after(() => { try { w.ScpDashboard.hide(); } catch (error) { /* already closed */ } w.close(); });
-    return { w, connections, api: w.ScpDashboard, panel: w.document.getElementById('scpDashboard') };
+    return { w, connections, tick, api: w.ScpDashboard, panel: w.document.getElementById('scpDashboard') };
 }
 
 function liveButton(w) {
@@ -77,7 +88,7 @@ test('turning the screens on watches the computers that are powered on, and no o
     assert.deepEqual(connections.map(c => c.nodeid).sort(), ['node//1', 'node//2']);
     connections.forEach(c => {
         assert.equal(c.m.ImageType, 4, 'WebP keeps a small picture cheap');
-        assert.equal(c.m.ScalingLevel, 256, 'a quarter-size picture is all a tile needs');
+        assert.equal(c.m.ScalingLevel, 384, 'more than the tile shows, so it stays crisp on a sharp screen');
         assert.ok(c.m.CompressionLevel <= 40, 'a thumbnail does not need full quality');
         assert.ok(c.m.FrameRateTimer >= 1000, 'a slow refresh keeps the network free for real sessions');
     });
@@ -193,4 +204,65 @@ test('a slot freed by a computer switching off is reused in the same redraw', (t
     api.render();
     assert.ok(connections.some(c => c.nodeid === waiting[0]), 'the computer that was waiting should take the freed slot');
     assert.equal(w.document.querySelector('.scp-dash-live-note').hidden, true);
+});
+
+test('saving a picture asks for one full-size frame, then returns to the small one', (t) => {
+    const { w, connections, tick, api } = setup(t);
+    api.show();
+    api.setLive(true);
+    const conn = connections[0];
+    conn.m.levels.length = 0;
+
+    const shot = w.document.querySelector('.scp-dash-tile-shot');
+    shot.dispatchEvent(new w.Event('click', { bubbles: true }));
+    assert.deepEqual(conn.m.levels[0].slice(0, 3), [4, 100, 1024], 'the saved picture is asked for at full size and quality');
+    assert.equal(conn.m.refreshes, 1, 'a whole new frame is requested, not the next change');
+    assert.ok(w.document.querySelector('.scp-dash-tile-overlay').textContent.length > 0, 'the tile should say it is fetching');
+
+    // Nothing is saved while the bigger frame is still arriving.
+    tick(2);
+    assert.equal(conn.m.levels.length, 1, 'it must not save a half-drawn picture');
+
+    // The larger frame announces a new canvas size and finishes drawing.
+    w.document.querySelector('.scp-dash-tile-canvas').width = 1920;
+    conn.m.tilesReceived = 0;
+    tick(4);
+    assert.deepEqual(conn.m.levels[1].slice(0, 3), [4, 40, 384], 'the cheap picture comes back afterwards');
+    assert.equal(w.document.querySelector('.scp-dash-tile-overlay').hidden, true);
+});
+
+test('a capture gives up rather than hanging if the frame never finishes', (t) => {
+    const { w, connections, tick, api } = setup(t);
+    api.show();
+    api.setLive(true);
+    const conn = connections[0];
+    conn.m.levels.length = 0;
+
+    w.document.querySelector('.scp-dash-tile-shot').dispatchEvent(new w.Event('click', { bubbles: true }));
+    tick(41); // 41 x 150ms is past the six second limit, with no frame ever arriving
+    assert.equal(conn.m.levels.length, 2, 'it saves what it has and restores the small picture');
+    assert.deepEqual(conn.m.levels[1].slice(0, 3), [4, 40, 384]);
+});
+
+test('closing a tile in the middle of a capture leaves nothing running', (t) => {
+    const { w, connections, tick, api } = setup(t);
+    api.show();
+    api.setLive(true);
+    const conn = connections[0];
+    conn.m.levels.length = 0;
+
+    w.document.querySelector('.scp-dash-tile-shot').dispatchEvent(new w.Event('click', { bubbles: true }));
+    api.setLive(false);
+    tick(50);
+    assert.equal(conn.m.levels.length, 1, 'a closed tile must not save or send anything more');
+    assert.equal(conn.stops, 1);
+});
+
+test('with both a prompt and a bar set, the page mentions both', (t) => {
+    const { w, api } = setup(t, { consent: 8 | 64 });
+    api.show();
+    api.setLive(true);
+    const hint = w.document.querySelector('.scp-dash-live-hint').textContent;
+    assert.ok(hint.indexOf('อนุญาต') >= 0, 'it should say the computer asks first');
+    assert.ok(hint.indexOf('แถบ') >= 0, 'it should also say a bar stays on that screen');
 });

@@ -1652,7 +1652,7 @@
         var nodeShortIdent = 0;
         var desktop;
         var desktopsettings = { encoding: 2, showfocus: false, showmouse: true, showcad: true, quality: 100, scaling: 1024, framerate: 50, localkeymap: false, swapmouse: false, remotekeymap: false, autoclipboard: false, autolock: false, agentencoding: 4 }; // SCP-Remote: WEBP at full quality stays sharp without the traffic PNG needs
-        var multidesktopsettings = { quality: 20, scaling: 128, framerate: 1000, agentencoding: 4 };
+        var multidesktopsettings = { quality: 60, scaling: 512, framerate: 400, agentencoding: 4 }; // SCP-Remote: an eighth of the screen is too coarse to read
         var terminal;
         var files;
         var debugLevel = parseInt('{{{debuglevel}}}');
@@ -1911,6 +1911,15 @@
                     if (multidesktopsettings.quality == null || parseInt(multidesktopsettings.quality) <= 20) { multidesktopsettings.quality = 40; }
                     localStorage.setItem('scpDesktopQuality3', 'webp100');
                     localStorage.setItem('desktopsettings', JSON.stringify(desktopsettings));
+                    localStorage.setItem('multidesktopsettings', JSON.stringify(multidesktopsettings));
+                }
+            } catch (ex) { }
+            try {
+                if (localStorage.getItem('scpMultiDesktopSharp1') == null) {
+                    if (multidesktopsettings.scaling == null || parseInt(multidesktopsettings.scaling) <= 256) { multidesktopsettings.scaling = 512; }
+                    if (multidesktopsettings.quality == null || parseInt(multidesktopsettings.quality) <= 40) { multidesktopsettings.quality = 60; }
+                    if (multidesktopsettings.framerate == null || parseInt(multidesktopsettings.framerate) >= 1000) { multidesktopsettings.framerate = 400; }
+                    localStorage.setItem('scpMultiDesktopSharp1', 'half');
                     localStorage.setItem('multidesktopsettings', JSON.stringify(multidesktopsettings));
                 }
             } catch (ex) { }

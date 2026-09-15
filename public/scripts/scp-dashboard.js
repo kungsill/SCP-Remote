@@ -55,7 +55,8 @@
         liveOffline: ['Computer is off', 'เครื่องปิดอยู่'],
         liveWaiting: ['Not shown', 'ยังไม่แสดง'],
         liveOpen: ['Click the picture to take over this computer', 'คลิกที่ภาพเพื่อเข้าควบคุมเครื่องนี้'],
-        liveShot: ['Save this picture', 'บันทึกภาพนี้ไว้'],
+        liveShot: ['Save a full-size picture of this screen', 'บันทึกภาพหน้าจอนี้แบบความละเอียดเต็ม'],
+        liveShooting: ['Fetching the full-size picture…', 'กำลังขอภาพความละเอียดเต็ม…'],
         liveFull: ['Showing {0} screens at once. Turn the rest off, or open one room at a time, to see the others.', 'แสดงได้ครั้งละ {0} จอ ปิดบางเครื่องหรือดูทีละห้อง เพื่อดูเครื่องที่เหลือ'],
         liveNoSupport: ['This browser cannot show live screens.', 'เบราว์เซอร์นี้แสดงภาพหน้าจอสดไม่ได้'],
         consentPrompt: ['Each computer asks the person sitting at it first. The picture starts only after they allow it.', 'เครื่องปลายทางจะถามผู้ใช้ก่อน ภาพจะเริ่มก็ต่อเมื่อผู้ใช้กดอนุญาตเท่านั้น'],
@@ -88,7 +89,9 @@
        itself on a later visit. */
     var tiles = {}, liveOn = false, liveSkipped = 0;
     var liveLimit = 12;
-    var liveSettings = { encoding: 4, quality: 30, scaling: 256, framerate: 1000 };
+    var liveSettings = { encoding: 4, quality: 40, scaling: 384, framerate: 1000 };
+    // Used for a single frame when someone saves a picture, then dropped again.
+    var liveCapture = { encoding: 4, quality: 100, scaling: 1024 };
 
     function element(tag, className, text) {
         var item = document.createElement(tag);
@@ -225,26 +228,72 @@
     // server's own consent flags, so this sentence stays true if the policy changes.
     function consentNote() {
         var flags = (window.serverinfo && typeof window.serverinfo.consent === 'number') ? window.serverinfo.consent : 0;
-        if (flags & 8) return t('consentPrompt');
-        if (flags & 64) return t('consentBar');
-        if (flags & 1) return t('consentNotify');
-        return t('consentSilent');
+        // More than one of these can be set at once, and each is a separate thing the
+        // person at that computer sees, so say all of them rather than only the first.
+        var parts = [];
+        if (flags & 8) { parts.push(t('consentPrompt')); }
+        else if (flags & 1) { parts.push(t('consentNotify')); }
+        if (flags & 64) { parts.push(t('consentBar')); }
+        if (!parts.length) { parts.push(t('consentSilent')); }
+        return parts.join(' ');
     }
-    function snapshot(node, canvas) {
+    function saveCanvas(node, canvas) {
         function pad(value) { return (value < 10 ? '0' : '') + value; }
+        function safe(text) { return String(text).replace(/[\\/:*?"<>|]/g, '_').trim(); }
         var now = new Date();
         var stamp = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + '-' + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());
         var link = document.createElement('a');
-        link.download = 'SCP-Remote_' + String(node.name || node._id).replace(/[\\/:*?"<>|]/g, '_') + '_' + stamp + '.png';
+        // Room and computer in the name, so a folder of these reads as a record.
+        link.download = ['SCP-Remote', safe(roomOf(node)), safe(node.name || node._id), stamp].join('_') + '.png';
         try { link.href = canvas.toDataURL('image/png'); } catch (error) { return; }
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     }
+    // The tile on screen is deliberately small, but a saved picture is the record of
+    // what was seen and has to be readable. So ask that one computer for a single
+    // frame at full size and best quality, wait until it has all arrived, save that,
+    // and put the small cheap picture back.
+    function snapshot(node, entry) {
+        if (entry.capturing) return;
+        var desk = entry.desk;
+        if (!desk || !desk.m || (desk.m.State !== 3) || (typeof desk.m.SendCompressionLevel !== 'function')) {
+            saveCanvas(node, entry.canvas); // nothing is streaming; save whatever is on the tile
+            return;
+        }
+        entry.capturing = true;
+        tileMessage(entry, t('liveShooting'), null);
+        var startWidth = entry.canvas.width, waited = 0;
+        desk.m.SendCompressionLevel(liveCapture.encoding, liveCapture.quality, liveCapture.scaling, liveSettings.framerate);
+        if (typeof desk.m.SendRefresh === 'function') { desk.m.SendRefresh(); }
+        entry.capture = window.setInterval(function () {
+            waited += 150;
+            // The larger frame announces itself as a new screen size, then arrives as
+            // tiles. The desktop module zeroes its tile counter once everything it has
+            // received is drawn, which is the moment the picture is whole.
+            var resized = (entry.canvas.width !== startWidth);
+            var settled = (desk.m.tilesReceived === 0);
+            if ((resized && settled && (waited >= 450)) || (waited >= 6000)) { finishCapture(node, entry); }
+        }, 150);
+    }
+    function finishCapture(node, entry) {
+        if (entry.capture) { window.clearInterval(entry.capture); entry.capture = null; }
+        if (!entry.capturing) return;
+        entry.capturing = false;
+        if (tiles[node._id] !== entry) return; // the tile was closed while we waited
+        saveCanvas(node, entry.canvas);
+        if (entry.desk && entry.desk.m && (typeof entry.desk.m.SendCompressionLevel === 'function')) {
+            entry.desk.m.SendCompressionLevel(liveSettings.encoding, liveSettings.quality, liveSettings.scaling, liveSettings.framerate);
+        }
+        entry.overlay.hidden = true;
+        entry.overlay.textContent = '';
+    }
     function stopTile(nodeid) {
         var entry = tiles[nodeid];
         if (!entry) return;
         delete tiles[nodeid];
+        if (entry.capture) { window.clearInterval(entry.capture); entry.capture = null; }
+        entry.capturing = false;
         try { if (entry.desk) entry.desk.Stop(); } catch (error) { /* the tunnel had already closed */ }
     }
     function stopAllTiles() { Object.keys(tiles).forEach(stopTile); }
@@ -263,6 +312,11 @@
         desk.m.FrameRateTimer = liveSettings.framerate;
         desk.onStateChanged = function (sender, state) {
             if (!tiles[node._id]) return;
+            if (entry.capturing) {
+                if (state !== 0) return; // a capture changes the picture, not the session
+                if (entry.capture) { window.clearInterval(entry.capture); entry.capture = null; }
+                entry.capturing = false;
+            }
             if (state === 3) { entry.overlay.hidden = true; entry.overlay.textContent = ''; return; }
             // The far end can refuse, and a session can drop. Never reconnect on a timer:
             // that would put the permission box back on their screen again and again.
@@ -285,13 +339,13 @@
         var canvas = document.createElement('canvas');
         canvas.className = 'scp-dash-tile-canvas';
         var overlay = element('div', 'scp-dash-tile-overlay');
-        var shot = button('⤓', 'scp-dash-tile-shot', function (event) { event.stopPropagation(); snapshot(node, canvas); });
+        entry = { box: box, canvas: canvas, overlay: overlay, desk: null, capturing: false, capture: null };
+        var shot = button('⤓', 'scp-dash-tile-shot', function (event) { event.stopPropagation(); snapshot(node, entry); });
         shot.title = t('liveShot');
         box.appendChild(canvas);
         box.appendChild(overlay);
         box.appendChild(shot);
         box.addEventListener('click', function () { openRemote(node); });
-        entry = { box: box, canvas: canvas, overlay: overlay, desk: null };
         tiles[node._id] = entry;
         connectTile(entry, node);
         return box;

@@ -2371,7 +2371,7 @@
         var nodeShortIdent = 0;
         var desktop;
         var desktopsettings = { encoding: 2, showfocus: false, showmouse: true, showcad: true, quality: 40, scaling: 1024, framerate: 50, localkeymap: false, swapmouse: false, remotekeymap: false, autoclipboard: false, autolock: false, agentencoding: 4 };
-        var multidesktopsettings = { quality: 20, scaling: 128, framerate: 1000, agentencoding: 4 };
+        var multidesktopsettings = { quality: 60, scaling: 512, framerate: 400, agentencoding: 4 }; // SCP-Remote: an eighth of the screen is too coarse to read
         var terminal;
         var files;
         var debugLevel = parseInt('{{{debuglevel}}}');
@@ -2620,6 +2620,19 @@
             t = null;
             try { t = localStorage.getItem('multidesktopsettings'); } catch (ex) { }
             if (t != null) { multidesktopsettings = JSON.parse(t); }
+            // SCP-Remote: anyone who already used the live screens view has the old
+            // eighth-size numbers saved in their browser, so a changed default alone
+            // would reach nobody. Lift them once; a setting better than the old default
+            // was chosen on purpose and is left alone.
+            try {
+                if (localStorage.getItem('scpMultiDesktopSharp1') == null) {
+                    if (multidesktopsettings.scaling == null || parseInt(multidesktopsettings.scaling) <= 256) { multidesktopsettings.scaling = 512; }
+                    if (multidesktopsettings.quality == null || parseInt(multidesktopsettings.quality) <= 40) { multidesktopsettings.quality = 60; }
+                    if (multidesktopsettings.framerate == null || parseInt(multidesktopsettings.framerate) >= 1000) { multidesktopsettings.framerate = 400; }
+                    localStorage.setItem('scpMultiDesktopSharp1', 'half');
+                    localStorage.setItem('multidesktopsettings', JSON.stringify(multidesktopsettings));
+                }
+            } catch (ex) { }
             applyDesktopSettings();
 
             // Terminal special keys

@@ -531,7 +531,7 @@
                         <span role=button tabindex=0 id=devViewButton2 class="fa-layers fa-fw fa-xl" onclick=onDeviceViewChange(2) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(2); }" title="List">
                             <i class="fa-solid fa-bars"></i>
                         </span>
-                        <span role=button tabindex=0 id=devViewButton3 class="fa-layers fa-fw fa-xl" onclick=onDeviceViewChange(3) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(3); }" title="Desktops">
+                        <span role=button tabindex=0 id=devViewButton3 class="fa-layers fa-fw fa-xl" onclick=onDeviceViewChange(3) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(3); }" title="Desktops Fixed Width">
                             <i class="fa-solid fa-square" data-fa-transform="shrink-9 up-4 left-4"></i>
                             <i class="fa-solid fa-square" data-fa-transform="shrink-9 up-4 right-4"></i>
                             <i class="fa-solid fa-square" data-fa-transform="shrink-9 down-4 left-4"></i>
@@ -2584,11 +2584,12 @@
             Q('DevFilterSelect').value = getstore('devFilterSelect', 0);
             Q('viewselect').value = getstore('deviceView', 1);
             Q('DeskControl').checked = (getstore('DeskControl', 1) == 1);
+            Q('autoConnectDesktopCheckbox').checked = (getstore('autoConnectDesktop', 1) == 1);
             QV('accountChangeEmailAddressSpan', (features & 0x200000) == 0);
 
             // Display the page devices
             mainUpdate(3)
-            for (var j = 1; j < 5; j++) { Q('devViewButton' + j).classList.remove('viewSelectorSel'); }
+            for (var j = 1; j < 6; j++) { Q('devViewButton' + j).classList.remove('viewSelectorSel'); }
             Q('devViewButton' + Q('viewselect').value).classList.add('viewSelectorSel');
 
             // Setup upload drag & drop for server files
@@ -5863,7 +5864,7 @@
                     deskAdjust();
                 } else {
                     disconnectAllKvmFunction();
-                    Q('autoConnectDesktopCheckbox').checked = false;
+                    Q('autoConnectDesktopCheckbox').checked = (getstore('autoConnectDesktop', 1) == 1);
                 }
             }
             oldviewmode = view;
@@ -6348,7 +6349,10 @@
             }
         }
 
-        function autoConnectDesktops() { if (Q('autoConnectDesktopCheckbox').checked == true) { connectAllKvmFunction(); } }
+        function autoConnectDesktops() {
+            putstore('autoConnectDesktop', Q('autoConnectDesktopCheckbox').checked ? 1 : 0);
+            if (Q('autoConnectDesktopCheckbox').checked == true) { connectAllKvmFunction(); }
+        }
         function connectAllKvmFunction(force) {
             if (xxdialogMode) return false;
             if (force !== true) { // We need to count how many devices will need to be connected, if it's a lot, prompt first.

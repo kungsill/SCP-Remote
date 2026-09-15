@@ -324,7 +324,7 @@
                         <div tabindex=0 id=devViewPageButton4 class=viewSelector onclick=onDeviceViewPageChange(4) onkeypress="if (event.key == 'Enter') { onDeviceViewPageChange(4); }" title="Go to last page" style="display:none;margin-right:12px"><div class="viewSelector8"></div></div>
                         <div tabindex=0 id=devViewButton1 class=viewSelector onclick=onDeviceViewChange(1) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(1); }" title="Columns"><div class="viewSelector2"></div></div>
                         <div tabindex=0 id=devViewButton2 class=viewSelector onclick=onDeviceViewChange(2) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(2); }" title="List"><div class="viewSelector1"></div></div>
-                        <div tabindex=0 id=devViewButton3 class=viewSelector onclick=onDeviceViewChange(3) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(3); }" title="Desktops"><div class="viewSelector3"></div></div>
+                        <div tabindex=0 id=devViewButton3 class=viewSelector onclick=onDeviceViewChange(3) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(3); }" title="Desktops Fixed Width"><div class="viewSelector3"></div></div>
                         <div tabindex=0 id=devViewButton5 class=viewSelector onclick=onDeviceViewChange(5) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(5); }" title="Desktops"><div class="viewSelector7"></div></div>
                         <div tabindex=0 id=devViewButton4 class=viewSelector onclick=onDeviceViewChange(4) onkeypress="if (event.key == 'Enter') { onDeviceViewChange(4); }" title="Map" style="display:none"><div class="viewSelector4"></div></div>
                     </div><div><h1>My Devices</h1></div>
@@ -1864,11 +1864,12 @@
             Q('DevFilterSelect').value = getstore('devFilterSelect', 0);
             Q('viewselect').value = getstore('deviceView', 1);
             Q('DeskControl').checked = (getstore('DeskControl', 1) == 1);
+            Q('autoConnectDesktopCheckbox').checked = (getstore('autoConnectDesktop', 1) == 1);
             QV('accountChangeEmailAddressSpan', (features & 0x200000) == 0);
 
             // Display the page devices
             mainUpdate(3)
-            for (var j = 1; j < 5; j++) { Q('devViewButton' + j).classList.remove('viewSelectorSel'); }
+            for (var j = 1; j < 6; j++) { Q('devViewButton' + j).classList.remove('viewSelectorSel'); }
             Q('devViewButton' + Q('viewselect').value).classList.add('viewSelectorSel');
 
             // Setup upload drag & drop for server files
@@ -4973,7 +4974,7 @@
                     deskAdjust();
                 } else {
                     disconnectAllKvmFunction();
-                    Q('autoConnectDesktopCheckbox').checked = false;
+                    Q('autoConnectDesktopCheckbox').checked = (getstore('autoConnectDesktop', 1) == 1);
                 }
             }
             oldviewmode = view;
@@ -5437,7 +5438,10 @@
             }
         }
 
-        function autoConnectDesktops() { if (Q('autoConnectDesktopCheckbox').checked == true) { connectAllKvmFunction(); } }
+        function autoConnectDesktops() {
+            putstore('autoConnectDesktop', Q('autoConnectDesktopCheckbox').checked ? 1 : 0);
+            if (Q('autoConnectDesktopCheckbox').checked == true) { connectAllKvmFunction(); }
+        }
         function connectAllKvmFunction(force) {
             if (xxdialogMode) return false;
             if (force !== true) { // We need to count how many devices will need to be connected, if it's a lot, prompt first.

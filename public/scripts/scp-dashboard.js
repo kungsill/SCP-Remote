@@ -71,10 +71,30 @@
     function format(value, arg) { return value.replace('{0}', arg); }
 
     /* Programs the hospital wants to know about when they appear on a computer.
-       Match is a lowercase substring of the program name. Edit this list to suit. */
+       Match is a lowercase substring of the program name. Edit this list to suit.
+
+       Remote-management tools lead the list because that is how intrusions of this kind
+       actually run: rather than writing malware, an attacker installs a legitimate,
+       signed remote-control product, which antivirus has no reason to stop and which
+       looks like ordinary IT work. A Thai broadband provider was taken this way in 2026
+       using MeshCentral — the same product this system is built on.
+
+       One limitation to know: our own agent installs under the name "Mesh Agent", so a
+       rogue MeshCentral agent on a ward computer cannot be told apart from ours by name
+       alone. What separates them is the server each one reports to, which is written in
+       the .msh file beside the agent and is not visible in a list of installed programs.
+       "meshcentral" below catches the server being installed somewhere it should not be,
+       which is the step that matters most. */
     var watchlist = [
+        // Remote control and remote management
         'teamviewer', 'anydesk', 'ultraviewer', 'ammyy', 'radmin', 'supremo',
-        'vnc', 'logmein', 'splashtop', 'hamachi', 'ngrok', 'zerotier',
+        'vnc', 'logmein', 'splashtop', 'rustdesk', 'dwservice', 'gotoassist',
+        'remote utilities', 'chrome remote desktop', 'meshcentral',
+        'screenconnect', 'connectwise', 'atera', 'syncro', 'action1',
+        'ninjaone', 'ninjarmm', 'pulseway', 'level.io', 'kaseya',
+        // Tunnels that carry traffic out past the hospital firewall
+        'hamachi', 'ngrok', 'zerotier', 'tailscale', 'cloudflared', 'playit',
+        // File sharing
         'utorrent', 'bittorrent', 'qbittorrent', 'thunder', 'tor browser'
     ];
     /* A computer with no keyboard or mouse activity for this long counts as idle

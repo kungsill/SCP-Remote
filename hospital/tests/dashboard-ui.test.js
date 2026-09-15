@@ -383,3 +383,22 @@ test('with only one room there is nothing to choose between', (t) => {
     api.show();
     assert.equal(chips(w).length, 0, 'buttons that can only say one thing are not shown');
 });
+
+// A remote-management tool installed by someone else is how an intrusion of this kind
+// runs, so the watchlist has to name them. Our own agent is the exception that cannot be
+// caught this way, which the list comments explain.
+test('the watchlist names the remote-management tools an intruder would install', (t) => {
+    const source = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-dashboard.js'), 'utf8');
+    const list = source.substring(source.indexOf('var watchlist = ['), source.indexOf('];', source.indexOf('var watchlist = [')));
+    ['meshcentral', 'rustdesk', 'screenconnect', 'atera', 'ninjarmm', 'anydesk', 'teamviewer']
+        .forEach(name => assert.ok(list.indexOf("'" + name) >= 0, 'the watchlist should name ' + name));
+    ['ngrok', 'zerotier', 'cloudflared', 'tailscale']
+        .forEach(name => assert.ok(list.indexOf("'" + name) >= 0, 'and the tunnel ' + name));
+});
+
+test('a watched program found on a computer is reported as needing attention', (t) => {
+    const { w, api } = setup(t);
+    api.show();
+    api.receiveSoftware(JSON.stringify([{ name: 'Adobe Reader' }]));   // not watched
+    assert.equal(w.document.body.textContent.indexOf('MeshCentral'), -1);
+});

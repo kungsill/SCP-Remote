@@ -18,7 +18,18 @@
       "10.10.1.0/24",
       "10.10.2.0/24",
       "10.10.3.0/24"
-    ]
+    ],
+    "autoBackup": {
+      "backupIntervalHours": 24,
+      "backupHour": 2,
+      "keepLastDaysBackup": 30,
+      "zipCompression": 6,
+      "backupPath": "CHANGE-ME/scp-remote-backups",
+      "backupSkipFoldersGlob": [
+        "**/signedagents"
+      ],
+      "scpBackupCopyPath": "CHANGE-ME-second-drive/SCP-Remote-Backups"
+    }
   },
   "domains": {
     "": {

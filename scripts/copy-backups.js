@@ -95,7 +95,42 @@ function run(destination) {
     return { source: settings.source, destination: destination, backups: backups, agents: agents, removed: removed, keepDays: settings.keepDays };
 }
 
-module.exports = { run: run, backupSettings: backupSettings, prune: prune, copyFolder: copyFolder };
+// Time until the next occurrence of a time of day. The copy is pinned to the clock
+// rather than to an interval from startup, so it always lands after the server's own
+// nightly backup instead of drifting to some other hour after every restart.
+function msUntilDailyTime(hour, minute, now) {
+    const from = now ? new Date(now.getTime()) : new Date();
+    const next = new Date(from.getFullYear(), from.getMonth(), from.getDate(), hour, minute, 0, 0);
+    if (next.getTime() <= from.getTime()) { next.setDate(next.getDate() + 1); }
+    return next.getTime() - from.getTime();
+}
+
+// Run the copy every day at the given time, from inside a process that is already
+// running. Timers are unreferenced so they never hold the process open on their own.
+function scheduleDaily(destination, hour, minute, report) {
+    const say = report || function (line) { console.log('[backup-copy] ' + line); };
+    function once() {
+        try {
+            const result = run(destination);
+            say('ก๊อปแล้ว: ไฟล์สำรองใหม่ ' + result.backups.copied + ', เอเจนต์ใหม่ ' + result.agents.copied + ', ลบสำเนาเก่า ' + result.removed);
+        } catch (error) {
+            say('ไม่สำเร็จ: ' + error.message);
+        }
+    }
+    // A machine that was switched off at the scheduled hour would otherwise wait a whole
+    // day for its first copy, so catch up shortly after starting as well.
+    const catchUp = setTimeout(once, 5 * 60 * 1000);
+    let daily = setTimeout(function tick() {
+        once();
+        daily = setTimeout(tick, 24 * 60 * 60 * 1000);
+        if (daily.unref) { daily.unref(); }
+    }, msUntilDailyTime(hour, minute));
+    if (catchUp.unref) { catchUp.unref(); }
+    if (daily.unref) { daily.unref(); }
+    return { stop: function () { clearTimeout(catchUp); clearTimeout(daily); } };
+}
+
+module.exports = { run: run, backupSettings: backupSettings, prune: prune, copyFolder: copyFolder, msUntilDailyTime: msUntilDailyTime, scheduleDaily: scheduleDaily };
 
 if (require.main === module) {
     const destination = process.argv[2];

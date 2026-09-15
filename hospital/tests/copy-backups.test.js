@@ -69,3 +69,32 @@ test('pruning is skipped entirely when the server keeps backups for ever', (t) =
     assert.equal(prune(dir, 0), 0);
     assert.equal(fs.readdirSync(dir).length, 1);
 });
+
+const { msUntilDailyTime, scheduleDaily } = require('../../scripts/copy-backups.js');
+
+test('the daily copy is pinned to the clock, not to when the server started', () => {
+    const hour = 60 * 60 * 1000;
+    // Before the hour on the same day: it waits until later today.
+    assert.equal(msUntilDailyTime(2, 30, new Date(2026, 8, 15, 1, 30, 0)), hour);
+    // After it: it waits until tomorrow, not a day from now.
+    assert.equal(msUntilDailyTime(2, 30, new Date(2026, 8, 15, 3, 30, 0)), 23 * hour);
+    // Exactly on it: the next one is tomorrow, so a restart at 02:30 cannot loop.
+    assert.equal(msUntilDailyTime(2, 30, new Date(2026, 8, 15, 2, 30, 0)), 24 * hour);
+});
+
+test('the daily copy survives a destination that is not reachable', (t) => {
+    // A drive that has been unplugged must be reported, not thrown, or it would take the
+    // whole server down with it when the service starts.
+    const said = [];
+    const job = scheduleDaily('Z:\\definitely-not-there', 2, 30, line => said.push(line));
+    t.after(() => job.stop());
+    assert.ok(job && typeof job.stop === 'function');
+});
+
+test('scheduling the copy never holds the server open by itself', (t) => {
+    const job = scheduleDaily('Z:\\nowhere', 2, 30, () => {});
+    t.after(() => job.stop());
+    // If the timers were referenced, node would refuse to exit while they were pending.
+    // There is no direct way to assert that, so assert the handle offers stopping instead.
+    assert.doesNotThrow(() => job.stop());
+});

@@ -55,6 +55,18 @@
       "agentTag": {
         "ServerName": 1,
         "ServerDesc": 2
+      },
+      "twoFactorCookieDurationDays": 30,
+      "passwordRequirements": {
+        "otp2factor": true,
+        "backupcode2factor": true,
+        "email2factor": false,
+        "sms2factor": false,
+        "msg2factor": false,
+        "push2factor": false,
+        "duo2factor": false,
+        "force2factor": false,
+        "lock2factor": false
       }
     }
   }

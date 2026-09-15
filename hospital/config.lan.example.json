@@ -47,7 +47,19 @@
         "Files": "{0} ขอจัดการไฟล์บนเครื่องนี้\nสามารถดู ดาวน์โหลด อัปโหลด และลบไฟล์ได้\nคุณต้องการอนุญาตหรือไม่?"
       },
       "footer": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล",
-      "loginfooter": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล"
+      "loginfooter": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล",
+      "twoFactorCookieDurationDays": 30,
+      "passwordRequirements": {
+        "otp2factor": true,
+        "backupcode2factor": true,
+        "email2factor": false,
+        "sms2factor": false,
+        "msg2factor": false,
+        "push2factor": false,
+        "duo2factor": false,
+        "force2factor": false,
+        "lock2factor": false
+      }
     }
   }
 }

@@ -875,11 +875,30 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
     // If there is a fail and null is returned, the request or connection is closed already.
     function checkAgentIpAddress(req, res) {
         if ((parent.config.settings.agentblockedip != null) && (checkIpAddressEx(req, res, parent.config.settings.agentblockedip, null) == true)) { obj.blockedAgents++; return null; }
-        if ((parent.config.settings.agentallowedip != null) && (checkIpAddressEx(req, res, parent.config.settings.agentallowedip, null) == false)) { obj.blockedAgents++; return null; }
+        if ((parent.config.settings.agentallowedip != null) && (checkIpAddressEx(req, res, parent.config.settings.agentallowedip, null) == false)) { obj.blockedAgents++; reportRefusedAgent(req, res); return null; }
         const domain = (req.url ? getDomain(req) : getDomain(res));
         if ((domain.agentblockedip != null) && (checkIpAddressEx(req, res, domain.agentblockedip, null) == true)) { obj.blockedAgents++; return null; }
-        if ((domain.agentallowedip != null) && (checkIpAddressEx(req, res, domain.agentallowedip, null) == false)) { obj.blockedAgents++; return null; }
+        if ((domain.agentallowedip != null) && (checkIpAddressEx(req, res, domain.agentallowedip, null) == false)) { obj.blockedAgents++; reportRefusedAgent(req, res); return null; }
         return domain;
+    }
+
+    // SCP-Remote: upstream counts refused agents and says nothing more, so a computer on
+    // an address range nobody remembered to allow simply never appears — no message on the
+    // server, none on the computer, nothing naming the reason. That is the hard part, not
+    // the fix. Name the address once per range per hour, with the command that allows it.
+    const refusedAgentRanges = {};
+    function reportRefusedAgent(req, res) {
+        try {
+            const address = cleanRemoteAddr((req && req.ip) || (res && res.connection && res.connection.remoteAddress) || '');
+            if (!address) { return; }
+            const parts = address.split('.');
+            const range = (parts.length === 4) ? (parts[0] + '.' + parts[1] + '.' + parts[2] + '.0/24') : address;
+            const now = Date.now();
+            if (refusedAgentRanges[range] && ((now - refusedAgentRanges[range]) < 3600000)) { return; }
+            refusedAgentRanges[range] = now;
+            console.log('ปฏิเสธเอเจนต์จาก ' + address + ' เพราะวง ' + range + ' ไม่อยู่ใน agentAllowedIP');
+            console.log('  อนุญาตด้วย: node scripts/allow-subnet.js add ' + range + '   แล้ว npm run service:restart');
+        } catch (ex) { }
     }
 
     // Return the current domain of the request

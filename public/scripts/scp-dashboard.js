@@ -47,6 +47,9 @@
         roomEmpty: ['No computers in this room yet. Install the agent, or move a computer here.', 'ห้องนี้ยังไม่มีเครื่อง ติดตั้งเอเจนต์เพิ่ม หรือย้ายเครื่องเข้ามาได้'],
         scanBusy: ['A program check is already running. Wait for it to finish.', 'กำลังตรวจโปรแกรมของอีกเครื่องอยู่ กรุณารอให้เสร็จก่อน'],
         liveCol: ['Screen', 'หน้าจอ'],
+        pickRooms: ['Show', 'เลือกดู'],
+        everyRoom: ['Everywhere', 'ทุกที่'],
+        roomHidden: ['Not selected', 'ไม่ได้เลือก'],
         liveOn: ['Show screens', 'เปิดดูภาพหน้าจอ'],
         liveOff: ['Hide screens', 'ปิดภาพหน้าจอ'],
         liveConnecting: ['Connecting…', 'กำลังเชื่อมต่อ…'],
@@ -88,6 +91,11 @@
        Watching starts only when someone presses the button, and never resumes by
        itself on a later visit. */
     var tiles = {}, liveOn = false, liveSkipped = 0;
+
+    /* Which rooms to show. Null means all of them. Kept in the browser because it is a
+       way of looking at the page, not an action: it opens nothing on its own, and the
+       buttons above the list say plainly what is being left out. */
+    var roomFilter = null;
     var liveLimit = 12;
     var liveSettings = { encoding: 4, quality: 40, scaling: 384, framerate: 1000 };
     // Used for a single frame when someone saves a picture, then dropped again.
@@ -156,6 +164,54 @@
         var list = window.nodes;
         if (!list) return [];
         return Array.isArray(list) ? list.slice() : [];
+    }
+
+    function loadRoomFilter() {
+        try {
+            var saved = JSON.parse(localStorage.getItem('scpDashRooms') || 'null');
+            if (Array.isArray(saved) && saved.length) { roomFilter = saved; }
+        } catch (error) { /* a private window, or storage turned off */ }
+    }
+    function saveRoomFilter() {
+        try {
+            if (roomFilter && roomFilter.length) { localStorage.setItem('scpDashRooms', JSON.stringify(roomFilter)); }
+            else { localStorage.removeItem('scpDashRooms'); }
+        } catch (error) { /* nothing here is worth failing over */ }
+    }
+    function roomShown(name) { return (roomFilter == null) || (roomFilter.indexOf(name) >= 0); }
+
+    function toggleRoom(name, everyRoom) {
+        if (roomFilter == null) {
+            // Nothing is narrowed yet, so picking a room out of a list means "this one",
+            // not "all of them except this one".
+            roomFilter = [name];
+        } else {
+            var at = roomFilter.indexOf(name);
+            if (at >= 0) { roomFilter.splice(at, 1); } else { roomFilter.push(name); }
+        }
+        // Showing nothing at all is never what someone meant, and neither is a list of
+        // every room: both mean the same as no filter.
+        if ((roomFilter.length === 0) || (roomFilter.length === everyRoom.length)) { roomFilter = null; }
+        saveRoomFilter();
+        render();
+    }
+
+    function roomChips(everyRoom, counts) {
+        var bar = element('div', 'scp-dash-rooms');
+        bar.appendChild(element('span', 'scp-dash-rooms-label', t('pickRooms')));
+        var all = button(t('everyRoom'), 'scp-dash-chip' + ((roomFilter == null) ? ' on' : ''), function () {
+            roomFilter = null; saveRoomFilter(); render();
+        });
+        bar.appendChild(all);
+        everyRoom.forEach(function (name) {
+            // Lit only when it is the reason something is being left out. With no choice
+            // made, "everywhere" is the lit one and the rooms read as available.
+            var on = (roomFilter != null) && (roomFilter.indexOf(name) >= 0);
+            var chip = button(name + '  ' + (counts[name] || 0), 'scp-dash-chip' + (on ? ' on' : ''), function () { toggleRoom(name, everyRoom); });
+            chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+            bar.appendChild(chip);
+        });
+        return bar;
     }
 
     function stat(label, value, tone) {
@@ -429,10 +485,33 @@
         // remaining slots. Each tile is a live desktop session against someone's screen,
         // so none may outlive the row that shows it.
         var watchable = {};
-        if (liveOn) { list.forEach(function (node) { if (isOnline(node)) { watchable[node._id] = true; } }); }
+        if (liveOn) { list.forEach(function (node) { if (isOnline(node) && roomShown(roomOf(node))) { watchable[node._id] = true; } }); }
         Object.keys(tiles).forEach(function (nodeid) { if (!watchable[nodeid]) { stopTile(nodeid); } });
 
         if (!list.length) { body.appendChild(element('div', 'scp-dash-empty', t('empty'))); return; }
+
+        // Group first, so the buttons can be drawn and the rest of the page can follow
+        // what they say. Start from the groups themselves so a room with no computer in
+        // it yet is still offered, rather than looking as though it does not exist.
+        var rooms = {};
+        Object.keys(window.meshes || {}).forEach(function (id) {
+            var mesh = window.meshes[id];
+            if (mesh && mesh.name) rooms[mesh.name] = [];
+        });
+        list.forEach(function (node) {
+            var room = roomOf(node);
+            if (!rooms[room]) rooms[room] = [];
+            rooms[room].push(node);
+        });
+        var everyRoom = Object.keys(rooms).sort();
+        var counts = {};
+        everyRoom.forEach(function (name) { counts[name] = rooms[name].length; });
+        if (everyRoom.length > 1) { body.appendChild(roomChips(everyRoom, counts)); }
+
+        // Everything below counts only what is being shown, so the numbers and the list
+        // never disagree.
+        var shownRooms = everyRoom.filter(roomShown);
+        list = list.filter(function (node) { return roomShown(roomOf(node)); });
 
         var online = list.filter(isOnline);
         var busy = list.filter(isBusy);
@@ -453,20 +532,7 @@
         liveNote.hidden = true;
         body.appendChild(liveNote);
 
-        // Group by device group, which is how rooms and departments are organised here.
-        // Start from the groups themselves so a room that has no computer yet is still
-        // listed, rather than looking as though it does not exist.
-        var rooms = {};
-        Object.keys(window.meshes || {}).forEach(function (id) {
-            var mesh = window.meshes[id];
-            if (mesh && mesh.name) rooms[mesh.name] = [];
-        });
-        list.forEach(function (node) {
-            var room = roomOf(node);
-            if (!rooms[room]) rooms[room] = [];
-            rooms[room].push(node);
-        });
-        Object.keys(rooms).sort().forEach(function (room) {
+        shownRooms.forEach(function (room) {
             var group = rooms[room];
             var section = element('section', 'scp-dash-room');
             var head = element('div', 'scp-dash-room-head');
@@ -590,8 +656,9 @@
                 return originalApps.apply(this, arguments);
             };
         }
+        loadRoomFilter();
         window.addEventListener('resize', fitHeight);
-        window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive };
+        window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom };
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

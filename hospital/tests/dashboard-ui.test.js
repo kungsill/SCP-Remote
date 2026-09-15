@@ -22,7 +22,7 @@ function setup(t, options = {}) {
     w.confirm = () => true;
     w.meshserver = { send: () => {} };
     w.serverinfo = { consent: options.consent === undefined ? 8 : options.consent };
-    w.meshes = { 'mesh//a': { _id: 'mesh//a', name: 'ทดสอบ' } };
+    w.meshes = options.meshes || { 'mesh//a': { _id: 'mesh//a', name: 'ทดสอบ' } };
     w.nodes = options.nodes || [
         { _id: 'node//1', name: 'pc-one', conn: 1, meshid: 'mesh//a', users: ['HOSP\\somchai'], idletime: 5 },
         { _id: 'node//2', name: 'pc-two', conn: 1, meshid: 'mesh//a', users: [] },
@@ -286,4 +286,100 @@ test('the hint drops the box when the server lets picture-only connections throu
     assert.equal(hint.indexOf('อนุญาต'), -1, 'it must not promise a box that will never appear here');
     assert.ok(hint.indexOf('แจ้งเตือน') >= 0, 'the person is still told it started');
     assert.ok(hint.indexOf('แถบ') >= 0, 'and the bar still stays on their screen');
+});
+
+// Picking which buildings to look at. Everything on the page follows the choice, so the
+// numbers, the rows and the screens being watched can never disagree with the buttons.
+const threeWards = {
+    meshes: {
+        'mesh//a': { _id: 'mesh//a', name: 'ตึกหญิง' },
+        'mesh//b': { _id: 'mesh//b', name: 'ตึกชาย' },
+        'mesh//c': { _id: 'mesh//c', name: 'OPD' }
+    },
+    nodes: [
+        { _id: 'node//1', name: 'w1', conn: 1, meshid: 'mesh//a', users: [] },
+        { _id: 'node//2', name: 'w2', conn: 1, meshid: 'mesh//a', users: [] },
+        { _id: 'node//3', name: 'm1', conn: 1, meshid: 'mesh//b', users: [] },
+        { _id: 'node//4', name: 'o1', conn: 1, meshid: 'mesh//c', users: [] }
+    ]
+};
+const chips = w => Array.from(w.document.querySelectorAll('.scp-dash-chip'));
+const chip = (w, label) => chips(w).find(item => item.textContent.indexOf(label) === 0);
+const roomTitles = w => Array.from(w.document.querySelectorAll('.scp-dash-room-head h3')).map(h => h.textContent);
+
+test('a button is offered for each room, and everywhere is the starting point', (t) => {
+    const { w, api } = setup(t, threeWards);
+    api.show();
+    assert.deepEqual(chips(w).map(c => c.textContent.split('  ')[0]), ['ทุกที่', 'OPD', 'ตึกชาย', 'ตึกหญิง']);
+    assert.equal(chip(w, 'ทุกที่').className.indexOf('on') > 0, true);
+    assert.deepEqual(roomTitles(w), ['OPD', 'ตึกชาย', 'ตึกหญิง']);
+    assert.ok(chip(w, 'ตึกหญิง').textContent.indexOf('2') > 0, 'each button says how many computers are there');
+});
+
+test('choosing one ward shows only that ward, and counts only its computers', (t) => {
+    const { w, api } = setup(t, threeWards);
+    api.show();
+    chip(w, 'ตึกหญิง').click();
+    assert.deepEqual(roomTitles(w), ['ตึกหญิง']);
+    const total = w.document.querySelector('.scp-dash-stat-value').textContent;
+    assert.equal(total, '2', 'the totals must count what is shown, not everything');
+});
+
+test('only the chosen ward is watched, and the rest stop', (t) => {
+    const { w, connections, api } = setup(t, threeWards);
+    api.show();
+    api.setLive(true);
+    assert.equal(connections.length, 4);
+
+    chip(w, 'ตึกหญิง').click();
+    const stopped = connections.filter(c => c.stops > 0).map(c => c.nodeid).sort();
+    assert.deepEqual(stopped, ['node//3', 'node//4'], 'the wards no longer shown must be released');
+    assert.equal(connections.length, 4, 'and the ones still shown must not reconnect');
+});
+
+test('a ward chosen later starts watching without disturbing the others', (t) => {
+    const { w, connections, api } = setup(t, threeWards);
+    api.show();
+    chip(w, 'ตึกหญิง').click();
+    api.setLive(true);
+    assert.equal(connections.length, 2);
+
+    chip(w, 'OPD').click();
+    assert.equal(connections.length, 3);
+    assert.ok(connections.every(c => c.stops === 0), 'the two already running must be left alone');
+});
+
+test('turning every room off means all of them, never an empty page', (t) => {
+    const { w, api } = setup(t, threeWards);
+    api.show();
+    chip(w, 'ตึกหญิง').click();
+    chip(w, 'ตึกหญิง').click();          // and off again
+    assert.deepEqual(roomTitles(w), ['OPD', 'ตึกชาย', 'ตึกหญิง']);
+    assert.equal(chip(w, 'ทุกที่').className.indexOf('on') > 0, true);
+});
+
+test('ticking every room one by one is the same as everywhere', (t) => {
+    const { w, api } = setup(t, threeWards);
+    api.show();
+    chip(w, 'ตึกหญิง').click();
+    chip(w, 'ตึกชาย').click();
+    chip(w, 'OPD').click();
+    assert.equal(chip(w, 'ทุกที่').className.indexOf('on') > 0, true);
+    assert.deepEqual(roomTitles(w), ['OPD', 'ตึกชาย', 'ตึกหญิง']);
+});
+
+test('the choice is remembered, and everywhere clears it again', (t) => {
+    const first = setup(t, threeWards);
+    first.api.show();
+    chip(first.w, 'ตึกชาย').click();
+    assert.equal(first.w.localStorage.getItem('scpDashRooms'), JSON.stringify(['ตึกชาย']));
+
+    chip(first.w, 'ทุกที่').click();
+    assert.equal(first.w.localStorage.getItem('scpDashRooms'), null, 'everywhere is the absence of a choice');
+});
+
+test('with only one room there is nothing to choose between', (t) => {
+    const { w, api } = setup(t);
+    api.show();
+    assert.equal(chips(w).length, 0, 'buttons that can only say one thing are not shown');
 });

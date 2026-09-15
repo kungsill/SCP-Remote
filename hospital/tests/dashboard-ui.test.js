@@ -20,7 +20,8 @@ function setup(t, options = {}) {
 
     w.alert = () => {};
     w.confirm = () => true;
-    w.meshserver = { send: () => {} };
+    const sent = [];
+    w.meshserver = { send: message => sent.push(message), onMessage: () => {} };
     w.serverinfo = { consent: options.consent === undefined ? 8 : options.consent };
     w.meshes = options.meshes || { 'mesh//a': { _id: 'mesh//a', name: 'ทดสอบ' } };
     w.nodes = options.nodes || [
@@ -67,7 +68,9 @@ function setup(t, options = {}) {
     w.eval(fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-dashboard.js'), 'utf8'));
     w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
     t.after(() => { try { w.ScpDashboard.hide(); } catch (error) { /* already closed */ } w.close(); });
-    return { w, connections, tick, api: w.ScpDashboard, panel: w.document.getElementById('scpDashboard') };
+    // Push a message through the page's own callback, the way the server would.
+    const fromServer = message => w.meshserver.onMessage(w.meshserver, message);
+    return { w, connections, tick, sent, fromServer, api: w.ScpDashboard, panel: w.document.getElementById('scpDashboard') };
 }
 
 function liveButton(w) {
@@ -401,4 +404,108 @@ test('a watched program found on a computer is reported as needing attention', (
     api.show();
     api.receiveSoftware(JSON.stringify([{ name: 'Adobe Reader' }]));   // not watched
     assert.equal(w.document.body.textContent.indexOf('MeshCentral'), -1);
+});
+
+// What each computer is made of, read from what the server already holds. Nothing new is
+// collected from the computers themselves.
+const specsFor = (nodeid, over = {}) => Object.assign({
+    action: 'getsysinfo', nodeid: nodeid,
+    hardware: {
+        identifiers: { cpu_name: 'AMD Ryzen 5 5500  ', gpu_name: 'NVIDIA GeForce GTX 960', product_name: 'MS-7C52', board_vendor: 'Micro-Star', bios_serial: 'To be filled by O.E.M.', bios_date: '20240409000000.000000+000' },
+        windows: {
+            memory: [{ Capacity: '8589934592' }, { Capacity: '8589934592' }],
+            volumes: { C: { type: 'NTFS', size: 511094812672, sizeremaining: 255547406336, dType: 3 } }
+        }
+    }
+}, over);
+
+test('a computer asks the server once for what it is made of, and shows it', (t) => {
+    const s = setup(t);
+    s.api.show();
+    const asked = s.sent.filter(m => m.action === 'getsysinfo').map(m => m.nodeid).sort();
+    assert.deepEqual(asked, ['node//1', 'node//2', 'node//3'], 'each computer once');
+
+    s.fromServer(specsFor('node//1'));
+    const line = s.w.document.querySelector('.scp-dash-specs').textContent;
+    assert.ok(line.indexOf('AMD Ryzen 5 5500') >= 0, 'the processor: ' + line);
+    assert.ok(line.indexOf('16 GB') >= 0, 'the memory added up: ' + line);
+    assert.ok(line.indexOf('C:') >= 0 && line.indexOf('50%') >= 0, 'and the system drive: ' + line);
+
+    s.api.render();
+    assert.equal(s.sent.filter(m => m.action === 'getsysinfo').length, 3, 'a redraw must not ask again');
+});
+
+test('the page still receives everything else the server sends', (t) => {
+    const s = setup(t);
+    const seen = [];
+    s.w.meshserver.onMessage = (server, message) => seen.push(message.action);
+    s.api.show();
+    s.fromServer({ action: 'something-else' });
+    s.fromServer(specsFor('node//1'));
+    assert.deepEqual(seen, ['something-else', 'getsysinfo'], 'our watching must not swallow messages');
+});
+
+test('a drive running out of room becomes something to attend to', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(specsFor('node//1', { hardware: {
+        identifiers: {}, windows: { volumes: { C: { size: 1000, sizeremaining: 120, dType: 3 } } } } }));
+    assert.ok(s.w.document.body.textContent.indexOf('ดิสก์ C เหลือ 12%') >= 0, 'twelve percent free is a warning');
+
+    s.fromServer(specsFor('node//2', { hardware: {
+        identifiers: {}, windows: { volumes: { C: { size: 1000, sizeremaining: 40, dType: 3 } } } } }));
+    assert.ok(s.w.document.body.textContent.indexOf('ใกล้เต็ม') >= 0, 'four percent free is urgent');
+});
+
+test('a memory stick low on room is not reported as a fault', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(specsFor('node//1', { hardware: {
+        identifiers: {}, windows: { volumes: { E: { size: 1000, sizeremaining: 10, dType: 2 } } } } }));
+    assert.equal(s.w.document.body.textContent.indexOf('ดิสก์ E'), -1, 'removable drives are not the hospital’s problem');
+});
+
+test('a computer waiting on a restart says so', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(specsFor('node//1', { pendingReboot: 'Windows Update' }));
+    assert.ok(s.w.document.body.textContent.indexOf('รอรีสตาร์ต') >= 0);
+});
+
+test('searching narrows the page, and says so when nothing matches', (t) => {
+    const s = setup(t);
+    s.api.show();
+    const box = s.w.document.getElementById('scpDashSearch');
+
+    box.value = 'pc-two';
+    box.dispatchEvent(new s.w.Event('input'));
+    assert.ok(s.w.document.body.textContent.indexOf('pc-two') >= 0);
+    assert.equal(s.w.document.body.textContent.indexOf('pc-three'), -1, 'the others are put away');
+
+    box.value = 'somchai';   // the signed-in person, not the computer
+    box.dispatchEvent(new s.w.Event('input'));
+    assert.ok(s.w.document.body.textContent.indexOf('pc-one') >= 0, 'a person’s name finds their computer');
+
+    box.value = 'ไม่มีเครื่องนี้';
+    box.dispatchEvent(new s.w.Event('input'));
+    assert.ok(s.w.document.body.textContent.indexOf('ไม่พบอะไรที่ตรงกับ') >= 0);
+});
+
+test('the inventory export carries the columns an asset register needs', (t) => {
+    const s = setup(t);
+    let saved = null;
+    s.w.HTMLAnchorElement.prototype.click = function () { saved = { name: this.download, href: this.href }; };
+    s.api.show();
+    s.fromServer(specsFor('node//1'));
+    s.w.ScpDashboard.exportInventory();
+
+    assert.ok(saved, 'it should produce a file');
+    assert.ok(saved.name.indexOf('ครุภัณฑ์') >= 0, 'named for what it is: ' + saved.name);
+    const csv = decodeURIComponent(saved.href.split(',')[1]);
+    assert.ok(csv.charCodeAt(0) === 0xFEFF, 'with a byte order mark, or Excel mangles Thai');
+    ['ชื่อเครื่อง', 'หน่วยงาน', 'CPU', 'แรม (GB)', 'Serial'].forEach(h =>
+        assert.ok(csv.indexOf(h) >= 0, 'the column ' + h));
+    assert.ok(csv.indexOf('MS-7C52') >= 0 && csv.indexOf('"16"') >= 0);
+    assert.ok(csv.indexOf('To be filled') < 0, 'a placeholder serial is left blank rather than copied');
+    assert.ok(csv.indexOf('09/04/2024') >= 0, 'the BIOS date as a date');
 });

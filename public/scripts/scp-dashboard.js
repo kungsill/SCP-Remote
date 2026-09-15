@@ -47,6 +47,16 @@
         roomEmpty: ['No computers in this room yet. Install the agent, or move a computer here.', 'ห้องนี้ยังไม่มีเครื่อง ติดตั้งเอเจนต์เพิ่ม หรือย้ายเครื่องเข้ามาได้'],
         scanBusy: ['A program check is already running. Wait for it to finish.', 'กำลังตรวจโปรแกรมของอีกเครื่องอยู่ กรุณารอให้เสร็จก่อน'],
         liveCol: ['Screen', 'หน้าจอ'],
+        search: ['Search a computer, a person, an address', 'ค้นหาชื่อเครื่อง ชื่อผู้ใช้ หรือ IP'],
+        searchNone: ['Nothing matched “{0}”.', 'ไม่พบอะไรที่ตรงกับ “{0}”'],
+        specsCol: ['Specification', 'สเปกเครื่อง'],
+        specsWait: ['Reading…', 'กำลังอ่าน…'],
+        diskLow: ['Disk {0} is {1}% free', 'ดิสก์ {0} เหลือ {1}%'],
+        diskFull: ['Disk {0} almost full — {1}% free', 'ดิสก์ {0} ใกล้เต็ม เหลือ {1}%'],
+        rebootPending: ['Waiting for a restart to finish updates', 'รอรีสตาร์ตเพื่อให้อัปเดตเสร็จ'],
+        exportCsv: ['Export inventory', 'ออกรายการครุภัณฑ์'],
+        exportNone: ['No specifications have been read yet. Open the page for a moment and try again.', 'ยังไม่ได้อ่านสเปกเครื่องเลย เปิดหน้านี้ทิ้งไว้สักครู่แล้วลองใหม่'],
+        exportDone: ['Saved {0} computers.', 'บันทึกแล้ว {0} เครื่อง'],
         pickRooms: ['Show', 'เลือกดู'],
         everyRoom: ['Everywhere', 'ทุกที่'],
         roomHidden: ['Not selected', 'ไม่ได้เลือก'],
@@ -68,7 +78,13 @@
         consentSilent: ['Nothing appears on the computer being watched. Staff should be told in writing that screens may be viewed.', 'เครื่องปลายทางจะไม่ขึ้นอะไรเลย ควรแจ้งเจ้าหน้าที่เป็นลายลักษณ์อักษรไว้ว่าหน้าจออาจถูกดู']
     };
     function t(key) { var entry = texts[key]; return entry ? entry[thai ? 1 : 0] : key; }
-    function format(value, arg) { return value.replace('{0}', arg); }
+    // Fills {0}, {1}, … so a sentence can carry more than one value.
+    function format(value) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        return String(value).replace(/\{(\d+)\}/g, function (whole, index) {
+            return (args[index] === undefined) ? whole : args[index];
+        });
+    }
 
     /* Programs the hospital wants to know about when they appear on a computer.
        Match is a lowercase substring of the program name. Edit this list to suit.
@@ -116,6 +132,12 @@
        way of looking at the page, not an action: it opens nothing on its own, and the
        buttons above the list say plainly what is being left out. */
     var roomFilter = null;
+
+    /* What each computer is made of, as the agent already reported it to the server.
+       Asked for once per computer per visit and kept here; nothing is collected that
+       the server does not already hold. */
+    var specs = {}, specsAsked = {}, listening = false, searchText = '';
+    var diskWarnPercent = 15, diskCriticalPercent = 8;
     var liveLimit = 12;
     var liveSettings = { encoding: 4, quality: 40, scaling: 384, framerate: 1000 };
     // Used for a single frame when someone saves a picture, then dropped again.
@@ -172,6 +194,12 @@
         }
         var uptime = daysSince(node.lastbootuptime);
         if (uptime != null && uptime > longUptimeDays) { found.push({ level: 'warn', text: format(t('uptimeLong'), uptime) }); }
+        disksOf(node).forEach(function (disk) {
+            if (disk.percent <= diskCriticalPercent) { found.push({ level: 'high', text: format(t('diskFull'), disk.letter, disk.percent) }); }
+            else if (disk.percent <= diskWarnPercent) { found.push({ level: 'warn', text: format(t('diskLow'), disk.letter, disk.percent) }); }
+        });
+        var record = specs[node._id];
+        if (record && record.pendingReboot) { found.push({ level: 'warn', text: t('rebootPending') }); }
         var scan = scanState[node._id];
         if (scan && scan.hits) { scan.hits.forEach(function (name) { found.push({ level: 'high', text: format(t('watched'), name) }); }); }
         return found;
@@ -289,6 +317,117 @@
         scanState[nodeid] = { state: 'done', count: list.length, hits: hits };
         render();
         return true;
+    }
+
+    // The page keeps one callback for everything the server sends. Wrap it to watch for
+    // the answers to our own questions, and always hand the message on afterwards so the
+    // rest of the page behaves exactly as before.
+    function listen() {
+        if (listening || !window.meshserver) return;
+        listening = true;
+        var original = window.meshserver.onMessage;
+        window.meshserver.onMessage = function (server, message) {
+            try {
+                if (message && (message.action === 'getsysinfo') && message.nodeid) {
+                    specs[message.nodeid] = (message.hardware || message.noinfo) ? message : null;
+                    render();
+                }
+            } catch (error) { /* never let our own bookkeeping break the page */ }
+            if (typeof original === 'function') { return original.apply(this, arguments); }
+        };
+    }
+
+    function askForSpecs(node) {
+        if (specsAsked[node._id] || !window.meshserver) return;
+        specsAsked[node._id] = true;
+        try { window.meshserver.send({ action: 'getsysinfo', nodeid: node._id }); } catch (error) { specsAsked[node._id] = false; }
+    }
+
+    function gigabytes(value) {
+        var n = Number(value);
+        if (!n || n <= 0) return null;
+        return Math.round(n / 1073741824);
+    }
+
+    function hardwareOf(node) {
+        var record = specs[node._id];
+        return (record && record.hardware) ? record.hardware : null;
+    }
+
+    // Every drive the computer reports, as a percentage free. Removable drives and
+    // network drives are left out: a memory stick at 2% is not a fault to report.
+    function disksOf(node) {
+        var hardware = hardwareOf(node);
+        var volumes = hardware && hardware.windows && hardware.windows.volumes;
+        if (!volumes) return [];
+        return Object.keys(volumes).map(function (letter) {
+            var volume = volumes[letter];
+            if (!volume || (volume.dType !== 3) || !volume.size) return null;
+            return { letter: letter, percent: Math.round((Number(volume.sizeremaining) / Number(volume.size)) * 100), free: gigabytes(volume.sizeremaining) };
+        }).filter(Boolean);
+    }
+
+    function specLine(node) {
+        var hardware = hardwareOf(node);
+        if (!hardware) return null;
+        var identifiers = hardware.identifiers || {}, windows = hardware.windows || {};
+        var parts = [];
+        if (identifiers.cpu_name) { parts.push(String(identifiers.cpu_name).replace(/\s+/g, ' ').trim()); }
+        var ram = 0;
+        (windows.memory || []).forEach(function (stick) { ram += Number(stick.Capacity) || 0; });
+        if (ram > 0) { parts.push(gigabytes(ram) + ' GB'); }
+        var system = disksOf(node).filter(function (d) { return d.letter === 'C'; })[0];
+        if (system) { parts.push('C: ' + system.free + ' GB (' + system.percent + '%)'); }
+        if (identifiers.gpu_name && !/basic|microsoft/i.test(identifiers.gpu_name)) { parts.push(String(identifiers.gpu_name).trim()); }
+        return parts.length ? parts.join('  ·  ') : null;
+    }
+
+    function matchesSearch(node) {
+        if (!searchText) return true;
+        var hay = [node.name, node.rname, node.host, node.ip, signedInUser(node), roomOf(node)].join(' ').toLowerCase();
+        return hay.indexOf(searchText) >= 0;
+    }
+
+    function csvCell(value) {
+        var text = (value === null || value === undefined) ? '' : String(value);
+        return '"' + text.replace(/"/g, '""').replace(/\s+/g, ' ').trim() + '"';
+    }
+
+    // One row per computer, for the asset register the hospital has to produce by hand
+    // today. Written with a byte order mark so Excel opens Thai text correctly.
+    function exportInventory() {
+        var rows = allNodes().filter(function (node) { return hardwareOf(node); });
+        if (!rows.length) { window.alert(t('exportNone')); return; }
+        var header = ['ชื่อเครื่อง', 'หน่วยงาน', 'ชื่อเครื่องใน Windows', 'IP', 'รุ่นเครื่อง', 'ยี่ห้อเมนบอร์ด',
+                      'CPU', 'การ์ดจอ', 'แรม (GB)', 'ดิสก์', 'ระบบปฏิบัติการ', 'Serial', 'วันที่ BIOS'];
+        var lines = [header.map(csvCell).join(',')];
+        rows.forEach(function (node) {
+            var hardware = hardwareOf(node), identifiers = hardware.identifiers || {}, windows = hardware.windows || {};
+            var ram = 0;
+            (windows.memory || []).forEach(function (stick) { ram += Number(stick.Capacity) || 0; });
+            var serial = identifiers.bios_serial || identifiers.chassis_serial || '';
+            if (/to be filled|default string|none/i.test(serial)) { serial = ''; }
+            var bios = String(identifiers.bios_date || '');
+            if (/^\d{8}/.test(bios)) { bios = bios.substring(6, 8) + '/' + bios.substring(4, 6) + '/' + bios.substring(0, 4); }
+            lines.push([
+                node.name, roomOf(node), node.rname || node.host || '', node.ip || '',
+                identifiers.product_name || '', identifiers.board_vendor || '',
+                identifiers.cpu_name || '', identifiers.gpu_name || '',
+                ram > 0 ? gigabytes(ram) : '',
+                disksOf(node).map(function (d) { return d.letter + ':' + d.free + 'GB'; }).join(' '),
+                (node.osdesc || '').replace('Microsoft ', ''), serial, bios
+            ].map(csvCell).join(','));
+        });
+        function pad(value) { return (value < 10 ? '0' : '') + value; }
+        var now = new Date();
+        var stamp = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate());
+        var link = document.createElement('a');
+        link.download = 'SCP-Remote_ครุภัณฑ์คอมพิวเตอร์_' + stamp + '.csv';
+        link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\ufeff' + lines.join('\r\n'));
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.alert(format(t('exportDone'), rows.length));
     }
 
     function openRemote(node) {
@@ -463,6 +602,8 @@
         label.appendChild(element('strong', '', node.name || node.rname || ''));
         var meta = [node.host || node.ip || '', (node.osdesc || '').replace('Microsoft ', '')].filter(Boolean).join(' · ');
         label.appendChild(element('small', '', meta));
+        var line = specLine(node);
+        if (line) { label.appendChild(element('small', 'scp-dash-specs', line)); }
         name.appendChild(label);
         row.appendChild(name);
 
@@ -524,6 +665,9 @@
             rooms[room].push(node);
         });
         var everyRoom = Object.keys(rooms).sort();
+        // Ask once per computer per visit. The server answers from what it already holds,
+        // so this costs the computers themselves nothing.
+        list.forEach(askForSpecs);
         var counts = {};
         everyRoom.forEach(function (name) { counts[name] = rooms[name].length; });
         if (everyRoom.length > 1) { body.appendChild(roomChips(everyRoom, counts)); }
@@ -531,7 +675,7 @@
         // Everything below counts only what is being shown, so the numbers and the list
         // never disagree.
         var shownRooms = everyRoom.filter(roomShown);
-        list = list.filter(function (node) { return roomShown(roomOf(node)); });
+        list = list.filter(function (node) { return roomShown(roomOf(node)) && matchesSearch(node); });
 
         var online = list.filter(isOnline);
         var busy = list.filter(isBusy);
@@ -552,8 +696,16 @@
         liveNote.hidden = true;
         body.appendChild(liveNote);
 
+        if (searchText && !list.length) {
+            body.appendChild(element('div', 'scp-dash-empty', format(t('searchNone'), searchText)));
+            liveNote.hidden = true;
+            if (scrollTop > 0) { panel.scrollTop = scrollTop; }
+            return;
+        }
+        // A search narrows to the rooms that still have something in them.
+        if (searchText) { shownRooms = shownRooms.filter(function (room) { return (rooms[room] || []).some(matchesSearch); }); }
         shownRooms.forEach(function (room) {
-            var group = rooms[room];
+            var group = (rooms[room] || []).filter(matchesSearch);
             var section = element('section', 'scp-dash-room');
             var head = element('div', 'scp-dash-room-head');
             head.appendChild(element('h3', '', room));
@@ -602,6 +754,7 @@
             if (page && page.style.display !== 'none') { page.dataset.scpHidden = '1'; page.style.display = 'none'; }
         });
         panel.hidden = false;
+        listen();
         render();
         fitHeight();
         if (!timer) timer = window.setInterval(render, 10000);
@@ -654,10 +807,20 @@
         var actions = element('div', 'scp-dash-heading-actions');
         liveToggle = button(t('liveOn'), 'scp-dash-live', function () { setLive(!liveOn); });
         actions.appendChild(liveToggle);
+        actions.appendChild(button(t('exportCsv'), 'scp-dash-refresh', exportInventory));
         actions.appendChild(button(t('refresh'), 'scp-dash-refresh', render));
         heading.appendChild(actions);
         liveHint = element('p', 'scp-dash-live-hint');
         heading.appendChild(liveHint);
+
+        var find = document.createElement('input');
+        find.type = 'search';
+        find.id = 'scpDashSearch';
+        find.className = 'scp-dash-search';
+        find.placeholder = t('search');
+        find.setAttribute('aria-label', t('search'));
+        find.addEventListener('input', function () { searchText = find.value.trim().toLowerCase(); render(); });
+        heading.appendChild(find);
         updateLiveControls();
         panel.appendChild(heading);
         body = element('div', 'scp-dash-body');
@@ -678,7 +841,8 @@
         }
         loadRoomFilter();
         window.addEventListener('resize', fitHeight);
-        window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom };
+        window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
+            exportInventory: exportInventory, specLine: specLine, disksOf: disksOf };
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

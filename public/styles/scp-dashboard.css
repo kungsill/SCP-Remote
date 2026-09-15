@@ -94,3 +94,13 @@
 .scp-dash-chip { border: 1px solid var(--scp-line); background: var(--scp-surface); color: var(--scp-muted); border-radius: 20px; padding: 6px 14px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .scp-dash-chip:hover { background: var(--scp-soft); color: var(--scp-ink); }
 .scp-dash-chip.on { border-color: var(--scp-accent); background: var(--scp-accent); color: #fff; }
+
+/* Search sits with the heading it filters, full width so it reads as a field and not
+   as one more button in the row above it. */
+.scp-dash-search { display: block; width: 100%; max-width: 420px; margin-top: 14px; padding: 9px 13px;
+  border: 1px solid var(--scp-line); border-radius: 9px; background: var(--scp-surface);
+  color: var(--scp-ink); font: inherit; font-size: 13px; }
+.scp-dash-search:focus { outline: 2px solid var(--scp-accent); outline-offset: 1px; border-color: var(--scp-accent); }
+
+/* What the computer is made of, under its name and quieter than it. */
+.scp-dash-specs { color: var(--scp-muted); font-size: 11px; font-variant-numeric: tabular-nums; }

@@ -170,6 +170,50 @@ namespace ScpRemoteSetup
         // file can be carried on its own. Anything placed next to it still wins, which is
         // how a newer download replaces the built-in copy without rebuilding.
         static string extractedFolder;
+        // The service was not created. Work out why and say it, rather than sending
+        // someone to go and find out. By far the most common cause is antivirus: a remote
+        // control agent is exactly the thing it is built to remove, and it removes it
+        // without saying anything to the person standing at the computer.
+        public static string DiagnoseMissingService(string installerPath)
+        {
+            List<string> notes = new List<string>();
+            string programs = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            string[] folders = new string[] { Path.Combine(programs, "Mesh Agent"), Path.Combine(programs, "SCP-Remote") };
+            bool installerGone = (installerPath != null) && !File.Exists(installerPath);
+            bool folderExists = false, exeExists = false;
+            foreach (string folder in folders)
+            {
+                if (!Directory.Exists(folder)) continue;
+                folderExists = true;
+                try { if (Directory.GetFiles(folder, "*.exe").Length > 0) exeExists = true; }
+                catch { }
+            }
+
+            if (installerGone || (folderExists && !exeExists))
+            {
+                notes.Add("ตัวโปรแกรมหายไปหลังติดตั้ง ซึ่งเกือบทุกครั้งเกิดจากแอนติไวรัสลบทิ้ง");
+                notes.Add("");
+                notes.Add("ให้เพิ่มข้อยกเว้นในแอนติไวรัสให้โฟลเดอร์เหล่านี้ แล้วติดตั้งใหม่");
+                notes.Add("    " + folders[0]);
+                notes.Add("    " + folders[1]);
+                notes.Add("    " + Path.Combine(Path.GetTempPath(), "SCP-Remote-Setup"));
+            }
+            else if (!folderExists)
+            {
+                notes.Add("ไม่พบโฟลเดอร์ของโปรแกรมเลย แปลว่าการติดตั้งไม่ได้เริ่ม หรือถูกขัดจังหวะ");
+                notes.Add("");
+                notes.Add("เปิด PowerShell แบบผู้ดูแลเครื่อง แล้วสั่งบรรทัดนี้เพื่อดูข้อความผิดพลาดจริง");
+                notes.Add("    \"" + installerPath + "\" -fullinstall");
+            }
+            else
+            {
+                notes.Add("ไฟล์โปรแกรมอยู่ครบ แต่บริการยังไม่ถูกสร้างขึ้นภายใน 90 วินาที");
+                notes.Add("");
+                notes.Add("ลองรีสตาร์ตเครื่องหนึ่งครั้ง แล้วดูว่าเครื่องขึ้นในระบบหรือยัง");
+            }
+            return string.Join("\r\n", notes.ToArray());
+        }
+
         public static string ExtractBundledInstaller()
         {
             Assembly assembly = Assembly.GetExecutingAssembly();
@@ -684,7 +728,8 @@ namespace ScpRemoteSetup
                 }
                 if (agent == null)
                 {
-                    Say("ติดตั้งแล้ว แต่ยังไม่พบบริการของโปรแกรม กรุณาแจ้งฝ่ายไอที", MessageBoxIcon.Warning);
+                    Say("ติดตั้งแล้ว แต่ยังไม่พบบริการของโปรแกรม\r\n\r\n" +
+                        Agent.DiagnoseMissingService(installer), MessageBoxIcon.Warning);
                     step = 3; UpdateStep(); return;
                 }
             }

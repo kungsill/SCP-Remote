@@ -409,8 +409,8 @@
             x += addInfo("NodeID", recFileMetadata.nodeid);
             if (recFileMetadata.protocol) {
                 var p = recFileMetadata.protocol;
-                if (p == 1) { p = "MeshCentral Terminal"; }
-                else if (p == 2) { p = "MeshCentral Desktop"; }
+                if (p == 1) { p = "SCP-Remote Terminal"; }
+                else if (p == 2) { p = "SCP-Remote Desktop"; }
                 else if (p == 6) { p = "Admin PowerShell"; }
                 else if (p == 8) { p = "User Shell"; }
                 else if (p == 9) { p = "User PowerShell"; }
@@ -677,7 +677,7 @@
             QH('timespan', '00:00:00');
             QV('metadatadiv', true);
             if (urlargs.stream == null) {
-                QH('metadatadiv', '<span style=\"font-family:Arial,Helvetica Neue,Helvetica,sans-serif;font-size:28px\">MeshCentral Session Player</span><br /><br /><span style=color:gray>' + "Drag & drop a .mcrec file or click \"Open File...\"" + '</span>');
+                QH('metadatadiv', '<span style=\"font-family:Arial,Helvetica Neue,Helvetica,sans-serif;font-size:28px\">SCP-Remote Session Player</span><br /><br /><span style=color:gray>' + "Drag & drop a .mcrec file or click \"Open File...\"" + '</span>');
             } else {
                 QH('metadatadiv', '');
             }

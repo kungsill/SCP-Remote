@@ -175,7 +175,7 @@
             </div>
             <p id="logoutControl"><span id=logoutControlSpan class="logoncontrolspan"></span><span id=idleTimeoutNotify style="color:yellow"></span></p>
             <div class=textnewui id=textnewui onmouseup=toggleBootstrapUIMode() onkeypress="if (event.key=='Enter') { toggleBootstrapUIMode(); }">
-                <b>Try the new MeshCentral UI</b>
+                <b>Try the new SCP-Remote UI</b>
             </div>
         </div>
         <div id="page_leftbar">
@@ -789,7 +789,7 @@
                         </div>
                         <div>
                             <input type="button" id="autoconnectbutton1" value="AutoConnect" onclick=autoConnectDesktop(event) onkeypress="return false" onkeydown="return false" style="display:none;margin-right:4px" />
-                            <span id=connectbutton1span><input type=button id=connectbutton1 cmenu="deskConnectButton" title="Connect using MeshAgent remote desktop" value="Connect" onclick=connectDesktop(event,3) onkeypress="return false" onkeydown="return false" disabled="disabled" /></span>
+                            <span id=connectbutton1span><input type=button id=connectbutton1 cmenu="deskConnectButton" title="Connect using SCP-Remote Agent remote desktop" value="Connect" onclick=connectDesktop(event,3) onkeypress="return false" onkeydown="return false" disabled="disabled" /></span>
                             <span id=connectbutton1rspan><input type=button id=connectbutton1r cmenu="altPortContextMenu" value="RDP Connect" title="Connect using RDP" onclick=askRdpCredentials() onkeypress="return false" onkeydown="return false" disabled="disabled" /></span>
                             <span id=connectbutton1hspan><input type=button id=connectbutton1h value="HW Connect" title="Connect using hardware KVM" onclick=connectDesktop(event,2) onkeypress="return false" onkeydown="return false" disabled="disabled" /></span>
                             <span id=disconnectbutton1span><input type=button id=disconnectbutton1 cmenu="deskDisconnectButton" value="Disconnect" onclick=connectDesktop(event,0) onkeypress="return false" onkeydown="return false" /></span>
@@ -3106,10 +3106,10 @@
                         x += addHtmlValue2('<label><input id=d2updateCheck2 type=checkbox onclick=server_showVersionDlgUpdate()' + (((message.tags.latest == "Unknown") || (message.tags.current == message.tags.latest) || ((features & 2048) == 0))?' disabled':'') + ' /> ' + "Latest Version" + '</label>', '<b>' + EscapeHtml(message.tags.latest) + '</b>');
                         x += '</div>';
                         if (((message.tags.current == message.tags.latest) && (message.tags.current == message.tags.stable)) || ((features & 2048) == 0)) {
-                            setDialogMode(2, "MeshCentral Version", 1, null, x);
+                            setDialogMode(2, "SCP-Remote Version", 1, null, x);
                         } else {
                             x += '<hr />' + "Check and click OK to start server self-update.";
-                            setDialogMode(2, "MeshCentral Version", 3, server_showVersionDlgEx, x, message.tags);
+                            setDialogMode(2, "SCP-Remote Version", 3, server_showVersionDlgEx, x, message.tags);
                             server_showVersionDlgUpdate();
                         }
                     }
@@ -3123,7 +3123,7 @@
                             var x = '<div class="dialogText dialogTextLog"><pre id=d2ServerErrorsLogPre>' + EscapeHtml(message.data) + '</pre></div>';
                             x += '<br /><div style=float:right><img src=images/link4.png height=10 width=10 title="' + "Download error log" + '" style=cursor:pointer onclick=d2CopyServerErrorsToClip()></div>';
                             x += '<div><label><input id=d2clearErrorsCheck type=checkbox onclick=server_showErrorsDlgUpdate() /> ' + "Check and click OK to clear error log." + '</label></div>';
-                            setDialogMode(2, "MeshCentral Server Errors", 3, server_showErrorsDlgEx, x);
+                            setDialogMode(2, "SCP-Remote Server Errors", 3, server_showErrorsDlgEx, x);
                             server_showErrorsDlgUpdate();
                         }
                     }
@@ -4379,7 +4379,7 @@
             x += '<label><input id=d2c13 type=checkbox' + ((deviceViewSettings.devsCols.indexOf('windowsfirewall') >= 0)?' checked':'') + '>' + "Windows Firewall" + '</label><br />';
             x += '<label><input id=d2c14 type=checkbox' + ((deviceViewSettings.devsCols.indexOf('lastbootuptime') >= 0)?' checked':'') + '>' + "Last Boot Up Time" + '</label><br />';
             x += '<label><input id=d2c16 type=checkbox' + ((deviceViewSettings.devsCols.indexOf('idletime') >= 0)?' checked':'') + '>' + "Idle Time" + '</label><br />';
-            x += '<label><input id=d2c1 type=checkbox' + ((deviceViewSettings.devsCols.indexOf('links') >= 0)?' checked':'') + '>' + "MeshCentral Router Links" + '</label><br />';
+            x += '<label><input id=d2c1 type=checkbox' + ((deviceViewSettings.devsCols.indexOf('links') >= 0)?' checked':'') + '>' + "SCP-Remote Router Links" + '</label><br />';
             x += '<label><input id=d2c2 type=checkbox' + ((deviceViewSettings.devsCols.indexOf('user') >= 0)?' checked':'') + '>' + "Logged in users" + '</label><br />';
             x += '<label><input id=d2c3 type=checkbox' + ((deviceViewSettings.devsCols.indexOf('ip') >= 0)?' checked':'') + '>' + "Agent IP address" + '</label><br />';
             x += '<label><input id=d2c4 type=checkbox' + ((deviceViewSettings.devsCols.indexOf('conn') >= 0)?' checked':'') + '>' + "Server Connectivity" + '</label><br />';
@@ -4892,7 +4892,7 @@
                 }
                 if ((userinfo.siteadmin == 0xFFFFFFFF) || ((userinfo.siteadmin & 128) == 0)) {
                     r += '<a href=# onclick=\'return p10showMeshCmdDialog(0)\' style=cursor:pointer title="' + "Download MeshCmd, a command line tool that performs many functions." + '">' + "MeshCmd" + '</a>&nbsp';
-                    if ((navigator.platform.toLowerCase() == 'win32') || (navigator.platform.toLowerCase() == 'macintel')) { r += '<a href=# onclick=\'return p10showMeshRouterDialog()\' style=cursor:pointer title="' + "Download MeshCentral Router, a TCP port mapping tool." + '">' + "Router" + '</a>&nbsp'; }
+                    if ((navigator.platform.toLowerCase() == 'win32') || (navigator.platform.toLowerCase() == 'macintel')) { r += '<a href=# onclick=\'return p10showMeshRouterDialog()\' style=cursor:pointer title="' + "Download SCP-Remote Router, a TCP port mapping tool." + '">' + "Router" + '</a>&nbsp'; }
                 }
                 r += '</div><br/>';
 
@@ -5793,7 +5793,7 @@
                 x += '<div id=emailInviteDiv style=display:none>' + format("Invite someone to install the mesh agent. An email with be sent with the link to the mesh agent installation for the \"{0}\" device group.", EscapeHtml(mesh.name)) + '<br /><br />';
                 x += addHtmlValue("Name (optional)", '<input id=agentInviteName value="" style=width:230px maxlength=64 />');
                 x += addHtmlValue("Email", '<input id=agentInviteEmail style=width:230px placeholder="' + "example@email.com" + '" onkeyup=validateAgentInvite()></input>');
-                x += addHtmlValue("Operating System", '<select id=agentInviteNameOs onchange=d2ChangedInviteType() style=width:236px><option value=4>' + "Send installation link" + '</option><option value=0 selected>' + "Any supported" + '</option><option value=1>' + "Windows only" + '</option><option value=3>' + "Apple macOS only" + '</option><option value=2>' + "Linux only" + '</option><option value=5>' + "MeshCentral Assistant" + '</option></select>');
+                x += addHtmlValue("Operating System", '<select id=agentInviteNameOs onchange=d2ChangedInviteType() style=width:236px><option value=4>' + "Send installation link" + '</option><option value=0 selected>' + "Any supported" + '</option><option value=1>' + "Windows only" + '</option><option value=3>' + "Apple macOS only" + '</option><option value=2>' + "Linux only" + '</option><option value=5>' + "SCP-Remote Assistant" + '</option></select>');
                 x += '<div id=d2agentexpirediv>';
                 x += addHtmlValue("Link Expiration", '<select id=agentInviteExpire style=width:236px><option value=1>' + "1 hour" + '</option><option value=8>' + "8 hours" + '</option><option value=24>' + "1 day" + '</option><option value=168>' + "1 week" + '</option><option value=5040>' + "1 month" + '</option><option value=0>' + "Unlimited" + '</option></select>');
                 x += '</div>';
@@ -5805,7 +5805,7 @@
             }
             x += '<div id=urlInviteDiv>' + format("Invite someone to install the mesh agent by sharing an invitation link. This link points the user to installation instructions for the \"{0}\" device group. The link is public and no account for this server is needed.", EscapeHtml(mesh.name)) + '<br /><br />';
             x += addHtmlValue("Link Expiration", '<select id=d2inviteExpire style=width:236px onchange=d2RequestInvitationLink()><option value=1>' + "1 hour" + '</option><option value=8>' + "8 hours" + '</option><option value=24>' + "1 day" + '</option><option value=168>' + "1 week" + '</option><option value=5040>' + "1 month" + '</option><option value=0>' + "Unlimited" + '</option></select>');
-            x += addHtmlValue("Agents", '<select id=d2agentType style=width:236px onchange=d2ChangedInviteType()><option value=0>' + "All Available Agents" + '</option><option value=1>' + "Windows MeshAgent" + '</option><option value=2>' + "Linux MeshAgent" + '</option><option value=4>' + "MacOS MeshAgent" + '</option><option value=8>' + "MeshCentral Assistant" + '</option><option value=16>' + "Android MeshAgent" + '</option></select>');
+            x += addHtmlValue("Agents", '<select id=d2agentType style=width:236px onchange=d2ChangedInviteType()><option value=0>' + "All Available Agents" + '</option><option value=1>' + "Windows SCP-Remote Agent" + '</option><option value=2>' + "Linux SCP-Remote Agent" + '</option><option value=4>' + "MacOS SCP-Remote Agent" + '</option><option value=8>' + "SCP-Remote Assistant" + '</option><option value=16>' + "Android SCP-Remote Agent" + '</option></select>');
             x += '<div id=d2agentInstallTypeDiv>';
             x += addHtmlValue("Installation Type", '<select id=d2agentInviteType style=width:236px onchange=d2RequestInvitationLink()><option value=0>' + "Background and interactive" + '</option><option value=2>' + "Background only" + '</option><option value=1>' + "Interactive only" + '</option></select>');
             x += '</div>';
@@ -5858,7 +5858,7 @@
 
             var opts = '<select id=aginsSelect onchange=addAgentToMeshClick() style=width:236px><option value=0>' + "Windows" + '</option><option value=1>' + "Linux / BSD" + '</option><option value=5>' + "Linux / BSD / macOS Binary Installer" + '</option><option value=2>' + "Apple macOS" + '</option>';
             if ((features & 2) == 0) { opts += '<option value=6>' + "Mobile device" + '</option>'; } // Don't display mobile setup in LAN mode.
-            opts += '<option value=7>' + "MeshCentral Assistant" + '</option>';
+            opts += '<option value=7>' + "SCP-Remote Assistant" + '</option>';
             opts += '<option value=3>' + "Windows (Uninstall)" + '</option><option value=4>' + "Linux / BSD (Uninstall)" + '</option><option value=8>' + "Apple macOS (Uninstall)" + '</option></select>';
             x += addHtmlValue("Operating System", opts);
 
@@ -5888,9 +5888,9 @@
 
             // Windows agent install
             x += '<div id=agins_windows>' + format("To add a new computer to the device group of \"{0}\", download the mesh agent and install it onto the designated computer to manage. This agent has server and device group information embedded within it.", EscapeHtml(mesh.name)) + '<br /><br />';
-            x += addHtmlValue("Mesh Agent", '<a id=aginsw32lnk name="meshagents?id=3&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "x86 32bit version of the MeshAgent" + '">' + "Windows x86-32 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows x86 32bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=3&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
-            x += addHtmlValue("Mesh Agent", '<a id=aginsw64lnk name="meshagents?id=4&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "x86 64bit version of the MeshAgent" + '">' + "Windows x86-64 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows x86 64bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=4&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
-            x += addHtmlValue("Mesh Agent", '<a id=aginswa64lnk name="meshagents?id=43&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "ARM 64bit version of the MeshAgent" + '">' + "Windows ARM-64 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows ARM 64bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=43&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a id=aginsw32lnk name="meshagents?id=3&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "x86 32bit version of the SCP-Remote Agent" + '">' + "Windows x86-32 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows x86 32bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=3&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a id=aginsw64lnk name="meshagents?id=4&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "x86 64bit version of the SCP-Remote Agent" + '">' + "Windows x86-64 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows x86 64bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=4&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a id=aginswa64lnk name="meshagents?id=43&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "ARM 64bit version of the SCP-Remote Agent" + '">' + "Windows ARM-64 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows ARM 64bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=43&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
             if (debugmode > 0) { x += addHtmlValue("Settings File", '<a id=aginswmshlnk name="meshsettings?id=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '">' + format("{0} settings (.msh)", EscapeHtml(mesh.name)) + '</a>'); }
             x += '</div>';
 
@@ -5901,35 +5901,35 @@
 
             // macOS agent install
             x += '<div id=agins_osx style=display:none>' + format("To add a new computer to the device group of \"{0}\", download the mesh agent and install it onto the designated computer to manage. This agent installer has server and device group information embedded within it.", EscapeHtml(mesh.name)) + '<br /><br />';
-            x += addHtmlValue("Mesh Agent", '<a onclick=downloadFile("meshosxagent?id=16&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '") title="' + "x86-64bit version of macOS Mesh Agent" + '">' + "macOS x86-64bit" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy macOS agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshosxagent?id=16&meshid=' + meshid.split('/')[2] + '",0)>');
-            x += addHtmlValue("Mesh Agent", '<a onclick=downloadFile("meshosxagent?id=29&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '") title="' + "ARM 64bit version of macOS Mesh Agent" + '">' + "macOS ARM (64bit)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy macOS agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshosxagent?id=29&meshid=' + meshid.split('/')[2] + '",0)>');
-            x += addHtmlValue("Mesh Agent", '<a onclick=downloadFile("meshosxagent?id=10005&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '") title="' + "Universal version of macOS Mesh Agent" + '">' + "macOS (Universal)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy macOS agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshosxagent?id=10005&meshid=' + meshid.split('/')[2] + '",0)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a onclick=downloadFile("meshosxagent?id=16&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '") title="' + "x86-64bit version of macOS SCP-Remote Agent" + '">' + "macOS x86-64bit" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy macOS agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshosxagent?id=16&meshid=' + meshid.split('/')[2] + '",0)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a onclick=downloadFile("meshosxagent?id=29&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '") title="' + "ARM 64bit version of macOS SCP-Remote Agent" + '">' + "macOS ARM (64bit)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy macOS agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshosxagent?id=29&meshid=' + meshid.split('/')[2] + '",0)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a onclick=downloadFile("meshosxagent?id=10005&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '") title="' + "Universal version of macOS SCP-Remote Agent" + '">' + "macOS (Universal)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy macOS agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshosxagent?id=10005&meshid=' + meshid.split('/')[2] + '",0)>');
             x += '</div>';
 
             // QR code agent install
-            x += '<div id=agins_qrcode style=display:none;min-height:180px><a id=agins_qrimage_a rel=\"noreferrer noopener\" target=_blank><div id=agins_qrimage style=float:right;margin-left:10px;width:180px;height:180px;cursor:pointer></div></a><div>' + format("To add a mobile device to group \"{0}\", download the MeshAgent application and scan this QR code.", EscapeHtml(mesh.name)) + '</div>';
+            x += '<div id=agins_qrcode style=display:none;min-height:180px><a id=agins_qrimage_a rel=\"noreferrer noopener\" target=_blank><div id=agins_qrimage style=float:right;margin-left:10px;width:180px;height:180px;cursor:pointer></div></a><div>' + format("To add a mobile device to group \"{0}\", download the SCP-Remote Agent application and scan this QR code.", EscapeHtml(mesh.name)) + '</div>';
             x += '<table style=width:180px>';
             x += '<tr><td style=text-align:center><a title="' + "Google Play Store" + '"rel="noreferrer noopener" target=_blank href="https://play.google.com/store/apps/details?id=com.meshcentral.agent2"><img style=cursor:pointer src="images/google-play-140.png" width=140 srcset="images/google-play-280.png 2x" /></a></td></tr>';
             x += '<tr><td style=text-align:center><a title="' + "Amazon App Store" + '" rel="noreferrer noopener" target=_blank href="https://www.amazon.co.uk/gp/product/B097Z4Q7SK/"><img style=cursor:pointer src="images/amazon-appstore-140.png"  width=140 srcset="images/amazon-appstore-280.png 2x" /></a></td></tr>';
             x += '</table>';
-            x += addHtmlValue("Android APK", '<a onclick=downloadFile("meshagents?id=14' + (urlargs.key?('&key=' + urlargs.key):'') + '",null,true) title="' + "APK version of the MeshAgent" + '">' + "APK" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=14&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '")>');
+            x += addHtmlValue("Android APK", '<a onclick=downloadFile("meshagents?id=14' + (urlargs.key?('&key=' + urlargs.key):'') + '",null,true) title="' + "APK version of the SCP-Remote Agent" + '">' + "APK" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=14&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '")>');
             x += '</div>'
 
             // MeshCentral Assistant
-            x += '<div id=agins_assistant style=display:none><table><tr><td style=vertical-align:top><div>' + format("MeshCentral Assistant is a Windows tool that users can use to ask for help. Use the link below to download a version that will connect to device group \"{0}\".", EscapeHtml(mesh.name)) + '</div><div></div><br />';
-            x += '<a id=asinslnk name="meshagents?id=10006&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "MeshCentral Assistant for Windows" + '">' + "Assistant for Windows (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=10006&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '")>';
+            x += '<div id=agins_assistant style=display:none><table><tr><td style=vertical-align:top><div>' + format("SCP-Remote Assistant is a Windows tool that users can use to ask for help. Use the link below to download a version that will connect to device group \"{0}\".", EscapeHtml(mesh.name)) + '</div><div></div><br />';
+            x += '<a id=asinslnk name="meshagents?id=10006&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "SCP-Remote Assistant for Windows" + '">' + "Assistant for Windows (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=10006&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '")>';
             x += '</td><td><img id=agass_img1 src=images/assistant-100.png width=74 height=100 srcset="images/assistant-200.png 2x"><img id=agass_img2 src=images/assistant2-100.png width=74 height=100 srcset="images/assistant2-200.png 2x"></td></tr></table></div>';
 
             // MeshCentral Assistant2
-            x += '<div id=agins_assistant2 style=display:none><table><tr><td style=vertical-align:top><div>' + "MeshCentral Assistant is a Windows tool that users can use to ask for help. Use the link below to download a version that will monitor the background agent." + '</div><div></div><br />';
-            x += '<a id=asinslnk2 name="meshagents?id=10006&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "MeshCentral Assistant for Windows" + '">' + "Assistant for Windows (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=10006&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '")>';
+            x += '<div id=agins_assistant2 style=display:none><table><tr><td style=vertical-align:top><div>' + "SCP-Remote Assistant is a Windows tool that users can use to ask for help. Use the link below to download a version that will monitor the background agent." + '</div><div></div><br />';
+            x += '<a id=asinslnk2 name="meshagents?id=10006&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "SCP-Remote Assistant for Windows" + '">' + "Assistant for Windows (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=10006&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '")>';
             x += '</td><td><img src=images/assistant-100.png width=74 height=100 srcset="images/assistant-200.png 2x"></td></tr></table></div>';
 
             // Windows agent uninstall
             x += '<div id=agins_windows_un style=display:none>' + "To remove a mesh agent, download the file below, run it and click \"Uninstall\"." + '<br /><br />';
-            x += addHtmlValue("Mesh Agent", '<a id=aginsw32unlnk name="meshagents?id=3&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "x86 32bit version of the MeshAgent" + '">' + "Windows x86-32 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows x86 32bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=3&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
-            x += addHtmlValue("Mesh Agent", '<a id=aginsw64unlnk name="meshagents?id=4&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "x86 64bit version of the MeshAgent" + '">' + "Windows x86-64 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows x86 64bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=4&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
-            x += addHtmlValue("Mesh Agent", '<a id=aginswa64unlnk name="meshagents?id=43&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "ARM 64bit version of the MeshAgent" + '">' + "Windows ARM-64 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows ARM 64bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=43&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a id=aginsw32unlnk name="meshagents?id=3&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "x86 32bit version of the SCP-Remote Agent" + '">' + "Windows x86-32 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows x86 32bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=3&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a id=aginsw64unlnk name="meshagents?id=4&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "x86 64bit version of the SCP-Remote Agent" + '">' + "Windows x86-64 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows x86 64bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=4&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a id=aginswa64unlnk name="meshagents?id=43&meshid=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "ARM 64bit version of the SCP-Remote Agent" + '">' + "Windows ARM-64 (.exe)" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy Windows ARM 64bit agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=43&meshid=' + meshid.split('/')[2] + '&installflags=",1)>');
             x += '</div>';
 
             // Linux agent uninstall
@@ -5939,16 +5939,16 @@
 
             // macOS agent uninstall
             x += '<div id=agins_osx_un style=display:none>' + "To remove a mesh agent, download the file below, extract the ZIP archive, then right-click \"Uninstall.command\" and select \"Open\"." + '<br /><br />';
-            x += addHtmlValue("Mesh Agent", '<a onclick=downloadFile("meshosxagent?id=10005&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '") title="' + "Universal version of macOS Mesh Agent" + '">macOS Agent (Universal)</a> <img src=images/link4.png height=10 width=10 title="' + "Copy macOS agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshosxagent?id=10005&meshid=' + meshid.split('/')[2] + '",0)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a onclick=downloadFile("meshosxagent?id=10005&meshid=' + meshid.split('/')[2] + (urlargs.key?('&key=' + urlargs.key):'') + '") title="' + "Universal version of macOS SCP-Remote Agent" + '">macOS Agent (Universal)</a> <img src=images/link4.png height=10 width=10 title="' + "Copy macOS agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshosxagent?id=10005&meshid=' + meshid.split('/')[2] + '",0)>');
             x += '</div>';
 
             // Linux binary installer
             x += '<div id=agins_linux_inst style=display:none>' + "This is an executable on OSs with graphical user interfaces." + '<br /><br />' + "Apple macOS executables will need to be removed from quarantine by running 'xattr -r -d com.apple.quarantine meshagent'." + '<br /><br />' + "You need to run 'chmod +x meshagent', and then run this file." + '<br /><br />';
-            x += addHtmlValue("Mesh Agent", '<a id=aginsbinlnk name="meshagents?id=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '">' + "meshagent" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=' + meshid.split('/')[2] + '&installflags=",1)>');
+            x += addHtmlValue("SCP-Remote Agent", '<a id=aginsbinlnk name="meshagents?id=' + meshid.split('/')[2] + '&installflags=0' + (urlargs.key?('&key=' + urlargs.key):'') + '">' + "meshagent" + '</a> <img src=images/link4.png height=10 width=10 title="' + "Copy agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentUrl("meshagents?id=' + meshid.split('/')[2] + '&installflags=",1)>');
             x += addHtmlValue("Command", '<input id=aginsbincmd type=text style="width:216px" readonly value=\'wget -O meshagent' + (((features & 0x80000000) != 0)?' --no-check-certificate':'') + ' \"https://' + servername + portStr + domainUrl + 'meshagents?id=' + meshid.split('/')[2].split('$').join('%24').split('@').join('%40') + '\' /> <img src=images/link4.png height=10 width=10 title="' + "Copy agent URL to clipboard" + '" style=cursor:pointer onclick=copyAgentIdValue("aginsbincmd")>');
             x += '</div>';
 
-            setDialogMode(2, "Add Mesh Agent", 2, null, x, 'fileDownload');
+            setDialogMode(2, "Add SCP-Remote Agent", 2, null, x, 'fileDownload');
 
             // Create the QR code
             new QRCode(Q('agins_qrimage'), { text: serverinfo.magenturl + ',' + serverinfo.agentCertHash + ',' + meshid.split('/')[2], width: 180, height: 180, colorDark: '#000000', colorLight: '#EEE', correctLevel: QRCode.CorrectLevel.M });
@@ -6293,7 +6293,7 @@
             var op = Q('d2deviceop').value, title = Q('dp2notifyTitle').value, msg = Q('d2notifyMsg').value, chkNodeIds = getCheckedDevices(), timeout = parseFloat(Q('d2notifyTimeout').value);
             if (msg.length == 0) return;
             if (title == '') { title = decodeURIComponent('{{{extitle}}}'); }
-            if (title == '') { title = "MeshCentral"; }
+            if (title == '') { title = "SCP-Remote"; }
             if (isNaN(timeout)) { timeout = 2; }
             if (op == 1) { // MessageBox
                 for (var i = 0; i < chkNodeIds.length; i++) { meshserver.send({ action: 'msg', type: 'messagebox', nodeid: chkNodeIds[i], title: title, msg: msg, timeout: (timeout * 60000) }); }
@@ -7846,7 +7846,7 @@
                     if (node.agent.ver != 0) { str += ' v' + node.agent.ver; }
                     if (node.agent.id == 14) { str = node.agent.core; }
                     if ((node.agent.root === false) && ((node.conn & 1) != 0)) { str += ', ' + "Restricted"; }
-                    x += addDeviceAttribute("Mesh Agent", str);
+                    x += addDeviceAttribute("SCP-Remote Agent", str);
                 }
 
                 // Attribute: Intel AMT
@@ -8033,7 +8033,7 @@
                 var connectivity = node.conn;
                 if (connectivity && (connectivity > 1)) {
                     var cstate = [];
-                    if ((node.conn & 1) != 0) cstate.push('<span title="' + "Mesh agent is connected and ready for use." + '">' + "Mesh Agent" + '</span>');
+                    if ((node.conn & 1) != 0) cstate.push('<span title="' + "Mesh agent is connected and ready for use." + '">' + "SCP-Remote Agent" + '</span>');
                     if ((node.conn & 2) != 0) cstate.push('<span title="' + "Intel&reg; AMT CIRA is connected and ready for use." + '">' + "Intel&reg; AMT CIRA" + '</span>');
                     else if ((node.conn & 4) != 0) cstate.push('<span title="' + "Intel&reg; AMT is routable and ready for use." + '">' + "Intel&reg; AMT" + '</span>');
                     if ((node.conn & 8) != 0) cstate.push('<span title="' + "Mesh agent is reachable using another agent as relay." + '">' + "Mesh Relay" + '</span>');
@@ -8152,19 +8152,19 @@
                         if ((node.agent.id > 0) && (node.agent.id < 5)) {
                             if (navigator.platform.toLowerCase() == 'win32') {
                                 if ((serverinfo.devicemeshrouterlinks == null) || (serverinfo.devicemeshrouterlinks.rdp != false)) {
-                                    x += '<a href=# cmenu=altPortContextMenu id=rdpMCRouterLink onclick=p10MCRouter("' + node._id + '",3) title="' + "Requires installation of MeshCentral Router" + '.">' + "RDP" + ((node.rdpport && (node.rdpport != 3389)) ? '/' + node.rdpport : '') + '</a>&nbsp;';
+                                    x += '<a href=# cmenu=altPortContextMenu id=rdpMCRouterLink onclick=p10MCRouter("' + node._id + '",3) title="' + "Requires installation of SCP-Remote Router" + '.">' + "RDP" + ((node.rdpport && (node.rdpport != 3389)) ? '/' + node.rdpport : '') + '</a>&nbsp;';
                                 }
                             }
                         }
                         if (node.agent.id > 4) {
                             if ((navigator.platform.toLowerCase() == 'win32') || (navigator.platform.toLowerCase() == 'macintel')) {
                                 if ((serverinfo.devicemeshrouterlinks == null) || (serverinfo.devicemeshrouterlinks.ssh != false)) {
-                                    x += '<a href=# cmenu=sshPortContextMenu onclick=p10MCRouter("' + node._id + '",4,' + (node.sshport ? node.sshport : 22) + ') title="' + "Requires installation of MeshCentral Router." + '">' + "SSH" + ((node.sshport && (node.sshport != 22)) ? '/' + node.sshport : '') + '</a>&nbsp;';
+                                    x += '<a href=# cmenu=sshPortContextMenu onclick=p10MCRouter("' + node._id + '",4,' + (node.sshport ? node.sshport : 22) + ') title="' + "Requires installation of SCP-Remote Router." + '">' + "SSH" + ((node.sshport && (node.sshport != 22)) ? '/' + node.sshport : '') + '</a>&nbsp;';
                                 }
                             }
                             if (navigator.platform.toLowerCase() == 'win32') {
                                 if ((serverinfo.devicemeshrouterlinks == null) || (serverinfo.devicemeshrouterlinks.scp != false)) {
-                                    x += '<a href=# cmenu=sshPortContextMenu onclick=p10MCRouter("' + node._id + '",5,' + (node.sshport ? node.sshport : 22) + ') title="' + "Requires installation of MeshCentral Router." + '">' + "SCP" + ((node.sshport && (node.sshport != 22)) ? '/' + node.sshport : '') + '</a>&nbsp;';
+                                    x += '<a href=# cmenu=sshPortContextMenu onclick=p10MCRouter("' + node._id + '",5,' + (node.sshport ? node.sshport : 22) + ') title="' + "Requires installation of SCP-Remote Router." + '">' + "SCP" + ((node.sshport && (node.sshport != 22)) ? '/' + node.sshport : '') + '</a>&nbsp;';
                                 }
                             }
                         }
@@ -8175,7 +8175,7 @@
                                     if (doesDeviceMatchFilterTags(node, r.filter)) {
                                         if (typeof r.protocol == 'number') { p = r.protocol; } else if (r.protocol == 'http') { p = 1; } else if (r.protocol == 'https') { p = 2; } else if (r.protocol == 'rdp') { p = 3; } else if (r.protocol == 'ssh') { p = 4; } else if (r.protocol == 'scp') { p = 5; } else if (r.protocol == 'mcrdesktop') { p = 6; } else if (r.protocol == 'mcrfiles') { p = 7; }
                                         if (((p == 6) || (p == 7)) && (node.mtype != 2)) continue; // If this is not an agent device, don't show MeshCentral Router desktop/file links.
-                                        x += '<a href=# onclick=p10MCRouter("' + node._id + '",' + p + ',' + r.port + (r.ip?(',\"' + r.ip + '\"'):',null') + ',' + (r.localport?r.localport:0) + ') title="' + "Requires installation of MeshCentral Router." + '">' + r.name + '</a>&nbsp;';
+                                        x += '<a href=# onclick=p10MCRouter("' + node._id + '",' + p + ',' + r.port + (r.ip?(',\"' + r.ip + '\"'):',null') + ',' + (r.localport?r.localport:0) + ') title="' + "Requires installation of SCP-Remote Router." + '">' + r.name + '</a>&nbsp;';
                                     }
                                 }
                             }
@@ -8672,7 +8672,7 @@
 
         function deviceMessageFunctionEx() {
             var title = decodeURIComponent('{{{extitle}}}'), timeout = parseFloat(Q('d2devTimeout').value);
-            if (title == '') { title = "MeshCentral"; }
+            if (title == '') { title = "SCP-Remote"; }
             if(isNaN(timeout)){ timeout = 2; }
             if (currentNode.pmt == 1) {
                 meshserver.send({ action: 'pushmessage', nodeid: currentNode._id, title: title, msg: Q('d2devMessage').value });
@@ -8734,7 +8734,7 @@
             var op = Q('d2deviceop').value, title = Q('dp2notifyTitle').value, msg = Q('d2notifyMsg').value, timeout = parseFloat(Q('d2notifyTimeout').value);
             if (msg.length == 0) return;
             if (title == '') { title = decodeURIComponent('{{{extitle}}}'); }
-            if (title == '') { title = "MeshCentral"; }
+            if (title == '') { title = "SCP-Remote"; }
             if(isNaN(timeout)){ timeout = 2; }
             if (op == 1) { // MessageBox
                 meshserver.send({ action: 'msg', type: 'messagebox', nodeid: currentNode._id, title: title, msg: msg, timeout: (timeout * 60000) });
@@ -9314,7 +9314,7 @@
         // Show MeshCentral Router dialog
         function p10showMeshRouterDialog() {
             if (xxdialogMode) return;
-            var x = '<div>' + "MeshCentral Router is a Windows tool for TCP port mapping. You can, for example, RDP into a remote device thru this server." + '</div><br />';
+            var x = '<div>' + "SCP-Remote Router is a Windows tool for TCP port mapping. You can, for example, RDP into a remote device thru this server." + '</div><br />';
             x += addHtmlValue("Win32 Executable", '<a style=cursor:pointer onclick=downloadFile("meshagents?meshaction=winrouter' + (urlargs.key?('&key=' + urlargs.key):'') + '",null,true)>MeshCentralRouter.exe</a>');
             x += addHtmlValue("MacOS Installer", '<a style=cursor:pointer onclick=downloadFile("meshagents?meshaction=macrouter' + (urlargs.key?('&key=' + urlargs.key):'') + '",null,true)>MeshCentralRouter.dmg</a>');
             var servername = serverinfo.name;
@@ -9324,10 +9324,10 @@
             var url = 'mcrouter://' + servername + portStr + domainUrl + 'control.ashx?c=' + authCookie + '&t=' + serverinfo.tlshash + '&l={{{lang}}}' + (urlargs.key?('&key=' + urlargs.key):'');
             //x += addHtmlValue("Launch", '<a style=cursor:pointer target="mcrouterframe" rel="noreferrer noopener" download href="' + url + '">Start MeshCentral Router</a>');
             //x += '<br /><div style=width:100%><a style=cursor:pointer target="mcrouterframe" rel="noreferrer noopener" download href="' + url + '">' + "Start MeshCentral Router" + '</a>' + ", for this link to work you must download MeshCentral Router run it and click the install button." + '</div>';
-            x += '<br /><div>' + "Run MeshCentral Router and click \"install\" to make it launchable from the browser." + '</div>';
-            x += '<br /><a style=cursor:pointer target="mcrouterframe" rel="noreferrer noopener" href="' + url + '"><input type=button style=width:100%;cursor:pointer value="' + "Launch MeshCentral Router" + '" /></a>';
+            x += '<br /><div>' + "Run SCP-Remote Router and click \"install\" to make it launchable from the browser." + '</div>';
+            x += '<br /><a style=cursor:pointer target="mcrouterframe" rel="noreferrer noopener" href="' + url + '"><input type=button style=width:100%;cursor:pointer value="' + "Launch SCP-Remote Router" + '" /></a>';
             x += '<iframe style=display:none name="mcrouterframe"></iframe>';
-            setDialogMode(2, "MeshCentral Router", 1, null, x, 'fileDownload');
+            setDialogMode(2, "SCP-Remote Router", 1, null, x, 'fileDownload');
         }
 
         // Request MQTT login credentials
@@ -13215,7 +13215,7 @@
                     if (node.agent.id <= agentsStr.length) { str = agentsStr[node.agent.id]; } else { str = agentsStr[0]; }
                     if (node.agent.ver != 0) { str += ' v' + node.agent.ver; }
                     if (node.agent.id == 14) { str = node.agent.core; }
-                    x += addDetailItem("Mesh Agent", str);
+                    x += addDetailItem("SCP-Remote Agent", str);
                 }
                 if (node._id) { x += addDetailItem("Node ID", EscapeHtml(node._id.split('/')[2])); }
                 if (node.firstconnect) { x += addDetailItem("First agent connection", printDateTime(new Date(node.firstconnect))); }
@@ -13247,7 +13247,7 @@
                 if (hardware.time != null) {
                     x += addDetailItem("Last details update", printDateTime(new Date(hardware.time)));
                 }
-                if (x != '') { sections.push({ name: "Mesh Agent", html: x, img: 'meshagent64.png'}); }
+                if (x != '') { sections.push({ name: "SCP-Remote Agent", html: x, img: 'meshagent64.png'}); }
             }
 
             // Mobile
@@ -14179,7 +14179,7 @@
             Q('d3auth').value = authCookie;
             Q('d3filter').value = '.js';
             Q('d3attrib').value = currentNode._id;
-            setDialogMode(3, "Upload Mesh Agent Core", 3, p15uploadCoreEx2);
+            setDialogMode(3, "Upload SCP-Remote Agent Core", 3, p15uploadCoreEx2);
             d3init();
         }
 
@@ -14473,7 +14473,7 @@
             y += addHtmlValue("Dates & Time", x);
 
             if ((userinfo.siteadmin == 0xFFFFFFFF) && (domain == '')) {
-                y += '<br /><a rel="noreferrer noopener" target="_blank" href="translator.htm">' + "Help translate MeshCentral" + '</a>';
+                y += '<br /><a rel="noreferrer noopener" target="_blank" href="translator.htm">' + "Help translate SCP-Remote" + '</a>';
             }
 
             setDialogMode(2, "Localization Settings", 3, account_showLocalizationSettingsEx, y);
@@ -14901,7 +14901,7 @@
 
         function server_showVersionDlg() {
             if (xxdialogMode) return false;
-            setDialogMode(2, "MeshCentral Version", 1, null, "Loading...", 'MeshCentralServerUpdate');
+            setDialogMode(2, "SCP-Remote Version", 1, null, "Loading...", 'MeshCentralServerUpdate');
             meshserver.send({ action: 'serverversion' });
             return false;
         }
@@ -15641,7 +15641,7 @@
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20noregistry style=margin-left:12px>' + "No Registry Access" + '</label><br>';
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20nosoftware style=margin-left:12px>' + "No Software" + '</label><br>';
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20noamt style=margin-left:12px>' + "No Intel&reg; AMT" + '</label><br>';
-            x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20meshagentconsole>' + "Mesh Agent Console" + '</label><br>';
+            x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20meshagentconsole>' + "SCP-Remote Agent Console" + '</label><br>';
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20meshserverfiles>' + "Server Files" + '</label><br>';
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20wakedevices>' + "Wake Devices" + '</label><br>';
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20editnotes>' + "Edit Device Notes" + '</label><br>';
@@ -16036,7 +16036,7 @@
                 x += '<div style=width:100%;text-align:center><a rel="noreferrer noopener" target=_blank href="' + url + '">' + url + '</a></div><br />';
                 x += '<div style=margin-bottom:5px><label><input id=agentJoinCheck type=checkbox onclick=p20editmeshInviteCodeValidate() />' + "Enable Invite Codes" + '</label></div>';
                 x += addHtmlValue("Invite Codes", '<input id=agentInviteCode style=width:236px onkeyup=p20editmeshInviteCodeValidate() placeholder="code1, code2, code3" />');
-                x += addHtmlValue("Agents", '<select id=agentType style=width:236px onchange=p20editmeshInviteCodeValidate()><option value=0>' + "All Available Agents" + '</option><option value=1>' + "Windows MeshAgent" + '</option><option value=2>' + "Linux MeshAgent" + '</option><option value=4>' + "MacOS MeshAgent" + '</option><option value=8>' + "MeshCentral Assistant" + '</option></select>');
+                x += addHtmlValue("Agents", '<select id=agentType style=width:236px onchange=p20editmeshInviteCodeValidate()><option value=0>' + "All Available Agents" + '</option><option value=1>' + "Windows SCP-Remote Agent" + '</option><option value=2>' + "Linux SCP-Remote Agent" + '</option><option value=4>' + "MacOS SCP-Remote Agent" + '</option><option value=8>' + "SCP-Remote Assistant" + '</option></select>');
                 x += '<div id=d2agentInstallTypeDiv>';
                 x += addHtmlValue("Installation Type", '<select id=agentInviteType style=width:236px><option value=0>' + "Background and interactive" + '</option><option value=2>' + "Background only" + '</option><option value=1>' + "Interactive only" + '</option></select>');
                 x += '</div>';
@@ -20077,9 +20077,9 @@
             x += '<div><label><input type=checkbox id=p41c1 ' + ((serverTraceSources.indexOf('cookie') >= 0) ? 'checked' : '') + '>' + "Cookie encoder" + '</label></div>';
             x += '<div><label><input type=checkbox id=p41c2 ' + ((serverTraceSources.indexOf('dispatch') >= 0) ? 'checked' : '') + '>' + "Message Dispatcher" + '</label></div>';
             x += '<div><label><input type=checkbox id=p41c3 ' + ((serverTraceSources.indexOf('main') >= 0) ? 'checked' : '') + '>' + "Main Server Messages" + '</label></div>';
-            x += '<div><label><input type=checkbox id=p41c4 ' + ((serverTraceSources.indexOf('peer') >= 0) ? 'checked' : '') + '>' + "MeshCentral Server Peering" + '</label></div>';
-            x += '<div><label><input type=checkbox id=p41c15 ' + ((serverTraceSources.indexOf('agent') >= 0) ? 'checked' : '') + '>' + "MeshAgent traffic" + '</label></div>';
-            x += '<div><label><input type=checkbox id=p41c14 ' + ((serverTraceSources.indexOf('agentupdate') >= 0) ? 'checked' : '') + '>' + "MeshAgent update" + '</label></div>';
+            x += '<div><label><input type=checkbox id=p41c4 ' + ((serverTraceSources.indexOf('peer') >= 0) ? 'checked' : '') + '>' + "SCP-Remote Server Peering" + '</label></div>';
+            x += '<div><label><input type=checkbox id=p41c15 ' + ((serverTraceSources.indexOf('agent') >= 0) ? 'checked' : '') + '>' + "SCP-Remote Agent traffic" + '</label></div>';
+            x += '<div><label><input type=checkbox id=p41c14 ' + ((serverTraceSources.indexOf('agentupdate') >= 0) ? 'checked' : '') + '>' + "SCP-Remote Agent update" + '</label></div>';
             x += '<div><label><input type=checkbox id=p41c16 ' + ((serverTraceSources.indexOf('cert') >= 0) ? 'checked' : '') + '>' + "Server Certificate" + '</label></div>';
             x += '<div><label><input type=checkbox id=p41c17 ' + ((serverTraceSources.indexOf('db') >= 0) ? 'checked' : '') + '>' + "Server Database" + '</label></div>';
             x += '<div><label><input type=checkbox id=p41c18 ' + ((serverTraceSources.indexOf('email') >= 0) ? 'checked' : '') + '>' + "Email/SMS/Push Traffic" + '</label></div>';
@@ -20442,7 +20442,7 @@
                         //  'downgrade': 'Downgrade' // disabling until plugins have prior versions available for better testing
                     }
                 };
-                var vers_not_compat = ' [ <span onclick="return setDialogMode(2, \'Compatibility Issue\', 1, null, \'This plugin version is not compatible with your MeshCentral installation, please upgrade MeshCentral first.\');" title="' + "Version incompatible, please upgrade your MeshCentral installation first" + '" style="cursor: pointer; color:red;"> ! </span> ]';
+                var vers_not_compat = ' [ <span onclick="return setDialogMode(2, \'Compatibility Issue\', 1, null, \'This plugin version is not compatible with your SCP-Remote installation, please upgrade SCP-Remote first.\');" title="' + "Version incompatible, please upgrade your SCP-Remote installation first" + '" style="cursor: pointer; color:red;"> ! </span> ]';
 
                 var tbl = document.getElementById('p42tbl');
                 installedPluginList.forEach(function(p){

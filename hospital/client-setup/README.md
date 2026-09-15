@@ -108,10 +108,16 @@ npm run service:restart
 
 ## ถอนการติดตั้ง
 
-ที่เครื่องลูก ไปที่ **ตั้งค่า > แอป** แล้วถอน Mesh Agent ออก หรือสั่งจากหน้าต่างคำสั่งแบบผู้ดูแลเครื่อง
+ที่เครื่องลูก ไปที่ **ตั้งค่า > แอป** แล้วถอน **SCP-Remote** ออก หรือสั่งจากหน้าต่างคำสั่งแบบผู้ดูแลเครื่อง
 
 ```
-"C:\Program Files\Mesh Agent\MeshAgent.exe" -fulluninstall
+"C:Program FilesSCP-Remotescpremote.exe" -fulluninstall
+```
+
+เครื่องที่ติดตั้งไว้ก่อนเปลี่ยนชื่อ จะยังอยู่ที่ตำแหน่งเดิม ใช้คำสั่งนี้แทน
+
+```
+"C:Program FilesMesh AgentMeshAgent.exe" -fulluninstall
 ```
 
 ## ข้อจำกัดที่ยังไม่ได้ทดสอบ

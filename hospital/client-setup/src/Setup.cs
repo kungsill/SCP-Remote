@@ -62,7 +62,11 @@ namespace ScpRemoteSetup
                             object image = key.GetValue("ImagePath");
                             if (image == null) continue;
                             string path = image.ToString();
-                            if (path.IndexOf("meshagent.exe", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                            // The agent executable is renamed by the server's branding, so accept
+                            // both the upstream name and the hospital one. A computer installed
+                            // before the rename keeps the old name and must still be recognised.
+                            if ((path.IndexOf("meshagent.exe", StringComparison.OrdinalIgnoreCase) < 0) &&
+                                (path.IndexOf("scpremote.exe", StringComparison.OrdinalIgnoreCase) < 0)) continue;
                             AgentInfo info = new AgentInfo();
                             info.ServiceName = name;
                             info.ExePath = ExtractExePath(path);
@@ -144,7 +148,9 @@ namespace ScpRemoteSetup
             List<string> ordered = new List<string>();
             foreach (string file in candidates)
             {
-                if (Path.GetFileName(file).IndexOf("agent", StringComparison.OrdinalIgnoreCase) >= 0) ordered.Add(file);
+                string name = Path.GetFileName(file);
+                if ((name.IndexOf("agent", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (name.IndexOf("scpremote", StringComparison.OrdinalIgnoreCase) >= 0)) ordered.Add(file);
             }
             foreach (string file in candidates)
             {

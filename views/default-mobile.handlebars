@@ -2564,7 +2564,7 @@
             y += addHtmlValue("Dates & Time", x);
 
             if ((userinfo.siteadmin == 0xFFFFFFFF) && (domain == '')) {
-                y += '<br /><a rel="noreferrer noopener" target="_blank" href="translator.htm">' + "Help translate MeshCentral" + '</a>';
+                y += '<br /><a rel="noreferrer noopener" target="_blank" href="translator.htm">' + "Help translate SCP-Remote" + '</a>';
             }
 
             setDialogMode(2, "Localization Settings", 3, account_showLocalizationSettingsEx, y);
@@ -3916,7 +3916,7 @@
                     if (node.agent.ver != 0) { str += ' v' + node.agent.ver; }
                     if (node.agent.id == 14) { str = node.agent.core; }
                     if ((node.agent.root === false) && ((node.conn & 1) != 0)) { str += ', ' + "Restricted"; }
-                    x += addDeviceAttribute("Mesh Agent", EscapeHtml(str));
+                    x += addDeviceAttribute("SCP-Remote Agent", EscapeHtml(str));
                 }
 
                 // Attribute: Intel AMT
@@ -4098,7 +4098,7 @@
                 // Set the node power state
                 var powerstate = PowerStateStr(node.state);
                 //if (node.state == 0) { powerstate = 'Unknown State'; }
-                if ((connectivity & 1) != 0) { if (powerstate.length > 0) { powerstate += ', '; } powerstate += ((node.mtype == 4) ? ((node.porttype == 'PDU') ? "Switch" : "IP-KVM") : "Mesh Agent"); }
+                if ((connectivity & 1) != 0) { if (powerstate.length > 0) { powerstate += ', '; } powerstate += ((node.mtype == 4) ? ((node.porttype == 'PDU') ? "Switch" : "IP-KVM") : "SCP-Remote Agent"); }
                 if ((connectivity & 2) != 0) { if (powerstate.length > 0) { powerstate += ', '; } powerstate += "Intel&reg; AMT connected"; }
                 else if ((connectivity & 4) != 0) { if (powerstate.length > 0) { powerstate += ', '; } powerstate += "Intel&reg; AMT detected"; }
                 if ((connectivity & 16) != 0) { if (powerstate.length > 0) { powerstate += ', '; } powerstate += "MQTT channel connected"; }
@@ -6945,7 +6945,7 @@
                     if (node.agent.id <= agentsStr.length) { str = agentsStr[node.agent.id]; } else { str = agentsStr[0]; }
                     if (node.agent.ver != 0) { str += ' v' + node.agent.ver; }
                     if (node.agent.id == 14) { str = node.agent.core; }
-                    x += addDetailItem("Mesh Agent", EscapeHtml(str));
+                    x += addDetailItem("SCP-Remote Agent", EscapeHtml(str));
                 }
                 if (node._id) { x += addDetailItem("Node ID", EscapeHtml(node._id.split('/')[2]), true); }
                 if (node.firstconnect) { x += addDetailItem("First agent connection", EscapeHtml(printDateTime(new Date(node.firstconnect)))); }
@@ -6979,7 +6979,7 @@
                 if (hardware.time != null) {
                     x += addDetailItem("Last details update", EscapeHtml(printDateTime(new Date(hardware.time))));
                 }
-                if (x != '') { sections.push({ name: "Mesh Agent", html: x, img: 'meshagent' }); }
+                if (x != '') { sections.push({ name: "SCP-Remote Agent", html: x, img: 'meshagent' }); }
             }
 
             // Mobile
@@ -7571,7 +7571,7 @@
             Q('d3localmodeform').action = 'uploadmeshcorefile.ashx';
             Q('d3auth').value = authCookie;
             Q('d3attrib').value = currentNode._id;
-            setDialogMode(4, "Upload Mesh Agent Core", 3, p15uploadCoreEx2);
+            setDialogMode(4, "Upload SCP-Remote Agent Core", 3, p15uploadCoreEx2);
             d3init();
         }
 
@@ -7753,10 +7753,10 @@
 
         function p20installAndroidDialog() {
             if (xxdialogMode) return;
-            var x = '<div style=text-align:center><p>' + "Install the MeshCentral Agent on your Android device. Once installed, click the pairing link to connect your device to this server." + '</p>';
+            var x = '<div style=text-align:center><p>' + "Install the SCP-Remote Agent on your Android device. Once installed, click the pairing link to connect your device to this server." + '</p>';
             x += '<p><a rel=\"noreferrer noopener\" target=_blank href=\"https://play.google.com/store/apps/details?id=com.meshcentral.agent2\"><img style=cursor:pointer src=\"images/google-play-140.png\" width=140 srcset=\"images/google-play-280.png 2x\" /></a></p>';
             x += '<p><a rel=\"noreferrer noopener\" target=_blank href=\"https://www.amazon.co.uk/gp/product/B097Z4Q7SK/\"><img style=cursor:pointer src=\"images/amazon-appstore-140.png\"  width=140 srcset=\"images/amazon-appstore-280.png 2x\" /></a></p>';
-            x += '<p><a rel=\"noreferrer noopener\" target=_blank href="meshagents?id=14' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "APK version of the MeshAgent" + '">' + "Android APK" + '</a></p>';
+            x += '<p><a rel=\"noreferrer noopener\" target=_blank href="meshagents?id=14' + (urlargs.key?('&key=' + urlargs.key):'') + '" title="' + "APK version of the SCP-Remote Agent" + '">' + "Android APK" + '</a></p>';
             x += '<p><a href="' + serverinfo.magenturl + ',' + serverinfo.agentCertHash + ',' + currentMesh._id.split('/')[2] + '"><b>' + "Device Pairing Link" + '</b></a></p></div>';
             setDialogMode(2, "Android Installation", 1, null, x);
         }
@@ -7776,7 +7776,7 @@
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20nofiles style=margin-left:12px>' + "No File Access" + '</label><br>';
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20noregistry style=margin-left:12px>' + "No Registry Access" + '</label><br>';
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20noamt style=margin-left:12px>' + "No Intel&reg; AMT" + '</label><br>';
-            x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20meshagentconsole>' + "Mesh Agent Console" + '</label><br>';
+            x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20meshagentconsole>' + "SCP-Remote Agent Console" + '</label><br>';
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20meshserverfiles>' + "Server Files" + '</label><br>';
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20wakedevices>' + "Wake Devices" + '</label><br>';
             x += '<label><input type=checkbox onchange=p20validateAddMeshUserDialog() id=p20editnotes>' + "Edit Device Notes" + '</label><br>';

@@ -23,6 +23,8 @@ function setup(t, options = {}) {
     w.meshserver = { send: () => {} };
     w.confirm = () => true;
     w.p13filetree = options.connected ? { dir: [] } : null;
+    // A folder is open unless a test says otherwise; [''] is the drive list.
+    w.p13filetreelocation = options.location || ['C:', 'Temp'];
     w.p13doUploadFiles = files => uploads.push(files);
     w.setDialogMode = () => {};
     w.gotoDevice = (id, panel) => { w.wentTo = { id, panel }; };
@@ -146,4 +148,35 @@ test('the percentage stops following an upload once its window has closed', (t) 
     host.innerHTML = '<div id="p13dfileName">b.pdf</div><progress id="d2progressBar" max="100" value="50"></progress>';
     s.tick();
     assert.ok(s.w.document.getElementById('scpUploadPercent').textContent.indexOf('50%') >= 0);
+});
+
+test('a computer opened at its drive list waits for a folder instead of failing into nothing', (t) => {
+    const s = setup(t, { connected: true });
+    s.w.p13filetreelocation = [''];          // the drive list, which is not a destination
+    s.drop([file('คู่มือ.pdf')]);
+    s.tick();
+    assert.equal(s.uploads.length, 0, 'a drive list must not be used as a destination');
+    assert.ok(s.toast().indexOf('เปิดโฟลเดอร์ปลายทาง') >= 0);
+
+    s.w.p13filetreelocation = ['C:', 'Users', 'nana', 'Desktop'];   // a folder is opened
+    s.tick();
+    assert.equal(s.uploads.length, 1, 'and the files go the moment there is somewhere to put them');
+});
+
+test('a computer already sitting in a folder sends straight away', (t) => {
+    const s = setup(t, { connected: true });
+    s.w.p13filetreelocation = ['D:', 'งาน'];
+    s.drop([file('a.zip')]);
+    s.tick();
+    assert.equal(s.uploads.length, 1);
+    assert.equal(s.toast(), '', 'no message is needed when it just works');
+});
+
+test('waiting for a folder gives up rather than waiting for ever', (t) => {
+    const s = setup(t, { connected: true });
+    s.w.p13filetreelocation = [''];
+    s.drop([file('b.zip')]);
+    s.tick(700);
+    assert.equal(s.uploads.length, 0);
+    assert.ok(s.toast().indexOf('ยังไม่ได้เปิดโฟลเดอร์') >= 0);
 });

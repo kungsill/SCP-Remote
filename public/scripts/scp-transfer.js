@@ -158,6 +158,47 @@
         }, 200);
     }
 
+    // Windows has no single place called the root: a computer opened for the first time
+    // shows its drive list, and a file cannot be put in a drive list. The page remembers
+    // the last folder per computer, so this only happens once each — but failing into
+    // nothing that once is exactly how a transfer goes missing. Wait for a folder to be
+    // opened and send the moment there is one.
+    function atAFolder() {
+        var where = window.p13filetreelocation;
+        return (where != null) && (where.length > 0) && (where.join('') !== '');
+    }
+
+    function sendOnceAFolderIsOpen(files, target) {
+        if (atAFolder()) {
+            toast('');
+            window.p13doUploadFiles(files);
+            watchUploadProgress();
+            return;
+        }
+        toast(t('Open the folder on that computer where these should go — they will be sent as soon as you do.', 'เปิดโฟลเดอร์ปลายทางบนเครื่องนั้น แล้วไฟล์จะถูกส่งทันที'));
+        var waited = 0;
+        var timer = setInterval(function () {
+            waited += 500;
+            if (!window.currentNode || (window.currentNode._id !== target) || (window.p13filetree == null)) {
+                clearInterval(timer);
+                toast(t('Stopped: that computer is no longer open.', 'หยุดส่ง เพราะออกจากเครื่องนั้นแล้ว'), true);
+                return;
+            }
+            if (atAFolder()) {
+                if (window.xxdialogMode) { return; } // something else is open; wait for it
+                clearInterval(timer);
+                toast('');
+                window.p13doUploadFiles(files);
+                watchUploadProgress();
+                return;
+            }
+            if (waited >= 300000) {
+                clearInterval(timer);
+                toast(t('Cancelled: no folder was opened on that computer.', 'ยกเลิกการส่ง เพราะยังไม่ได้เปิดโฟลเดอร์ปลายทาง'), true);
+            }
+        }, 500);
+    }
+
     function sendDroppedFiles(files) {
         var device = window.currentNode;
         if (!device) { return; }
@@ -181,9 +222,7 @@
                     toast(t('Close the open window first, then drop the files again.', 'ปิดหน้าต่างที่เปิดอยู่ก่อน แล้วลากไฟล์มาวางใหม่'), true);
                     return;
                 }
-                toast('');
-                window.p13doUploadFiles(files);
-                watchUploadProgress();
+                sendOnceAFolderIsOpen(files, target);
                 return;
             }
             if (!pressedConnect) {
@@ -247,6 +286,6 @@
             if (item) { item.addEventListener(id === 'p13filetable' ? 'drop' : 'click', function () { setTimeout(watchUploadProgress, 300); }, false); }
         });
     }
-    window.ScpTransfer = { handle: handle, show: show, filePage: filePage, desktopDrop: desktopDrop, watchUploadProgress: watchUploadProgress };
+    window.ScpTransfer = { handle: handle, show: show, filePage: filePage, desktopDrop: desktopDrop, watchUploadProgress: watchUploadProgress, atAFolder: atAFolder };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

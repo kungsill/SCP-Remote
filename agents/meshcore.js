@@ -292,16 +292,14 @@ function setDefaultCoreTranslation(obj, field, value) {
     if (obj[field] == null || obj[field] == '') { obj[field] = value; }
 }
 
-function getCoreTranslation() {
+function getCoreTranslation(preferredLanguage) {
     var ret = {};
     if (global.coretranslations != null) {
         try {
             // SCP-Remote: this hospital runs Thai and English only, with Thai as the
             // default, the same rule the web interface uses. A machine whose Windows is
             // in some other language still shows Thai rather than falling back to English.
-            var lang = require('util-language').current;
-            if (lang == null) { lang = ''; }
-            lang = (lang.toLowerCase().split('-')[0] == 'en') ? 'en' : 'th';
+            var lang = preferredLanguage === 'en' ? 'en' : 'th';
             if (coretranslations[lang] == null) { lang = 'en'; }
             if (coretranslations[lang] != null) { ret = coretranslations[lang]; }
         }
@@ -1378,6 +1376,7 @@ function handleServerCommand(data) {
                                 // file written at install time, so a computer installed before
                                 // the colours were chosen would keep the default blue for ever.
                                 applyServerConsentColors(tunnel.soptions);
+                                currentTranslation = getCoreTranslation(tunnel.soptions && tunnel.soptions.consentLanguage);
                                 tunnel.consentTimeout = (tunnel.soptions && tunnel.soptions.consentTimeout) ? tunnel.soptions.consentTimeout : 30;
                                 tunnel.consentAutoAccept = (tunnel.soptions && (tunnel.soptions.consentAutoAccept === true));
                                 tunnel.consentAutoAcceptIfNoUser = (tunnel.soptions && (tunnel.soptions.consentAutoAcceptIfNoUser === true));
@@ -1637,14 +1636,14 @@ function handleServerCommand(data) {
                         //sendConsoleText('getClip: ' + JSON.stringify(data));
                         if (require('MeshAgent').isService) {
                             require('clipboard').dispatchRead().then(function (str) {
-                                if (str) {
+                                if (typeof str === 'string') {
                                     if (data.tag != 3) { MeshServerLogEx(21, [str.length], "Getting clipboard content, " + str.length + " byte(s)", data); }
                                     mesh.SendCommand({ action: 'msg', type: 'getclip', sessionid: data.sessionid, data: str, tag: data.tag });
                                 }
                             });
                         } else {
                             require('clipboard').read().then(function (str) {
-                                if (str) {
+                                if (typeof str === 'string') {
                                     if (data.tag != 3) { MeshServerLogEx(21, [str.length], "Getting clipboard content, " + str.length + " byte(s)", data); }
                                     mesh.SendCommand({ action: 'msg', type: 'getclip', sessionid: data.sessionid, data: str, tag: data.tag });
                                 }
@@ -2733,7 +2732,7 @@ function terminal_consent_ask(ws) {
     if (process.platform == 'win32') {
         var enhanced = false;
         if (ws.httprequest.oldStyle === false) {
-            try { require('win-userconsent'); enhanced = true; } catch (ex) { }
+            try { require('win-scp-userconsent'); enhanced = true; } catch (ex) { }
         }
         if (enhanced) {
             var ipr = server_getUserImage(ws.httprequest.userid);
@@ -2745,7 +2744,7 @@ function terminal_consent_ask(ws) {
             ipr.tsid = ws.tsid;
             ipr.translations = { Allow: currentTranslation['allow'], Deny: currentTranslation['deny'], Auto: currentTranslation['autoAllowForFive'], Caption: consentMessage };
             ws.httprequest.tpromise._consent = ipr.then(function (img) {
-                this.consent = require('win-userconsent').create(this.consentTitle, this.consentMessage, this.username, { b64Image: img.split(',').pop(), uid: this.tsid, timeout: this.consentTimeout * 1000, timeoutAutoAccept: this.consentAutoAccept, translations: this.translations, background: color_options.background, foreground: color_options.foreground });
+                this.consent = require('win-scp-userconsent').create(this.consentTitle, this.consentMessage, this.username, { b64Image: img.split(',').pop(), uid: this.tsid, timeout: this.consentTimeout * 1000, timeoutAutoAccept: this.consentAutoAccept, translations: this.translations, background: color_options.background, foreground: color_options.foreground });
                 this.__childPromise.close = this.consent.close.bind(this.consent);
                 return (this.consent);
             });
@@ -3170,7 +3169,7 @@ function kvm_consent_ask(ws){
     if (process.platform == 'win32') {
         var enhanced = false;
         if (ws.httprequest.oldStyle === false) {
-            try { require('win-userconsent'); enhanced = true; } catch (ex) { }
+            try { require('win-scp-userconsent'); enhanced = true; } catch (ex) { }
         }
         if (enhanced) {
             var ipr = server_getUserImage(ws.httprequest.userid);
@@ -3182,7 +3181,7 @@ function kvm_consent_ask(ws){
             ipr.username = ws.httprequest.realname;
             ipr.translation = { Allow: currentTranslation['allow'], Deny: currentTranslation['deny'], Auto: currentTranslation['autoAllowForFive'], Caption: consentMessage };
             pr = ipr.then(function (img) {
-                this.consent = require('win-userconsent').create(this.consentTitle, this.consentMessage, this.username, { b64Image: img.split(',').pop(), uid: this.tsid, timeout: this.consentTimeout * 1000, timeoutAutoAccept: this.consentAutoAccept, translations: this.translation, background: color_options.background, foreground: color_options.foreground });
+                this.consent = require('win-scp-userconsent').create(this.consentTitle, this.consentMessage, this.username, { b64Image: img.split(',').pop(), uid: this.tsid, timeout: this.consentTimeout * 1000, timeoutAutoAccept: this.consentAutoAccept, translations: this.translation, background: color_options.background, foreground: color_options.foreground });
                 this.__childPromise.close = this.consent.close.bind(this.consent);
                 return (this.consent);
             });
@@ -3314,7 +3313,7 @@ function files_consent_ask(ws){
     if (process.platform == 'win32') {
         var enhanced = false;
         if (ws.httprequest.oldStyle === false) {
-            try { require('win-userconsent'); enhanced = true; } catch (ex) { }
+            try { require('win-scp-userconsent'); enhanced = true; } catch (ex) { }
         }
         if (enhanced) {
             var ipr = server_getUserImage(ws.httprequest.userid);
@@ -3326,7 +3325,7 @@ function files_consent_ask(ws){
             ipr.tsid = ws.tsid;
             ipr.translations = { Allow: currentTranslation['allow'], Deny: currentTranslation['deny'], Auto: currentTranslation['autoAllowForFive'], Caption: consentMessage };
             pr = ipr.then(function (img) {
-                this.consent = require('win-userconsent').create(this.consentTitle, this.consentMessage, this.username, { b64Image: img.split(',').pop(), uid: this.tsid, timeout: this.consentTimeout * 1000, timeoutAutoAccept: this.consentAutoAccept, translations: this.translations, background: color_options.background, foreground: color_options.foreground });
+                this.consent = require('win-scp-userconsent').create(this.consentTitle, this.consentMessage, this.username, { b64Image: img.split(',').pop(), uid: this.tsid, timeout: this.consentTimeout * 1000, timeoutAutoAccept: this.consentAutoAccept, translations: this.translations, background: color_options.background, foreground: color_options.foreground });
                 this.__childPromise.close = this.consent.close.bind(this.consent);
                 return (this.consent);
             });
@@ -3413,7 +3412,7 @@ function registry_consent_ask(ws){
     var pr;
     if (process.platform == 'win32') {
         var enhanced = false;
-        if (ws.httprequest.oldStyle === false) { try { require('win-userconsent'); enhanced = true; } catch (ex) { } }
+        if (ws.httprequest.oldStyle === false) { try { require('win-scp-userconsent'); enhanced = true; } catch (ex) { } }
         if (enhanced) {
             var ipr = server_getUserImage(ws.httprequest.userid);
             ipr.consentTitle = consentTitle;
@@ -3424,7 +3423,7 @@ function registry_consent_ask(ws){
             ipr.tsid = ws.tsid;
             ipr.translations = { Allow: currentTranslation['allow'], Deny: currentTranslation['deny'], Auto: currentTranslation['autoAllowForFive'], Caption: consentMessage };
             pr = ipr.then(function (img) {
-                this.consent = require('win-userconsent').create(this.consentTitle, this.consentMessage, this.username, { b64Image: img.split(',').pop(), uid: this.tsid, timeout: this.consentTimeout * 1000, timeoutAutoAccept: this.consentAutoAccept, translations: this.translations, background: color_options.background, foreground: color_options.foreground });
+                this.consent = require('win-scp-userconsent').create(this.consentTitle, this.consentMessage, this.username, { b64Image: img.split(',').pop(), uid: this.tsid, timeout: this.consentTimeout * 1000, timeoutAutoAccept: this.consentAutoAccept, translations: this.translations, background: color_options.background, foreground: color_options.foreground });
                 this.__childPromise.close = this.consent.close.bind(this.consent);
                 return (this.consent);
             });

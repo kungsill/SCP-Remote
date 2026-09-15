@@ -32,7 +32,8 @@
         "desktopnotify": true,
         "desktopprompt": true,
         "terminalprompt": true,
-        "fileprompt": true
+        "fileprompt": true,
+        "desktopprivacybar": true
       },
       "consentMessages": {
         "Title": "SCP-Remote",

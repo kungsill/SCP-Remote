@@ -45,7 +45,23 @@
         watched: ['Watched program: {0}', 'โปรแกรมเฝ้าระวัง: {0}'],
         days: ['days', 'วัน'],
         roomEmpty: ['No computers in this room yet. Install the agent, or move a computer here.', 'ห้องนี้ยังไม่มีเครื่อง ติดตั้งเอเจนต์เพิ่ม หรือย้ายเครื่องเข้ามาได้'],
-        scanBusy: ['A program check is already running. Wait for it to finish.', 'กำลังตรวจโปรแกรมของอีกเครื่องอยู่ กรุณารอให้เสร็จก่อน']
+        scanBusy: ['A program check is already running. Wait for it to finish.', 'กำลังตรวจโปรแกรมของอีกเครื่องอยู่ กรุณารอให้เสร็จก่อน'],
+        liveCol: ['Screen', 'หน้าจอ'],
+        liveOn: ['Show screens', 'เปิดดูภาพหน้าจอ'],
+        liveOff: ['Hide screens', 'ปิดภาพหน้าจอ'],
+        liveConnecting: ['Connecting…', 'กำลังเชื่อมต่อ…'],
+        liveEnded: ['Picture stopped', 'ภาพหยุดแล้ว'],
+        liveRetry: ['Try again', 'ลองใหม่'],
+        liveOffline: ['Computer is off', 'เครื่องปิดอยู่'],
+        liveWaiting: ['Not shown', 'ยังไม่แสดง'],
+        liveOpen: ['Click the picture to take over this computer', 'คลิกที่ภาพเพื่อเข้าควบคุมเครื่องนี้'],
+        liveShot: ['Save this picture', 'บันทึกภาพนี้ไว้'],
+        liveFull: ['Showing {0} screens at once. Turn the rest off, or open one room at a time, to see the others.', 'แสดงได้ครั้งละ {0} จอ ปิดบางเครื่องหรือดูทีละห้อง เพื่อดูเครื่องที่เหลือ'],
+        liveNoSupport: ['This browser cannot show live screens.', 'เบราว์เซอร์นี้แสดงภาพหน้าจอสดไม่ได้'],
+        consentPrompt: ['Each computer asks the person sitting at it first. The picture starts only after they allow it.', 'เครื่องปลายทางจะถามผู้ใช้ก่อน ภาพจะเริ่มก็ต่อเมื่อผู้ใช้กดอนุญาตเท่านั้น'],
+        consentBar: ['While you watch, a bar on that computer says its screen is being shared.', 'ระหว่างที่ดู เครื่องปลายทางจะขึ้นแถบบอกว่าหน้าจอกำลังถูกดูอยู่'],
+        consentNotify: ['While you watch, that computer shows a notice that its screen is being viewed.', 'ระหว่างที่ดู เครื่องปลายทางจะขึ้นแจ้งเตือนว่าหน้าจอกำลังถูกดู'],
+        consentSilent: ['Nothing appears on the computer being watched. Staff should be told in writing that screens may be viewed.', 'เครื่องปลายทางจะไม่ขึ้นอะไรเลย ควรแจ้งเจ้าหน้าที่เป็นลายลักษณ์อักษรไว้ว่าหน้าจออาจถูกดู']
     };
     function t(key) { var entry = texts[key]; return entry ? entry[thai ? 1 : 0] : key; }
     function format(value, arg) { return value.replace('{0}', arg); }
@@ -64,6 +80,15 @@
     var longUptimeDays = 14;
 
     var panel, body, scanState = {}, pending = null, timer = null;
+    var liveToggle = null, liveHint = null, liveNote = null;
+
+    /* Live screen tiles. Small, slow and look-only: no mouse or keyboard handler is
+       ever attached to these canvases, so a tile cannot touch the computer it shows.
+       Watching starts only when someone presses the button, and never resumes by
+       itself on a later visit. */
+    var tiles = {}, liveOn = false, liveSkipped = 0;
+    var liveLimit = 12;
+    var liveSettings = { encoding: 4, quality: 30, scaling: 256, framerate: 1000 };
 
     function element(tag, className, text) {
         var item = document.createElement(tag);
@@ -139,11 +164,7 @@
 
     function actionCell(node) {
         var cell = element('div', 'scp-dash-actions');
-        cell.appendChild(button(t('remote'), 'scp-dash-go', function () {
-            if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
-            hide();
-            if (typeof window.gotoDevice === 'function') window.gotoDevice(node._id, 11);
-        }));
+        cell.appendChild(button(t('remote'), 'scp-dash-go', function () { openRemote(node); }));
         cell.appendChild(button(t('scan'), 'scp-dash-scan', function () { scan(node); }));
         cell.appendChild(button(t('shutdown'), 'scp-dash-off', function () {
             if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
@@ -191,9 +212,115 @@
         return true;
     }
 
+    function openRemote(node) {
+        if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
+        hide();
+        if (typeof window.gotoDevice === 'function') window.gotoDevice(node._id, 11);
+    }
+
+    function liveSupported() {
+        return (typeof window.CreateAgentRedirect === 'function') && (typeof window.CreateAgentRemoteDesktop === 'function');
+    }
+    // What the person at the far end sees while a tile is running. Read from the
+    // server's own consent flags, so this sentence stays true if the policy changes.
+    function consentNote() {
+        var flags = (window.serverinfo && typeof window.serverinfo.consent === 'number') ? window.serverinfo.consent : 0;
+        if (flags & 8) return t('consentPrompt');
+        if (flags & 64) return t('consentBar');
+        if (flags & 1) return t('consentNotify');
+        return t('consentSilent');
+    }
+    function snapshot(node, canvas) {
+        function pad(value) { return (value < 10 ? '0' : '') + value; }
+        var now = new Date();
+        var stamp = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + '-' + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds());
+        var link = document.createElement('a');
+        link.download = 'SCP-Remote_' + String(node.name || node._id).replace(/[\\/:*?"<>|]/g, '_') + '_' + stamp + '.png';
+        try { link.href = canvas.toDataURL('image/png'); } catch (error) { return; }
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    function stopTile(nodeid) {
+        var entry = tiles[nodeid];
+        if (!entry) return;
+        delete tiles[nodeid];
+        try { if (entry.desk) entry.desk.Stop(); } catch (error) { /* the tunnel had already closed */ }
+    }
+    function stopAllTiles() { Object.keys(tiles).forEach(stopTile); }
+    function tileMessage(entry, text, retry) {
+        entry.overlay.hidden = false;
+        entry.overlay.textContent = '';
+        entry.overlay.appendChild(element('span', null, text));
+        if (retry) { entry.overlay.appendChild(button(t('liveRetry'), 'scp-dash-tile-retry', function (event) { event.stopPropagation(); retry(); })); }
+    }
+    function connectTile(entry, node) {
+        var desk = window.CreateAgentRedirect(window.meshserver, window.CreateAgentRemoteDesktop(entry.canvas),
+            window.serverPublicNamePort, window.authCookie, window.authRelayCookie, window.domainUrl);
+        desk.m.ImageType = liveSettings.encoding;
+        desk.m.CompressionLevel = liveSettings.quality;
+        desk.m.ScalingLevel = liveSettings.scaling;
+        desk.m.FrameRateTimer = liveSettings.framerate;
+        desk.onStateChanged = function (sender, state) {
+            if (!tiles[node._id]) return;
+            if (state === 3) { entry.overlay.hidden = true; entry.overlay.textContent = ''; return; }
+            // The far end can refuse, and a session can drop. Never reconnect on a timer:
+            // that would put the permission box back on their screen again and again.
+            // Show the button instead and let a person decide.
+            if (state === 0) { tileMessage(entry, t('liveEnded'), function () { connectTile(entry, node); }); }
+            else { tileMessage(entry, t('liveConnecting'), null); }
+        };
+        entry.desk = desk;
+        tileMessage(entry, t('liveConnecting'), null);
+        desk.Start(node._id);
+    }
+    function tileCell(node) {
+        var entry = tiles[node._id];
+        if (entry) return entry.box;
+        // A cap on how many desktops stream at once, so opening this page on a large
+        // site does not try to connect to every computer in the hospital.
+        if (Object.keys(tiles).length >= liveLimit) { liveSkipped++; return null; }
+        var box = element('div', 'scp-dash-cell scp-dash-tile');
+        box.title = t('liveOpen');
+        var canvas = document.createElement('canvas');
+        canvas.className = 'scp-dash-tile-canvas';
+        var overlay = element('div', 'scp-dash-tile-overlay');
+        var shot = button('⤓', 'scp-dash-tile-shot', function (event) { event.stopPropagation(); snapshot(node, canvas); });
+        shot.title = t('liveShot');
+        box.appendChild(canvas);
+        box.appendChild(overlay);
+        box.appendChild(shot);
+        box.addEventListener('click', function () { openRemote(node); });
+        entry = { box: box, canvas: canvas, overlay: overlay, desk: null };
+        tiles[node._id] = entry;
+        connectTile(entry, node);
+        return box;
+    }
+    function setLive(on) {
+        liveOn = (on === true) && liveSupported();
+        if (!liveOn) stopAllTiles();
+        updateLiveControls();
+        render();
+    }
+    function updateLiveControls() {
+        if (!liveToggle) return;
+        if (!liveSupported()) { liveToggle.hidden = true; liveHint.textContent = t('liveNoSupport'); return; }
+        liveToggle.textContent = liveOn ? t('liveOff') : t('liveOn');
+        liveToggle.classList.toggle('on', liveOn);
+        liveHint.textContent = liveOn ? consentNote() : '';
+    }
+
     function deviceRow(node) {
         var row = element('div', 'scp-dash-row');
         var online = isOnline(node), busy = isBusy(node);
+
+        if (liveOn) {
+            row.classList.add('scp-dash-row-live');
+            var tile = (online && liveSupported()) ? tileCell(node) : null;
+            // A computer that is off, or one past the cap, still gets a box of the same
+            // size, so the columns beside it stay lined up.
+            row.appendChild(tile || element('div', 'scp-dash-cell scp-dash-tile scp-dash-tile-blank', online ? t('liveWaiting') : t('liveOffline')));
+        }
 
         var name = element('div', 'scp-dash-cell scp-dash-name');
         name.appendChild(element('span', 'scp-dash-dot ' + (online ? (busy ? 'busy' : 'idle') : 'off')));
@@ -235,7 +362,17 @@
         // reading a room further down the page is thrown back to the top each time.
         var scrollTop = panel.scrollTop;
         body.textContent = '';
+        liveSkipped = 0;
         var list = allNodes();
+
+        // Close the tiles that should no longer be running — the feature switched off,
+        // or a computer powered down or removed — before the rows below hand out the
+        // remaining slots. Each tile is a live desktop session against someone's screen,
+        // so none may outlive the row that shows it.
+        var watchable = {};
+        if (liveOn) { list.forEach(function (node) { if (isOnline(node)) { watchable[node._id] = true; } }); }
+        Object.keys(tiles).forEach(function (nodeid) { if (!watchable[nodeid]) { stopTile(nodeid); } });
+
         if (!list.length) { body.appendChild(element('div', 'scp-dash-empty', t('empty'))); return; }
 
         var online = list.filter(isOnline);
@@ -250,6 +387,12 @@
         stats.appendChild(stat(t('offline'), list.length - online.length, 'off'));
         stats.appendChild(stat(t('risky'), needing.length, needing.length ? 'risk' : 'ok'));
         body.appendChild(stats);
+
+        // Filled in at the end of this pass, once the rows are built and it is known
+        // whether the screen cap was reached.
+        liveNote = element('div', 'scp-dash-live-note');
+        liveNote.hidden = true;
+        body.appendChild(liveNote);
 
         // Group by device group, which is how rooms and departments are organised here.
         // Start from the groups themselves so a room that has no computer yet is still
@@ -275,6 +418,7 @@
             section.appendChild(head);
 
             var header = element('div', 'scp-dash-row scp-dash-head');
+            if (liveOn) { header.classList.add('scp-dash-row-live'); header.appendChild(element('div', 'scp-dash-cell', t('liveCol'))); }
             [t('nameCol'), t('statusCol'), t('userCol'), t('riskCol'), t('actionCol')].forEach(function (title) {
                 header.appendChild(element('div', 'scp-dash-cell', title));
             });
@@ -287,6 +431,9 @@
             }
             body.appendChild(section);
         });
+        liveNote.hidden = (liveSkipped === 0);
+        liveNote.textContent = liveSkipped ? format(t('liveFull'), liveLimit) : '';
+
         if (scrollTop > 0) { panel.scrollTop = scrollTop; }
     }
 
@@ -317,6 +464,7 @@
     function hide() {
         if (!panel || panel.hidden) return;
         panel.hidden = true;
+        stopAllTiles();
         var navButton = document.getElementById('LeftMenuScpDashboard');
         if (navButton) navButton.classList.remove('lbbuttonsel');
         document.querySelectorAll('[data-scp-hidden]').forEach(function (page) {
@@ -358,7 +506,14 @@
         heading.appendChild(element('span', 'scp-eyebrow', t('eyebrow')));
         heading.appendChild(element('h2', '', t('title')));
         heading.appendChild(element('p', '', t('intro')));
-        heading.appendChild(button(t('refresh'), 'scp-dash-refresh', render));
+        var actions = element('div', 'scp-dash-heading-actions');
+        liveToggle = button(t('liveOn'), 'scp-dash-live', function () { setLive(!liveOn); });
+        actions.appendChild(liveToggle);
+        actions.appendChild(button(t('refresh'), 'scp-dash-refresh', render));
+        heading.appendChild(actions);
+        liveHint = element('p', 'scp-dash-live-hint');
+        heading.appendChild(liveHint);
+        updateLiveControls();
         panel.appendChild(heading);
         body = element('div', 'scp-dash-body');
         panel.appendChild(body);
@@ -377,7 +532,7 @@
             };
         }
         window.addEventListener('resize', fitHeight);
-        window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware };
+        window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive };
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

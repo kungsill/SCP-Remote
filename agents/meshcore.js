@@ -2283,6 +2283,35 @@ function replaceSpacesWithUnderscoresRec(o) {
     for (var i in o) { if (i.indexOf(' ') >= 0) { o[i.split(' ').join('_')] = o[i]; delete o[i]; } replaceSpacesWithUnderscoresRec(o[i]); }
 }
 
+/*
+SCP-Remote: the devices Windows itself is unhappy about — the yellow marks in Device
+Manager. Without this the hospital only learns a driver has failed when somebody
+telephones to say the printer has stopped.
+
+Any non-zero ConfigManagerErrorCode is a fault, with two exceptions that are not
+faults at all: 22 is a device an administrator switched off deliberately, and 45 is
+one that simply is not plugged in at the moment. Reporting either would teach the
+person reading the dashboard to ignore the list, which is worse than not having it.
+*/
+function scpDeviceFaults() {
+    try {
+        var rows = require('win-wmi-fixed').query('ROOT\\CIMV2',
+            'SELECT Name, DeviceID, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0',
+            ['Name', 'DeviceID', 'ConfigManagerErrorCode']);
+        if (!Array.isArray(rows)) { return []; }
+        var found = [];
+        for (var i = 0; i < rows.length; i++) {
+            var code = parseInt(rows[i].ConfigManagerErrorCode);
+            if (!code || (code == 22) || (code == 45)) { continue; }
+            found.push({ name: rows[i].Name, code: code, id: rows[i].DeviceID });
+            // A machine in this much trouble needs a person in front of it, not a
+            // longer list travelling to the server.
+            if (found.length >= 20) { break; }
+        }
+        return found;
+    } catch (ex) { return []; }   // an older Windows without the provider must not break sysinfo
+}
+
 function getSystemInformation(func) {
     try {
         var results = { hardware: require('computer-identifiers').get() }; // Hardware info
@@ -2364,6 +2393,7 @@ function getSystemInformation(func) {
         if (process.platform == 'win32')
         {
             results.pendingReboot = require('win-info').pendingReboot(); // Pending reboot
+            results.deviceFaults = scpDeviceFaults(); // SCP-Remote: devices Windows itself cannot start
             if (require('win-volumes').volumes_promise != null)
             {
                 var p = require('win-volumes').volumes_promise();

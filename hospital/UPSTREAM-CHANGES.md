@@ -52,6 +52,7 @@ grep -rn "// SCP-Remote\|/\* SCP-Remote\|<!-- SCP-Remote" --include=*.js --inclu
 | `agents/meshcore.js` | ~299 | เลือกภาษาไทยเว้นแต่ Windows เป็นอังกฤษ | กล่องขออนุญาตกลับไปเป็นอังกฤษ |
 | `agents/meshcore.js` | ~415 | แปลงสี `#RRGGBB` เป็น `r,g,b` | สีกล่องขออนุญาตไม่ทำงาน |
 | `agents/meshcore.js` | ~1374 | รับสีกล่องขออนุญาตจากเซิร์ฟเวอร์ | เหมือนข้างบน |
+| `agents/meshcore.js` | `scpDeviceFaults()` + `results.deviceFaults` ใน `getSystemInformation` | อ่าน Device Manager ผ่าน WMI ส่งรายการอุปกรณ์ที่ Windows เริ่มไม่ได้ ไปกับ sysinfo ที่แดชบอร์ดดึงอยู่แล้ว | แถบ "ต้องดูแล" จะไม่รู้เรื่องไดรเวอร์เสีย ต้องรอคนโทรมาแจ้งเหมือนเดิม |
 | `agents/meshcore.js` | ตัวกรองแพ็กเก็ตดูอย่างเดียว | เรียก `scp-viewonly` ทิ้งทุกแพ็กเก็ตที่ไม่ใช่การตั้งค่าแสดงผล | **การยกเว้นกล่องขออนุญาตจะไม่ปลอดภัยอีกต่อไป** ท่อดูอย่างเดียวจะคุมเครื่องได้ |
 | `agents/meshcore.js` | เรียก `win-scp-userconsent` | ใช้หน้าต่างขออนุญาตของเรา แทน `win-userconsent` เดิม (4 จุด) | กลับไปใช้หน้าต่างเดิม พื้นมืด ปุ่มเล็ก อังกฤษ |
 | `public/scripts/agent-redir-ws-0.1.1.js` | ~24, ~80 | ส่ง `viewonly` ไปกับคำขอเปิดท่อ | เซิร์ฟเวอร์ไม่รู้ว่าท่อไหนดูอย่างเดียว ทุกอย่างกลับไปถาม |

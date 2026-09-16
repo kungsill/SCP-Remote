@@ -772,3 +772,50 @@ test('the report refuses to save an empty file', (t) => {
     assert.equal(saved, false, 'nothing is saved');
     assert.ok(told.indexOf('ยังไม่ได้รับประวัติ') >= 0, 'and it says why: ' + told);
 });
+
+// Devices Windows itself cannot start — the yellow marks in Device Manager. Until now
+// the hospital only learned of a failed driver when somebody telephoned about it.
+const faultsFor = (nodeid, faults) => Object.assign(specsFor(nodeid), { deviceFaults: faults });
+
+test('a failed driver becomes a job on the attention panel', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [{ name: 'HP LaserJet 1020', code: 28, id: 'USB\\1' }]));
+
+    const row = s.w.document.querySelector('.scp-dash-attention-row');
+    assert.ok(row, 'it reaches the panel at the top without anything else being wired up');
+    assert.ok(row.textContent.indexOf('HP LaserJet 1020') >= 0, 'naming the device: ' + row.textContent);
+    assert.ok(row.textContent.indexOf('ยังไม่ได้ติดตั้งไดรเวอร์') >= 0, 'and what is wrong with it in plain words');
+});
+
+test('an error code nobody has a phrase for still says something useful', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [{ name: 'Odd Device', code: 37, id: 'PCI\\9' }]));
+    const text = s.w.document.querySelector('.scp-dash-attention-row').textContent;
+    assert.ok(text.indexOf('Odd Device') >= 0 && text.indexOf('37') >= 0, 'the code itself: ' + text);
+});
+
+test('one badly broken computer cannot crowd out everyone else', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [
+        { name: 'Device A', code: 28 }, { name: 'Device B', code: 10 }, { name: 'Device C', code: 1 },
+        { name: 'Device D', code: 31 }, { name: 'Device E', code: 43 }
+    ]));
+    const text = s.w.document.querySelector('.scp-dash-attention-row').textContent;
+    assert.ok(text.indexOf('Device C') >= 0, 'the first three are named');
+    assert.ok(text.indexOf('Device D') < 0, 'the rest are not');
+    assert.ok(text.indexOf('และอีก 2 อุปกรณ์') >= 0, 'but they are counted: ' + text);
+});
+
+test('a computer with nothing wrong stays off the panel', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(faultsFor('node//1', []));
+    assert.equal(s.w.document.querySelectorAll('.scp-dash-attention-row').length, 0);
+    // Compared by length: arrays built inside the page belong to another realm, so a
+    // deep comparison against one built here fails even when both are empty.
+    assert.equal(s.api.faultsOf({ _id: 'node//1' }).length, 0, 'an empty list is not a fault');
+    assert.equal(s.api.faultsOf({ _id: 'node//nothing' }).length, 0, 'nor is never having asked');
+});

@@ -54,6 +54,17 @@
         diskLow: ['Disk {0} is {1}% free', 'ดิสก์ {0} เหลือ {1}%'],
         diskFull: ['Disk {0} almost full — {1}% free', 'ดิสก์ {0} ใกล้เต็ม เหลือ {1}%'],
         rebootPending: ['Waiting for a restart to finish updates', 'รอรีสตาร์ตเพื่อให้อัปเดตเสร็จ'],
+        driverFault: ['{0}: {1}', '{0}: {1}'],
+        driverMore: ['and {0} more devices', 'และอีก {0} อุปกรณ์'],
+        fault28: ['no driver installed', 'ยังไม่ได้ติดตั้งไดรเวอร์'],
+        fault10: ['cannot start', 'เริ่มอุปกรณ์ไม่ได้'],
+        fault1: ['not configured correctly', 'ตั้งค่าไม่ถูกต้อง'],
+        fault43: ['stopped by Windows after a fault', 'Windows หยุดอุปกรณ์เพราะมีปัญหา'],
+        fault31: ['not working properly', 'ทำงานไม่ถูกต้อง'],
+        fault12: ['not enough resources', 'ทรัพยากรไม่พอ'],
+        fault18: ['drivers need reinstalling', 'ต้องติดตั้งไดรเวอร์ใหม่'],
+        fault19: ['registry entry damaged', 'ข้อมูลใน registry เสียหาย'],
+        faultOther: ['driver problem (code {0})', 'ไดรเวอร์มีปัญหา (รหัส {0})'],
         exportCsv: ['Export inventory', 'ออกรายการครุภัณฑ์'],
         exportNone: ['No specifications have been read yet. Open the page for a moment and try again.', 'ยังไม่ได้อ่านสเปกเครื่องเลย เปิดหน้านี้ทิ้งไว้สักครู่แล้วลองใหม่'],
         exportDone: ['Saved {0} computers.', 'บันทึกแล้ว {0} เครื่อง'],
@@ -232,6 +243,7 @@
         else if ((away != null) && (away >= awayWarnDays)) { found.push({ level: 'warn', text: format(t('awayDays'), away) }); }
         var record = specs[node._id];
         if (record && record.pendingReboot) { found.push({ level: 'warn', text: t('rebootPending') }); }
+        faultsOf(node).forEach(function (fault) { found.push(fault); });
         var scan = scanState[node._id];
         if (scan && scan.hits) { scan.hits.forEach(function (name) { found.push({ level: 'high', text: format(t('watched'), name) }); }); }
         return found;
@@ -659,6 +671,22 @@
             if (!volume || (volume.dType !== 3) || !volume.size) return null;
             return { letter: letter, percent: Math.round((Number(volume.sizeremaining) / Number(volume.size)) * 100), free: gigabytes(volume.sizeremaining) };
         }).filter(Boolean);
+    }
+
+    /* The devices Windows itself cannot start, as the agent read them out of Device
+       Manager. Kept to the three worst so one badly broken machine cannot push every
+       other computer's problems off the panel; the rest are counted in a final line. */
+    function faultsOf(node) {
+        var record = specs[node._id];
+        var faults = record && record.deviceFaults;
+        if (!Array.isArray(faults) || !faults.length) return [];
+        var found = faults.slice(0, 3).map(function (fault) {
+            var key = 'fault' + fault.code;
+            var reason = (texts[key] != null) ? t(key) : format(t('faultOther'), fault.code);
+            return { level: 'warn', text: format(t('driverFault'), fault.name || '?', reason) };
+        });
+        if (faults.length > 3) { found.push({ level: 'warn', text: format(t('driverMore'), faults.length - 3) }); }
+        return found;
     }
 
     function specLine(node) {
@@ -1175,7 +1203,7 @@
         window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
             exportInventory: exportInventory, specLine: specLine, disksOf: disksOf,
             hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway,
-            hoursByDay: hoursByDay, exportUsage: exportUsage };
+            hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf };
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

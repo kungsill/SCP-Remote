@@ -66,6 +66,15 @@
         rankingNone: ['No usage history yet. It builds up as the computers stay connected.', 'ยังไม่มีประวัติการใช้งาน ข้อมูลจะสะสมขึ้นเองเมื่อเครื่องเชื่อมต่ออยู่'],
         awayDays: ['Not seen for {0} days', 'ไม่ติดต่อมา {0} วัน'],
         awayNever: ['Never connected since it was added', 'ไม่เคยเชื่อมต่อเลยตั้งแต่เพิ่มเข้ามา'],
+        attention: ['Needs attention', 'ต้องดูแล'],
+        attentionCount: ['{0} computers need attention', '{0} เครื่องต้องดูแล'],
+        attentionOne: ['1 computer needs attention', '1 เครื่องต้องดูแล'],
+        attentionNone: ['Nothing needs attention right now.', 'ตอนนี้ไม่มีเรื่องต้องดูแล'],
+        attentionGo: ['Open', 'เปิด'],
+        weekChart: ['Last 7 days', '7 วันล่าสุด'],
+        weekHours: ['{0}: on {1} hrs', '{0}: เปิด {1} ชม.'],
+        exportUsage: ['Export usage', 'ออกรายงานการใช้งาน'],
+        exportUsageNone: ['No usage history has arrived yet. Open the page for a moment and try again.', 'ยังไม่ได้รับประวัติการใช้งาน เปิดหน้านี้ทิ้งไว้สักครู่แล้วลองใหม่'],
         pickRooms: ['Show', 'เลือกดู'],
         everyRoom: ['Everywhere', 'ทุกที่'],
         roomHidden: ['Not selected', 'ไม่ได้เลือก'],
@@ -332,6 +341,8 @@
             fill.style.width = (best > 0 ? Math.max(3, Math.round((entry.use.hours / best) * 100)) : 0) + '%';
             bar.appendChild(fill);
             row.appendChild(bar);
+            var week = weekBars(entry.node);
+            if (week) { row.appendChild(week); }
             rows.appendChild(row);
         });
 
@@ -341,6 +352,81 @@
         }
         panelEl.appendChild(rows);
         return panelEl;
+    }
+
+    /* Everything that needs doing, in one place at the top. The same findings already
+       appear on each computer's own row, but a person looking after a hospital single
+       handed should not have to scan sixty rows to discover there are three jobs today.
+       Sorted worst first, and each line opens the computer it is about. */
+    function attentionPanel(list) {
+        var panelEl = element('section', 'scp-dash-attention');
+        var flagged = [];
+        list.forEach(function (node) {
+            var risks = risksOf(node);
+            if (!risks.length) return;
+            var worst = risks.some(function (r) { return r.level === 'high'; }) ? 'high' : 'warn';
+            flagged.push({ node: node, risks: risks, worst: worst });
+        });
+        flagged.sort(function (a, b) {
+            if (a.worst !== b.worst) { return (a.worst === 'high') ? -1 : 1; }
+            if (b.risks.length !== a.risks.length) { return b.risks.length - a.risks.length; }
+            return String(a.node.name || '').localeCompare(String(b.node.name || ''));
+        });
+
+        var head = element('div', 'scp-dash-attention-head');
+        head.appendChild(element('h3', '', t('attention')));
+        head.appendChild(element('span', 'scp-dash-attention-count', flagged.length
+            ? ((flagged.length === 1) ? t('attentionOne') : format(t('attentionCount'), flagged.length))
+            : t('attentionNone')));
+        panelEl.appendChild(head);
+        if (!flagged.length) { panelEl.className += ' scp-dash-attention-clear'; return panelEl; }
+
+        var rows = element('div', 'scp-dash-attention-rows');
+        flagged.forEach(function (entry) {
+            var row = element('div', 'scp-dash-attention-row scp-dash-attention-' + entry.worst);
+            var who = element('div', 'scp-dash-attention-who');
+            who.appendChild(element('strong', '', entry.node.name || ''));
+            who.appendChild(element('small', '', roomOf(entry.node)));
+            row.appendChild(who);
+            var what = element('div', 'scp-dash-attention-what');
+            entry.risks.forEach(function (risk) {
+                // The same chip the computer's own row uses, so one finding looks the same
+                // wherever it is read.
+                what.appendChild(element('span', 'scp-dash-flag ' + risk.level, risk.text));
+            });
+            row.appendChild(what);
+            row.appendChild(button(t('attentionGo'), 'scp-dash-attention-go', function () { openRemote(entry.node); }));
+            rows.appendChild(row);
+        });
+        panelEl.appendChild(rows);
+        return panelEl;
+    }
+
+    /* One small column per day for the past week, so the shape of a department's week is
+       readable at a glance: which wards run at weekends, which day went wrong. Drawn
+       against a full day, because the question here is how much of each day was used,
+       not how this computer compares to another. */
+    function weekBars(node) {
+        var days = hoursByDay(node, rankingDays);
+        if (!days) return null;
+        var chart = element('div', 'scp-dash-week');
+        chart.setAttribute('aria-label', t('weekChart'));
+        days.forEach(function (entry) {
+            var column = element('span', 'scp-dash-week-day' + ((entry.hours == null) ? ' scp-dash-week-blank' : ''));
+            if (entry.hours != null) {
+                var fill = element('i', '');
+                fill.style.height = Math.max(4, Math.round((entry.hours / 24) * 100)) + '%';
+                column.appendChild(fill);
+                column.title = format(t('weekHours'), dayName(entry.day), entry.hours.toFixed(1));
+            }
+            chart.appendChild(column);
+        });
+        return chart;
+    }
+
+    function dayName(date) {
+        try { return date.toLocaleDateString(thai ? 'th-TH' : 'en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); }
+        catch (error) { return date.toDateString(); }
     }
 
     function stat(label, value, tone) {
@@ -471,19 +557,52 @@
        changed to. Walk it and add up the time spent powered on since the given moment.
        Power state 1 is on; sleep and hibernate do not count, which is right — a sleeping
        computer is not in use. */
-    function hoursPoweredOn(timeline, sinceMs) {
+    function hoursPoweredOn(timeline, sinceMs, untilMs) {
         if (!timeline || (timeline.length < 3)) return null;
         var at = historyStart(timeline);
         if (at == null) return null;
-        var now = Date.now(), state = timeline[2], on = 0;
+        var now = Date.now();
+        // Never count past this moment. A day still being lived has only the hours it has
+        // actually had, not the hours it will have by midnight.
+        var until = (untilMs == null) ? now : Math.min(untilMs, now);
+        var state = timeline[2], on = 0;
         for (var i = 3; (i + 1) < timeline.length; i += 2) {
             var next = at + (Number(timeline[i]) * 1000);
-            if (state === 1) { on += overlap(at, next, sinceMs, now); }
+            if (state === 1) { on += overlap(at, next, sinceMs, until); }
             at = next;
             state = timeline[i + 1];
         }
-        if (state === 1) { on += overlap(at, now, sinceMs, now); }
+        if (state === 1) { on += overlap(at, now, sinceMs, until); }
         return on / 3600000;
+    }
+
+    // Midnight to midnight, local time, for the day a given number of days back from
+    // today. Local, because a hospital day is a local day and the shifts are read against
+    // it — not against UTC.
+    function dayEdges(daysBack) {
+        var start = new Date();
+        start.setHours(0, 0, 0, 0);
+        start.setDate(start.getDate() - daysBack);
+        var end = new Date(start.getTime());
+        end.setDate(end.getDate() + 1);
+        return { from: start.getTime(), until: end.getTime(), label: start };
+    }
+
+    // Hours powered on for each of the last few days, oldest first. Null for a day that
+    // begins before this computer's history does, so an absence of records is never drawn
+    // as a quiet day.
+    function hoursByDay(node, days) {
+        var timeline = timelines[node._id];
+        if (!timeline || (timeline.length < 3)) return null;
+        var known = historyStart(timeline);
+        if (known == null) return null;
+        var out = [];
+        for (var back = days - 1; back >= 0; back--) {
+            var edge = dayEdges(back);
+            if (edge.until <= known) { out.push({ day: edge.label, hours: null }); continue; }
+            out.push({ day: edge.label, hours: hoursPoweredOn(timeline, Math.max(edge.from, known), edge.until) });
+        }
+        return out;
     }
 
     /* Total hours powered on within the window — a fact about what was observed, not a
@@ -593,15 +712,47 @@
                 (node.osdesc || '').replace('Microsoft ', ''), serial, bios
             ].map(csvCell).join(','));
         });
-        function pad(value) { return (value < 10 ? '0' : '') + value; }
-        var now = new Date();
-        var stamp = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate());
+        saveCsv('SCP-Remote_ครุภัณฑ์คอมพิวเตอร์_' + stamp() + '.csv', lines);
+        window.alert(format(t('exportDone'), rows.length));
+    }
+
+    // Saves a file rather than making the browser navigate, and names it for what it is.
+    function saveCsv(name, lines) {
         var link = document.createElement('a');
-        link.download = 'SCP-Remote_ครุภัณฑ์คอมพิวเตอร์_' + stamp + '.csv';
+        link.download = name;
         link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\ufeff' + lines.join('\r\n'));
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }
+
+    function stamp() {
+        function pad(value) { return (value < 10 ? '0' : '') + value; }
+        var now = new Date();
+        return now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate());
+    }
+
+    /* One row per computer, one column per day, so the whole week opens in Excel as a
+       grid somebody can sort, total or chart without asking us for anything further.
+       A day with no history is left blank rather than written as a zero: the difference
+       between "switched off" and "we were not watching" has to survive the export. */
+    function exportUsage() {
+        var rows = allNodes().filter(function (node) { return hoursByDay(node, rankingDays) != null; });
+        if (!rows.length) { window.alert(t('exportUsageNone')); return; }
+        var columns = hoursByDay(rows[0], rankingDays).map(function (entry) { return dayName(entry.day); });
+        var lines = [['ชื่อเครื่อง', 'หน่วยงาน'].concat(columns).concat(['รวม (ชม.)']).map(csvCell).join(',')];
+        rows.forEach(function (node) {
+            var days = hoursByDay(node, rankingDays), total = 0, any = false;
+            var cells = days.map(function (entry) {
+                if (entry.hours == null) return '';
+                any = true;
+                total += entry.hours;
+                return entry.hours.toFixed(1);
+            });
+            lines.push([node.name, roomOf(node)].concat(cells).concat([any ? total.toFixed(1) : ''])
+                .map(csvCell).join(','));
+        });
+        saveCsv('SCP-Remote_การใช้งาน_' + stamp() + '.csv', lines);
         window.alert(format(t('exportDone'), rows.length));
     }
 
@@ -866,6 +1017,7 @@
         stats.appendChild(stat(t('offline'), list.length - online.length, 'off'));
         stats.appendChild(stat(t('risky'), needing.length, needing.length ? 'risk' : 'ok'));
         body.appendChild(stats);
+        body.appendChild(attentionPanel(list));
         body.appendChild(usageRanking(rooms, shownRooms));
 
         // Filled in at the end of this pass, once the rows are built and it is known
@@ -986,6 +1138,7 @@
         liveToggle = button(t('liveOn'), 'scp-dash-live', function () { setLive(!liveOn); });
         actions.appendChild(liveToggle);
         actions.appendChild(button(t('exportCsv'), 'scp-dash-refresh', exportInventory));
+        actions.appendChild(button(t('exportUsage'), 'scp-dash-refresh', exportUsage));
         actions.appendChild(button(t('refresh'), 'scp-dash-refresh', render));
         heading.appendChild(actions);
         liveHint = element('p', 'scp-dash-live-hint');
@@ -1021,7 +1174,8 @@
         window.addEventListener('resize', fitHeight);
         window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
             exportInventory: exportInventory, specLine: specLine, disksOf: disksOf,
-            hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway };
+            hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway,
+            hoursByDay: hoursByDay, exportUsage: exportUsage };
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

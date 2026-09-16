@@ -126,3 +126,33 @@
   .scp-dash-rank-hours { text-align: right; }
   .scp-dash-rank-bar { grid-column: 1 / -1; }
 }
+
+/* Everything that needs doing, before anything else on the page. Severity is carried by
+   a stripe down the left rather than by colouring the whole row, so a long list stays
+   readable and the worst rows still announce themselves. */
+.scp-dash-attention { border: 1px solid var(--scp-line); border-radius: 12px; background: var(--scp-surface);
+  box-shadow: var(--scp-shadow); padding: 16px 18px; margin-bottom: 26px; }
+.scp-dash-attention-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.scp-dash-attention-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.scp-dash-attention-count { font-size: 12px; color: var(--scp-muted); }
+.scp-dash-attention-clear { opacity: 0.72; }
+.scp-dash-attention-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 13px; }
+.scp-dash-attention-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr) auto; gap: 12px;
+  align-items: center; padding: 9px 12px; border-radius: 9px; background: var(--scp-soft);
+  border-left: 3px solid var(--scp-line); }
+.scp-dash-attention-row.scp-dash-attention-high { border-left-color: #c0392b; }
+.scp-dash-attention-row.scp-dash-attention-warn { border-left-color: #b07d17; }
+.scp-dash-attention-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.scp-dash-attention-who strong { font-size: 12.5px; overflow-wrap: anywhere; }
+.scp-dash-attention-who small { font-size: 11px; color: var(--scp-muted); }
+.scp-dash-attention-what { display: flex; flex-wrap: wrap; gap: 5px; }
+.scp-dash-attention-go { white-space: nowrap; }
+
+/* A week in seven columns. Small enough to sit inside a table row, tall enough that the
+   difference between a nine hour day and a twenty four hour one is obvious. */
+.scp-dash-week { display: flex; align-items: flex-end; gap: 2px; height: 26px; }
+.scp-dash-week-day { display: flex; align-items: flex-end; width: 7px; height: 100%;
+  background: var(--scp-soft); border-radius: 2px; overflow: hidden; }
+.scp-dash-week-day i { display: block; width: 100%; background: var(--scp-accent); border-radius: 2px; }
+.scp-dash-week-blank { background: transparent; border: 1px dashed var(--scp-line); }
+@media (max-width: 760px) { .scp-dash-week { grid-column: 1 / -1; } }

@@ -653,3 +653,122 @@ test('nothing is said about last contact until the server has answered', (t) => 
     assert.ok(s.w.document.body.textContent.indexOf('ไม่เคยเชื่อมต่อเลย') < 0,
         'an unanswered question must not read as bad news');
 });
+
+// Everything needing action, gathered at the top. The same findings already sit on each
+// computer's own row; the point of the panel is that nobody should have to scan sixty
+// rows to discover there are three jobs today.
+test('everything needing attention is gathered at the top, worst first', (t) => {
+    const s = setup(t, { nodes: [
+        { _id: 'node//1', name: 'pc-fine', conn: 1, meshid: 'mesh//a', users: [] },
+        { _id: 'node//2', name: 'pc-firewall', conn: 1, meshid: 'mesh//a', users: [], wsc: { firewall: 'BAD' } },
+        { _id: 'node//3', name: 'pc-updates', conn: 1, meshid: 'mesh//a', users: [], wsc: { autoUpdate: 'BAD' } }
+    ] });
+    s.api.show();
+
+    const rows = Array.from(s.w.document.querySelectorAll('.scp-dash-attention-row'));
+    assert.equal(rows.length, 2, 'only the computers with something wrong');
+    assert.ok(rows[0].textContent.indexOf('pc-firewall') >= 0, 'the serious one leads: ' + rows[0].textContent);
+    assert.ok(rows[0].className.indexOf('scp-dash-attention-high') >= 0, 'and is marked as serious');
+    assert.ok(rows[1].textContent.indexOf('pc-updates') >= 0);
+    assert.ok(s.w.document.querySelector('.scp-dash-attention-count').textContent.indexOf('2') >= 0);
+    assert.ok(rows[0].textContent.indexOf('ทดสอบ') >= 0, 'each line says which department');
+    assert.ok(rows[0].querySelector('.scp-dash-flag.high'), 'and reuses the same chip the device row uses');
+});
+
+test('the attention panel says so plainly when there is nothing to do', (t) => {
+    const s = setup(t, { nodes: [{ _id: 'node//1', name: 'pc-fine', conn: 1, meshid: 'mesh//a', users: [] }] });
+    s.api.show();
+    assert.equal(s.w.document.querySelectorAll('.scp-dash-attention-row').length, 0);
+    assert.ok(s.w.document.querySelector('.scp-dash-attention-clear'), 'and stands down rather than shouting');
+    assert.ok(s.w.document.body.textContent.indexOf('ตอนนี้ไม่มีเรื่องต้องดูแล') >= 0);
+});
+
+test('a line in the attention panel opens the computer it is about', (t) => {
+    const opened = [];
+    const s = setup(t, { nodes: [
+        { _id: 'node//2', name: 'pc-firewall', conn: 1, meshid: 'mesh//a', users: [], wsc: { firewall: 'BAD' } }
+    ] });
+    s.w.gotoDevice = (nodeid) => opened.push(nodeid);
+    s.api.show();
+    s.w.document.querySelector('.scp-dash-attention-go').dispatchEvent(new s.w.Event('click'));
+    assert.deepEqual(opened, ['node//2'], 'straight to the computer that needs it');
+});
+
+// A week of power history, one small column per day.
+test('the week chart draws a column per day and leaves unknown days blank', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    s.api.show();
+    // Three days of history only: the four days before it are not quiet, they are unknown.
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//opd1', timeline: poweredOn(3, workingDays(3, 8)) });
+    const chart = s.w.document.querySelector('.scp-dash-week');
+    assert.ok(chart, 'a chart is drawn');
+    const columns = Array.from(chart.querySelectorAll('.scp-dash-week-day'));
+    assert.equal(columns.length, 7, 'seven days');
+    const blank = columns.filter(c => c.className.indexOf('scp-dash-week-blank') >= 0);
+    // Three whole days sit before the history begins. The fourth is the day the history
+    // started part way through, which is drawn from the moment it began rather than blanked.
+    assert.equal(blank.length, 3, 'the days before the history began are blank, not zero');
+    assert.deepEqual(columns.slice(0, 3).map(c => c.className.indexOf('blank') >= 0), [true, true, true], 'and they are the earliest days');
+    assert.ok(blank.every(c => c.querySelector('i') === null), 'and carry no bar at all');
+    assert.ok(columns[6].title.indexOf('เปิด') >= 0, 'each known day says its hours: ' + columns[6].title);
+});
+
+test('today is measured only as far as today has got', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    s.api.show();
+    // On continuously since a week ago and still on now.
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//opd1', timeline: poweredOn(7, []) });
+    const days = s.api.hoursByDay({ _id: 'node//opd1' }, 7);
+    const today = days[days.length - 1];
+    const hoursSoFar = (Date.now() - new Date().setHours(0, 0, 0, 0)) / 3600000;
+    assert.ok(today.hours <= hoursSoFar + 0.01,
+        'today cannot have had more hours than it has had: ' + today.hours + ' vs ' + hoursSoFar);
+    const yesterday = days[days.length - 2];
+    assert.ok(Math.abs(yesterday.hours - 24) < 0.1, 'a full day on reads as 24: ' + yesterday.hours);
+});
+
+// The usage report, for the asset and management reporting the hospital does by hand.
+test('the usage report carries a column per day and a total', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    let saved = null;
+    s.w.HTMLAnchorElement.prototype.click = function () { saved = { name: this.download, href: this.href }; };
+    s.api.show();
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//opd1', timeline: poweredOn(7, workingDays(7, 8)) });
+    s.api.exportUsage();
+
+    assert.ok(saved, 'it should produce a file');
+    assert.ok(saved.name.indexOf('การใช้งาน') >= 0, 'named for what it is: ' + saved.name);
+    const csv = decodeURIComponent(saved.href.split(',')[1]);
+    assert.ok(csv.charCodeAt(0) === 0xFEFF, 'with a byte order mark, or Excel mangles Thai');
+    const header = csv.split('\r\n')[0];
+    assert.equal(header.split(',').length, 10, 'name, department, seven days, total');
+    assert.ok(header.indexOf('รวม (ชม.)') >= 0, 'and a total column');
+    const row = csv.split('\r\n').find(line => line.indexOf('opd-1') >= 0);
+    assert.ok(row, 'the computer with history is in it');
+    assert.ok(row.indexOf('OPD') >= 0, 'with its department');
+});
+
+test('a day with no history is left blank in the report, never written as a zero', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    let saved = null;
+    s.w.HTMLAnchorElement.prototype.click = function () { saved = { name: this.download, href: this.href }; };
+    s.api.show();
+    s.fromServer({ action: 'powertimeline', nodeid: 'node//opd1', timeline: poweredOn(2, workingDays(2, 8)) });
+    s.api.exportUsage();
+    const row = decodeURIComponent(saved.href.split(',')[1]).split('\r\n').find(l => l.indexOf('opd-1') >= 0);
+    const cells = row.split(',');
+    // name, department, then seven days. The earliest days predate the history.
+    assert.equal(cells[2], '""', 'a day we were not watching is blank: ' + row);
+    assert.notEqual(cells[2], '"0.0"', 'a blank must never read as an idle day');
+});
+
+test('the report refuses to save an empty file', (t) => {
+    const s = setup(t, { meshes: wards, nodes: inWards });
+    let saved = false, told = '';
+    s.w.HTMLAnchorElement.prototype.click = function () { saved = true; };
+    s.w.alert = (message) => { told = message; };
+    s.api.show();
+    s.api.exportUsage();   // no power history has arrived
+    assert.equal(saved, false, 'nothing is saved');
+    assert.ok(told.indexOf('ยังไม่ได้รับประวัติ') >= 0, 'and it says why: ' + told);
+});

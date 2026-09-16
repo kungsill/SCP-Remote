@@ -65,6 +65,18 @@
         fault18: ['drivers need reinstalling', 'ต้องติดตั้งไดรเวอร์ใหม่'],
         fault19: ['registry entry damaged', 'ข้อมูลใน registry เสียหาย'],
         faultOther: ['driver problem (code {0})', 'ไดรเวอร์มีปัญหา (รหัส {0})'],
+        fixDrivers: ['Install drivers', 'ติดตั้งไดรเวอร์'],
+        fixAll: ['Install drivers on all {0} computers', 'ติดตั้งไดรเวอร์ทั้ง {0} เครื่อง'],
+        fixAsk: ['Install missing drivers on {0}?\n\nWindows will look for drivers and install what it finds. It can take several minutes. The computer will NOT be restarted — if a restart is needed, the dashboard will say so afterwards.\n\nThe person using it can carry on working.', 'สั่งติดตั้งไดรเวอร์ที่ขาดบน {0} ใช่ไหม\n\nWindows จะค้นหาไดรเวอร์แล้วติดตั้งที่หาเจอ อาจใช้เวลาหลายนาที\n\nระบบจะไม่รีสตาร์ตเครื่องให้ ถ้าต้องรีสตาร์ต แดชบอร์ดจะบอกทีหลัง คนที่ใช้เครื่องอยู่ทำงานต่อได้ตามปกติ'],
+        fixAskMany: ['{0} computers', '{0} เครื่อง'],
+        fixWorking: ['Installing drivers…', 'กำลังติดตั้งไดรเวอร์…'],
+        fixOffline: ['{0} is switched off, so it was skipped.', '{0} ปิดอยู่ จึงข้ามไป'],
+        fixSent: ['Sent to {0} computers. This takes a few minutes.', 'สั่งไปแล้ว {0} เครื่อง ใช้เวลาสักครู่'],
+        fixDone: ['Drivers installed. {0}', 'ติดตั้งไดรเวอร์แล้ว {0}'],
+        fixNothing: ['Windows had no drivers to offer for this computer.', 'Windows ไม่มีไดรเวอร์ให้สำหรับเครื่องนี้'],
+        fixReboot: ['Finished, but this computer needs restarting.', 'เสร็จแล้ว แต่เครื่องนี้ต้องรีสตาร์ต'],
+        fixFailed: ['Could not finish: {0}', 'ทำไม่สำเร็จ: {0}'],
+        fixTimeout: ['No answer after 15 minutes. It may still be working — check again later.', 'ไม่ตอบกลับภายใน 15 นาที อาจยังทำงานอยู่ ลองดูใหม่ภายหลัง'],
         exportCsv: ['Export inventory', 'ออกรายการครุภัณฑ์'],
         exportNone: ['No specifications have been read yet. Open the page for a moment and try again.', 'ยังไม่ได้อ่านสเปกเครื่องเลย เปิดหน้านี้ทิ้งไว้สักครู่แล้วลองใหม่'],
         exportDone: ['Saved {0} computers.', 'บันทึกแล้ว {0} เครื่อง'],
@@ -149,6 +161,11 @@
     var longUptimeDays = 14;
 
     var panel, body, scanState = {}, pending = null, timer = null;
+
+    /* Driver installs in flight, keyed by the id we sent with the command so a reply can
+       never be credited to the wrong computer. Unlike the software scan these may run on
+       several machines at once, because each is a separate job on a separate agent. */
+    var fixing = {}, fixTicket = 0;
     var liveToggle = null, liveHint = null, liveNote = null;
 
     /* Live screen tiles. Small, slow and look-only: no mouse or keyboard handler is
@@ -390,6 +407,14 @@
         head.appendChild(element('span', 'scp-dash-attention-count', flagged.length
             ? ((flagged.length === 1) ? t('attentionOne') : format(t('attentionCount'), flagged.length))
             : t('attentionNone')));
+        // One press for every computer missing a driver, since they are usually missing
+        // the same one — a room of machines imaged from the same disk.
+        var faulty = flagged.map(function (entry) { return entry.node; })
+            .filter(function (node) { return faultsOf(node).length && isOnline(node); });
+        if (faulty.length > 1) {
+            head.appendChild(button(format(t('fixAll'), faulty.length), 'scp-dash-fix-all',
+                function () { fixDrivers(faulty); }));
+        }
         panelEl.appendChild(head);
         if (!flagged.length) { panelEl.className += ' scp-dash-attention-clear'; return panelEl; }
 
@@ -407,7 +432,19 @@
                 what.appendChild(element('span', 'scp-dash-flag ' + risk.level, risk.text));
             });
             row.appendChild(what);
-            row.appendChild(button(t('attentionGo'), 'scp-dash-attention-go', function () { openRemote(entry.node); }));
+            var state = fixing[entry.node._id];
+            if (state) {
+                what.appendChild(element('span', 'scp-dash-fix-state scp-dash-fix-' + state.state,
+                    (state.state === 'working') ? t('fixWorking') : state.text));
+            }
+            var buttons = element('div', 'scp-dash-attention-buttons');
+            // Only offered where it is the right tool: a computer with a driver Windows
+            // cannot start. It is never offered as a general fix for anything else wrong.
+            if (faultsOf(entry.node).length && (!state || (state.state !== 'working'))) {
+                buttons.appendChild(button(t('fixDrivers'), 'scp-dash-fix-go', function () { fixDrivers([entry.node]); }));
+            }
+            buttons.appendChild(button(t('attentionGo'), 'scp-dash-attention-go', function () { openRemote(entry.node); }));
+            row.appendChild(buttons);
             rows.appendChild(row);
         });
         panelEl.appendChild(rows);
@@ -513,6 +550,9 @@
                 } else if (message && (message.action === 'powertimeline') && message.nodeid) {
                     timelines[message.nodeid] = message.timeline || [];
                     render();
+                } else if (message && (message.action === 'msg') && (message.type === 'runcommands')
+                    && message.nodeid && fixing[message.nodeid]) {
+                    readDriverReply(message.nodeid, message.result);
                 } else if (message && (message.action === 'lastconnects') && message.lastconnects) {
                     // Keyed by node, each a moment in milliseconds.
                     var seen = message.lastconnects, kept = {};
@@ -782,6 +822,93 @@
         });
         saveCsv('SCP-Remote_การใช้งาน_' + stamp() + '.csv', lines);
         window.alert(format(t('exportDone'), rows.length));
+    }
+
+    /* What gets run on the far machine, as SYSTEM.
+
+       Two steps, cheapest first. A device re-scan installs anything already sitting in
+       the machine's own driver store and costs nothing; only then do we ask Windows
+       Update, which has to download. Drivers only — this must never turn into a general
+       Windows update that reboots a ward computer in the middle of a shift.
+
+       Nothing here restarts the machine. Where a restart is needed we say so and leave
+       the decision to a person who knows what the computer is being used for. */
+    var driverScript = [
+        "$ProgressPreference='SilentlyContinue'; $out=@()",
+        "try { $null = & pnputil.exe /scan-devices; $out += 'rescan ok' } catch { $out += 'rescan failed' }",
+        "try {",
+        "  $s = New-Object -ComObject Microsoft.Update.Session",
+        "  $r = $s.CreateUpdateSearcher().Search(\"IsInstalled=0 and Type='Driver'\")",
+        "  if ($r.Updates.Count -eq 0) { $out += 'NODRIVERS' } else {",
+        "    $c = New-Object -ComObject Microsoft.Update.UpdateColl",
+        "    foreach ($u in $r.Updates) { if (-not $u.EulaAccepted) { $u.AcceptEula() }; $null = $c.Add($u) }",
+        "    $d = $s.CreateUpdateDownloader(); $d.Updates = $c; $null = $d.Download()",
+        "    $i = $s.CreateUpdateInstaller(); $i.Updates = $c; $res = $i.Install()",
+        "    $out += ('installed ' + $c.Count + ' driver(s)')",
+        "    if ($res.RebootRequired) { $out += 'REBOOT' }",
+        "  }",
+        "} catch { $out += ('FAILED ' + $_.Exception.Message) }",
+        "$out -join ' | '"
+    ].join('\n');
+
+    function fixDrivers(nodes) {
+        var targets = nodes.filter(isOnline);
+        var asleep = nodes.filter(function (node) { return !isOnline(node); });
+        if (asleep.length && !targets.length) { window.alert(format(t('fixOffline'), asleep[0].name || '')); return; }
+        if (!targets.length) return;
+
+        var who = (targets.length === 1) ? (targets[0].name || '') : format(t('fixAskMany'), targets.length);
+        if (!window.confirm(format(t('fixAsk'), who))) return;
+
+        var ticket = 'scpfix' + (++fixTicket) + '_' + Date.now();
+        targets.forEach(function (node) { fixing[node._id] = { state: 'working', ticket: ticket }; });
+        render();
+        try {
+            window.meshserver.send({
+                action: 'runcommands',
+                nodeids: targets.map(function (node) { return node._id; }),
+                type: 2,          // Windows PowerShell
+                runAsUser: 0,     // as the agent, so no one has to be signed in
+                reply: true,
+                responseid: ticket,
+                cmds: driverScript
+            });
+        } catch (error) {
+            targets.forEach(function (node) { fixing[node._id] = { state: 'failed', text: String(error) }; });
+            render();
+            return;
+        }
+        if (asleep.length) { window.alert(format(t('fixOffline'), asleep[0].name || '')); }
+        else if (targets.length > 1) { window.alert(format(t('fixSent'), targets.length)); }
+
+        // Windows Update can genuinely take a quarter of an hour. Give up waiting after
+        // that rather than leaving a row spinning for ever, and say the work may yet
+        // finish, because it may.
+        window.setTimeout(function () {
+            var changed = false;
+            targets.forEach(function (node) {
+                var state = fixing[node._id];
+                if (state && (state.ticket === ticket) && (state.state === 'working')) {
+                    fixing[node._id] = { state: 'failed', text: t('fixTimeout') };
+                    changed = true;
+                }
+            });
+            if (changed) { render(); }
+        }, 900000);
+    }
+
+    // Turn what the far machine printed into one plain sentence.
+    function readDriverReply(nodeid, result) {
+        var text = String(result == null ? '' : result);
+        if (/FAILED/.test(text)) { fixing[nodeid] = { state: 'failed', text: format(t('fixFailed'), text.split('FAILED')[1].trim().substring(0, 120)) }; }
+        else if (/REBOOT/.test(text)) { fixing[nodeid] = { state: 'reboot', text: t('fixReboot') }; }
+        else if (/NODRIVERS/.test(text)) { fixing[nodeid] = { state: 'done', text: t('fixNothing') }; }
+        else { fixing[nodeid] = { state: 'done', text: format(t('fixDone'), text.substring(0, 120)) }; }
+        // What the agent reported a moment ago is now out of date; ask again so the fault
+        // disappears from the panel on its own once it is really gone.
+        specsAsked[nodeid] = false;
+        askForSpecs({ _id: nodeid });
+        render();
     }
 
     function openRemote(node) {
@@ -1203,7 +1330,8 @@
         window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
             exportInventory: exportInventory, specLine: specLine, disksOf: disksOf,
             hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway,
-            hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf };
+            hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf,
+            fixDrivers: fixDrivers, driverScript: driverScript };
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

@@ -819,3 +819,127 @@ test('a computer with nothing wrong stays off the panel', (t) => {
     assert.equal(s.api.faultsOf({ _id: 'node//1' }).length, 0, 'an empty list is not a fault');
     assert.equal(s.api.faultsOf({ _id: 'node//nothing' }).length, 0, 'nor is never having asked');
 });
+
+// One press to install a missing driver. It runs as SYSTEM on a hospital computer
+// somebody may be working at, so what it will and will not do is pinned down here.
+const faulty = (nodeid, name, conn = 1) => ({ _id: nodeid, name: name, conn: conn, meshid: 'mesh//a', users: [] });
+
+test('the repair button is offered only where a driver has actually failed', (t) => {
+    const s = setup(t, { nodes: [faulty('node//1', 'pc-broken'), faulty('node//2', 'pc-firewall')] });
+    s.w.nodes[1].wsc = { firewall: 'BAD' };   // wrong, but not a driver
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+
+    const rows = Array.from(s.w.document.querySelectorAll('.scp-dash-attention-row'));
+    const withButton = rows.filter(r => r.querySelector('.scp-dash-fix-go'));
+    assert.equal(withButton.length, 1, 'exactly one row offers it');
+    assert.ok(withButton[0].textContent.indexOf('pc-broken') >= 0, 'and it is the one with the driver fault');
+});
+
+test('pressing it asks first, and sends nothing if the answer is no', (t) => {
+    const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
+    let asked = '';
+    s.w.confirm = (message) => { asked = message; return false; };
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
+
+    assert.ok(asked.indexOf('pc-broken') >= 0, 'the question names the computer: ' + asked);
+    assert.ok(asked.indexOf('ไม่รีสตาร์ต') >= 0, 'and promises not to restart it');
+    assert.equal(s.sent.filter(m => m.action === 'runcommands').length, 0, 'no means no');
+});
+
+test('saying yes sends the drivers-only command as the agent, asking for a reply', (t) => {
+    const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
+
+    const sent = s.sent.filter(m => m.action === 'runcommands');
+    assert.equal(sent.length, 1);
+    assert.deepEqual(Array.from(sent[0].nodeids), ['node//1'], 'only the computer that needs it');
+    assert.equal(sent[0].type, 2, 'PowerShell');
+    assert.equal(sent[0].runAsUser, 0, 'as the agent, so nobody has to be signed in');
+    assert.equal(sent[0].reply, true, 'and we want to hear how it went');
+    assert.ok(typeof sent[0].responseid === 'string' && sent[0].responseid.length > 0);
+    assert.ok(s.w.document.body.textContent.indexOf('กำลังติดตั้งไดรเวอร์') >= 0, 'the row says it is working');
+});
+
+test('the command installs drivers and never restarts the computer', (t) => {
+    const s = setup(t);
+    const script = s.api.driverScript;
+    assert.ok(/Type='Driver'/.test(script), 'drivers only, never a general Windows update');
+    assert.ok(/IsInstalled=0/.test(script), 'and only ones not already on');
+    assert.ok(!/Restart-Computer|shutdown|Restart-Service/i.test(script), 'nothing here restarts anything');
+    assert.ok(/RebootRequired/.test(script), 'it reports that a restart is needed instead');
+    assert.ok(/pnputil/.test(script), 'the free local re-scan is tried first');
+});
+
+test('what the computer reports back is turned into one plain sentence', (t) => {
+    const cases = [
+        ['rescan ok | installed 2 driver(s)', 'ติดตั้งไดรเวอร์แล้ว'],
+        ['rescan ok | NODRIVERS', 'Windows ไม่มีไดรเวอร์ให้'],
+        ['rescan ok | installed 1 driver(s) | REBOOT', 'ต้องรีสตาร์ต'],
+        ['rescan failed | FAILED 0x80240044 access denied', 'ทำไม่สำเร็จ']
+    ];
+    cases.forEach(([reply, expected]) => {
+        const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
+        s.api.show();
+        s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+        s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
+        s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', result: reply });
+        assert.ok(s.w.document.body.textContent.indexOf(expected) >= 0,
+            '“' + reply + '” should read as “' + expected + '”');
+    });
+});
+
+test('a reply about a computer we never asked about is ignored', (t) => {
+    const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    // Somebody else ran a command from the device's own page. That answer is theirs.
+    s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', result: 'installed 9 driver(s)' });
+    assert.ok(s.w.document.body.textContent.indexOf('ติดตั้งไดรเวอร์แล้ว') < 0,
+        'an answer to a question we did not ask must not be reported as ours');
+});
+
+test('a computer that is switched off is skipped and said to be skipped', (t) => {
+    const s = setup(t, { nodes: [faulty('node//1', 'pc-off', 0)] });
+    let told = '';
+    s.w.alert = (message) => { told = message; };
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.api.fixDrivers([{ _id: 'node//1', name: 'pc-off', conn: 0 }]);
+    assert.equal(s.sent.filter(m => m.action === 'runcommands').length, 0, 'nothing is sent into the dark');
+    assert.ok(told.indexOf('pc-off') >= 0 && told.indexOf('ปิดอยู่') >= 0, 'and it says which: ' + told);
+});
+
+test('one press covers a room imaged from the same disk', (t) => {
+    const s = setup(t, { nodes: [
+        faulty('node//1', 'opd-1'), faulty('node//2', 'opd-2'),
+        faulty('node//3', 'opd-3', 0), faulty('node//4', 'opd-4')
+    ] });
+    s.api.show();
+    ['node//1', 'node//2', 'node//3'].forEach(id =>
+        s.fromServer(faultsFor(id, [{ name: 'SM Bus Controller', code: 28 }])));
+    s.fromServer(faultsFor('node//4', []));   // this one is fine
+
+    const all = s.w.document.querySelector('.scp-dash-fix-all');
+    assert.ok(all, 'a single button appears once more than one computer needs it');
+    assert.ok(all.textContent.indexOf('2') >= 0, 'counting only the ones it can reach: ' + all.textContent);
+    all.dispatchEvent(new s.w.Event('click'));
+    const sent = s.sent.filter(m => m.action === 'runcommands')[0];
+    assert.deepEqual(Array.from(sent.nodeids).sort(), ['node//1', 'node//2'],
+        'the switched-off one and the healthy one are both left out');
+});
+
+test('after a repair the computer is asked again what is wrong with it', (t) => {
+    const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    const before = s.sent.filter(m => m.action === 'getsysinfo').length;
+    s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
+    s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', result: 'installed 1 driver(s)' });
+    assert.ok(s.sent.filter(m => m.action === 'getsysinfo').length > before,
+        'so the fault clears itself from the panel once it is really gone');
+});

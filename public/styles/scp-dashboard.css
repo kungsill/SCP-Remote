@@ -156,3 +156,18 @@
 .scp-dash-week-day i { display: block; width: 100%; background: var(--scp-accent); border-radius: 2px; }
 .scp-dash-week-blank { background: transparent; border: 1px dashed var(--scp-line); }
 @media (max-width: 760px) { .scp-dash-week { grid-column: 1 / -1; } }
+
+/* The repair button sits with the one that opens the computer, so the two obvious
+   responses to a problem are side by side. */
+.scp-dash-attention-buttons { display: flex; gap: 6px; align-items: center; }
+.scp-dash-fix-go, .scp-dash-fix-all { white-space: nowrap; }
+.scp-dash-fix-all { margin-left: auto; }
+.scp-dash-fix-state { font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  background: var(--scp-surface); border: 1px dashed var(--scp-line); color: var(--scp-muted); }
+.scp-dash-fix-working { border-style: solid; border-color: var(--scp-accent); color: var(--scp-accent); }
+.scp-dash-fix-reboot { border-style: solid; border-color: #b07d17; color: #8a6410; }
+.scp-dash-fix-failed { border-style: solid; border-color: #c0392b; color: #a93226; }
+@media (max-width: 760px) {
+  .scp-dash-attention-row { grid-template-columns: 1fr; }
+  .scp-dash-fix-all { margin-left: 0; }
+}

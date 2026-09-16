@@ -13,7 +13,7 @@ const MARKER = /(\/\/|\/\*|<!--)\s*SCP-Remote/;
 
 // Files that belong to us. Editing these needs no entry: they carry no upstream code.
 const ours = [
-    /^hospital[\\/]/, /^public[\\/]scripts[\\/]scp-/, /^public[\\/]styles[\\/]scp-/,
+    /^hospital[\\/]/, /^scp-[^\\/]+\.js$/, /^public[\\/]scripts[\\/]scp-/, /^public[\\/]styles[\\/]scp-/,
     /^agents[\\/]modules_meshcore[\\/]scp-/, /^agents[\\/]modules_meshcore[\\/]win-scp-/,
     /^scripts[\\/]/, /^views[\\/]translations[\\/]/
 ];
@@ -22,7 +22,7 @@ const ours = [
 // that only gained the one-line theme include are grouped there rather than listed
 // individually; they are matched by the pattern below.
 const recorded = new Set([
-    'meshuser.js', 'webserver.js', 'meshagent.js', 'meshdesktopmultiplex.js',
+    'meshuser.js', 'webserver.js', 'meshagent.js', 'meshdesktopmultiplex.js', 'meshcentral.js',
     path.join('agents', 'meshcore.js'),
     path.join('public', 'scripts', 'agent-redir-ws-0.1.1.js'),
     path.join('views', 'default.handlebars'),

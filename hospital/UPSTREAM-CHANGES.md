@@ -20,7 +20,7 @@ grep -rn "// SCP-Remote\|/\* SCP-Remote\|<!-- SCP-Remote" --include=*.js --inclu
 
 อัปเกรดแล้วก๊อปกลับมาวางได้เลย ไม่ชนกับใคร
 
-`hospital/` ทั้งโฟลเดอร์ · `scripts/*hospital*.js`, `check-config.js`, `allow-subnet.js`, `build-setup-exe.js`, `copy-backups.js`, `service-*.js` · `public/scripts/scp-*.js` · `public/styles/scp-*.css` · `agents/modules_meshcore/scp-viewonly.js` · `agents/modules_meshcore/win-scp-userconsent.js` · `public/fonts/sarabun/` · `public/images/scp-logo.png`
+`hospital/` ทั้งโฟลเดอร์ · `scripts/*hospital*.js`, `check-config.js`, `allow-subnet.js`, `build-setup-exe.js`, `copy-backups.js`, `service-*.js` · `scp-*.js` (ที่โฟลเดอร์หลัก เช่น `scp-usage.js`) · `public/scripts/scp-*.js` · `public/styles/scp-*.css` · `agents/modules_meshcore/scp-viewonly.js` · `agents/modules_meshcore/win-scp-userconsent.js` · `public/fonts/sarabun/` · `public/images/scp-logo.png`
 
 **นี่คือส่วนใหญ่ของงานที่ทำไป และตั้งใจให้เป็นแบบนี้** ของใหม่ควรไปอยู่ในไฟล์ของตัวเองเสมอ ไม่แทรกในไฟล์ต้นฉบับถ้าเลี่ยงได้
 
@@ -46,6 +46,8 @@ grep -rn "// SCP-Remote\|/\* SCP-Remote\|<!-- SCP-Remote" --include=*.js --inclu
 | `webserver.js` | ~10284, ~10312 | จำภาษาที่เลือกหน้าเข้าสู่ระบบ และเสิร์ฟเฉพาะไทย/อังกฤษ | ภาษาเด้งกลับตามเบราว์เซอร์ |
 | `meshagent.js` | ~431 | ถอดชื่อเครื่องจาก tag เป็น UTF-8 | ชื่อเครื่องภาษาไทยกลายเป็นตัวอักษรขยะ |
 | `meshagent.js` | ~2091 | ตั้งชื่อจาก tag เฉพาะเมื่อค่าเปลี่ยนจริง | ชื่อที่ผู้ดูแลตั้งเองถูกทับทุกครั้งที่เอเจนต์ต่อใหม่ |
+| `meshagent.js` | ~1959 ในบล็อก `command.idletime` | เรียก `scpUsage.sample(device, ...)` เก็บยอดเวลาที่มีคนใช้งานจริงลงในระเบียนเครื่อง | แดชบอร์ดจะแยกไม่ออกระหว่างเครื่องที่เปิดทิ้งไว้กับเครื่องที่มีคนนั่งทำงาน ยอดเก่ายังอยู่แต่หยุดเดิน |
+| `meshcentral.js` | ~30 และ ~1966 | ประกาศ `obj.scpUsage` และสร้างขึ้นก่อนเว็บเซิร์ฟเวอร์ | ตัวบันทึกไม่ถูกสร้าง ฝั่ง `meshagent.js` มีการ์ดกันไว้แล้วจึงไม่พัง แต่จะไม่เก็บอะไรเลย |
 | `meshdesktopmultiplex.js` | ~1033 | ผู้ชมที่ขอดูอย่างเดียวถูกบังคับดูอย่างเดียวในภาพที่แชร์กัน | คนดูภาพจะคุมเครื่องได้ทั้งที่ไม่ควร |
 | `agents/meshcore.js` | ~299 | เลือกภาษาไทยเว้นแต่ Windows เป็นอังกฤษ | กล่องขออนุญาตกลับไปเป็นอังกฤษ |
 | `agents/meshcore.js` | ~415 | แปลงสี `#RRGGBB` เป็น `r,g,b` | สีกล่องขออนุญาตไม่ทำงาน |

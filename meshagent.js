@@ -1953,6 +1953,10 @@ module.exports.CreateMeshAgent = function (parent, db, ws, req, args, domain) {
                 if (command.idletime != null) { // Idle Time
                     if (!device.idletime) { device.idletime = 0; }
                     if (parseInt(device.idletime) != parseInt(command.idletime)) { /*changes.push('Idle Time');*/ device.idletime = parseInt(command.idletime); change = 1; } // Don't log idle time changes, this is too volatile.
+                    // SCP-Remote: fold this report into the device's daily tally of time somebody
+                    // was actually at the keyboard, so a computer in use can be told apart from one
+                    // left switched on. It rides along with the save this change already causes.
+                    if ((parent.parent.scpUsage != null) && parent.parent.scpUsage.sample(device, parseInt(command.idletime))) { change = 1; }
                 }
 
                 // Push Messaging Token

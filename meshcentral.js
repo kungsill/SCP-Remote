@@ -27,6 +27,7 @@ function CreateMeshCentralServer(config, args) {
     obj.redirserver = null;     // HTTP relay web server, typically on port 80
     obj.mpsserver = null;       // Intel AMT CIRA server, typically on port 4433
     obj.mqttbroker = null;      // MQTT server, not is not often used
+    obj.scpUsage = null;        // SCP-Remote: daily tally of time somebody was at each computer
     obj.swarmserver = null;     // Swarm server, this is used only to update older MeshCentral v1 agents
     obj.smsserver = null;       // SMS server, used to send user SMS messages
     obj.msgserver = null;       // Messaging server, used to sent used messages
@@ -1959,6 +1960,10 @@ function CreateMeshCentralServer(config, args) {
 
                     // Create MQTT Broker to hook into webserver and mpsserver
                     if ((typeof obj.config.settings.mqtt == 'object') && (typeof obj.config.settings.mqtt.auth == 'object') && (typeof obj.config.settings.mqtt.auth.keyid == 'string') && (typeof obj.config.settings.mqtt.auth.key == 'string')) { obj.mqttbroker = require("./mqttbroker.js").CreateMQTTBroker(obj, obj.db, obj.args); }
+
+                    // SCP-Remote: start the active use recorder before any agent can connect,
+                    // so no idle-time report arrives with nowhere to be counted.
+                    obj.scpUsage = require('./scp-usage.js').CreateScpUsage(obj);
 
                     // Start the web server and if needed, the redirection web server.
                     obj.webserver = require('./webserver.js').CreateWebServer(obj, obj.db, obj.args, obj.certificates, obj.StartEx5);

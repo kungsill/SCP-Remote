@@ -7412,6 +7412,13 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
                 obj.app.get(url + 'meshsettings', obj.handleMeshSettingsRequest);
                 obj.app.get(url + 'devicepowerevents.ashx', obj.handleDevicePowerEvents);
                 obj.app.get(url + 'downloadfile.ashx', handleDownloadFile);
+                // SCP-Remote: hands an agent a driver package this server already downloaded,
+                // against a one-time ticket its install command carries. Ward computers cannot
+                // reach Windows Update themselves, which is the whole reason the library exists.
+                obj.app.get(url + 'scp-driver-package.ashx', function(req,res){ require('./hospital/driver-library').serve(obj,req,res); });
+                // SCP-Remote: takes in a driver package the hospital's own IT supplies, for wards
+                // whose computers have no route to Windows Update at all.
+                obj.app.post(url + 'scp-driver-upload.ashx', function(req,res){ const d = checkUserIpAddress(req, res); if (d == null) { return; } require('./hospital/driver-library').upload(obj, d, req, res); });
                 obj.app.get(url + 'commander.ashx', handleMeshCommander);
                 obj.app.post(url + 'uploadfile.ashx', obj.bodyParser.urlencoded({ extended: false }), handleUploadFile);
                 obj.app.post(url + 'uploadfilebatch.ashx', obj.bodyParser.urlencoded({ extended: false }), handleUploadFileBatch);

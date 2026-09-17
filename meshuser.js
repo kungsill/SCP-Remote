@@ -740,6 +740,15 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
             // pass through to switch statement until refactoring complete
 
         switch (command.action) {
+            // SCP-Remote: the single channel every hospital panel uses to reach the server --
+            // repairs, backups, cleanup and the driver library all ride on it.
+            case 'scpops': {
+                if (typeof command.tag !== 'string' || command.tag.length > 80) break;
+                require('./hospital/operations').handle({db:db,parent:parent,user:user,domain:domain},command).then(function(result){
+                    obj.send({action:'scpops',tag:command.tag,result:result});
+                }).catch(function(error){obj.send({action:'scpops',tag:command.tag,error: String(error.message).slice(0,200)});});
+                break;
+            }
             case 'nodes':
                 {
                     // If in paging mode, look to set the skip and limit values

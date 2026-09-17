@@ -1295,6 +1295,10 @@
         actions.appendChild(button(t('exportCsv'), 'scp-dash-refresh', exportInventory));
         actions.appendChild(button(t('exportUsage'), 'scp-dash-refresh', exportUsage));
         actions.appendChild(button(t('refresh'), 'scp-dash-refresh', render));
+        actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { if (window.ScpOperations) ScpOperations.open(); }));
+        // The library spends the hospital's disk and reaches every ward, so it is offered
+        // only to the account that already answers for the whole server.
+        if (window.userinfo && window.userinfo.siteadmin === 4294967295) { actions.appendChild(button(document.documentElement.lang === 'th' ? 'คลังไดรเวอร์' : 'Driver library', 'scp-dash-refresh', function () { if (window.ScpOperations) ScpOperations.openLibrary(); })); }
         heading.appendChild(actions);
         liveHint = element('p', 'scp-dash-live-hint');
         heading.appendChild(liveHint);

@@ -39,7 +39,11 @@ test('the removal refuses the remote agent, the protecting antivirus, and Window
     assert.match(source, /REFUSED_REMOTE_AGENT/);
     assert.match(source, /mesh \?agent\|meshcentral\|scp\[- \]\?remote/i, 'the agent is matched by name, not by a list of ids');
     assert.match(source, /REFUSED_ACTIVE_ANTIVIRUS/);
-    assert.match(source, /productState -band 0x1000/, 'only the antivirus actually protecting the machine is protected from removal');
+    assert.match(source, /productState -band 0x1000/, 'the antivirus has to be switched on to be protected from removal');
+    // A derelict antivirus -- switched on but never updating -- is the reason Windows calls a
+    // machine unprotected. Removing it is the repair, and Defender takes over once it is gone.
+    assert.match(source, /productState -band 0x10\)/, 'and up to date, or the broken one could never be removed');
+    assert.match(source, /-and \(-not \$stale\)/, 'a stale antivirus is not protected from removal');
     assert.match(source, /REFUSED_SYSTEM_LOCATION/);
 });
 
@@ -128,4 +132,13 @@ test('the name, folder and uninstaller are carried as data, not pasted into the 
     const cmds = s.sent[0].cmds;
     assert.equal(cmds.indexOf('Start-Process calc'), -1, 'a program name cannot become part of the script');
     assert.match(cmds, /FromBase64String\('[A-Za-z0-9+/=]+'\)/);
+});
+
+test('an antivirus is flagged as one that will resist being removed this way', (t) => {
+    const s = setup(t, [{ name: 'ESET Security', version: '9', publisher: 'ESET', uninstall: 'C:/ESET/u.exe', location: 'C:/ESET' }]);
+    let asked = '';
+    s.w.confirm = text => { asked = text; return false; };
+    s.click('ESET Security');
+    assert.ok(asked.indexOf('Safe Mode') >= 0, 'the reliable route is named rather than implied');
+    assert.equal(s.sent.length, 0, 'and saying no sends nothing');
 });

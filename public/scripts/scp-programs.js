@@ -22,7 +22,22 @@
     }
     function button(text, className, fn) { var b = el('button', text, className); b.type = 'button'; b.onclick = fn; return b; }
 
-    var jobs = {}, serial = 0, dialog, listBox, notice, current = null, programs = [];
+    var jobs = {}, serial = 0, dialog, listBox, notice, current = null, programs = [], ticker = null;
+    function elapsed(since) {
+        var total = Math.max(0, Math.round((Date.now() - since) / 1000));
+        return Math.floor(total / 60) + ':' + ('0' + (total % 60)).slice(-2);
+    }
+    // There is no percentage to be had here: the agent streams nothing back for this kind of
+    // job, and the uninstaller in the middle of it reports nothing at all. A clock at least
+    // says the difference between working and hung, which a frozen 0% never did.
+    function tick() {
+        if (ticker) { return; }
+        ticker = root.setInterval(function () {
+            var working = Object.keys(jobs).some(function (id) { return jobs[id].state === 'working'; });
+            if (!working || !dialog || !dialog.open) { root.clearInterval(ticker); ticker = null; return; }
+            draw();
+        }, 1000);
+    }
 
     // Each step is reported as it finishes, so a run that dies half way still says how far
     // it reached. The reasons for refusing are the first thing the script checks.
@@ -37,7 +52,12 @@
         "  $win=$env:windir.TrimEnd('\\'); $trimmed=$loc.TrimEnd('\\')",
         "  if ($trimmed -and (($trimmed -ieq $win) -or ($trimmed -ieq $env:SystemDrive) -or ($trimmed -ieq ($env:SystemDrive+'\\')) -or ($trimmed -ieq \"$win\\System32\"))) { throw 'REFUSED_SYSTEM_LOCATION' }",
         "  foreach ($p in @(Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction SilentlyContinue)) {",
-        "    if ($p.displayName -and (($p.productState -band 0x1000) -ne 0) -and ($name -like ('*'+$p.displayName+'*'))) { throw 'REFUSED_ACTIVE_ANTIVIRUS' }",
+        // Being registered is not the same as protecting. An antivirus whose signatures are
+        // stale is the reason Windows is reporting the machine unprotected, and removing it
+        // is the repair rather than the hazard -- Defender takes over once it is gone. Only
+        // one that is both switched on and current is worth stopping somebody from removing.
+        "    $on = ($p.productState -band 0x1000) -ne 0; $stale = ($p.productState -band 0x10) -ne 0",
+        "    if ($p.displayName -and $on -and (-not $stale) -and ($name -like ('*'+$p.displayName+'*'))) { throw 'REFUSED_ACTIVE_ANTIVIRUS' }",
         "  }",
         "  $under = { param($p) $trimmed -and $p -and ($p -ilike ($trimmed+'*')) }",
         // Stop whatever puts it back, before anything is deleted.
@@ -93,12 +113,17 @@
         return btoa(utf8);
     }
 
+    // An antivirus carries a kernel driver whose whole job is to stop software doing what
+    // this tool does. Stopping its services and deleting its files can half-succeed, and a
+    // half-removed antivirus is worse than either state. Worth trying, not worth pretending
+    // about: the maker's own removal tool in Safe Mode is the reliable way.
+    var AV = /eset|kaspersky|mcafee|norton|symantec|avast|avg|bitdefender|trend ?micro|sophos|forticlient|f-secure|panda|360 ?total|avira|webroot/i;
     function refusalText(code) {
         return {
             REFUSED_REMOTE_AGENT: t('Refused: this is the remote-support agent. Removing it would end every way back into that computer.',
                 'ไม่ดำเนินการ: นี่คือเอเจนต์ที่ใช้รีโมต ถอดออกแล้วจะเข้าเครื่องนั้นจากที่นี่ไม่ได้อีกเลย'),
-            REFUSED_ACTIVE_ANTIVIRUS: t('Refused: Windows has this antivirus protecting the computer right now.',
-                'ไม่ดำเนินการ: Windows กำลังใช้แอนตี้ไวรัสตัวนี้ป้องกันเครื่องอยู่'),
+            REFUSED_ACTIVE_ANTIVIRUS: t('Refused: this antivirus is switched on and up to date, so it is the one protecting the computer.',
+                'ไม่ดำเนินการ: แอนตี้ไวรัสตัวนี้เปิดอยู่และอัปเดตล่าสุด คือตัวที่กำลังป้องกันเครื่องอยู่'),
             REFUSED_SYSTEM_LOCATION: t('Refused: this is installed into a Windows system folder.',
                 'ไม่ดำเนินการ: โปรแกรมนี้ติดตั้งอยู่ในโฟลเดอร์ระบบของ Windows')
         }[code];
@@ -117,8 +142,9 @@
 
     function send(node, program) {
         var ticket = 'scpprog' + (++serial) + '_' + Date.now();
-        jobs[node._id] = { ticket: ticket, name: program.name, state: 'working' };
+        jobs[node._id] = { ticket: ticket, name: program.name, state: 'working', started: Date.now() };
         draw();
+        tick();
         try {
             root.meshserver.send({
                 action: 'runcommands', nodeids: [node._id], type: 2, runAsUser: 0, reply: true, responseid: ticket,
@@ -186,6 +212,7 @@
                 var warning = t('Force-remove this program from ', 'บังคับถอดโปรแกรมนี้ออกจากเครื่อง ') + (current.name || '') + '?\n\n' + program.name +
                     '\n\n' + t('This stops its services, scheduled tasks and startup entries first, then removes its files. It cannot be undone from here.',
                         'ระบบจะหยุดเซอร์วิส งานตั้งเวลา และรายการเริ่มอัตโนมัติของมันก่อน แล้วจึงลบไฟล์ทิ้ง เลิกทำจากที่นี่ไม่ได้');
+                if (AV.test(program.name)) { warning += '\n\n' + t('This is an antivirus, and it defends itself against being removed this way. The attempt may only half-succeed and leave the computer worse off than it is now. The maker\u2019s own removal tool, run in Safe Mode, is the reliable way.', 'นี่คือแอนตี้ไวรัส ซึ่งมีกลไกป้องกันตัวเองจากการถูกถอดด้วยวิธีนี้ อาจถอดได้ไม่หมดและทำให้เครื่องแย่กว่าเดิม ทางที่ได้ผลแน่นอนคือเครื่องมือถอนของผู้ผลิต รันใน Safe Mode'); }
                 if (!root.confirm(warning)) { return; }
                 send(current, program);
             });
@@ -201,7 +228,9 @@
                 failed: t('Did not run', 'ไม่ได้ดำเนินการ'), unknown: t('Result not confirmed', 'ยังยืนยันผลไม่ได้')
             };
             var box = el('div', null, 'scp-program-result');
-            box.appendChild(el('strong', job.name + ' · ' + (states[job.state] || job.state)));
+            box.appendChild(el('strong', job.name + ' · ' + (states[job.state] || job.state) +
+                ((job.state === 'working' && job.started) ? ' · ' + elapsed(job.started) : '')));
+            if (job.state === 'working') { box.appendChild(el('small', t('Each step is reported when it finishes. The uninstaller in the middle of it can take several minutes.', 'แต่ละขั้นจะรายงานเมื่อทำเสร็จ ช่วงที่ตัวถอนของโปรแกรมทำงานอาจใช้เวลาหลายนาที'))); }
             if (job.text) { box.appendChild(el('p', job.text)); }
             (job.steps || []).forEach(function (step) { box.appendChild(el('small', '· ' + stepText(step))); });
             if (job.state === 'done') {

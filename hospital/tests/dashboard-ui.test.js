@@ -862,7 +862,8 @@ test('saying yes sends the drivers-only command as the agent, asking for a reply
     assert.equal(sent[0].runAsUser, 0, 'as the agent, so nobody has to be signed in');
     assert.equal(sent[0].reply, true, 'and we want to hear how it went');
     assert.ok(typeof sent[0].responseid === 'string' && sent[0].responseid.length > 0);
-    assert.ok(s.w.document.body.textContent.indexOf('กำลังติดตั้งไดรเวอร์') >= 0, 'the row says it is working');
+    // Until the computer answers, the true thing to report is that it has not.
+    assert.ok(s.w.document.body.textContent.indexOf('ยังไม่มีคำตอบ') >= 0, 'the row says the command is out and unanswered');
 });
 
 test('the command installs drivers and never restarts the computer', (t) => {
@@ -1043,4 +1044,25 @@ test('a computer Windows itself calls unprotected is still flagged', (t) => {
     const text = s.w.document.body.textContent;
     assert.ok(text.indexOf('Windows รายงานว่า') >= 0, 'the verdict Windows reached is what is reported');
     assert.ok(text.indexOf('McAfee') >= 0, 'and a computer with nothing running at all is still flagged');
+});
+
+// Two ward computers showed "installing drivers" for a quarter of an hour and had never
+// answered at all. The row was reporting the press, not the computer.
+test('a command that has been sent but not answered says exactly that', (t) => {
+    const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
+    const text = s.w.document.body.textContent;
+    assert.ok(text.indexOf('\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e04\u0e33\u0e15\u0e2d\u0e1a') >= 0, 'it says the computer has not answered');
+    assert.equal(text.indexOf('\u0e01\u0e33\u0e25\u0e31\u0e07\u0e15\u0e34\u0e14\u0e15\u0e31\u0e49\u0e07\u0e44\u0e14\u0e23\u0e40\u0e27\u0e2d\u0e23\u0e4c'), -1, 'and does not claim an installation is under way');
+});
+
+test('the device re-scan cannot hold the job for ever', (t) => {
+    const s = setup(t);
+    const script = s.api.driverScript;
+    assert.match(script, /pnputil\.exe/, 'the cheap step still runs first');
+    assert.match(script, /WaitForExit\(\d+\)/, 'but a re-scan that never returns has to be given up on');
+    assert.match(script, /rescan timed out/, 'and said to have been given up on');
+    assert.doesNotMatch(script, /Restart-Computer/);
 });

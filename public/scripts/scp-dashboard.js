@@ -78,6 +78,7 @@
         fixWorking: ['Installing drivers…', 'กำลังติดตั้งไดรเวอร์…'],
         fixOffline: ['{0} is switched off, so it was skipped.', '{0} ปิดอยู่ จึงข้ามไป'],
         fixSent: ['Sent to {0} computers. This takes a few minutes.', 'สั่งไปแล้ว {0} เครื่อง ใช้เวลาสักครู่'],
+        fixAwaiting: ['Command sent. The computer has not answered yet.', 'ส่งคำสั่งแล้ว ยังไม่มีคำตอบจากเครื่อง'],
         fixDone: ['Drivers installed. {0}', 'ติดตั้งไดรเวอร์แล้ว {0}'],
         fixNothing: ['Windows had no drivers to offer for this computer.', 'Windows ไม่มีไดรเวอร์ให้สำหรับเครื่องนี้'],
         fixReboot: ['Finished, but this computer needs restarting.', 'เสร็จแล้ว แต่เครื่องนี้ต้องรีสตาร์ต'],
@@ -471,7 +472,7 @@
             var state = fixing[entry.node._id];
             if (state) {
                 what.appendChild(element('span', 'scp-dash-fix-state scp-dash-fix-' + state.state,
-                    (state.state === 'working') ? t('fixWorking') : state.text));
+                    (state.state === 'working') ? (state.text || t('fixWorking')) : state.text));
             }
             var buttons = element('div', 'scp-dash-attention-buttons');
             // Only offered where it is the right tool: a computer with a driver Windows
@@ -883,7 +884,13 @@
        the decision to a person who knows what the computer is being used for. */
     var driverScript = [
         "$ProgressPreference='SilentlyContinue'; $out=@()",
-        "try { $null = & pnputil.exe /scan-devices; $out += 'rescan ok' } catch { $out += 'rescan failed' }",
+        // The re-scan stalls on exactly the computers this is aimed at -- the ones with a
+        // device Windows cannot start. Left unbounded it holds the whole job before a word
+        // has been reported, and the panel has nothing to show but silence.
+        "try {",
+        "  $rescan = Start-Process -FilePath \"$env:windir\\System32\\pnputil.exe\" -ArgumentList '/scan-devices' -PassThru -WindowStyle Hidden",
+        "  if ($rescan.WaitForExit(180000)) { $out += 'rescan ok' } else { $rescan.Kill(); $out += 'rescan timed out' }",
+        "} catch { $out += 'rescan failed' }",
         "try {",
         "  $s = New-Object -ComObject Microsoft.Update.Session",
         "  $r = $s.CreateUpdateSearcher().Search(\"IsInstalled=0 and Type='Driver'\")",
@@ -909,7 +916,9 @@
         if (!window.confirm(format(t('fixAsk'), who))) return;
 
         var ticket = 'scpfix' + (++fixTicket) + '_' + Date.now();
-        targets.forEach(function (node) { fixing[node._id] = { state: 'working', ticket: ticket }; });
+        // Until the far end says something, the only true thing to report is that we asked.
+        // Saying it is installing makes a command that never arrived look like work.
+        targets.forEach(function (node) { fixing[node._id] = { state: 'working', ticket: ticket, text: t('fixAwaiting') }; });
         render();
         try {
             window.meshserver.send({

@@ -27,6 +27,9 @@
         scan: ['Check programs', 'ตรวจโปรแกรม'],
         refresh: ['Refresh', 'รีเฟรช'],
         none: ['Nothing to flag', 'ไม่พบสิ่งผิดปกติ'],
+        avProblem: ['Windows reports this computer is not protected', 'Windows รายงานว่าเครื่องนี้ไม่ได้รับการป้องกัน'],
+        avPassive: ['idle', 'ตัวที่พักอยู่'],
+        diskFree: ['C: {0} GB free ({1}%)', 'C: ว่าง {0} GB ({1}%)'],
         empty: ['No computers yet. Install the agent on a computer to see it here.', 'ยังไม่มีเครื่องในระบบ ติดตั้งเอเจนต์บนเครื่องลูกแล้วจะขึ้นที่นี่'],
         noUser: ['No one signed in', 'ไม่มีผู้ใช้ล็อกอิน'],
         confirmOff: ['Shut down this computer now?', 'สั่งปิดเครื่องนี้เดี๋ยวนี้หรือไม่?'],
@@ -39,6 +42,7 @@
         avOff: ['Antivirus turned off', 'แอนติไวรัสถูกปิด'],
         avOld: ['Virus signatures out of date', 'ฐานข้อมูลไวรัสเก่า'],
         firewallOff: ['Firewall not protecting', 'ไฟร์วอลล์ไม่ทำงาน'],
+        firewallUnknown: ['Firewall state not reported yet', 'ยังตรวจสถานะไฟร์วอลล์ไม่ได้'],
         updateOff: ['Windows Update not protecting', 'Windows Update ไม่ทำงาน'],
         rebootDue: ['Waiting for a restart', 'รอการรีสตาร์ต'],
         uptimeLong: ['Not restarted for {0} days', 'ไม่ได้รีสตาร์ตมา {0} วัน'],
@@ -54,6 +58,7 @@
         diskLow: ['Disk {0} is {1}% free', 'ดิสก์ {0} เหลือ {1}%'],
         diskFull: ['Disk {0} almost full — {1}% free', 'ดิสก์ {0} ใกล้เต็ม เหลือ {1}%'],
         rebootPending: ['Waiting for a restart to finish updates', 'รอรีสตาร์ตเพื่อให้อัปเดตเสร็จ'],
+        rebootPendingFiles: ['Waiting for a restart to replace files in use', 'รอรีสตาร์ตเพื่อแทนที่ไฟล์ที่ถูกใช้งานอยู่'],
         driverFault: ['{0}: {1}', '{0}: {1}'],
         driverMore: ['and {0} more devices', 'และอีก {0} อุปกรณ์'],
         fault28: ['no driver installed', 'ยังไม่ได้ติดตั้งไดรเวอร์'],
@@ -240,14 +245,33 @@
     // the moment a computer connects; no extra query is needed.
     function risksOf(node) {
         var found = [];
-        (node.av || []).forEach(function (product) {
-            if (product && product.enabled === false) { found.push({ level: 'high', text: t('avOff') + ': ' + (product.product || '') }); }
-        });
+        // Windows runs one real-time antivirus at a time and puts any second product
+        // installed beside it into passive mode on purpose. A product reading as disabled is
+        // therefore not the fault by itself; what decides it is whether Windows concludes the
+        // computer is unprotected. Flagging the passive one asks somebody to go and "fix" a
+        // machine that was never broken.
+        var products = (node.av || []).filter(Boolean);
+        var guarding = products.filter(function (p) { return p.enabled === true; });
+        var passive = products.filter(function (p) { return p.enabled === false; });
+        var named = passive.map(function (p) { return p.product || ''; }).filter(Boolean).join(', ');
+        var verdict = (node.wsc || {}).antiVirus;
+        if (verdict && verdict !== 'OK' && verdict !== 'UNKNOWN') {
+            found.push({ level: 'high', text: t('avProblem') + (named ? ' (' + t('avPassive') + ': ' + named + ')' : '') });
+        } else if (!guarding.length && passive.length) {
+            found.push({ level: 'high', text: t('avOff') + ': ' + named });
+        }
         var age = signatureAge(node);
         if (age != null && age > staleSignatureDays) { found.push({ level: 'warn', text: t('avOld') + ' (' + age + ' ' + t('days') + ')' }); }
         if (node.wsc) {
-            if (node.wsc.firewall && node.wsc.firewall !== 'OK') found.push({ level: 'high', text: t('firewallOff') });
-            if (node.wsc.autoUpdate && node.wsc.autoUpdate !== 'OK') found.push({ level: 'warn', text: t('updateOff') });
+            // Windows Security Center answers UNKNOWN while it is still working the answer
+            // out, which is ordinary in the minutes after a restart. Announcing an unprotected
+            // firewall then is a false alarm, and false alarms are how a panel stops being read.
+            if (node.wsc.firewall && node.wsc.firewall !== 'OK') {
+                found.push((node.wsc.firewall === 'UNKNOWN')
+                    ? { level: 'warn', text: t('firewallUnknown') }
+                    : { level: 'high', text: t('firewallOff') });
+            }
+            if (node.wsc.autoUpdate && node.wsc.autoUpdate !== 'OK' && node.wsc.autoUpdate !== 'UNKNOWN') found.push({ level: 'warn', text: t('updateOff') });
         }
         var uptime = daysSince(node.lastbootuptime);
         if (uptime != null && uptime > longUptimeDays) { found.push({ level: 'warn', text: format(t('uptimeLong'), uptime) }); }
@@ -259,7 +283,18 @@
         if (away === -1) { found.push({ level: 'warn', text: t('awayNever') }); }
         else if ((away != null) && (away >= awayWarnDays)) { found.push({ level: 'warn', text: format(t('awayDays'), away) }); }
         var record = specs[node._id];
-        if (record && record.pendingReboot) { found.push({ level: 'warn', text: t('rebootPending') }); }
+        // win-info reports the reasons as a list, and an empty list is still truthy, so a
+        // computer with nothing pending used to be told it was waiting on a restart -- and
+        // restarting it could not clear the message, because the message was never about it.
+        var pending = record && record.pendingReboot;
+        var reasons = Array.isArray(pending) ? pending : (pending ? [String(pending)] : []);
+        if (reasons.length) {
+            // Nearly all of these are a file waiting to be replaced, which any installer can
+            // leave behind. Calling that an unfinished update is untrue, and a panel that
+            // says untrue things is one people learn to scroll past.
+            var updating = reasons.some(function (why) { return /update/i.test(why); });
+            found.push({ level: 'warn', text: updating ? t('rebootPending') : t('rebootPendingFiles') });
+        }
         faultsOf(node).forEach(function (fault) { found.push(fault); });
         var scan = scanState[node._id];
         if (scan && scan.hits) { scan.hits.forEach(function (name) { found.push({ level: 'high', text: format(t('watched'), name) }); }); }
@@ -553,6 +588,13 @@
                 } else if (message && (message.action === 'msg') && (message.type === 'runcommands')
                     && message.nodeid && fixing[message.nodeid]) {
                     readDriverReply(message.nodeid, message.result);
+                } else if (message && (message.action === 'event') && message.event
+                    && (message.event.action === 'nodeconnect') && message.event.nodeid && (message.event.conn & 1)) {
+                    // A computer that has just come back may have restarted since it was last
+                    // asked. Without this the panel keeps showing what it reported before it
+                    // left, and nothing on screen tells the reader to reload the page.
+                    specsAsked[message.event.nodeid] = false;
+                    askForSpecs({ _id: message.event.nodeid });
                 } else if (message && (message.action === 'lastconnects') && message.lastconnects) {
                     // Keyed by node, each a moment in milliseconds.
                     var seen = message.lastconnects, kept = {};
@@ -739,8 +781,12 @@
         (windows.memory || []).forEach(function (stick) { ram += Number(stick.Capacity) || 0; });
         if (ram > 0) { parts.push(gigabytes(ram) + ' GB'); }
         var system = disksOf(node).filter(function (d) { return d.letter === 'C'; })[0];
-        if (system) { parts.push('C: ' + system.free + ' GB (' + system.percent + '%)'); }
-        if (identifiers.gpu_name && !/basic|microsoft/i.test(identifiers.gpu_name)) { parts.push(String(identifiers.gpu_name).trim()); }
+        if (system) { parts.push(format(t('diskFree'), system.free, system.percent)); }
+        // SCP-Remote installs the mirror driver itself for remote screens, so naming it on
+        // every row describes this system, not the computer the reader is looking at.
+        var gpu = String(identifiers.gpu_name || '').split(',').map(function (name) { return name.trim(); })
+            .filter(function (name) { return name && !/basic|microsoft|mirror/i.test(name); });
+        if (gpu.length) { parts.push(gpu.join(', ')); }
         return parts.length ? parts.join('  ·  ') : null;
     }
 
@@ -1101,8 +1147,6 @@
         else if (state && state.state === 'error') { risk.appendChild(element('span', 'scp-dash-note', t('scanFail'))); }
         if (found.length) {
             found.forEach(function (item) { risk.appendChild(element('span', 'scp-dash-flag ' + item.level, item.text)); });
-        } else if (!state || state.state !== 'scanning') {
-            risk.appendChild(element('span', 'scp-dash-note ok', t('none')));
         }
         if (state && state.state === 'done') {
             risk.appendChild(element('span', 'scp-dash-note', t('scanDone') + ': ' + state.count + ' ' + t('programs') + (state.hits.length ? '' : ' · ' + t('scanClean'))));

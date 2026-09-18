@@ -943,3 +943,104 @@ test('after a repair the computer is asked again what is wrong with it', (t) => 
     assert.ok(s.sent.filter(m => m.action === 'getsysinfo').length > before,
         'so the fault clears itself from the panel once it is really gone');
 });
+
+// win-info reports pending-restart reasons as a list. An empty list means nothing is
+// pending, and a restart cannot clear a message that was never about it.
+test('a computer with an empty list of restart reasons is not said to be waiting', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(specsFor('node//1', { pendingReboot: [] }));
+    assert.equal(s.w.document.body.textContent.indexOf('รอรีสตาร์ต'), -1, 'nothing is pending, so nothing is said');
+    s.fromServer(specsFor('node//1', { pendingReboot: ['File Rename'] }));
+    assert.ok(s.w.document.body.textContent.indexOf('รอรีสตาร์ต') >= 0, 'a real reason is still reported');
+});
+
+test('a firewall Windows cannot report on yet is not called unprotected', (t) => {
+    const s = setup(t, { nodes: [
+        { _id: 'node//1', name: 'pc-unknown', conn: 1, meshid: 'mesh//a', users: [], wsc: { firewall: 'UNKNOWN', autoUpdate: 'UNKNOWN' } },
+        { _id: 'node//2', name: 'pc-off', conn: 1, meshid: 'mesh//a', users: [], wsc: { firewall: 'OFF' } }
+    ] });
+    s.api.show();
+    const text = s.w.document.body.textContent;
+    assert.ok(text.indexOf('ยังตรวจสถานะไฟร์วอลล์ไม่ได้') >= 0, 'not knowing is said plainly');
+    assert.ok(text.indexOf('ไฟร์วอลล์ไม่ทำงาน') >= 0, 'a firewall really off is still an alarm');
+    assert.equal(text.indexOf('อัปเดตอัตโนมัติ'), -1, 'an unknown update setting is not an alarm either');
+});
+
+test('a computer that comes back is asked again, so the panel corrects itself', (t) => {
+    const s = setup(t);
+    s.api.show();
+    const before = s.sent.filter(m => m.action === 'getsysinfo' && m.nodeid === 'node//1').length;
+    s.fromServer({ action: 'event', event: { action: 'nodeconnect', nodeid: 'node//1', conn: 1 } });
+    const after = s.sent.filter(m => m.action === 'getsysinfo' && m.nodeid === 'node//1').length;
+    assert.equal(after, before + 1, 'a reconnect asks for fresh information');
+    s.fromServer({ action: 'event', event: { action: 'nodeconnect', nodeid: 'node//1', conn: 0 } });
+    assert.equal(s.sent.filter(m => m.action === 'getsysinfo' && m.nodeid === 'node//1').length, after, 'a disconnect asks nothing');
+});
+
+// The panel is read by someone looking for the row that needs them. Everything printed
+// on the rows that do not need them is in the way.
+test('a computer with nothing wrong says nothing at all', (t) => {
+    const s = setup(t);
+    s.api.show();
+    assert.equal(s.w.document.body.textContent.indexOf('ไม่พบสิ่งผิดปกติ'), -1,
+        'a healthy row leaves the column empty rather than saying so twenty times');
+});
+
+test('the remote-screen mirror driver is not reported as the computer graphics card', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(specsFor('node//1', { hardware: { identifiers: {
+        cpu_name: 'Intel(R) Core(TM) i5-4590S CPU @ 3.00GHz',
+        gpu_name: 'VNC Mirror Driver,NVIDIA GeForce GT 620' }, windows: {} } }));
+    const text = s.w.document.body.textContent;
+    assert.equal(text.indexOf('VNC Mirror Driver'), -1, 'our own driver is not a fact about the computer');
+    assert.ok(text.indexOf('NVIDIA GeForce GT 620') >= 0, 'the real card still shows');
+});
+
+test('the disk figure says which way round it is', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(specsFor('node//1', { hardware: { identifiers: {}, windows: {
+        volumes: { C: { size: 100 * 1024 * 1024 * 1024, sizeremaining: 34 * 1024 * 1024 * 1024, dType: 3 } } } } }));
+    assert.ok(s.w.document.body.textContent.indexOf('C: ว่าง') >= 0, 'a bare percentage leaves the reader guessing');
+});
+
+test('a restart waiting on a file in use is not called an unfinished update', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(specsFor('node//1', { pendingReboot: ['File Rename'] }));
+    let text = s.w.document.body.textContent;
+    assert.ok(text.indexOf('แทนที่ไฟล์') >= 0, 'it says what is actually waiting');
+    assert.equal(text.indexOf('อัปเดตเสร็จ'), -1, 'and does not claim an update is unfinished');
+    s.fromServer(specsFor('node//1', { pendingReboot: ['Windows Update', 'File Rename'] }));
+    text = s.w.document.body.textContent;
+    assert.ok(text.indexOf('อัปเดตเสร็จ') >= 0, 'a real update is still named as one');
+});
+
+// Windows installs a second antivirus in passive mode on purpose. Calling that "switched
+// off" sends somebody to repair a computer that was never broken -- and, worse, invites a
+// button that would uninstall the product to make the message go away.
+test('an antivirus Windows parked in passive mode is not reported as switched off', (t) => {
+    const s = setup(t, { nodes: [{ _id: 'node//1', name: 'pc-passive', conn: 1, meshid: 'mesh//a', users: [],
+        av: [{ product: 'FortiClient', enabled: false, updated: true }, { product: 'Windows Defender', enabled: true, updated: true }],
+        wsc: { antiVirus: 'OK', firewall: 'OK', autoUpdate: 'OK' } }] });
+    s.api.show();
+    const text = s.w.document.body.textContent;
+    assert.equal(text.indexOf('FortiClient'), -1, 'Windows says the computer is protected, so nothing is wrong');
+    assert.equal(text.indexOf('แอนตี้ไวรัสถูกปิด'), -1);
+});
+
+test('a computer Windows itself calls unprotected is still flagged', (t) => {
+    const s = setup(t, { nodes: [
+        { _id: 'node//1', name: 'pc-problem', conn: 1, meshid: 'mesh//a', users: [],
+          av: [{ product: 'Windows Defender', enabled: false, updated: true }, { product: 'ESET Security', enabled: true, updated: true }],
+          wsc: { antiVirus: 'PROBLEM', firewall: 'OK', autoUpdate: 'OK' } },
+        { _id: 'node//2', name: 'pc-nothing-running', conn: 1, meshid: 'mesh//a', users: [],
+          av: [{ product: 'McAfee', enabled: false, updated: true }], wsc: { firewall: 'OK' } }
+    ] });
+    s.api.show();
+    const text = s.w.document.body.textContent;
+    assert.ok(text.indexOf('Windows รายงานว่า') >= 0, 'the verdict Windows reached is what is reported');
+    assert.ok(text.indexOf('McAfee') >= 0, 'and a computer with nothing running at all is still flagged');
+});

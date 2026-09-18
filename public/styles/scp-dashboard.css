@@ -171,3 +171,12 @@
   .scp-dash-attention-row { grid-template-columns: 1fr; }
   .scp-dash-fix-all { margin-left: 0; }
 }
+#scpPrograms{max-width:760px;width:92vw;border:none;border-radius:14px;padding:20px}
+#scpPrograms header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+#scpPrograms input[type=search]{width:100%;margin:10px 0;padding:8px}
+.scp-program-list{max-height:52vh;overflow-y:auto}
+.scp-program-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--scp-line,#d7e5e4)}
+.scp-program-row small{display:block;font-size:11px;color:#5a6b6a}
+.scp-program-remove{white-space:nowrap}
+.scp-program-result{margin:10px 0;padding:12px;background:var(--scp-soft,#eaf4f3);border-radius:10px}
+.scp-program-result small{display:block;font-size:11px}

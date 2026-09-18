@@ -1,0 +1,241 @@
+// SCP-Remote: removing a program that will not leave.
+//
+// The ordinary uninstaller is the right tool and this is not it. This is for the case the
+// hospital keeps meeting: the entry is in the list, Add/Remove Programs does nothing, and
+// whatever was deleted is back by the morning. Something is putting it back -- a scheduled
+// task, a service, a Run key -- so those go first, before anything is deleted, or the
+// deletion is just another round of the same argument.
+//
+// It refuses three things whatever it is asked, because being asked is not evidence that
+// asking was right: the remote agent itself (removing it ends every way back into that
+// computer), the antivirus Windows currently has protecting the machine, and anything
+// installed into a Windows system folder.
+(function (root) {
+    'use strict';
+    var th = document.documentElement.lang === 'th';
+    function t(en, thai) { return th ? thai : en; }
+    function el(tag, text, className) {
+        var n = document.createElement(tag);
+        if (text != null) { n.textContent = text; }
+        if (className) { n.className = className; }
+        return n;
+    }
+    function button(text, className, fn) { var b = el('button', text, className); b.type = 'button'; b.onclick = fn; return b; }
+
+    var jobs = {}, serial = 0, dialog, listBox, notice, current = null, programs = [];
+
+    // Each step is reported as it finishes, so a run that dies half way still says how far
+    // it reached. The reasons for refusing are the first thing the script checks.
+    var script = [
+        "$ErrorActionPreference='Continue'; $ProgressPreference='SilentlyContinue'",
+        "$name=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__NAME__'))",
+        "$loc=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__LOC__'))",
+        "$un=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__UN__'))",
+        "$did=@(); $ok=$true; $err=''",
+        "try {",
+        "  if ($name -match '(?i)mesh ?agent|meshcentral|scp[- ]?remote') { throw 'REFUSED_REMOTE_AGENT' }",
+        "  $win=$env:windir.TrimEnd('\\'); $trimmed=$loc.TrimEnd('\\')",
+        "  if ($trimmed -and (($trimmed -ieq $win) -or ($trimmed -ieq $env:SystemDrive) -or ($trimmed -ieq ($env:SystemDrive+'\\')) -or ($trimmed -ieq \"$win\\System32\"))) { throw 'REFUSED_SYSTEM_LOCATION' }",
+        "  foreach ($p in @(Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction SilentlyContinue)) {",
+        "    if ($p.displayName -and (($p.productState -band 0x1000) -ne 0) -and ($name -like ('*'+$p.displayName+'*'))) { throw 'REFUSED_ACTIVE_ANTIVIRUS' }",
+        "  }",
+        "  $under = { param($p) $trimmed -and $p -and ($p -ilike ($trimmed+'*')) }",
+        // Stop whatever puts it back, before anything is deleted.
+        "  foreach ($task in @(Get-ScheduledTask -ErrorAction SilentlyContinue)) {",
+        "    $hit=$false; foreach ($a in @($task.Actions)) { if (& $under $a.Execute) { $hit=$true } }",
+        "    if ($hit) { Unregister-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath -Confirm:$false -ErrorAction SilentlyContinue; $did+=('task: '+$task.TaskName) }",
+        "  }",
+        "  foreach ($svc in @(Get-CimInstance Win32_Service -ErrorAction SilentlyContinue)) {",
+        "    if (& $under ($svc.PathName -replace '^\"?([^\"]*).*$','$1')) {",
+        "      Stop-Service -Name $svc.Name -Force -ErrorAction SilentlyContinue",
+        "      & \"$env:windir\\System32\\sc.exe\" delete $svc.Name | Out-Null",
+        "      $did+=('service: '+$svc.Name)",
+        "    }",
+        "  }",
+        "  foreach ($key in @('HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run','HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce','HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Run','HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run')) {",
+        "    $item = Get-Item -LiteralPath $key -ErrorAction SilentlyContinue",
+        "    if ($item) { foreach ($value in $item.GetValueNames()) { if (& $under $item.GetValue($value)) { Remove-ItemProperty -LiteralPath $key -Name $value -ErrorAction SilentlyContinue; $did+=('startup: '+$value) } } }",
+        "  }",
+        "  foreach ($proc in @(Get-Process -ErrorAction SilentlyContinue)) {",
+        "    $path=$null; try { $path=$proc.Path } catch {}",
+        "    if (& $under $path) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue; $did+=('process: '+$proc.ProcessName) }",
+        "  }",
+        // Now the registered uninstaller, which may well work once nothing is holding it open.
+        "  if ($un) {",
+        "    $quiet = $un; if ($quiet -notmatch '(?i)/quiet|/silent|/S\\b|/qn') { if ($quiet -match '(?i)msiexec') { $quiet = ($quiet -replace '(?i)/I','/X') + ' /qn /norestart' } else { $quiet = $quiet + ' /S' } }",
+        "    try { $p = Start-Process -FilePath $env:ComSpec -ArgumentList ('/c ' + $quiet) -PassThru -WindowStyle Hidden -ErrorAction Stop",
+        "      if (-not $p.WaitForExit(300000)) { $p.Kill(); $did+='uninstaller: timed out' } else { $did+=('uninstaller: exit ' + $p.ExitCode) } } catch { $did+=('uninstaller: could not run') }",
+        "  } else { $did+='uninstaller: none registered' }",
+        // Whatever the uninstaller left behind.
+        "  if ($trimmed -and (Test-Path -LiteralPath $trimmed)) { Remove-Item -LiteralPath $trimmed -Recurse -Force -ErrorAction SilentlyContinue }",
+        "  if ($trimmed -and (Test-Path -LiteralPath $trimmed)) { $did+='folder: still present' } elseif ($trimmed) { $did+='folder: removed' }",
+        "  foreach ($base in @('HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall','HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')) {",
+        "    foreach ($sub in @(Get-ChildItem -LiteralPath $base -ErrorAction SilentlyContinue)) {",
+        "      if ((Get-ItemProperty -LiteralPath $sub.PSPath -ErrorAction SilentlyContinue).DisplayName -eq $name) { Remove-Item -LiteralPath $sub.PSPath -Recurse -Force -ErrorAction SilentlyContinue; $did+='registry entry: removed' }",
+        "    }",
+        "  }",
+        "  $still = $false",
+        "  foreach ($base in @('HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall','HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')) {",
+        "    foreach ($sub in @(Get-ChildItem -LiteralPath $base -ErrorAction SilentlyContinue)) {",
+        "      if ((Get-ItemProperty -LiteralPath $sub.PSPath -ErrorAction SilentlyContinue).DisplayName -eq $name) { $still = $true }",
+        "    }",
+        "  }",
+        "  $did += ($(if ($still) { 'listed: still in Add/Remove Programs' } else { 'listed: gone' }))",
+        "} catch { $ok=$false; $err=$_.Exception.Message }",
+        "Write-Output ('SCP_PROGRAM_REMOVE:'+(@{ok=$ok;error=$err;steps=$did}|ConvertTo-Json -Compress))"
+    ].join('\n');
+
+    // Program names carry Thai, so the bytes have to be UTF-8 before they are base64. Doing
+    // it this way rather than with TextEncoder keeps it working wherever btoa exists.
+    function encode(value) {
+        var utf8 = encodeURIComponent(String(value == null ? '' : value))
+            .replace(/%([0-9A-F]{2})/g, function (whole, hex) { return String.fromCharCode(parseInt(hex, 16)); });
+        return btoa(utf8);
+    }
+
+    function refusalText(code) {
+        return {
+            REFUSED_REMOTE_AGENT: t('Refused: this is the remote-support agent. Removing it would end every way back into that computer.',
+                'ไม่ดำเนินการ: นี่คือเอเจนต์ที่ใช้รีโมต ถอดออกแล้วจะเข้าเครื่องนั้นจากที่นี่ไม่ได้อีกเลย'),
+            REFUSED_ACTIVE_ANTIVIRUS: t('Refused: Windows has this antivirus protecting the computer right now.',
+                'ไม่ดำเนินการ: Windows กำลังใช้แอนตี้ไวรัสตัวนี้ป้องกันเครื่องอยู่'),
+            REFUSED_SYSTEM_LOCATION: t('Refused: this is installed into a Windows system folder.',
+                'ไม่ดำเนินการ: โปรแกรมนี้ติดตั้งอยู่ในโฟลเดอร์ระบบของ Windows')
+        }[code];
+    }
+
+    function stepText(step) {
+        var parts = String(step).split(': ');
+        var names = {
+            task: t('scheduled task removed', 'ลบงานตั้งเวลา'), service: t('service removed', 'ลบเซอร์วิส'),
+            startup: t('startup entry removed', 'ลบรายการเริ่มอัตโนมัติ'), process: t('process stopped', 'ปิดโปรเซส'),
+            uninstaller: t('uninstaller', 'ตัวถอนการติดตั้ง'), folder: t('folder', 'โฟลเดอร์'),
+            'registry entry': t('registry entry', 'รายการในรีจิสทรี'), listed: t('in Add/Remove Programs', 'ในรายการโปรแกรม')
+        };
+        return (names[parts[0]] || parts[0]) + (parts[1] ? ': ' + parts[1] : '');
+    }
+
+    function send(node, program) {
+        var ticket = 'scpprog' + (++serial) + '_' + Date.now();
+        jobs[node._id] = { ticket: ticket, name: program.name, state: 'working' };
+        draw();
+        try {
+            root.meshserver.send({
+                action: 'runcommands', nodeids: [node._id], type: 2, runAsUser: 0, reply: true, responseid: ticket,
+                cmds: script.replace('__NAME__', encode(program.name)).replace('__LOC__', encode(program.location)).replace('__UN__', encode(program.uninstall))
+            });
+        } catch (error) { jobs[node._id] = { ticket: ticket, name: program.name, state: 'failed', text: String(error) }; draw(); return; }
+        root.setTimeout(function () {
+            var job = jobs[node._id];
+            if (job && job.ticket === ticket && job.state === 'working') {
+                job.state = 'unknown';
+                job.text = t('No reply after 10 minutes. The removal may still be running.', 'ไม่มีคำตอบเกิน 10 นาที งานอาจยังทำอยู่');
+                draw();
+            }
+        }, 600000);
+    }
+
+    // Only a reply to the question this dialog asked is read as an answer to it.
+    function receive(message) {
+        if (!message || message.action !== 'msg' || message.type !== 'runcommands' || !message.nodeid) { return false; }
+        var job = jobs[message.nodeid];
+        if (!job || job.ticket !== message.responseid || message.progress === true) { return false; }
+        var text = String(message.result == null ? '' : message.result);
+        if (/COMMAND_BUSY/.test(text)) {
+            job.state = 'failed';
+            job.text = t('The computer is busy with another command; nothing was removed.', 'เครื่องกำลังทำคำสั่งอื่นอยู่ ยังไม่ได้ถอดอะไร');
+            draw(); return true;
+        }
+        var match = text.match(/SCP_PROGRAM_REMOVE:(\{[\s\S]*?\})\s*$/m) || text.match(/SCP_PROGRAM_REMOVE:(\{.*\})/);
+        if (!match) {
+            job.state = 'unknown';
+            job.text = t('A reply came back that does not say what happened.', 'ได้รับคำตอบ แต่ยังบอกไม่ได้ว่าเกิดอะไรขึ้น');
+            draw(); return true;
+        }
+        try {
+            var result = JSON.parse(match[1]);
+            job.steps = [].concat(result.steps || []);
+            job.state = result.ok ? 'done' : 'failed';
+            job.text = result.ok ? '' : (refusalText(result.error) || String(result.error || ''));
+        } catch (error) {
+            job.state = 'unknown';
+            job.text = t('The reply could not be read.', 'อ่านคำตอบไม่ได้');
+        }
+        draw(); return true;
+    }
+
+    function draw() {
+        if (!dialog || !dialog.open || !current) { return; }
+        listBox.textContent = '';
+        var job = jobs[current._id];
+        var filter = (dialog.querySelector('#scpProgramFilter') || {}).value || '';
+        var needle = filter.trim().toLowerCase();
+        var shown = programs.filter(function (p) {
+            return !needle || (p.name + ' ' + (p.publisher || '')).toLowerCase().indexOf(needle) >= 0;
+        });
+        if (!shown.length) { listBox.appendChild(el('p', t('Nothing matches.', 'ไม่พบรายการที่ตรงกับคำค้น'))); }
+        shown.slice(0, 400).forEach(function (program) {
+            var row = el('article', null, 'scp-program-row');
+            var label = el('div');
+            label.appendChild(el('strong', program.name));
+            var meta = [program.version, program.publisher].filter(Boolean).join(' · ');
+            if (meta) { label.appendChild(el('small', meta)); }
+            if (!program.uninstall) { label.appendChild(el('small', t('No uninstaller registered', 'ไม่มีตัวถอนการติดตั้งลงทะเบียนไว้'))); }
+            row.appendChild(label);
+            var go = button(t('Remove', 'ถอดออก'), 'scp-program-remove', function () {
+                var warning = t('Force-remove this program from ', 'บังคับถอดโปรแกรมนี้ออกจากเครื่อง ') + (current.name || '') + '?\n\n' + program.name +
+                    '\n\n' + t('This stops its services, scheduled tasks and startup entries first, then removes its files. It cannot be undone from here.',
+                        'ระบบจะหยุดเซอร์วิส งานตั้งเวลา และรายการเริ่มอัตโนมัติของมันก่อน แล้วจึงลบไฟล์ทิ้ง เลิกทำจากที่นี่ไม่ได้');
+                if (!root.confirm(warning)) { return; }
+                send(current, program);
+            });
+            go.disabled = !!(job && job.state === 'working');
+            row.appendChild(go);
+            listBox.appendChild(row);
+        });
+        notice.textContent = '';
+        if (shown.length > 400) { notice.appendChild(el('p', t('Showing the first 400. Use the filter to narrow it.', 'แสดง 400 รายการแรก ใช้ช่องค้นหาเพื่อจำกัดให้แคบลง'))); }
+        if (job) {
+            var states = {
+                working: t('Removing…', 'กำลังถอด…'), done: t('Finished', 'ทำงานเสร็จแล้ว'),
+                failed: t('Did not run', 'ไม่ได้ดำเนินการ'), unknown: t('Result not confirmed', 'ยังยืนยันผลไม่ได้')
+            };
+            var box = el('div', null, 'scp-program-result');
+            box.appendChild(el('strong', job.name + ' · ' + (states[job.state] || job.state)));
+            if (job.text) { box.appendChild(el('p', job.text)); }
+            (job.steps || []).forEach(function (step) { box.appendChild(el('small', '· ' + stepText(step))); });
+            if (job.state === 'done') {
+                box.appendChild(el('p', t('Check the list again to confirm it is gone, and after a restart to confirm it stays gone.',
+                    'กดตรวจโปรแกรมอีกครั้งเพื่อยืนยันว่าหายไปแล้ว และตรวจซ้ำหลังรีสตาร์ตเพื่อยืนยันว่าไม่กลับมา')));
+            }
+            notice.appendChild(box);
+        }
+    }
+
+    function open(node, list) {
+        current = node;
+        programs = (list || []).filter(function (p) { return p && p.name; })
+            .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), th ? 'th' : 'en'); });
+        if (!dialog) {
+            dialog = el('dialog'); dialog.id = 'scpPrograms';
+            var head = el('header');
+            head.appendChild(el('h2', t('Installed programs', 'โปรแกรมที่ติดตั้ง')));
+            head.appendChild(button(t('Close', 'ปิด'), '', function () { dialog.close(); }));
+            dialog.appendChild(head);
+            dialog.appendChild(el('p', t('For a program the ordinary uninstaller will not remove, or that comes back on its own. The remote-support agent, the antivirus currently protecting this computer, and anything in a Windows system folder are refused.',
+                'สำหรับโปรแกรมที่ตัวถอนปกติถอดไม่ออก หรือถอดแล้วกลับมาเอง ระบบจะไม่ยอมถอดเอเจนต์รีโมต แอนตี้ไวรัสที่กำลังป้องกันเครื่องอยู่ และโปรแกรมในโฟลเดอร์ระบบของ Windows')));
+            var filter = el('input'); filter.id = 'scpProgramFilter'; filter.type = 'search';
+            filter.placeholder = t('Filter by name or publisher', 'ค้นหาจากชื่อหรือผู้ผลิต');
+            filter.oninput = draw;
+            dialog.appendChild(filter);
+            notice = el('div'); notice.setAttribute('role', 'status'); dialog.appendChild(notice);
+            listBox = el('div', null, 'scp-program-list'); dialog.appendChild(listBox);
+            document.body.appendChild(dialog);
+        }
+        dialog.querySelector('#scpProgramFilter').value = '';
+        if (!dialog.open) { dialog.showModal(); }
+        draw();
+    }
+
+    root.ScpPrograms = { open: open, receive: receive, _script: script, _jobs: jobs };
+}(typeof window === 'undefined' ? globalThis : window));

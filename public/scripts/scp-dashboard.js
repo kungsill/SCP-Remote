@@ -36,6 +36,7 @@
         offlineAction: ['This computer is not connected.', 'เครื่องนี้ไม่ได้เชื่อมต่ออยู่'],
         scanning: ['Checking installed programs…', 'กำลังตรวจโปรแกรมที่ติดตั้ง…'],
         scanDone: ['Programs checked', 'ตรวจโปรแกรมแล้ว'],
+        programList: ['Open the list', 'ดูรายการ / ถอดออก'],
         scanFail: ['Could not read the program list', 'อ่านรายการโปรแกรมไม่ได้'],
         scanClean: ['No watched programs found', 'ไม่พบโปรแกรมที่เฝ้าระวัง'],
         programs: ['programs', 'โปรแกรม'],
@@ -565,7 +566,7 @@
                 if (lower.indexOf(watchlist[i]) >= 0) { hits.push(String(name)); return; }
             }
         });
-        scanState[nodeid] = { state: 'done', count: list.length, hits: hits };
+        scanState[nodeid] = { state: 'done', count: list.length, hits: hits, list: list };
         render();
         return true;
     }
@@ -579,7 +580,8 @@
         var original = window.meshserver.onMessage;
         window.meshserver.onMessage = function (server, message) {
             try {
-                if (message && (message.action === 'getsysinfo') && message.nodeid) {
+                if (window.ScpPrograms && window.ScpPrograms.receive(message)) { /* it answered its own question */ }
+                else if (message && (message.action === 'getsysinfo') && message.nodeid) {
                     specs[message.nodeid] = (message.hardware || message.noinfo) ? message : null;
                     render();
                 } else if (message && (message.action === 'powertimeline') && message.nodeid) {
@@ -1150,6 +1152,9 @@
         }
         if (state && state.state === 'done') {
             risk.appendChild(element('span', 'scp-dash-note', t('scanDone') + ': ' + state.count + ' ' + t('programs') + (state.hits.length ? '' : ' · ' + t('scanClean'))));
+            if (window.ScpPrograms && state.list) {
+                risk.appendChild(button(t('programList'), 'scp-dash-scan', function () { window.ScpPrograms.open(node, state.list); }));
+            }
         }
         row.appendChild(risk);
 

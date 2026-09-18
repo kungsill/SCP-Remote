@@ -39,70 +39,84 @@
         }, 1000);
     }
 
-    // Each step is reported as it finishes, so a run that dies half way still says how far
-    // it reached. The reasons for refusing are the first thing the script checks.
+    // Eight steps, each announced as it begins so the dialog can count them, and a real
+    // check at the end rather than an assumption. What "removed" means here is that the
+    // entry, the folder and the services are all gone -- an uninstaller returning zero has
+    // been known to mean nothing at all.
+    var STEPS = 8;
     var script = [
         "$ErrorActionPreference='Continue'; $ProgressPreference='SilentlyContinue'",
         "$name=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__NAME__'))",
         "$loc=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__LOC__'))",
         "$un=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__UN__'))",
-        "$did=@(); $ok=$true; $err=''",
+        "$did=@(); $ok=$true; $err=''; $svc=@(); $restart=$false",
+        "function Step($n,$what){ Write-Output ('SCP_PROGRAM_STEP:'+(@{n=$n;of=" + 8 + ";what=$what}|ConvertTo-Json -Compress)) }",
+        "function Listed($n){ foreach ($base in @('HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall','HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')) {",
+        "  foreach ($sub in @(Get-ChildItem -LiteralPath $base -ErrorAction SilentlyContinue)) {",
+        "    if ((Get-ItemProperty -LiteralPath $sub.PSPath -ErrorAction SilentlyContinue).DisplayName -eq $n) { return $sub.PSPath } } }; return $null }",
         "try {",
+        "  Step 1 'checks'",
         "  if ($name -match '(?i)mesh ?agent|meshcentral|scp[- ]?remote') { throw 'REFUSED_REMOTE_AGENT' }",
         "  $win=$env:windir.TrimEnd('\\'); $trimmed=$loc.TrimEnd('\\')",
         "  if ($trimmed -and (($trimmed -ieq $win) -or ($trimmed -ieq $env:SystemDrive) -or ($trimmed -ieq ($env:SystemDrive+'\\')) -or ($trimmed -ieq \"$win\\System32\"))) { throw 'REFUSED_SYSTEM_LOCATION' }",
         "  foreach ($p in @(Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction SilentlyContinue)) {",
-        // Being registered is not the same as protecting. An antivirus whose signatures are
-        // stale is the reason Windows is reporting the machine unprotected, and removing it
-        // is the repair rather than the hazard -- Defender takes over once it is gone. Only
-        // one that is both switched on and current is worth stopping somebody from removing.
         "    $on = ($p.productState -band 0x1000) -ne 0; $stale = ($p.productState -band 0x10) -ne 0",
         "    if ($p.displayName -and $on -and (-not $stale) -and ($name -like ('*'+$p.displayName+'*'))) { throw 'REFUSED_ACTIVE_ANTIVIRUS' }",
         "  }",
         "  $under = { param($p) $trimmed -and $p -and ($p -ilike ($trimmed+'*')) }",
-        // Stop whatever puts it back, before anything is deleted.
+        "  Step 2 'tasks'",
         "  foreach ($task in @(Get-ScheduledTask -ErrorAction SilentlyContinue)) {",
         "    $hit=$false; foreach ($a in @($task.Actions)) { if (& $under $a.Execute) { $hit=$true } }",
         "    if ($hit) { Unregister-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath -Confirm:$false -ErrorAction SilentlyContinue; $did+=('task: '+$task.TaskName) }",
         "  }",
-        "  foreach ($svc in @(Get-CimInstance Win32_Service -ErrorAction SilentlyContinue)) {",
-        "    if (& $under ($svc.PathName -replace '^\"?([^\"]*).*$','$1')) {",
-        "      Stop-Service -Name $svc.Name -Force -ErrorAction SilentlyContinue",
-        "      & \"$env:windir\\System32\\sc.exe\" delete $svc.Name | Out-Null",
-        "      $did+=('service: '+$svc.Name)",
+        "  Step 3 'services'",
+        "  foreach ($s in @(Get-CimInstance Win32_Service -ErrorAction SilentlyContinue)) {",
+        "    if (& $under ($s.PathName -replace '^\"?([^\"]*).*$','$1')) {",
+        "      $svc += $s.Name",
+        "      Stop-Service -Name $s.Name -Force -ErrorAction SilentlyContinue",
+        "      & \"$env:windir\\System32\\sc.exe\" delete $s.Name | Out-Null",
+        "      $did+=('service: '+$s.Name)",
         "    }",
         "  }",
+        "  Step 4 'startup'",
         "  foreach ($key in @('HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run','HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce','HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Run','HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run')) {",
         "    $item = Get-Item -LiteralPath $key -ErrorAction SilentlyContinue",
         "    if ($item) { foreach ($value in $item.GetValueNames()) { if (& $under $item.GetValue($value)) { Remove-ItemProperty -LiteralPath $key -Name $value -ErrorAction SilentlyContinue; $did+=('startup: '+$value) } } }",
         "  }",
+        "  Step 5 'processes'",
         "  foreach ($proc in @(Get-Process -ErrorAction SilentlyContinue)) {",
         "    $path=$null; try { $path=$proc.Path } catch {}",
         "    if (& $under $path) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue; $did+=('process: '+$proc.ProcessName) }",
         "  }",
-        // Now the registered uninstaller, which may well work once nothing is holding it open.
+        "  Step 6 'uninstaller'",
         "  if ($un) {",
         "    $quiet = $un; if ($quiet -notmatch '(?i)/quiet|/silent|/S\\b|/qn') { if ($quiet -match '(?i)msiexec') { $quiet = ($quiet -replace '(?i)/I','/X') + ' /qn /norestart' } else { $quiet = $quiet + ' /S' } }",
         "    try { $p = Start-Process -FilePath $env:ComSpec -ArgumentList ('/c ' + $quiet) -PassThru -WindowStyle Hidden -ErrorAction Stop",
-        "      if (-not $p.WaitForExit(300000)) { $p.Kill(); $did+='uninstaller: timed out' } else { $did+=('uninstaller: exit ' + $p.ExitCode) } } catch { $did+=('uninstaller: could not run') }",
+        "      if (-not $p.WaitForExit(300000)) { $p.Kill(); $did+='uninstaller: timed out' } else { $did+=('uninstaller: exit ' + $p.ExitCode) } } catch { $did+='uninstaller: could not run' }",
         "  } else { $did+='uninstaller: none registered' }",
-        // Whatever the uninstaller left behind.
+        "  Step 7 'leftovers'",
         "  if ($trimmed -and (Test-Path -LiteralPath $trimmed)) { Remove-Item -LiteralPath $trimmed -Recurse -Force -ErrorAction SilentlyContinue }",
-        "  if ($trimmed -and (Test-Path -LiteralPath $trimmed)) { $did+='folder: still present' } elseif ($trimmed) { $did+='folder: removed' }",
-        "  foreach ($base in @('HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall','HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')) {",
-        "    foreach ($sub in @(Get-ChildItem -LiteralPath $base -ErrorAction SilentlyContinue)) {",
-        "      if ((Get-ItemProperty -LiteralPath $sub.PSPath -ErrorAction SilentlyContinue).DisplayName -eq $name) { Remove-Item -LiteralPath $sub.PSPath -Recurse -Force -ErrorAction SilentlyContinue; $did+='registry entry: removed' }",
+        "  $entry = Listed $name",
+        "  if ($entry) { Remove-Item -LiteralPath $entry -Recurse -Force -ErrorAction SilentlyContinue }",
+        "  Step 8 'verify'",
+        // What is still there decides whether this worked, and what to try next.
+        "  $stillListed = [bool](Listed $name)",
+        "  $stillFolder = [bool]($trimmed -and (Test-Path -LiteralPath $trimmed))",
+        "  $stillSvc = @($svc | Where-Object { Get-Service -Name $_ -ErrorAction SilentlyContinue })",
+        "  $did += ('listed: ' + $(if ($stillListed) { 'still there' } else { 'gone' }))",
+        "  if ($trimmed) { $did += ('folder: ' + $(if ($stillFolder) { 'still there' } else { 'gone' })) }",
+        "  if ($svc.Count) { $did += ('services: ' + $(if ($stillSvc.Count) { ($stillSvc -join ',') + ' still there' } else { 'gone' })) }",
+        // Self-protection is what survives all of the above. A driver cannot defend itself
+        // while it is not running, so take away its right to start and say a restart is owed.
+        "  if ($stillListed -or $stillFolder -or $stillSvc.Count) {",
+        "    foreach ($s in $stillSvc) {",
+        "      $key = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\' + $s",
+        "      if (Test-Path -LiteralPath $key) { Set-ItemProperty -LiteralPath $key -Name Start -Value 4 -ErrorAction SilentlyContinue; $restart=$true; $did+=('disabled at boot: '+$s) }",
         "    }",
+        "    $ok = $false; $err = 'STILL_PRESENT'",
         "  }",
-        "  $still = $false",
-        "  foreach ($base in @('HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall','HKLM:\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')) {",
-        "    foreach ($sub in @(Get-ChildItem -LiteralPath $base -ErrorAction SilentlyContinue)) {",
-        "      if ((Get-ItemProperty -LiteralPath $sub.PSPath -ErrorAction SilentlyContinue).DisplayName -eq $name) { $still = $true }",
-        "    }",
-        "  }",
-        "  $did += ($(if ($still) { 'listed: still in Add/Remove Programs' } else { 'listed: gone' }))",
         "} catch { $ok=$false; $err=$_.Exception.Message }",
-        "Write-Output ('SCP_PROGRAM_REMOVE:'+(@{ok=$ok;error=$err;steps=$did}|ConvertTo-Json -Compress))"
+        "Write-Output ('SCP_PROGRAM_REMOVE:'+(@{ok=$ok;error=$err;steps=$did;restart=$restart}|ConvertTo-Json -Compress))"
     ].join('\n');
 
     // Program names carry Thai, so the bytes have to be UTF-8 before they are base64. Doing
@@ -124,11 +138,22 @@
                 'ไม่ดำเนินการ: นี่คือเอเจนต์ที่ใช้รีโมต ถอดออกแล้วจะเข้าเครื่องนั้นจากที่นี่ไม่ได้อีกเลย'),
             REFUSED_ACTIVE_ANTIVIRUS: t('Refused: this antivirus is switched on and up to date, so it is the one protecting the computer.',
                 'ไม่ดำเนินการ: แอนตี้ไวรัสตัวนี้เปิดอยู่และอัปเดตล่าสุด คือตัวที่กำลังป้องกันเครื่องอยู่'),
+            STILL_PRESENT: t('Every step ran, and it is still there. A program that survives this is defending itself, so its services have been stopped from starting.', 'ทำครบทุกขั้นแล้วแต่มันยังอยู่ โปรแกรมที่รอดมาได้คือโปรแกรมที่ป้องกันตัวเอง ระบบจึงสั่งไม่ให้เซอร์วิสของมันเริ่มทำงานอีก'),
             REFUSED_SYSTEM_LOCATION: t('Refused: this is installed into a Windows system folder.',
                 'ไม่ดำเนินการ: โปรแกรมนี้ติดตั้งอยู่ในโฟลเดอร์ระบบของ Windows')
         }[code];
     }
 
+    var WHAT = {
+        checks: t('checking what must not be removed', '\u0e15\u0e23\u0e27\u0e08\u0e2a\u0e34\u0e48\u0e07\u0e17\u0e35\u0e48\u0e2b\u0e49\u0e32\u0e21\u0e16\u0e2d\u0e14'),
+        tasks: t('removing scheduled tasks', '\u0e25\u0e1a\u0e07\u0e32\u0e19\u0e15\u0e31\u0e49\u0e07\u0e40\u0e27\u0e25\u0e32'),
+        services: t('stopping services', '\u0e2b\u0e22\u0e38\u0e14\u0e40\u0e0b\u0e2d\u0e23\u0e4c\u0e27\u0e34\u0e2a'),
+        startup: t('removing startup entries', '\u0e25\u0e1a\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23\u0e40\u0e23\u0e34\u0e48\u0e21\u0e2d\u0e31\u0e15\u0e42\u0e19\u0e21\u0e31\u0e15\u0e34'),
+        processes: t('closing its processes', '\u0e1b\u0e34\u0e14\u0e42\u0e1b\u0e23\u0e40\u0e0b\u0e2a\u0e02\u0e2d\u0e07\u0e21\u0e31\u0e19'),
+        uninstaller: t('running its own uninstaller', '\u0e40\u0e23\u0e35\u0e22\u0e01\u0e15\u0e31\u0e27\u0e16\u0e2d\u0e19\u0e02\u0e2d\u0e07\u0e21\u0e31\u0e19'),
+        leftovers: t('removing what is left', '\u0e25\u0e1a\u0e2a\u0e48\u0e27\u0e19\u0e17\u0e35\u0e48\u0e40\u0e2b\u0e25\u0e37\u0e2d'),
+        verify: t('checking whether it is really gone', '\u0e15\u0e23\u0e27\u0e08\u0e27\u0e48\u0e32\u0e2b\u0e32\u0e22\u0e44\u0e1b\u0e08\u0e23\u0e34\u0e07\u0e2b\u0e23\u0e37\u0e2d\u0e44\u0e21\u0e48')
+    };
     function stepText(step) {
         var parts = String(step).split(': ');
         var names = {
@@ -165,8 +190,13 @@
     function receive(message) {
         if (!message || message.action !== 'msg' || message.type !== 'runcommands' || !message.nodeid) { return false; }
         var job = jobs[message.nodeid];
-        if (!job || job.ticket !== message.responseid || message.progress === true) { return false; }
+        if (!job || job.ticket !== message.responseid) { return false; }
         var text = String(message.result == null ? '' : message.result);
+        if (message.progress === true) {
+            var step = text.match(/SCP_PROGRAM_STEP:(\{[^\r\n]*\})/);
+            if (step) { try { var at = JSON.parse(step[1]); job.step = at.n; job.of = at.of; job.what = at.what; draw(); } catch (error) { /* a step we cannot read changes nothing */ } }
+            return true;
+        }
         if (/COMMAND_BUSY/.test(text)) {
             job.state = 'failed';
             job.text = t('The computer is busy with another command; nothing was removed.', 'เครื่องกำลังทำคำสั่งอื่นอยู่ ยังไม่ได้ถอดอะไร');
@@ -181,6 +211,7 @@
         try {
             var result = JSON.parse(match[1]);
             job.steps = [].concat(result.steps || []);
+            job.restart = result.restart === true;
             job.state = result.ok ? 'done' : 'failed';
             job.text = result.ok ? '' : (refusalText(result.error) || String(result.error || ''));
         } catch (error) {
@@ -228,11 +259,23 @@
                 failed: t('Did not run', 'ไม่ได้ดำเนินการ'), unknown: t('Result not confirmed', 'ยังยืนยันผลไม่ได้')
             };
             var box = el('div', null, 'scp-program-result');
+            var percent = (job.of && job.step) ? Math.round(job.step / job.of * 100) : null;
             box.appendChild(el('strong', job.name + ' · ' + (states[job.state] || job.state) +
+                ((job.state === 'working' && percent !== null) ? ' · ' + percent + '%' : '') +
                 ((job.state === 'working' && job.started) ? ' · ' + elapsed(job.started) : '')));
+            if (job.state === 'working' && percent !== null) {
+                var bar = el('progress'); bar.max = 100; bar.value = percent;
+                bar.setAttribute('aria-label', percent + '%'); box.appendChild(bar);
+                box.appendChild(el('small', t('Step ', '\u0e02\u0e31\u0e49\u0e19\u0e17\u0e35\u0e48 ') + job.step + '/' + job.of +
+                    (WHAT[job.what] ? ' · ' + WHAT[job.what] : '')));
+            }
             if (job.state === 'working') { box.appendChild(el('small', t('Each step is reported when it finishes. The uninstaller in the middle of it can take several minutes.', 'แต่ละขั้นจะรายงานเมื่อทำเสร็จ ช่วงที่ตัวถอนของโปรแกรมทำงานอาจใช้เวลาหลายนาที'))); }
             if (job.text) { box.appendChild(el('p', job.text)); }
             (job.steps || []).forEach(function (step) { box.appendChild(el('small', '· ' + stepText(step))); });
+            if (job.restart) {
+                box.appendChild(el('p', t('Restart that computer, then remove it again from here. With its services stopped from starting, the second attempt has nothing defending against it. If it survives that too, only the maker’s own removal tool in Safe Mode will shift it.',
+                    'รีสตาร์ตเครื่องนั้น แล้วสั่งถอดจากที่นี่อีกครั้ง เมื่อเซอร์วิสของมันไม่ได้เริ่มทำงาน รอบสองจะไม่มีอะไรคอยป้องกัน ถ้ายังไม่ออกอีก ต้องใช้เครื่องมือถอนของผู้ผลิตรันใน Safe Mode เท่านั้น')));
+            }
             if (job.state === 'done') {
                 box.appendChild(el('p', t('Check the list again to confirm it is gone, and after a restart to confirm it stays gone.',
                     'กดตรวจโปรแกรมอีกครั้งเพื่อยืนยันว่าหายไปแล้ว และตรวจซ้ำหลังรีสตาร์ตเพื่อยืนยันว่าไม่กลับมา')));

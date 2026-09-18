@@ -142,3 +142,43 @@ test('an antivirus is flagged as one that will resist being removed this way', (
     assert.ok(asked.indexOf('Safe Mode') >= 0, 'the reliable route is named rather than implied');
     assert.equal(s.sent.length, 0, 'and saying no sends nothing');
 });
+
+// "I pressed uninstall again and again and it is still there" is the case this is for, so
+// what it must never do is report a removal it has not checked.
+test('each step is counted as it finishes, so there is a percentage to watch', (t) => {
+    const s = setup(t);
+    s.click('Stubborn Toolbar');
+    const ticket = s.sent[0].responseid;
+    assert.match(s.sent[0].cmds, /SCP_PROGRAM_STEP/, 'the far end reports each step');
+    s.w.ScpPrograms.receive({ action: 'msg', type: 'runcommands', nodeid: 'node//1', responseid: ticket,
+        progress: true, result: 'SCP_PROGRAM_STEP:{"n":6,"of":8,"what":"uninstaller"}' });
+    assert.equal(s.w.ScpPrograms._jobs['node//1'].state, 'working', 'a step is not a result');
+    const text = s.text();
+    assert.ok(text.indexOf('75%') >= 0, 'six of eight is seventy-five per cent');
+    assert.ok(text.indexOf('6/8') >= 0);
+});
+
+test('a program still there after every step is not reported as removed', (t) => {
+    const s = setup(t);
+    s.click('Stubborn Toolbar');
+    s.w.ScpPrograms.receive({ action: 'msg', type: 'runcommands', nodeid: 'node//1', responseid: s.sent[0].responseid,
+        result: 'SCP_PROGRAM_REMOVE:{"ok":false,"error":"STILL_PRESENT","restart":true,"steps":["listed: still there","disabled at boot: ekrn"]}' });
+    const job = s.w.ScpPrograms._jobs['node//1'];
+    assert.equal(job.state, 'failed', 'still there is not success');
+    const text = s.text();
+    assert.equal(text.indexOf('STILL_PRESENT'), -1, 'and the reason is a sentence');
+    assert.ok(text.indexOf('Safe Mode') >= 0, 'the last resort is named');
+    assert.ok(text.indexOf('รีสตาร์ต') >= 0, 'and the next step is a restart');
+});
+
+test('the removal checks what is left rather than trusting the uninstaller', () => {
+    const source = fs.readFileSync(path.join(root, 'public/scripts/scp-programs.js'), 'utf8');
+    assert.match(source, /\$stillListed/, 'the entry is looked for again');
+    assert.match(source, /\$stillFolder/, 'so is the folder');
+    assert.match(source, /\$stillSvc/, 'so are the services');
+    // Naming the variables is not enough; they have to be what decides the verdict.
+    assert.ok(source.indexOf("if ($stillListed -or $stillFolder -or $stillSvc.Count)") >= 0,
+        'what is left over is what decides whether the removal worked');
+    assert.ok(source.indexOf("$ok = $false; $err = 'STILL_PRESENT'") >= 0, 'and anything left over fails the job');
+    assert.match(source, /Name Start -Value 4/, 'and what survives is stopped from starting again');
+});

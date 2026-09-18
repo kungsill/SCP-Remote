@@ -5,7 +5,7 @@ const discovery=fs.readFileSync(path.join(__dirname,'driver-discovery.ps1'),'utf
 const hash=v=>crypto.createHash('sha256').update(v).digest('hex');
 function safeUrl(raw){
  const u=new URL(raw); const host=u.hostname.toLowerCase();
- if(!['http:','https:'].includes(u.protocol)||u.username||u.password||(u.port&&u.port!=='443')||!(host.endsWith('.windowsupdate.com')||host.endsWith('.update.microsoft.com')||host==='download.microsoft.com'||host==='delivery.mp.microsoft.com'))throw Error('UNTRUSTED_DOWNLOAD');
+ if(!['http:','https:'].includes(u.protocol)||u.username||u.password||(u.port&&u.port!=='443')||!(host.endsWith('.windowsupdate.com')||host.endsWith('.update.microsoft.com')||host==='download.microsoft.com'||host==='delivery.mp.microsoft.com'||host.endsWith('.delivery.mp.microsoft.com')))throw Error('UNTRUSTED_DOWNLOAD');
  u.protocol='https:';return u.href;
 }
 function getStore(server){
@@ -139,9 +139,14 @@ function ingest(s,job,report){
  const ids=[];
  for(const u of report.updates){
   if(typeof u.id!=='string'||! /^[0-9a-f-]{36}$/i.test(u.id)||!Number.isInteger(u.revision)||!Array.isArray(u.urls)||u.urls.length>12)throw Error('INVALID_REPORT');
-  const id=hash(u.id+':'+u.revision),urls=[...new Set(u.urls.map(safeUrl))];
+  const id=hash(u.id+':'+u.revision);
+  // A link this server will not follow is dropped on its own. Throwing here would lose
+  // every other result the machine reported, which is how one odd URL used to cost a
+  // whole ward computer its search.
+  const urls=[];let blocked=0;
+  for(const raw of new Set(u.urls)){try{urls.push(safeUrl(raw));}catch(e){blocked++;}}
   let p=s.data.packages[id];
-  if(!p){p=s.data.packages[id]={id,updateId:u.id,revision:u.revision,title:String(u.title||'').slice(0,400),hardwareId:String(u.hardwareId||'').slice(0,300),manufacturer:String(u.manufacturer||'').slice(0,150),driverDate:String(u.driverDate||'').slice(0,100),created:Date.now(),state:urls.length?'queued':'unavailable',files:urls.map(url=>({url,name:hash(url)+'.cab'}))};}
+  if(!p){p=s.data.packages[id]={id,updateId:u.id,revision:u.revision,title:String(u.title||'').slice(0,400),hardwareId:String(u.hardwareId||'').slice(0,300),manufacturer:String(u.manufacturer||'').slice(0,150),driverDate:String(u.driverDate||'').slice(0,100),created:Date.now(),blocked,state:urls.length?'queued':'unavailable',files:urls.map(url=>({url,name:hash(url)+'.cab'}))};}
   ids.push(id);
  }
  job.packages=ids;job.state='completed';job.updated=Date.now();job.machine={manufacturer:String(report.manufacturer||'').slice(0,120),model:String(report.model||'').slice(0,120),os:String(report.os||'').slice(0,120),architecture:String(report.architecture||'').slice(0,40)};

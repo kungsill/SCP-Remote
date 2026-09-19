@@ -771,16 +771,24 @@
     /* The devices Windows itself cannot start, as the agent read them out of Device
        Manager. Kept to the three worst so one badly broken machine cannot push every
        other computer's problems off the panel; the rest are counted in a final line. */
+    // Windows raises a yellow flag on the chipset housekeeping devices it has no built-in
+    // name for -- SM Bus, the MEI "PCI Simple Communications Controller", the generic PCI
+    // placeholders. There is one on nearly every machine, the computer works without them,
+    // and left in they crowd out the device fault that actually stops something. So they are
+    // not attention: a computer whose only faults are these has nothing here to report.
+    var HOUSEKEEPING = /^(SM ?Bus Controller|PCI Simple Communications Controller|PCI Memory Controller|PCI Data Acquisition and Signal Processing Controller|PCI Device|Base System Device|PCI Serial Port|PCI Encryption\/Decryption Controller|Performance Counters|PCI standard RAM Controller|Communications controller|Unknown device)$/i;
     function faultsOf(node) {
         var record = specs[node._id];
         var faults = record && record.deviceFaults;
         if (!Array.isArray(faults) || !faults.length) return [];
-        var found = faults.slice(0, 3).map(function (fault) {
+        var real = faults.filter(function (fault) { return !HOUSEKEEPING.test(String(fault.name || '').trim()); });
+        if (!real.length) return [];
+        var found = real.slice(0, 3).map(function (fault) {
             var key = 'fault' + fault.code;
             var reason = (texts[key] != null) ? t(key) : format(t('faultOther'), fault.code);
             return { level: 'warn', text: format(t('driverFault'), fault.name || '?', reason) };
         });
-        if (faults.length > 3) { found.push({ level: 'warn', text: format(t('driverMore'), faults.length - 3) }); }
+        if (real.length > 3) { found.push({ level: 'warn', text: format(t('driverMore'), real.length - 3) }); }
         return found;
     }
 

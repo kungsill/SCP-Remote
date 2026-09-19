@@ -828,7 +828,7 @@ test('the repair button is offered only where a driver has actually failed', (t)
     const s = setup(t, { nodes: [faulty('node//1', 'pc-broken'), faulty('node//2', 'pc-firewall')] });
     s.w.nodes[1].wsc = { firewall: 'BAD' };   // wrong, but not a driver
     s.api.show();
-    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
 
     const rows = Array.from(s.w.document.querySelectorAll('.scp-dash-attention-row'));
     const withButton = rows.filter(r => r.querySelector('.scp-dash-fix-go'));
@@ -841,7 +841,7 @@ test('pressing it asks first, and sends nothing if the answer is no', (t) => {
     let asked = '';
     s.w.confirm = (message) => { asked = message; return false; };
     s.api.show();
-    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
     s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
 
     assert.ok(asked.indexOf('pc-broken') >= 0, 'the question names the computer: ' + asked);
@@ -852,7 +852,7 @@ test('pressing it asks first, and sends nothing if the answer is no', (t) => {
 test('saying yes sends the drivers-only command as the agent, asking for a reply', (t) => {
     const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
     s.api.show();
-    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
     s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
 
     const sent = s.sent.filter(m => m.action === 'runcommands');
@@ -886,7 +886,7 @@ test('what the computer reports back is turned into one plain sentence', (t) => 
     cases.forEach(([reply, expected]) => {
         const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
         s.api.show();
-        s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+        s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
         s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
         s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', result: reply });
         assert.ok(s.w.document.body.textContent.indexOf(expected) >= 0,
@@ -897,7 +897,7 @@ test('what the computer reports back is turned into one plain sentence', (t) => 
 test('a reply about a computer we never asked about is ignored', (t) => {
     const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
     s.api.show();
-    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
     // Somebody else ran a command from the device's own page. That answer is theirs.
     s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', result: 'installed 9 driver(s)' });
     assert.ok(s.w.document.body.textContent.indexOf('ติดตั้งไดรเวอร์แล้ว') < 0,
@@ -909,7 +909,7 @@ test('a computer that is switched off is skipped and said to be skipped', (t) =>
     let told = '';
     s.w.alert = (message) => { told = message; };
     s.api.show();
-    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
     s.api.fixDrivers([{ _id: 'node//1', name: 'pc-off', conn: 0 }]);
     assert.equal(s.sent.filter(m => m.action === 'runcommands').length, 0, 'nothing is sent into the dark');
     assert.ok(told.indexOf('pc-off') >= 0 && told.indexOf('ปิดอยู่') >= 0, 'and it says which: ' + told);
@@ -922,7 +922,7 @@ test('one press covers a room imaged from the same disk', (t) => {
     ] });
     s.api.show();
     ['node//1', 'node//2', 'node//3'].forEach(id =>
-        s.fromServer(faultsFor(id, [{ name: 'SM Bus Controller', code: 28 }])));
+        s.fromServer(faultsFor(id, [{ name: 'Multimedia Audio Controller', code: 28 }])));
     s.fromServer(faultsFor('node//4', []));   // this one is fine
 
     const all = s.w.document.querySelector('.scp-dash-fix-all');
@@ -937,7 +937,7 @@ test('one press covers a room imaged from the same disk', (t) => {
 test('after a repair the computer is asked again what is wrong with it', (t) => {
     const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
     s.api.show();
-    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
     const before = s.sent.filter(m => m.action === 'getsysinfo').length;
     s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
     s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', result: 'installed 1 driver(s)' });
@@ -1051,7 +1051,7 @@ test('a computer Windows itself calls unprotected is still flagged', (t) => {
 test('a command that has been sent but not answered says exactly that', (t) => {
     const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
     s.api.show();
-    s.fromServer(faultsFor('node//1', [{ name: 'SM Bus Controller', code: 28 }]));
+    s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
     s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
     const text = s.w.document.body.textContent;
     assert.ok(text.indexOf('\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e04\u0e33\u0e15\u0e2d\u0e1a') >= 0, 'it says the computer has not answered');
@@ -1065,4 +1065,32 @@ test('the device re-scan cannot hold the job for ever', (t) => {
     assert.match(script, /WaitForExit\(\d+\)/, 'but a re-scan that never returns has to be given up on');
     assert.match(script, /rescan timed out/, 'and said to have been given up on');
     assert.doesNotMatch(script, /Restart-Computer/);
+});
+
+// The chipset placeholders Windows cannot name are on nearly every machine and the computer
+// works without them, so they must not crowd the panel out of the faults that matter.
+test('a computer whose only device faults are chipset housekeeping is not flagged for drivers', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [
+        { name: 'SM Bus Controller', code: 28 },
+        { name: 'PCI Simple Communications Controller', code: 28 },
+        { name: 'PCI Device', code: 28 }
+    ]));
+    const text = s.w.document.body.textContent;
+    assert.equal(text.indexOf('SM Bus Controller'), -1, 'the cosmetic bangs are not shown as attention');
+    assert.equal(text.indexOf('PCI Simple Communications Controller'), -1);
+});
+
+test('a real device fault is still flagged even beside chipset housekeeping', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.fromServer(faultsFor('node//1', [
+        { name: 'SM Bus Controller', code: 28 },
+        { name: 'High Definition Audio Device', code: 28 },
+        { name: 'PCI Device', code: 28 }
+    ]));
+    const text = s.w.document.body.textContent;
+    assert.ok(text.indexOf('High Definition Audio Device') >= 0, 'the one that actually stops something shows');
+    assert.equal(text.indexOf('SM Bus Controller'), -1, 'the housekeeping beside it does not');
 });

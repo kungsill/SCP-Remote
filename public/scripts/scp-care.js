@@ -27,17 +27,20 @@
 
     var script = [
         "$ErrorActionPreference='Continue'; $did=@{}",
-        // Firewall on, across all three profiles.
+        // Firewall on, across all three profiles. Instant, so it goes first.
         "try { Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True -ErrorAction Stop; $did['firewall']='on' } catch { $did['firewall']='failed' }",
-        // Signatures updated. On a machine with no route out this fails, which is reported, not hidden.
-        "try { $null = Update-MpSignature -ErrorAction Stop; $did['signatures']='updated' } catch { $did['signatures']='failed' }",
         // Defender's real-time protection, but only where nothing else is actually guarding.
+        // Before signatures, so the slow step below can never gate this important one.
         "try {",
         "  $av = @(Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction SilentlyContinue)",
         "  $guard = @($av | Where-Object { (($_.productState -band 0x1000) -ne 0) -and (($_.productState -band 0x10) -eq 0) -and ($_.displayName -notmatch 'Defender') })",
         "  if ($guard.Count -eq 0) { Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction SilentlyContinue; $did['defender']='on' }",
         "  else { $did['defender']='left off, '+$guard[0].displayName+' is guarding' }",
         "} catch { $did['defender']='unchanged' }",
+        // Signatures last, and time-bounded. On a machine with no route out Update-MpSignature
+        // blocks on the download until it times out on its own, which held the whole reply and
+        // made the panel look stuck. Run it in a child process we can give up on after 90s.
+        "try { $p = Start-Process powershell -ArgumentList '-NoProfile','-Command','Update-MpSignature' -PassThru -WindowStyle Hidden -ErrorAction Stop; if ($p.WaitForExit(90000)) { $did['signatures'] = $(if ($p.ExitCode -eq 0) {'updated'} else {'failed'}) } else { try { $p.Kill() } catch {}; $did['signatures']='timed out' } } catch { $did['signatures']='failed' }",
         "Write-Output ('SCP_CARE:'+($did|ConvertTo-Json -Compress))"
     ].join('\n');
 
@@ -51,6 +54,7 @@
             on: t('turned on', 'เปิดแล้ว'),
             updated: t('updated', 'อัปเดตแล้ว'),
             failed: t('could not (the computer may have no route out)', 'ไม่สำเร็จ (เครื่องอาจออกเน็ตไม่ได้)'),
+            'timed out': t('timed out (no route out)', 'หมดเวลา (ออกเน็ตไม่ได้)'),
             unchanged: t('left unchanged', 'คงเดิม')
         }[value] || value;
         return name + ': ' + said;

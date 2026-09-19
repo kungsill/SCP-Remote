@@ -85,3 +85,16 @@ test('a progress frame is not mistaken for a result', (t) => {
     assert.equal(s.w.ScpCare.receive({ action: 'msg', type: 'runcommands', nodeid: 'node//1', responseid: s.sent[0].responseid,
         progress: true, result: 'anything' }), false);
 });
+
+// On a computer with no route out, Update-MpSignature blocks on the download until it times
+// out on its own, and because the reply only comes when the whole script ends, the panel sat
+// at "working" for every such machine. The slow step has to be bounded and it has to be last.
+test('the signature update is time-bounded and never gates the firewall or Defender', () => {
+    const source = fs.readFileSync(path.join(root, 'public/scripts/scp-care.js'), 'utf8');
+    const firewall = source.indexOf('Set-NetFirewallProfile');
+    const defender = source.indexOf('DisableRealtimeMonitoring');
+    const signatures = source.indexOf('Update-MpSignature');
+    assert.ok(firewall < signatures && defender < signatures, 'firewall and Defender run before the slow step');
+    assert.match(source, /Update-MpSignature[\s\S]*WaitForExit\(\d+\)/, 'the update runs in a child process it can give up on');
+    assert.match(source, /WaitForExit\(90000\)/);
+});

@@ -180,3 +180,9 @@
 .scp-program-remove{white-space:nowrap}
 .scp-program-result{margin:10px 0;padding:12px;background:var(--scp-soft,#eaf4f3);border-radius:10px}
 .scp-program-result small{display:block;font-size:11px}
+#scpCare{max-width:640px;width:90vw;border:none;border-radius:14px;padding:20px}
+#scpCare header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.scp-care-list{max-height:56vh;overflow-y:auto;margin-top:8px}
+.scp-care-row{padding:10px 12px;border-bottom:1px solid var(--scp-line,#d7e5e4)}
+.scp-care-row small{display:block;font-size:11px;color:#5a6b6a}
+.scp-care-state{font-size:12px;color:var(--scp-accent,#087f83);font-weight:600}

@@ -452,6 +452,12 @@
             head.appendChild(button(format(t('fixAll'), faulty.length), 'scp-dash-fix-all',
                 function () { fixDrivers(faulty); }));
         }
+        // One press for the guards that are simply switched off. Safe on every machine, so it
+        // runs on all the flagged ones at once and never on the risky problems beside them.
+        if (window.ScpCare) {
+            var careable = flagged.map(function (entry) { return entry.node; }).filter(isOnline);
+            if (careable.length) { head.appendChild(button(t('Safe auto-care', 'ดูแลอัตโนมัติ (ปลอดภัย)'), 'scp-dash-fix-all', function () { window.ScpCare.run(careable); })); }
+        }
         panelEl.appendChild(head);
         if (!flagged.length) { panelEl.className += ' scp-dash-attention-clear'; return panelEl; }
 
@@ -581,7 +587,8 @@
         var original = window.meshserver.onMessage;
         window.meshserver.onMessage = function (server, message) {
             try {
-                if (window.ScpPrograms && window.ScpPrograms.receive(message)) { /* it answered its own question */ }
+                if (window.ScpCare && window.ScpCare.receive(message)) { /* care answered its own request */ }
+                else if (window.ScpPrograms && window.ScpPrograms.receive(message)) { /* it answered its own question */ }
                 else if (message && (message.action === 'getsysinfo') && message.nodeid) {
                     specs[message.nodeid] = (message.hardware || message.noinfo) ? message : null;
                     render();

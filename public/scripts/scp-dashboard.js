@@ -486,6 +486,9 @@
             if (faultsOf(entry.node).length && (!state || (state.state !== 'working'))) {
                 buttons.appendChild(button(t('fixDrivers'), 'scp-dash-fix-go', function () { fixDrivers([entry.node]); }));
             }
+            if (state) {
+                buttons.appendChild(button(document.documentElement.lang === 'th' ? 'ล้างงานค้าง' : 'Clear', 'scp-dash-attention-go', function () { clearDriverJob(entry.node); }));
+            }
             buttons.appendChild(button(t('attentionGo'), 'scp-dash-attention-go', function () { openRemote(entry.node); }));
             row.appendChild(buttons);
             rows.appendChild(row);
@@ -913,6 +916,16 @@
         "$out -join ' | '"
     ].join('\n');
 
+    // Take a finished-or-stuck driver job off the panel. It does not stop a command still
+    // running on the computer; it clears the card and asks the computer again, so a fault
+    // that is really gone clears with it and one that is real comes back named.
+    function clearDriverJob(node) {
+        delete fixing[node._id];
+        if (window.ScpOperations) { window.ScpOperations.request('driverClear', { nodeid: node._id }).catch(function () {}); }
+        specsAsked[node._id] = false;
+        askForSpecs(node);
+        render();
+    }
     function fixDrivers(nodes) {
         var targets = nodes.filter(isOnline);
         var asleep = nodes.filter(function (node) { return !isOnline(node); });

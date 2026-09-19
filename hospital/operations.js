@@ -18,6 +18,15 @@ exports.handle = async function (ctx, cmd) {
   const rows=await new Promise((resolve,reject)=>db.GetAllTypeNoTypeField(cmd.op==='driverStatus'?'scpdriver':'scpcleanup',domain.id,(e,r)=>e?reject(e):resolve(r)));
   const allowed=[];for(const row of rows)if(await access(row.nodeid))allowed.push(row);return allowed;
  }
+ if (cmd.op==='driverClear') {
+  // Clears the stored result so a finished-or-stuck job stops reappearing on reload. It
+  // does not reach the computer -- a command already running there runs to its own end or
+  // times out; this only takes the card off the panel. The device fault, if it is real,
+  // stays until the driver is actually installed.
+  if (typeof cmd.nodeid!=='string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
+  await new Promise((resolve,reject)=>db.Remove('scpdriver/'+cmd.nodeid,e=>e?reject(e):resolve()));
+  return {cleared:true};
+ }
  if (cmd.op==='tickets') {
   const rows=await new Promise((resolve,reject)=>db.GetAllTypeNoTypeField('scpticket',domain.id,(e,r)=>e?reject(e):resolve(r)));
   const out=[]; for(const row of rows) if(await access(row.nodeid)) out.push(row);

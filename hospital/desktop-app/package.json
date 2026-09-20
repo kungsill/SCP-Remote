@@ -1,0 +1,15 @@
+{
+  "name": "scp-remote-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SCP-Remote hospital remote desktop client",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-packager . SCP-Remote --overwrite --platform=win32 --arch=x64 --out=release --ignore=dist --ignore=release --ignore=tests"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.4.3"
+  }
+}

@@ -412,6 +412,18 @@ var color_options =
         foreground: (global._MSH != null) ? global._MSH().foreground : '255,255,255'
     };
 
+// SCP-Remote: the connection bar defaults to pinned, which parks a full-width bar across the
+// top of the watched screen for the whole session and covers the person's work. Unpinned, the
+// same bar rests as a small tab at the screen edge -- still visible, still carrying the close
+// button that lets the person end the session, but no longer blocking what they are doing. Only
+// its resting size changes; the bar is still raised on every consented session and still theirs
+// to stop. This is the module's own built-in mode (the 'privacybar UNPINNED' console command),
+// set here as the default so it applies without a per-agent command.
+try {
+    var _scpNotifyBar = require('notifybar-desktop');
+    if (_scpNotifyBar && (_scpNotifyBar.DefaultPinned != null)) { _scpNotifyBar.DefaultPinned = false; }
+} catch (ex) { }
+
 // SCP-Remote: the consent window takes colours as "red,green,blue". Accept the hex form
 // the server configuration uses as well, so one value works in both places.
 function toConsentColor(value) {
@@ -815,7 +827,7 @@ else {
 
 
 // MeshAgent JavaScript Core Module. This code is sent to and running on the mesh agent.
-var meshCoreObj = { action: 'coreinfo', value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
+var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.20.3', value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
 
 // Get the operating system description string
 try { require('os').name().then(function (v) { meshCoreObj.osdesc = v; meshCoreObjChanged(); }); } catch (ex) { }
@@ -1359,12 +1371,18 @@ function handleServerCommand(data) {
                                 tunnel.consent = data.consent;
                                 if (global._MSH && _MSH().LocalConsent != null) { tunnel.consent |= parseInt(_MSH().LocalConsent); }
                                 tunnel.privacybartext = data.privacybartext ? data.privacybartext : currentTranslation['privacyBar'];
-                                tunnel.username = data.username + (data.guestname ? (' - ' + data.guestname) : '');
-                                tunnel.realname = (data.realname ? data.realname : data.username) + (data.guestname ? (' - ' + data.guestname) : '');
+                                // An app session is worked by whoever the administrator handed that installation
+                                // to -- a colleague, a supervisor -- not by the administrator whose account the
+                                // share borrows to exist. Naming the account owner would tell the person at the
+                                // machine that the wrong person is asking to watch them, so an app session is
+                                // identified by its own name and nothing else.
+                                var scpAppSession = (typeof data.guestname === 'string') && (data.guestname.indexOf('SCP-App: ') === 0);
+                                tunnel.username = scpAppSession ? data.guestname : (data.username + (data.guestname ? (' - ' + data.guestname) : ''));
+                                tunnel.realname = scpAppSession ? data.guestname : ((data.realname ? data.realname : data.username) + (data.guestname ? (' - ' + data.guestname) : ''));
                                 tunnel.guestuserid = data.guestuserid;
                                 tunnel.guestname = data.guestname;
                                 tunnel.userid = data.userid;
-                                if (server_check_consentTimer(tunnel.userid)) { tunnel.consent = (tunnel.consent & -57); } // Deleting Consent Requirement
+                                if (!scpAppSession && server_check_consentTimer(tunnel.userid)) { tunnel.consent = (tunnel.consent & -57); } // Deleting Consent Requirement
                                 tunnel.desktopviewonly = data.desktopviewonly;
                                 tunnel.remoteaddr = data.remoteaddr;
                                 tunnel.state = 0;
@@ -1434,12 +1452,12 @@ function handleServerCommand(data) {
                         if (data.title && data.msg) {
                             MeshServerLogEx(18, [data.title, data.msg], "Displaying message box, title=" + data.title + ", message=" + data.msg, data);
                             if (process.platform == 'win32') {
-                                if (global._clientmessage) {
+                                if (global._clientmessage && typeof global._clientmessage.addMessage === 'function') {
                                     global._clientmessage.addMessage(data.msg);
                                 }
                                 else {
                                     try {
-                                        require('win-dialog');
+                                        require('win-scp-dialog');
                                         var ipr = server_getUserImage(data.userid);
                                         ipr.title = data.title;
                                         ipr.message = data.msg;
@@ -1449,12 +1467,14 @@ function handleServerCommand(data) {
                                         global._clientmessage = ipr.then(function (img) {
                                             var options = { b64Image: img.split(',').pop(), background: color_options.background, foreground: color_options.foreground }
                                             if (this.timeout != 0) { options.timeout = this.timeout; }
-                                            this.messagebox = require('win-dialog').create(this.title, this.message, this.username, options);
+                                            this.messagebox = require('win-scp-dialog').create(this.title, this.message, this.username, options);
                                             this.__childPromise.addMessage = this.messagebox.addMessage.bind(this.messagebox);
                                             return (this.messagebox);
                                         });
 
-                                        global._clientmessage.then(function () { global._clientmessage = null; });
+                                        var pendingMessage = global._clientmessage;
+                                        var clearMessage = function () { if (global._clientmessage === pendingMessage) global._clientmessage = null; };
+                                        pendingMessage.then(clearMessage, clearMessage);
                                     }
                                     catch (z) {
                                         try { require('message-box').create(data.title, data.msg, 120).then(function () { }).catch(function () { }); } catch (ex) { }
@@ -1471,7 +1491,7 @@ function handleServerCommand(data) {
                         // Return the list of running processes
                         if (data.sessionid) {
                             processManager.getProcesses(function (plist) {
-                                mesh.SendCommand({ action: 'msg', type: 'ps', value: JSON.stringify(plist), sessionid: data.sessionid });
+                                mesh.SendCommand({ action: 'msg', type: 'ps', value: JSON.stringify(plist), tag: data.tag, sessionid: data.sessionid });
                             });
                         }
                         break;
@@ -1507,7 +1527,7 @@ function handleServerCommand(data) {
                             info.machineName = "dummydata"; // Only set this if machine name is not "."
                             info.handleCount = 123; // Number
                             */
-                            mesh.SendCommand({ action: 'msg', type: 'psinfo', pid: data.pid, sessionid: data.sessionid, value: info });
+                            mesh.SendCommand({ action: 'msg', type: 'psinfo', pid: data.pid, tag: data.tag, sessionid: data.sessionid, value: info });
                         }
                         break;
                     }
@@ -1944,7 +1964,11 @@ function handleServerCommand(data) {
                 break;
             }
             case 'runcommands': {
-                if (mesh.cmdchild != null) { sendConsoleText("Run commands can't execute, already busy."); break; }
+                if (mesh.cmdchild != null) {
+                    if (data.reply) mesh.SendCommand({ action:'msg', type:'runcommands', result:'FAILED COMMAND_BUSY: Another command is still running.', sessionid:data.sessionid, responseid:data.responseid });
+                    else sendConsoleText("Run commands can't execute, already busy.");
+                    break;
+                }
                 if (!data.reply) sendConsoleText("Run commands (" + data.runAsUser + "): " + data.cmds);
 
                 // data.runAsUser: 0=Agent,1=UserOrAgent,2=UserOnly
@@ -1978,7 +2002,32 @@ function handleServerCommand(data) {
                         // Windows Powershell
                         mesh.cmdchild = require('child_process').execFile(process.env['windir'] + '\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', ['powershell', '-noprofile', '-nologo', '-command', '-'], options);
                         mesh.cmdchild.descriptorMetadata = 'UserCommandsPowerShell';
-                        mesh.cmdchild.stdout.on('data', function (c) { replydata += c.toString(); sendConsoleText(c.toString()); });
+                        var scpDriverStage = '', scpCleanupLine = '', scpProgramStep = '';
+                        mesh.cmdchild.stdout.on('data', function (c) {
+                            replydata += c.toString(); sendConsoleText(c.toString());
+                            if (data.reply && typeof data.responseid === 'string' && data.responseid.indexOf('scpclean-') === 0) {
+                                var lines=replydata.match(/SCP_CLEANUP_PROGRESS:\{[^\r\n]*\}/g);
+                                var last=lines&&lines[lines.length-1];
+                                if(last&&last!==scpCleanupLine){scpCleanupLine=last;mesh.SendCommand({action:'msg',type:'runcommands',progress:true,result:last,sessionid:data.sessionid,responseid:data.responseid});}
+                            }
+                            // SCP-Remote: a forced program removal reports each step as it finishes.
+                            if (data.reply && typeof data.responseid === 'string' && data.responseid.indexOf('scpprog') === 0) {
+                                var progSteps = replydata.match(/SCP_PROGRAM_STEP:\{[^\r\n]*\}/g);
+                                var progLatest = progSteps && progSteps[progSteps.length - 1];
+                                if (progLatest && progLatest !== scpProgramStep) {
+                                    scpProgramStep = progLatest;
+                                    mesh.SendCommand({ action:'msg', type:'runcommands', progress:true, result:progLatest, sessionid:data.sessionid, responseid:data.responseid });
+                                }
+                            }
+                            if (data.reply && typeof data.responseid === 'string' && data.responseid.indexOf('scpfix') === 0) {
+                                var stages = replydata.match(/SCP_DRIVER_STAGE:(rescan|search|download|install)|SCP_DRIVER_PROGRESS:\{[^\r\n]*\}/g);
+                                var latest = stages && stages[stages.length - 1];
+                                if (latest && latest !== scpDriverStage) {
+                                    scpDriverStage = latest;
+                                    mesh.SendCommand({ action:'msg', type:'runcommands', progress:true, result:latest, sessionid:data.sessionid, responseid:data.responseid });
+                                }
+                            }
+                        });
                         mesh.cmdchild.stderr.on('data', function (c) { replydata += c.toString(); sendConsoleText(c.toString()); });
                         mesh.cmdchild.stdin.write(data.cmds + '\r\nexit\r\n');
                         mesh.cmdchild.on('exit', function () {
@@ -4471,6 +4520,8 @@ function onTunnelControlData(data, ws) {
 
             // Set additional user consent options if present
             if ((obj != null) && (typeof obj.consent == 'number')) { ws.httprequest.consent |= obj.consent; }
+            // This option comes from authenticated server routing, never from browser control data.
+            if (ws.httprequest.soptions && ws.httprequest.soptions.scpUnattended === true) { ws.httprequest.consent &= ~(8 | 16 | 32); }
 
             // Set autolock
             if ((obj != null) && (obj.autolock === true)) {

@@ -2102,6 +2102,7 @@
               }
             }
           },
+          "unattendedAdmins": { "type": "array", "items": { "type": "string" }, "default": [], "description": "SCP-Remote: full user IDs of full site administrators allowed to connect without desktop, terminal or file consent prompts. Notifications, access rights and guest consent remain enforced. Example: user//admin." },
           "desktopViewOnlyNoPrompt": { "type": "boolean", "default": false, "description": "SCP-Remote: skip only the desktop prompt on an agent-enforced picture-only tunnel. Notifications and privacy bar remain governed by consent flags. Shared desktop streams retain their prompt policy." },
           "consentMessages": {
             "type": "object",

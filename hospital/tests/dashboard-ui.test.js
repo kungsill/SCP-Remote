@@ -888,7 +888,7 @@ test('what the computer reports back is turned into one plain sentence', (t) => 
         s.api.show();
         s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
         s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
-        s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', result: reply });
+        s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', responseid: s.sent.find(m => m.action === 'runcommands').responseid, result: reply });
         assert.ok(s.w.document.body.textContent.indexOf(expected) >= 0,
             '“' + reply + '” should read as “' + expected + '”');
     });
@@ -940,9 +940,42 @@ test('after a repair the computer is asked again what is wrong with it', (t) => 
     s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
     const before = s.sent.filter(m => m.action === 'getsysinfo').length;
     s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
-    s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', result: 'installed 1 driver(s)' });
+    s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', responseid: s.sent.find(m => m.action === 'runcommands').responseid, result: 'installed 1 driver(s)' });
     assert.ok(s.sent.filter(m => m.action === 'getsysinfo').length > before,
         'so the fault clears itself from the panel once it is really gone');
+});
+
+test('a cleanup reply cannot complete a driver repair on the same computer',t=>{
+ const s=setup(t,{nodes:[faulty('node//1','pc-broken')]});s.api.show();s.fromServer(faultsFor('node//1',[{name:'Multimedia Audio Controller',code:28}]));s.w.document.querySelector('.scp-dash-fix-go').click();
+ s.fromServer({action:'msg',type:'runcommands',nodeid:'node//1',responseid:'scpclean-other',result:'SCP_CLEANUP_RESULT:{}'});assert.ok(s.w.document.body.textContent.includes('ยังไม่มีคำตอบ'),'a reply from another job leaves the driver job alone');
+});
+test('a late driver result still updates the row after the waiting deadline',t=>{
+ const s=setup(t,{nodes:[faulty('node//1','pc-broken')]});s.api.show();s.fromServer(faultsFor('node//1',[{name:'Multimedia Audio Controller',code:28}]));const timeouts=[];s.w.setTimeout=(fn)=>{timeouts.push(fn);return 1;};s.w.document.querySelector('.scp-dash-fix-go').click();const request=s.sent.find(m=>m.action==='runcommands');timeouts[0]();assert.ok(s.w.document.body.textContent.includes('15 นาที'));
+ s.fromServer({action:'msg',type:'runcommands',nodeid:'node//1',responseid:request.responseid,result:'installed 1 driver(s)'});assert.ok(s.w.document.body.textContent.includes('ติดตั้งไดรเวอร์แล้ว'));
+});
+test('driver stages remain pending and server rejection immediately ends the waiting state',t=>{
+ const s=setup(t,{nodes:[faulty('node//1','pc-broken')]});s.api.show();s.fromServer(faultsFor('node//1',[{name:'Multimedia Audio Controller',code:28}]));s.w.document.querySelector('.scp-dash-fix-go').click();const request=s.sent.find(m=>m.action==='runcommands');
+ s.fromServer({action:'msg',type:'runcommands',nodeid:'node//1',responseid:request.responseid,progress:true,result:'SCP_DRIVER_STAGE:download'});assert.ok(s.w.document.body.textContent.includes('กำลังดาวน์โหลดไดรเวอร์'));
+ s.fromServer({action:'runcommands',responseid:request.responseid,result:'Agent not connected'});assert.ok(s.w.document.body.textContent.includes('ทำไม่สำเร็จ'));
+});
+test('opening the dashboard restores a saved driver result without reinstalling',async t=>{
+ const s=setup(t,{nodes:[faulty('node//1','pc-broken')]});s.w.ScpOperations={request:async()=>[{nodeid:'node//1',ticket:'scpfix1_100',result:'NODRIVERS',progress:false,updated:100}]};s.api.show();await new Promise(resolve=>setImmediate(resolve));assert.ok(s.w.document.body.textContent.includes('Windows ไม่มีไดรเวอร์ให้'),s.w.document.body.textContent);assert.equal(s.sent.filter(m=>m.action==='runcommands').length,0);
+});
+
+test('dashboard opens a compact overview and switching away from live devices stops sessions', (t) => {
+    const { w, connections, api } = setup(t);
+    api.show();
+    assert.equal(w.document.getElementById('scp-dash-view-overview').hidden, false);
+    assert.equal(w.document.getElementById('scp-dash-view-devices').hidden, true);
+    api.setLive(true);
+    assert.equal(w.document.getElementById('scp-dash-view-devices').hidden, false);
+    assert.equal(connections.length, 2);
+    w.document.querySelector('[aria-controls="scp-dash-view-reports"]').click();
+    assert.ok(connections.every(c => c.stops === 1));
+    assert.equal(w.document.getElementById('scp-dash-view-reports').hidden, false);
+    api.render();
+    assert.equal(w.document.getElementById('scp-dash-view-reports').hidden, false);
+    assert.equal(connections.length, 2);
 });
 
 // win-info reports pending-restart reasons as a list. An empty list means nothing is
@@ -1046,25 +1079,41 @@ test('a computer Windows itself calls unprotected is still flagged', (t) => {
     assert.ok(text.indexOf('McAfee') >= 0, 'and a computer with nothing running at all is still flagged');
 });
 
-// Two ward computers showed "installing drivers" for a quarter of an hour and had never
-// answered at all. The row was reporting the press, not the computer.
+// The bar used to show "installing drivers, step 1 of 4" from the instant the button was
+// pressed. Two computers sat like that for a quarter of an hour having never answered at
+// all, and nothing on the screen could tell that apart from work in progress.
 test('a command that has been sent but not answered says exactly that', (t) => {
-    const s = setup(t, { nodes: [faulty('node//1', 'pc-broken')] });
+    const s = setup(t);
     s.api.show();
-    s.fromServer(faultsFor('node//1', [{ name: 'Multimedia Audio Controller', code: 28 }]));
-    s.w.document.querySelector('.scp-dash-fix-go').dispatchEvent(new s.w.Event('click'));
+    const row = [...s.w.document.querySelectorAll('.scp-dash-row')].find(r => r.textContent.indexOf('pc-one') >= 0);
+    assert.ok(row, 'no row to work with');
+    s.w.ScpDashboard.fixDrivers([s.w.nodes[0]]);
     const text = s.w.document.body.textContent;
-    assert.ok(text.indexOf('\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e04\u0e33\u0e15\u0e2d\u0e1a') >= 0, 'it says the computer has not answered');
-    assert.equal(text.indexOf('\u0e01\u0e33\u0e25\u0e31\u0e07\u0e15\u0e34\u0e14\u0e15\u0e31\u0e49\u0e07\u0e44\u0e14\u0e23\u0e40\u0e27\u0e2d\u0e23\u0e4c'), -1, 'and does not claim an installation is under way');
+    assert.ok(text.indexOf('ยังไม่มีคำตอบ') >= 0, 'it says the computer has not answered');
+    assert.equal(s.w.document.querySelector('.scp-job-progress'), null, 'and shows no stage until one is reported');
 });
 
-test('the device re-scan cannot hold the job for ever', (t) => {
+test('the device re-scan is a stage of its own, and cannot run forever', (t) => {
     const s = setup(t);
-    const script = s.api.driverScript;
-    assert.match(script, /pnputil\.exe/, 'the cheap step still runs first');
-    assert.match(script, /WaitForExit\(\d+\)/, 'but a re-scan that never returns has to be given up on');
-    assert.match(script, /rescan timed out/, 'and said to have been given up on');
+    const script = s.w.ScpDashboard.driverScript;
+    const rescan = script.indexOf("SCP_DRIVER_STAGE:rescan");
+    const search = script.indexOf("SCP_DRIVER_STAGE:search");
+    const pnputil = script.indexOf('pnputil.exe');
+    assert.ok(rescan >= 0 && rescan < pnputil, 'the re-scan is announced before it starts, or a hang there looks like a search');
+    assert.ok(pnputil < search, 'and it still runs before Windows Update is asked');
+    assert.match(script, /WaitForExit\(\d+\)/, 'a re-scan that never returns has to be given up on');
     assert.doesNotMatch(script, /Restart-Computer/);
+});
+
+test('the re-scan stage is reported to the panel by name', (t) => {
+    const s = setup(t);
+    s.api.show();
+    s.w.ScpDashboard.fixDrivers([s.w.nodes[0]]);
+    const ticket = s.sent.filter(m => m.action === 'runcommands').pop().responseid;
+    s.fromServer({ action: 'msg', type: 'runcommands', nodeid: 'node//1', responseid: ticket,
+        progress: true, result: 'SCP_DRIVER_STAGE:rescan' });
+    assert.ok(s.w.document.body.textContent.indexOf('สแกนอุปกรณ์') >= 0,
+        'the panel distinguishes scanning the computer from asking Windows Update');
 });
 
 // The chipset placeholders Windows cannot name are on nearly every machine and the computer

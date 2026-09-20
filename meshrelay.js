@@ -263,6 +263,7 @@ function CreateMeshRelayEx(parent, ws, req, domain, user, cookie) {
                     command.rights = rights;            // Add user rights flags to the message
                     if (typeof command.consent == 'number') { command.consent = command.consent | mesh.consent; } else { command.consent = mesh.consent; } // Add user consent
                     if (typeof domain.userconsentflags == 'number') { command.consent |= domain.userconsentflags; } // Add server required consent flags
+                    require('./hospital/consent-policy').apply(command, domain, user);
                     if (user != null) {
                         command.username = user.name;       // Add user name
                         command.realname = user.realname;   // Add real name
@@ -284,6 +285,7 @@ function CreateMeshRelayEx(parent, ws, req, domain, user, cookie) {
                         command.rights = rights;                // Add user rights flags to the message
                         if (typeof command.consent == 'number') { command.consent = command.consent | mesh.consent; } else { command.consent = mesh.consent; } // Add user consent
                         if (typeof domain.userconsentflags == 'number') { command.consent |= domain.userconsentflags; } // Add server required consent flags
+                        require('./hospital/consent-policy').apply(command, domain, user);
                         if (user != null) {
                             command.username = user.name;           // Add user name
                             command.realname = user.realname;       // Add real name
@@ -912,7 +914,18 @@ function CreateMeshRelayEx(parent, ws, req, domain, user, cookie) {
                 const command = { nodeid: cookie.nodeid, action: 'msg', type: 'tunnel', value: '*/' + xdomain + 'meshrelay.ashx?' + (obj.req.query.p != null ? ('p=' + obj.req.query.p + '&') : '') + 'id=' + obj.id + '&rauth=' + rcookie, tcpport: cookie.tcpport, tcpaddr: cookie.tcpaddr, soptions: {} };
                 if (user) { command.userid = user._id; }
                 if (typeof domain.terminaluservariable == 'string') { command.soptions.terminalUserVariable = domain.terminaluservariable; }
+                // SCP-Remote: a guest share raised the consent window in the default blue and
+                // in the wrong language, because this path copied the wording across but not
+                // the colours or the language the rest of the server already sends. The person
+                // being asked should not be able to tell which kind of session is asking.
+                if (typeof domain.agentcustomization == 'object') {
+                    if (typeof domain.agentcustomization.backgroundcolor == 'string') { command.soptions.consentBackground = domain.agentcustomization.backgroundcolor; }
+                    if (typeof domain.agentcustomization.foregroundcolor == 'string') { command.soptions.consentForeground = domain.agentcustomization.foregroundcolor; }
+                }
                 if (typeof domain.consentmessages == 'object') {
+                    command.soptions.consentLanguage = domain.consentmessages.language === 'en' ? 'en' : 'th';
+                    if (typeof domain.consentmessages.backgroundcolor == 'string') { command.soptions.consentBackground = domain.consentmessages.backgroundcolor; }
+                    if (typeof domain.consentmessages.foregroundcolor == 'string') { command.soptions.consentForeground = domain.consentmessages.foregroundcolor; }
                     if (typeof domain.consentmessages.title == 'string') { command.soptions.consentTitle = domain.consentmessages.title; }
                     if (typeof domain.consentmessages.desktop == 'string') { command.soptions.consentMsgDesktop = domain.consentmessages.desktop; }
                     if (typeof domain.consentmessages.terminal == 'string') { command.soptions.consentMsgTerminal = domain.consentmessages.terminal; }

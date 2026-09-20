@@ -325,3 +325,8 @@ scripts/daemon/
 hospital/client-setup/agents/
 hospital/client-setup/*.exe
 hospital/client-setup.zip
+# SCP-Remote desktop build artifacts and installed toolchain
+hospital/desktop-app/node_modules/
+hospital/desktop-app/dist/
+
+hospital/desktop-app/release/

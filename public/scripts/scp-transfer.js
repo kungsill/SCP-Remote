@@ -148,6 +148,7 @@
                 bar.parentElement.insertBefore(line, bar.nextSibling);
             }
             var max = Number(bar.max) || 0, value = Number(bar.value) || 0;
+            renderTransfer();
             var parts = [(max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0) + '%'];
             if (max > 0) { parts.push(bytes(value) + ' / ' + bytes(max)); }
             var queue = window.uploadFile;
@@ -258,6 +259,36 @@
         sendDroppedFiles(forUpload);
     }
 
+    var transfer = null;
+    function transferEvent(kind, info) {
+        if (kind === 'uploadBegin') transfer = { kind:'upload', target:window.currentNode._id, path:window.uploadFile.xpath, files:Array.from(info), completed:[], start:Date.now(), state:'working' };
+        if (kind === 'downloadBegin') transfer = { kind:'download', target:window.currentNode._id, path:info.path, file:info.file, size:info.size, start:Date.now(), state:'working' };
+        if (!transfer) return;
+        if (kind === 'disconnected' && transfer.state === 'working') kind = 'error';
+        if (kind === 'fileDone' && transfer.kind === 'upload' && window.uploadFile) transfer.completed.push(window.uploadFile.xfilePtr);
+        if (kind === 'done' && transfer.kind === 'upload') transfer.completed = transfer.files.map(function(f,i){return i;});
+        if (kind === 'done' || kind === 'error' || kind === 'cancelled') transfer.state = kind;
+        renderTransfer();
+    }
+    function renderTransfer() {
+        var host = node('p13filetable'); if (!host || !transfer || !window.currentNode || window.currentNode._id !== transfer.target) return;
+        var box = node('scpTransferSummary'); if (!box) { box = document.createElement('div'); box.id='scpTransferSummary'; box.className='scp-transfer-summary'; host.insertBefore(box,host.firstChild); }
+        var current = window.uploadFile, downloading=window.gdownloadFile;
+        var sent = transfer.kind === 'upload' ? (transfer.completed.reduce(function(total,i){return total+transfer.files[i].size;},0) + (current && transfer.completed.indexOf(current.xfilePtr)<0 ? current.xptr||0 : 0)) : (downloading && downloading.tsize || 0);
+        var rate = bytes(Math.round(sent / Math.max(1,(Date.now()-transfer.start)/1000))) + '/s';
+        var direction = transfer.kind === 'upload' ? t('This computer → remote: ','เครื่องเรา → เครื่องลูก: ') : t('Remote → this computer: ','เครื่องลูก → เครื่องเรา: ');
+        var statusNames={working:t('Transferring','กำลังโอน'),done:t('Transfer confirmed','โอนข้อมูลครบแล้ว'),error:t('Failed — retry available','โอนไม่สำเร็จ — ลองใหม่ได้'),cancelled:t('Cancelled','ยกเลิกแล้ว')};
+        box.textContent = direction + (window.currentNode.name||'') + '\n' + transfer.path + '\n' + statusNames[transfer.state];
+        if (transfer.kind==='upload') box.textContent+='\n'+transfer.files.map(function(f,i){return (transfer.completed.indexOf(i)>=0?t('Done','ครบแล้ว'):current&&current.xfilePtr===i?statusNames[transfer.state]:t('Queued','รอคิว'))+' · '+f.name;}).join('\n');
+        else box.textContent+=' · '+transfer.file;
+        if(transfer.state==='working')box.textContent+=' · '+rate;
+        if(transfer.state==='error'||transfer.state==='cancelled'){
+            var retry=document.createElement('button');retry.type='button';retry.textContent=t('Retry','ลองใหม่');retry.onclick=function(){if(!window.currentNode||window.currentNode._id!==transfer.target||!window.files||window.files.State!==3)return;
+                if(transfer.kind==='upload'){if(window.p13filetreelocation.join('/')!==transfer.path){toast(t('Open the original destination folder first.','เปิดโฟลเดอร์ปลายทางเดิมก่อนลองใหม่'),true);return;}window.p13doUploadFiles(transfer.files);}
+                else window.p13downloadfile(encodeURIComponent(transfer.path),encodeURIComponent(transfer.file),transfer.size);
+            };box.appendChild(retry);
+        }
+    }
     function init() {
         var clip = node('DeskClip');
         if (clip) {
@@ -286,6 +317,6 @@
             if (item) { item.addEventListener(id === 'p13filetable' ? 'drop' : 'click', function () { setTimeout(watchUploadProgress, 300); }, false); }
         });
     }
-    window.ScpTransfer = { handle: handle, show: show, filePage: filePage, desktopDrop: desktopDrop, watchUploadProgress: watchUploadProgress, atAFolder: atAFolder };
+    window.ScpTransfer = { transferEvent: transferEvent, handle: handle, show: show, filePage: filePage, desktopDrop: desktopDrop, watchUploadProgress: watchUploadProgress, atAFolder: atAFolder };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

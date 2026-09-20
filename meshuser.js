@@ -329,6 +329,7 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                             }
                         }
                         applyViewOnlyConsent(command, options);
+                        require('./hospital/consent-policy').apply(command, domain, user);
 
                         command.username = user.name;       // Add user name
                         command.realname = user.realname;   // Add real name
@@ -370,6 +371,7 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                                 }
                             }
                             applyViewOnlyConsent(command, options);
+                            require('./hospital/consent-policy').apply(command, domain, user);
 
                             command.username = user.name;           // Add user name
                             command.realname = user.realname;       // Add real name
@@ -590,6 +592,7 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                 emailcheck: ((domain.mailserver != null) && (domain.auth != 'sspi') && (domain.auth != 'ldap') && (args.lanonly != true) && (parent.certificates.CommonName != null) && (parent.certificates.CommonName.indexOf('.') != -1) && (user._id.split('/')[2].startsWith('~') == false)),
                 domainauth: (domain.auth == 'sspi'),
                 serverTime: Date.now(),
+                scpRelease: require('./hospital/release.json').version,
                 features: allFeatures.features,
                 features2: allFeatures.features2,
                 features3: allFeatures.features3
@@ -646,6 +649,10 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                 }
             }
             if (typeof domain.userconsentflags == 'number') { serverinfo.consent = domain.userconsentflags; }
+            if (require('./hospital/consent-policy').canConnectUnattended(domain, user)) {
+                serverinfo.consent = (serverinfo.consent || 0) & ~(8 | 16 | 32);
+                serverinfo.scpUnattendedAdmin = true;
+            }
             // SCP-Remote: the pages that show picture-only tiles tell the operator what the
             // watched computer will see. Without this they would read the flags above and
             // promise a permission box that these connections no longer raise.

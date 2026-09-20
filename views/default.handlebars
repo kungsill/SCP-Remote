@@ -59,13 +59,18 @@
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-ui.css" />
     <script defer src="{{{domainurl}}}scripts/scp-ui.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-dashboard.css" />
-    <script defer src="{{{domainurl}}}scripts/scp-dashboard.js"></script>
-    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-transfer.css" />
-    <script defer src="{{{domainurl}}}scripts/scp-transfer.js"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-progress.js"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-monitor.js"></script>
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-monitor.css" />
+    <script defer src="{{{domainurl}}}scripts/scp-cleanup.js"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-connection.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-operations.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-programs.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-care.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-operations.css" />
+    <script defer src="{{{domainurl}}}scripts/scp-dashboard.js"></script>
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-transfer.css" />
+    <script defer src="{{{domainurl}}}scripts/scp-transfer.js"></script>
 </head>
 <body id="body" oncontextmenu="handleContextMenu(event)" style="display:none;min-width:495px" onload="if (typeof(startup) !== 'undefined') startup();">
     <!-- right click menu -->
@@ -2629,6 +2634,8 @@
         }
 
         function onMessage(server, message) {
+            if (window.ScpMonitor && ScpMonitor.receive(message)) return;
+            if (window.ScpCleanup && ScpCleanup.receive(message)) return;
             switch (message.action) {
                 case 'scpops': if(window.ScpOperations) ScpOperations.receive(message); break;
                 case 'trace': {
@@ -9800,6 +9807,7 @@
                         QS('p11capslock').display = ((state & 4) ? 'inline-block' : 'none');
                     }
                     desktop.onConsoleMessageChange = function () {
+                        if (window.ScpConnection) ScpConnection.message(desktop);
                         if (desktop.consoleMessage) {
                             Q('p11DeskConsoleMsg').innerHTML += formatAgentConsoleMessage(desktop.consoleMessage, desktop.consoleMessageId, desktop.consoleMessageArgs);
                             QV('p11DeskConsoleMsg', true);
@@ -9836,6 +9844,7 @@
                     desktop.Start(desktopNode._id, currentNode.rdpport ? currentNode.rdpport : 3389, tsid);
                     desktop.contype = 4;
                     desktop.onConsoleMessageChange = function () {
+                        if (window.ScpConnection) ScpConnection.message(desktop);
                         if (desktop.consoleMessage) {
                             Q('p11DeskConsoleMsg').innerHTML += formatAgentConsoleMessage(desktop.consoleMessage, desktop.consoleMessageId, desktop.consoleMessageArgs);
                             QV('p11DeskConsoleMsg', true);
@@ -10011,6 +10020,7 @@
             if ((desktop != null) && (xstate == 3) && (desktop.contype == 4)) { str += ", RDP"; }
             //if (desktop.m.stopInput == true) { str += ', Loopback'; }
             QH('deskstatus', str);
+            if (window.ScpConnection) ScpConnection.state(xdesktop, state);
             switch (state) {
                 case 0:
                     if (desktop != null) {
@@ -11500,6 +11510,7 @@
         }
 
         function onFilesStateChange(xfiles, state) {
+            if(state === 0 && window.ScpTransfer) ScpTransfer.transferEvent('disconnected');
             setSessionActivity();
             QV('p13Connect', (state == 0) && (filesNode.mtype == 2));
             QV('p13Connects', (state == 0) && (features2 & 0x200) && (filesNode.agent != null) && (filesNode.agent.id != 3) && (filesNode.agent.id != 4) && ((features2 & 0x800000) == 0));
@@ -12702,21 +12713,22 @@
         // Called by the html page to start a download, arguments are: path, file name and file size.
         function p13downloadfile(x, y, z, tag) {
             if (xxdialogMode || !files) return;
-            gdownloadFile = { path: decodeURIComponent(x), file: decodeURIComponent(y), size: z, tsize: 0, data: '', state: 0, id: Math.random(), tag: tag }
+            gdownloadFile = { path: decodeURIComponent(x), file: decodeURIComponent(y), size: z, tsize: 0, data: '', state: 0, id: Math.random(), tag: tag };
+            if(window.ScpTransfer) ScpTransfer.transferEvent('downloadBegin', gdownloadFile)
             //console.log('p13downloadFileCancel', gdownloadFile);
             files.sendText({ action: 'download', sub: 'start', id: gdownloadFile.id, path: gdownloadFile.path });
             setDialogMode(2, "Download File", 10, p13downloadFileCancel, '<div>' + EscapeHtml(gdownloadFile.file) + '</div><br /><progress id=d2progressBar style=width:100% value=0 max=' + z + ' />');
         }
 
         // Called by the html page to cancel the download
-        function p13downloadFileCancel() { setDialogMode(0); files.sendText({ action: 'download', sub: 'cancel', id: gdownloadFile.id }); gdownloadFile = null; }
+        function p13downloadFileCancel() { if(window.ScpTransfer) ScpTransfer.transferEvent('cancelled'); setDialogMode(0); files.sendText({ action: 'download', sub: 'cancel', id: gdownloadFile.id }); gdownloadFile = null; }
 
         // Called by the transport when download control command is received
         function p13gotDownloadCommand(cmd) {
             //console.log('p13gotDownloadCommand', cmd);
             if ((gdownloadFile == null) || (cmd.id != gdownloadFile.id)) return;
             if (cmd.sub == 'start') { gdownloadFile.state = 1; files.sendText({ action: 'download', sub: 'startack', id: gdownloadFile.id }); }
-            else if (cmd.sub == 'cancel') { gdownloadFile = null; setDialogMode(0); }
+            else if (cmd.sub == 'cancel') { if(window.ScpTransfer) ScpTransfer.transferEvent('error'); gdownloadFile = null; setDialogMode(0); }
         }
 
         // Called by the transport when binary data is received
@@ -12725,6 +12737,7 @@
             if (data.length > 4) {
                 gdownloadFile.tsize += (data.length - 4); // Add to the total bytes received
                 gdownloadFile.data += data.substring(4); // Append the data
+                if(window.ScpTransfer) ScpTransfer.transferEvent('progress');
                 Q('d2progressBar').value = gdownloadFile.tsize; // Change the progress bar
             }
             if ((ReadInt(data, 0) & 1) != 0) { // Check end flag
@@ -12770,7 +12783,7 @@
                     gdownloadFile = null;
                 } else {
                     // Save the file to disk
-                    saveAs(data2blob(gdownloadFile.data), gdownloadFile.file); gdownloadFile = null; setDialogMode(0); // Save the file
+                    if(window.ScpTransfer) ScpTransfer.transferEvent('done'); saveAs(data2blob(gdownloadFile.data), gdownloadFile.file); gdownloadFile = null; setDialogMode(0); // Save the file
                 }
             } else {
                 files.sendText({ action: 'download', sub: 'ack', id: gdownloadFile.id }); // Send the ACK
@@ -12879,6 +12892,7 @@
             uploadFile.xpath = p13filetreelocation.join('/');
             uploadFile.xfiles = files;
             uploadFile.xfilePtr = -1;
+            if(window.ScpTransfer) ScpTransfer.transferEvent('uploadBegin', files);
             setDialogMode(2, "Upload File", 10, p13uploadFileCancel, '<div id=p13dfileName>' + "Connecting..." + '</div><br /><progress id=d2progressBar style=width:100% value=0 max=0 />');
             p13uploadNextFile();
         }
@@ -12921,12 +12935,14 @@
                     files.sendText(JSON.stringify({ action: 'upload', reqid: uploadFile.xfilePtr, path: uploadFile.xpath, name: file.name, size: uploadFile.xdata.byteLength }));
                 }
             } else {
+                if(window.ScpTransfer) ScpTransfer.transferEvent('done');
                 p13uploadFileTransferDone();
             }
         }
 
         // Used to cancel the entire transfer.
         function p13uploadFileCancel(button, tag) {
+            if(window.ScpTransfer) ScpTransfer.transferEvent('cancelled');
             if (uploadFile != null) { files.sendText(JSON.stringify({ action: 'uploadcancel', reqid: uploadFile.xfilePtr })); uploadFile = null; }
             p13uploadFileTransferDone();
         }
@@ -12944,13 +12960,14 @@
             switch (cmd.action) {
                 case 'uploadstart': { uploadFile.xdataPriming = 8; p13uploadNextPart(false); break; } // Send 8 more blocks of 16k to fill the websocket.
                 case 'uploadack': { p13uploadNextPart(false); break; }
-                case 'uploaddone': { if (uploadFile.xfiles.length > uploadFile.xfilePtr + 1) { p13uploadNextFile(); } else { p13uploadFileTransferDone(); } break; }
-                case 'uploaderror': { p13uploadFileCancel(); break; }
+                case 'uploaddone': { if(window.ScpTransfer) ScpTransfer.transferEvent('fileDone'); if (uploadFile.xfiles.length === uploadFile.xfilePtr + 1 && window.ScpTransfer) ScpTransfer.transferEvent('done'); if (uploadFile.xfiles.length > uploadFile.xfilePtr + 1) { p13uploadNextFile(); } else { p13uploadFileTransferDone(); } break; }
+                case 'uploaderror': { p13uploadFileCancel(); if(window.ScpTransfer) ScpTransfer.transferEvent('error'); break; }
                 case 'uploadhash': {
                     var file = uploadFile.xfiles[uploadFile.xfilePtr];
                     if (file) {
                         if (cmd.tag.h === cmd.hash) {
                             if (cmd.tag.skip) {
+                                if(window.ScpTransfer) ScpTransfer.transferEvent('fileDone');
                                 p13uploadNextFile();
                             } else {
                                 uploadFile.xptr = cmd.tag.s;

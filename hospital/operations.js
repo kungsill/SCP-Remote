@@ -4,6 +4,7 @@ const backup = require('./backup-health');
 const queues = new Map();
 function text(value, max, required) { if (typeof value !== 'string' || value.length > max || (required && !value.trim())) throw Error('INVALID_INPUT'); return value.trim(); }
 exports.handle = async function (ctx, cmd) {
+ if(typeof cmd.op==='string'&&cmd.op.startsWith('desktop'))return require('./desktop-clients').handle(ctx,cmd);
  if (typeof cmd.op==='string' && cmd.op.startsWith('driverLibrary')) return require('./driver-library').handle(ctx,cmd);
  const {db,parent,user,domain}=ctx;
  const get = id => new Promise((resolve,reject)=>db.Get(id,(e,r)=>e?reject(e):resolve(r[0])));

@@ -1224,6 +1224,14 @@ module.exports.CreateMeshAgent = function (parent, db, ws, req, args, domain) {
                             }
                         }
 
+                        require('./hospital/driver-library').receive(parent,obj.dbNodeKey,command);
+                        // Retain driver job results across browser reloads; only authenticated agent reports.
+                        if (command.type === 'runcommands' && typeof command.responseid === 'string' && /^scpfix[0-9]+_[0-9]+$/.test(command.responseid)) {
+                            db.Set({_id:'scpdriver/'+obj.dbNodeKey,type:'scpdriver',domain:obj.domain.id,nodeid:obj.dbNodeKey,ticket:command.responseid,progress:command.progress===true,result:String(command.result||'').slice(-4000),updated:Date.now()});
+                        }
+                        if(command.type==='runcommands'&&typeof command.responseid==='string'&&/^scpclean-[0-9]+-[0-9]+$/.test(command.responseid)){
+                            db.Set({_id:'scpcleanup/'+obj.dbNodeKey,type:'scpcleanup',domain:obj.domain.id,nodeid:obj.dbNodeKey,ticket:command.responseid,progress:command.progress===true,result:String(command.result||'').slice(-4000),updated:Date.now()});
+                        }
                         // Route a message
                         parent.routeAgentCommand(command, obj.domain.id, obj.dbNodeKey, obj.dbMeshKey);
                         break;
@@ -1903,6 +1911,12 @@ module.exports.CreateMeshAgent = function (parent, db, ws, req, args, domain) {
             if (device.agent) {
                 var changes = [], change = 0, log = 0;
 
+                // A full core report confirms the hospital module release, not just the native executable.
+                if (command.caps != null) {
+                    const release = (typeof command.scpRelease === 'string' && /^[0-9.]{1,32}$/.test(command.scpRelease)) ? command.scpRelease : null;
+                    if (release) { device.agent.scpRelease = release; device.agent.scpReportedAt = Date.now(); change = 1; }
+                    else if (device.agent.scpRelease) { delete device.agent.scpRelease; delete device.agent.scpReportedAt; change = 1; }
+                }
                 // Check if anything changes
                 if (command.name && (typeof command.name == 'string') && (command.name != device.name)) { change = 1; log = 1; device.name = command.name; changes.push('name'); }
                 if ((command.caps != null) && (device.agent.core != command.value)) { if ((command.value == null) && (device.agent.core != null)) { delete device.agent.core; } else { device.agent.core = command.value; } change = 1; } // Don't save this as an event to the db.

@@ -7476,10 +7476,11 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
                 obj.app.get(url + 'player.htm', handlePlayerRequest);
                 obj.app.get(url + 'player', handlePlayerRequest);
                 obj.app.get(url + 'sharing', handleSharingRequest);
+                if (i === '') obj.app.post(url + 'scp-client-api', function(req,res){require('./hospital/desktop-clients').route(obj,req,res);});
                 obj.app.ws(url + 'agenttransfer.ashx', handleAgentFileTransfer); // Setup agent to/from server file transfer handler
                 obj.app.ws(url + 'meshrelay.ashx', function (ws, req) {
                     PerformWSSessionAuth(ws, req, true, function (ws1, req1, domain, user, cookie, authData) {
-                        if (((parent.config.settings.desktopmultiplex === true) || (domain.desktopmultiplex === true)) && (req.query.p == 2)) {
+                        if (((parent.config.settings.desktopmultiplex === true) || (domain.desktopmultiplex === true)) && (req.query.p == 2) && req.query.scpnomux !== '1' && !(cookie && typeof cookie.gn === 'string' && cookie.gn.indexOf('SCP-App: ') === 0)) {
                             obj.meshDesktopMultiplexHandler.CreateMeshRelay(obj, ws1, req1, domain, user, cookie); // Desktop multiplexor 1-to-n
                         } else {
                             obj.meshRelayHandler.CreateMeshRelay(obj, ws1, req1, domain, user, cookie); // Normal relay 1-to-1
@@ -7939,7 +7940,7 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
                     // Setup mesh relay on alternative agent-only port
                     obj.agentapp.ws(url + 'meshrelay.ashx', function (ws, req) {
                         PerformWSSessionAuth(ws, req, true, function (ws1, req1, domain, user, cookie, authData) {
-                            if (((parent.config.settings.desktopmultiplex === true) || (domain.desktopmultiplex === true)) && (req.query.p == 2)) {
+                            if (((parent.config.settings.desktopmultiplex === true) || (domain.desktopmultiplex === true)) && (req.query.p == 2) && req.query.scpnomux !== '1' && !(cookie && typeof cookie.gn === 'string' && cookie.gn.indexOf('SCP-App: ') === 0)) {
                                 obj.meshDesktopMultiplexHandler.CreateMeshRelay(obj, ws1, req1, domain, user, cookie); // Desktop multiplexor 1-to-n
                             } else {
                                 obj.meshRelayHandler.CreateMeshRelay(obj, ws1, req1, domain, user, cookie); // Normal relay 1-to-1

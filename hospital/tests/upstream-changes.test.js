@@ -23,6 +23,7 @@ const ours = [
 // individually; they are matched by the pattern below.
 const recorded = new Set([
     'meshuser.js', 'webserver.js', 'meshagent.js', 'meshdesktopmultiplex.js', 'meshcentral.js',
+    'meshrelay.js',
     path.join('agents', 'meshcore.js'),
     path.join('public', 'scripts', 'agent-redir-ws-0.1.1.js'),
     path.join('views', 'default.handlebars'),

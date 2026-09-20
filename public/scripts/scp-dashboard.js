@@ -167,6 +167,7 @@
     var staleSignatureDays = 7;
     var longUptimeDays = 14;
 
+    var activeView = 'overview', attentionExpanded = false;
     var panel, body, scanState = {}, pending = null, timer = null;
 
     /* Driver installs in flight, keyed by the id we sent with the command so a reply can
@@ -462,8 +463,9 @@
         if (!flagged.length) { panelEl.className += ' scp-dash-attention-clear'; return panelEl; }
 
         var rows = element('div', 'scp-dash-attention-rows');
-        flagged.forEach(function (entry) {
+        flagged.forEach(function (entry, index) {
             var row = element('div', 'scp-dash-attention-row scp-dash-attention-' + entry.worst);
+            row.hidden = !attentionExpanded && index >= 5;
             var who = element('div', 'scp-dash-attention-who');
             who.appendChild(element('strong', '', entry.node.name || ''));
             who.appendChild(element('small', '', roomOf(entry.node)));
@@ -478,8 +480,9 @@
             var state = fixing[entry.node._id];
             if (state) {
                 what.appendChild(element('span', 'scp-dash-fix-state scp-dash-fix-' + state.state,
-                    (state.state === 'working') ? (state.text || t('fixWorking')) : state.text));
+                    state.text || t('fixWorking')));
             }
+            if(state&&state.progress&&window.ScpProgress)what.appendChild(ScpProgress.view(state.progress,'driver',state.started));
             var buttons = element('div', 'scp-dash-attention-buttons');
             // Only offered where it is the right tool: a computer with a driver Windows
             // cannot start. It is never offered as a general fix for anything else wrong.
@@ -494,6 +497,7 @@
             rows.appendChild(row);
         });
         panelEl.appendChild(rows);
+        if (flagged.length > 5) panelEl.appendChild(button(attentionExpanded ? (thai ? 'ย่อรายการ' : 'Show less') : (thai ? 'ดูทั้งหมด ' + flagged.length + ' เครื่อง' : 'View all ' + flagged.length + ' devices'), 'scp-dash-expand', function () { attentionExpanded = !attentionExpanded; render(); }));
         return panelEl;
     }
 
@@ -535,6 +539,9 @@
         var cell = element('div', 'scp-dash-actions');
         cell.appendChild(button(t('remote'), 'scp-dash-go', function () { openRemote(node); }));
         cell.appendChild(button(t('scan'), 'scp-dash-scan', function () { scan(node); }));
+        if (window.ScpMonitor) cell.appendChild(button(document.documentElement.lang==='th'?'สถานะเครื่อง / Task Manager':'Monitor / Task Manager','scp-dash-scan',function(){window.ScpMonitor.open(node);}));
+        if (window.ScpCleanup) cell.appendChild(window.ScpCleanup.control(node));
+        if (fixing[node._id]) { cell.appendChild(element('small', 'scp-dash-note', fixing[node._id].text || t('fixWorking'))); if(window.ScpProgress&&fixing[node._id].progress)cell.appendChild(ScpProgress.view(fixing[node._id].progress,'driver')); }
         cell.appendChild(button(t('shutdown'), 'scp-dash-off', function () {
             if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
             if (!window.confirm(t('confirmOff') + '\n\n' + node.name)) return;
@@ -599,8 +606,11 @@
                     timelines[message.nodeid] = message.timeline || [];
                     render();
                 } else if (message && (message.action === 'msg') && (message.type === 'runcommands')
-                    && message.nodeid && fixing[message.nodeid]) {
-                    readDriverReply(message.nodeid, message.result);
+                    && message.nodeid && fixing[message.nodeid] && message.responseid === fixing[message.nodeid].ticket) {
+                    if(message.progress === true) readDriverProgress(message.nodeid, message.result);
+                    else readDriverReply(message.nodeid, message.result);
+                } else if (message && message.action === 'runcommands' && message.result !== 'OK') {
+                    Object.keys(fixing).forEach(function(id){ if(fixing[id].ticket === message.responseid) readDriverReply(id, 'FAILED ' + String(message.result)); });
                 } else if (message && (message.action === 'event') && message.event
                     && (message.event.action === 'nodeconnect') && message.event.nodeid && (message.event.conn & 1)) {
                     // A computer that has just come back may have restarted since it was last
@@ -902,23 +912,36 @@
        the decision to a person who knows what the computer is being used for. */
     var driverScript = [
         "$ProgressPreference='SilentlyContinue'; $out=@()",
-        // The re-scan stalls on exactly the computers this is aimed at -- the ones with a
-        // device Windows cannot start. Left unbounded it holds the whole job before a word
-        // has been reported, and the panel has nothing to show but silence.
+        "Write-Output 'SCP_DRIVER_STAGE:rescan'",
         "try {",
         "  $rescan = Start-Process -FilePath \"$env:windir\\System32\\pnputil.exe\" -ArgumentList '/scan-devices' -PassThru -WindowStyle Hidden",
         "  if ($rescan.WaitForExit(180000)) { $out += 'rescan ok' } else { $rescan.Kill(); $out += 'rescan timed out' }",
         "} catch { $out += 'rescan failed' }",
         "try {",
+        "  Write-Output 'SCP_DRIVER_STAGE:search'",
         "  $s = New-Object -ComObject Microsoft.Update.Session",
         "  $r = $s.CreateUpdateSearcher().Search(\"IsInstalled=0 and Type='Driver'\")",
         "  if ($r.Updates.Count -eq 0) { $out += 'NODRIVERS' } else {",
         "    $c = New-Object -ComObject Microsoft.Update.UpdateColl",
         "    foreach ($u in $r.Updates) { if (-not $u.EulaAccepted) { $u.AcceptEula() }; $null = $c.Add($u) }",
-        "    $d = $s.CreateUpdateDownloader(); $d.Updates = $c; $null = $d.Download()",
-        "    $i = $s.CreateUpdateInstaller(); $i.Updates = $c; $res = $i.Install()",
+        "    Write-Output 'SCP_DRIVER_STAGE:download'",
+        "    for ($k=0; $k -lt $c.Count; $k++) {",
+        "      Write-Output ('SCP_DRIVER_PROGRESS:' + (@{stage='download';done=$k;total=$c.Count}|ConvertTo-Json -Compress))",
+        "      $one=New-Object -ComObject Microsoft.Update.UpdateColl; $null=$one.Add($c.Item($k)); $d=$s.CreateUpdateDownloader();$d.Updates=$one;$download=$d.Download()",
+        "      if ($download.ResultCode -ne 2) { throw ('Download result code ' + $download.ResultCode) }",
+        "      Write-Output ('SCP_DRIVER_PROGRESS:' + (@{stage='download';done=($k+1);total=$c.Count}|ConvertTo-Json -Compress))",
+        "    }",
+        "    Write-Output 'SCP_DRIVER_STAGE:install'",
+        "    $needsReboot=$false",
+        "    for ($k=0; $k -lt $c.Count; $k++) {",
+        "      Write-Output ('SCP_DRIVER_PROGRESS:' + (@{stage='install';done=$k;total=$c.Count}|ConvertTo-Json -Compress))",
+        "      $one=New-Object -ComObject Microsoft.Update.UpdateColl;$null=$one.Add($c.Item($k));$i=$s.CreateUpdateInstaller();$i.Updates=$one;$res=$i.Install()",
+        "      if ($res.ResultCode -ne 2) { throw ('Install result code ' + $res.ResultCode) }",
+        "      if($res.RebootRequired){$needsReboot=$true}",
+        "      Write-Output ('SCP_DRIVER_PROGRESS:' + (@{stage='install';done=($k+1);total=$c.Count}|ConvertTo-Json -Compress))",
+        "    }",
         "    $out += ('installed ' + $c.Count + ' driver(s)')",
-        "    if ($res.RebootRequired) { $out += 'REBOOT' }",
+        "    if ($needsReboot) { $out += 'REBOOT' }",
         "  }",
         "} catch { $out += ('FAILED ' + $_.Exception.Message) }",
         "$out -join ' | '"
@@ -935,7 +958,7 @@
         render();
     }
     function fixDrivers(nodes) {
-        var targets = nodes.filter(isOnline);
+        var targets = nodes.filter(function(node){return isOnline(node) && (!fixing[node._id] || fixing[node._id].state !== 'working');});
         var asleep = nodes.filter(function (node) { return !isOnline(node); });
         if (asleep.length && !targets.length) { window.alert(format(t('fixOffline'), asleep[0].name || '')); return; }
         if (!targets.length) return;
@@ -944,9 +967,9 @@
         if (!window.confirm(format(t('fixAsk'), who))) return;
 
         var ticket = 'scpfix' + (++fixTicket) + '_' + Date.now();
-        // Until the far end says something, the only true thing to report is that we asked.
-        // Saying it is installing makes a command that never arrived look like work.
-        targets.forEach(function (node) { fixing[node._id] = { state: 'working', ticket: ticket, text: t('fixAwaiting') }; });
+        // Until the computer says something, the only true thing to report is that we asked.
+        // Showing a stage here made a command that never arrived look like work in progress.
+        targets.forEach(function (node) { fixing[node._id] = { state: 'working', ticket: ticket, text: t('fixAwaiting'), progress: null, started: Date.now() }; });
         render();
         try {
             window.meshserver.send({
@@ -974,7 +997,7 @@
             targets.forEach(function (node) {
                 var state = fixing[node._id];
                 if (state && (state.ticket === ticket) && (state.state === 'working')) {
-                    fixing[node._id] = { state: 'failed', text: t('fixTimeout') };
+                    fixing[node._id] = { state: 'unknown', ticket: state.ticket, progress:state.progress, text: t('fixTimeout') };
                     changed = true;
                 }
             });
@@ -982,13 +1005,43 @@
         }, 900000);
     }
 
+    function readDriverProgress(nodeid, result) {
+        var report=null;try{var json=String(result).match(/SCP_DRIVER_PROGRESS:(\{[^\r\n]*\})/);if(json)report=JSON.parse(json[1]);}catch(e){}
+        var match=report?[null,report.stage]:String(result).match(/SCP_DRIVER_STAGE:(rescan|search|download|install)/);if(!match||!['rescan','search','download','install'].includes(match[1]))return;
+        if(window.ScpProgress)fixing[nodeid].progress=ScpProgress.model(match[1],report&&report.done,report&&report.total);
+        var labels={rescan:['Re-scanning the computer\u2019s own devices…','กำลังสแกนอุปกรณ์ในเครื่อง…'],search:['Searching Windows Update…','กำลังค้นหาไดรเวอร์จาก Windows Update…'],download:['Downloading drivers…','กำลังดาวน์โหลดไดรเวอร์…'],install:['Installing drivers…','กำลังติดตั้งไดรเวอร์…']};
+        fixing[nodeid].state='working';if(!fixing[nodeid].started)fixing[nodeid].started=Date.now();fixing[nodeid].text=labels[match[1]][document.documentElement.lang==='th'?1:0];render();
+        var ticket=fixing[nodeid].ticket;window.setTimeout(function(){var job=fixing[nodeid];if(job&&job.ticket===ticket&&job.state==='working'){job.state='unknown';job.text=t('fixTimeout');render();}},900000);
+    }
+    var driverStatusLoading=false;
+    function loadDriverStatus() {
+        if(window.ScpCleanup)window.ScpCleanup.refresh();
+        if(driverStatusLoading||!window.ScpOperations)return;
+        driverStatusLoading=true;
+        window.ScpOperations.request('driverStatus').then(function(rows){rows.forEach(function(row){
+            var previous=fixing[row.nodeid];if(previous&&previous.ticket!==row.ticket)return;
+            if(previous&&previous.reportedAt>=row.updated)return;
+            if(!previous)fixing[row.nodeid]={ticket:row.ticket};
+            if(row.progress){
+                if(Date.now()-row.updated>900000){fixing[row.nodeid]={ticket:row.ticket,state:'unknown',text:t('fixTimeout')};}
+                else readDriverProgress(row.nodeid,row.result);
+            }else readDriverReply(row.nodeid,row.result);
+            fixing[row.nodeid].reportedAt=row.updated;
+        });render();}).catch(function(){}).then(function(){driverStatusLoading=false;});
+    }
     // Turn what the far machine printed into one plain sentence.
     function readDriverReply(nodeid, result) {
-        var text = String(result == null ? '' : result);
-        if (/FAILED/.test(text)) { fixing[nodeid] = { state: 'failed', text: format(t('fixFailed'), text.split('FAILED')[1].trim().substring(0, 120)) }; }
+        var ticket = fixing[nodeid] && fixing[nodeid].ticket;
+        var progress = fixing[nodeid] && fixing[nodeid].progress;
+        var text = String(result == null ? '' : result).replace(/SCP_DRIVER_STAGE:(rescan|search|download|install)|SCP_DRIVER_PROGRESS:\{[^\r\n]*\}/g, '').trim();
+        if (/COMMAND_BUSY/.test(text)) { fixing[nodeid] = {state:'failed', text:document.documentElement.lang==='th'?'เครื่องลูกกำลังทำคำสั่งอื่น จึงยังไม่ได้เริ่มติดตั้งไดรเวอร์':'The remote computer is busy; driver installation was not started'}; }
+        else if (/FAILED/.test(text)) { fixing[nodeid] = { state: 'failed', text: format(t('fixFailed'), text.split('FAILED')[1].trim().substring(0, 120)) }; }
         else if (/REBOOT/.test(text)) { fixing[nodeid] = { state: 'reboot', text: t('fixReboot') }; }
         else if (/NODRIVERS/.test(text)) { fixing[nodeid] = { state: 'done', text: t('fixNothing') }; }
-        else { fixing[nodeid] = { state: 'done', text: format(t('fixDone'), text.substring(0, 120)) }; }
+        else if (/installed [0-9]+ driver/.test(text)) { fixing[nodeid] = { state: 'done', text: format(t('fixDone'), text.substring(0, 120)) }; }
+        else { fixing[nodeid] = { state: 'unknown', text: document.documentElement.lang === 'th' ? 'ได้รับคำตอบ แต่ยังยืนยันผลติดตั้งไม่ได้' : 'Reply received, but installation is not confirmed' }; }
+        fixing[nodeid].ticket = ticket;
+        if(window.ScpProgress)fixing[nodeid].progress=['done','reboot'].includes(fixing[nodeid].state)?ScpProgress.model('summarizing',null,null,true):progress;
         // What the agent reported a moment ago is now out of date; ask again so the fault
         // disappears from the panel on its own once it is really gone.
         specsAsked[nodeid] = false;
@@ -1138,6 +1191,7 @@
     }
     function setLive(on) {
         liveOn = (on === true) && liveSupported();
+        if (liveOn) activeView = 'devices';
         if (!liveOn) stopAllTiles();
         updateLiveControls();
         render();
@@ -1168,6 +1222,10 @@
         label.appendChild(element('strong', '', node.name || node.rname || ''));
         var meta = [node.host || node.ip || '', (node.osdesc || '').replace('Microsoft ', '')].filter(Boolean).join(' · ');
         label.appendChild(element('small', '', meta));
+        // Only when it needs saying: up to date, or offline and therefore stale, is what
+        // the reader already assumes, and the status column says the offline part again.
+        var release = window.ScpConnection ? window.ScpConnection.releaseBadge(node, true) : null;
+        if (release) { label.appendChild(release); }
         var line = specLine(node);
         if (line) { label.appendChild(element('small', 'scp-dash-specs', line)); }
         name.appendChild(label);
@@ -1203,6 +1261,7 @@
         if (!body || panel.hidden) return;
         // This redraws every ten seconds. Without keeping the scroll position, anyone
         // reading a room further down the page is thrown back to the top each time.
+        var libraryButton=document.getElementById('scpDriverLibraryButton');if(libraryButton)libraryButton.hidden=!(window.userinfo&&window.userinfo.siteadmin===4294967295);
         var scrollTop = panel.scrollTop;
         body.textContent = '';
         liveSkipped = 0;
@@ -1258,14 +1317,57 @@
         stats.appendChild(stat(t('offline'), list.length - online.length, 'off'));
         stats.appendChild(stat(t('risky'), needing.length, needing.length ? 'risk' : 'ok'));
         body.appendChild(stats);
-        body.appendChild(attentionPanel(list));
-        body.appendChild(usageRanking(rooms, shownRooms));
+        var tabs = element('nav', 'scp-dash-tabs');
+        tabs.setAttribute('aria-label', thai ? 'มุมมองแดชบอร์ด' : 'Dashboard views');
+        var sections = {};
+        [['overview','ภาพรวม','Overview'],['devices','เครื่องทั้งหมด','Devices'],['jobs','สถานะงาน','Jobs'],['reports','รายงาน','Reports']].forEach(function (entry) {
+            var tab = button(entry[thai ? 1 : 2], 'scp-dash-tab', function () {
+                activeView = entry[0];
+                if (activeView !== 'devices' && liveOn) { liveOn = false; stopAllTiles(); updateLiveControls(); }
+                render();
+            });
+            tab.setAttribute('aria-pressed', String(activeView === entry[0]));
+            tab.setAttribute('aria-controls', 'scp-dash-view-' + entry[0]);
+            tabs.appendChild(tab);
+            var section = element('section', 'scp-dash-view');
+            section.id = 'scp-dash-view-' + entry[0]; section.hidden = activeView !== entry[0];
+            sections[entry[0]] = section;
+        });
+        body.appendChild(tabs);
+        Object.keys(sections).forEach(function (key) { body.appendChild(sections[key]); });
+        var overview = element('div', 'scp-dash-overview-grid');
+        var fleet = element('section', 'scp-dash-fleet');
+        fleet.appendChild(element('h3', '', thai ? 'ความพร้อมของเครื่อง' : 'Device availability'));
+        var pct = list.length ? Math.round(online.length / list.length * 100) : 0;
+        var ring = element('div', 'scp-dash-ring');
+        ring.style.setProperty('--online', pct + '%');
+        ring.setAttribute('role', 'img'); ring.setAttribute('aria-label', t('online') + ' ' + pct + '%');
+        var center = element('div', 'scp-dash-ring-center');
+        center.appendChild(element('strong', '', pct + '%')); center.appendChild(element('span', '', t('online'))); ring.appendChild(center); fleet.appendChild(ring);
+        fleet.appendChild(element('p', '', t('online') + ' ' + online.length + ' / ' + list.length + ' ' + t('devices')));
+        fleet.appendChild(element('small', '', thai ? 'เลือกเครื่องเพื่อดู CPU, RAM และโปรเซสแบบสด' : 'Select a device for live CPU, RAM and processes'));
+        fleet.appendChild(button(thai ? 'ดูสถานะเครื่อง / Task Manager' : 'Monitor / Task Manager', 'scp-dash-refresh', function () { if(window.ScpMonitor) window.ScpMonitor.open(); }));
+        overview.appendChild(fleet); overview.appendChild(attentionPanel(list)); sections.overview.appendChild(overview);
+        var jobs = list.filter(function (node) { return !!fixing[node._id]; });
+        sections.jobs.appendChild(element('h3', '', thai ? 'สถานะงานไดรเวอร์ล่าสุด' : 'Latest driver jobs'));
+        var jobGrid = element('div', 'scp-dash-job-grid');
+        jobs.forEach(function (node) {
+            var state = fixing[node._id], card = element('article', 'scp-dash-job-card');
+            card.appendChild(element('strong', '', node.name)); card.appendChild(element('small', 'scp-dash-note', roomOf(node)));
+            card.appendChild(element('p', 'scp-dash-job-message', state.text || t('fixWorking')));
+            if (window.ScpProgress && state.progress) card.appendChild(ScpProgress.view(state.progress, 'driver', state.started));
+            jobGrid.appendChild(card);
+        });
+        sections.jobs.appendChild(jobGrid);
+        if (!jobs.length) sections.jobs.appendChild(element('div', 'scp-dash-empty', thai ? 'ยังไม่มีงานไดรเวอร์ในรายการที่เลือก' : 'No driver jobs for the selected devices'));
+        if(window.ScpMonitor) sections.reports.appendChild(window.ScpMonitor.overview());
+        sections.reports.appendChild(usageRanking(rooms, shownRooms));
 
         // Filled in at the end of this pass, once the rows are built and it is known
         // whether the screen cap was reached.
         liveNote = element('div', 'scp-dash-live-note');
         liveNote.hidden = true;
-        body.appendChild(liveNote);
+        sections.devices.appendChild(liveNote);
 
         if (searchText && !list.length) {
             body.appendChild(element('div', 'scp-dash-empty', format(t('searchNone'), searchText)));
@@ -1297,7 +1399,7 @@
             } else {
                 section.appendChild(element('div', 'scp-dash-empty-room', t('roomEmpty')));
             }
-            body.appendChild(section);
+            sections.devices.appendChild(section);
         });
         liveNote.hidden = (liveSkipped === 0);
         liveNote.textContent = liveSkipped ? format(t('liveFull'), liveLimit) : '';
@@ -1326,9 +1428,10 @@
         });
         panel.hidden = false;
         listen();
+        loadDriverStatus();
         render();
         fitHeight();
-        if (!timer) timer = window.setInterval(render, 10000);
+        if (!timer) timer = window.setInterval(function(){loadDriverStatus();render();}, 10000);
     }
     function hide() {
         if (!panel || panel.hidden) return;
@@ -1344,6 +1447,7 @@
     }
 
     function init() {
+        if (panel) return;
         var bar = document.getElementById('page_leftbar');
         var devices = document.getElementById('p1');
         if (!bar || !devices) return;
@@ -1381,10 +1485,8 @@
         actions.appendChild(button(t('exportCsv'), 'scp-dash-refresh', exportInventory));
         actions.appendChild(button(t('exportUsage'), 'scp-dash-refresh', exportUsage));
         actions.appendChild(button(t('refresh'), 'scp-dash-refresh', render));
-        actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { if (window.ScpOperations) ScpOperations.open(); }));
-        // The library spends the hospital's disk and reaches every ward, so it is offered
-        // only to the account that already answers for the whole server.
-        if (window.userinfo && window.userinfo.siteadmin === 4294967295) { actions.appendChild(button(document.documentElement.lang === 'th' ? 'คลังไดรเวอร์' : 'Driver library', 'scp-dash-refresh', function () { if (window.ScpOperations) ScpOperations.openLibrary(); })); }
+        actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));
+        var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);
         heading.appendChild(actions);
         liveHint = element('p', 'scp-dash-live-hint');
         heading.appendChild(liveHint);
@@ -1395,7 +1497,7 @@
         find.className = 'scp-dash-search';
         find.placeholder = t('search');
         find.setAttribute('aria-label', t('search'));
-        find.addEventListener('input', function () { searchText = find.value.trim().toLowerCase(); render(); });
+        find.addEventListener('input', function () { searchText = find.value.trim().toLowerCase(); if (searchText) activeView = 'devices'; render(); });
         heading.appendChild(find);
         updateLiveControls();
         panel.appendChild(heading);

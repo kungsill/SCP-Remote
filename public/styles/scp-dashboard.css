@@ -171,6 +171,52 @@
   .scp-dash-attention-row { grid-template-columns: 1fr; }
   .scp-dash-fix-all { margin-left: 0; }
 }
+/* Compact dashboard: overview first, detailed workspaces on demand. */
+.scp-dash { background:var(--scp-bg); padding:0 24px 28px; }
+.scp-dash-heading { display:grid; grid-template-columns:1fr auto; gap:6px 24px; padding:24px 0 18px; }
+.scp-dash-heading .scp-eyebrow,.scp-dash-heading h2,.scp-dash-heading>p { grid-column:1; }
+.scp-dash-heading h2 { margin:0; font-size:25px; letter-spacing:-.5px; }
+.scp-dash-heading-actions { position:static; grid-column:2; grid-row:1 / 5; max-width:540px; align-content:center; justify-content:flex-end; }
+.scp-dash-heading .scp-dash-search { grid-column:1 / -1; margin-top:4px; max-width:none; box-sizing:border-box; }
+.scp-dash-heading p.scp-dash-live-hint:empty { display:none; }
+.scp-dash-stats { gap:12px; margin-bottom:18px; }
+.scp-dash-stat { position:relative; display:block; padding:16px 18px; border-radius:16px; box-shadow:0 5px 16px #143c4710; overflow:hidden; }
+.scp-dash-stat:before { content:''; position:absolute; top:0; left:18px; width:28px; height:3px; background:var(--scp-accent); border-radius:0 0 3px 3px; }
+.scp-dash-stat-value { font-size:30px; letter-spacing:-1px; }
+.scp-dash-tabs { display:flex; gap:4px; padding:5px; width:fit-content; max-width:100%; box-sizing:border-box; background:var(--scp-soft); border:1px solid var(--scp-line); border-radius:12px; margin:0 0 18px; }
+.scp-dash-tab { font:inherit; font-size:13px; padding:9px 22px; border:0; border-radius:8px; background:transparent; color:var(--scp-muted); cursor:pointer; }
+.scp-dash-tab[aria-pressed=true] { background:var(--scp-surface); color:var(--scp-accent); font-weight:600; box-shadow:0 2px 7px #143c471c; }
+.scp-dash-view[hidden],.scp-dash-attention-row[hidden] { display:none !important; }
+.scp-dash-overview-grid { display:grid; grid-template-columns:280px minmax(0,1fr); gap:18px; align-items:start; }
+.scp-dash-fleet,.scp-dash-attention,.scp-dash-job-card,.scp-dash-room,.scp-dash-rank { border:1px solid var(--scp-line); border-radius:16px; background:var(--scp-surface); box-shadow:0 6px 22px #143c4710; }
+.scp-dash-fleet { padding:22px; text-align:center; }
+.scp-dash-fleet h3 { font-size:15px; margin:0 0 20px; text-align:left; }
+.scp-dash-ring { width:164px; height:164px; margin:0 auto 18px; padding:13px; box-sizing:border-box; border-radius:50%; background:conic-gradient(var(--scp-accent) var(--online),var(--scp-soft) 0); box-shadow:0 5px 20px #087f8315; }
+.scp-dash-ring-center { background:var(--scp-surface); height:100%; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.scp-dash-ring strong { font-size:34px; line-height:1.3; letter-spacing:-1px; }.scp-dash-ring span { font-size:12px; color:var(--scp-muted); }
+.scp-dash-fleet p { font-size:13px; margin:8px 0; }.scp-dash-fleet small { display:block; font-size:12px; line-height:1.7; color:var(--scp-muted); margin-bottom:16px; }
+.scp-dash-fleet button { width:100%; font:inherit; font-size:12px; }
+.scp-dash-attention { padding:20px; margin:0 0 18px; }
+.scp-dash-attention-head { align-items:center; gap:8px; }.scp-dash-attention-head h3 { font-size:15px; }
+.scp-dash-attention-row { grid-template-columns:minmax(110px,.65fr) minmax(0,2fr) auto; background:var(--scp-bg); border:1px solid var(--scp-line); border-left-width:3px; padding:12px; align-items:start; }
+.scp-dash-attention-what { align-items:flex-start; align-content:flex-start; min-width:0; }
+.scp-dash-flag,.scp-dash-fix-state { display:inline-block; align-self:flex-start; height:auto; box-sizing:border-box; border-radius:6px; line-height:1.6; }
+.scp-dash-attention-what>.scp-job-progress { flex-basis:100%; }
+.scp-dash-attention-buttons { flex-wrap:wrap; justify-content:flex-end; max-width:115px; }
+.scp-dash-attention button,.scp-dash-expand { font:inherit; font-size:12px; border:1px solid var(--scp-line); color:var(--scp-ink); background:var(--scp-surface); padding:6px 10px; border-radius:8px; cursor:pointer; }
+.scp-dash-attention button:hover { border-color:var(--scp-accent); color:var(--scp-accent); }
+.scp-dash-expand { width:100%; margin-top:12px; }
+.scp-dash-job-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+.scp-dash-job-card { padding:20px; }.scp-dash-job-card>small { display:block; margin-top:4px; }.scp-dash-job-message { font-size:12px; line-height:1.7; }
+.scp-dash-job-card .scp-job-progress { max-width:none; }.scp-dash-room { margin-bottom:18px; }
+.scp-dash-room-head { background:var(--scp-soft); }.scp-dash-row:not(.scp-dash-head):hover { background:var(--scp-bg); }
+.scp-dash-view .scp-monitor-overview { margin-top:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px 24px; }
+.scp-dash-view .scp-monitor-overview>h3,.scp-dash-view .scp-monitor-overview>h4 { grid-column:1 / -1; margin:0; }
+.scp-dash-view .scp-monitor-overview>button { grid-column:1 / -1; justify-self:start; }
+.scp-dash button:focus-visible { outline:2px solid var(--scp-accent); outline-offset:3px; }
+@media(max-width:1150px) { .scp-dash-heading { display:block; }.scp-dash-heading-actions { max-width:none; justify-content:flex-start; margin:14px 0; }.scp-dash-overview-grid { grid-template-columns:230px minmax(0,1fr); }.scp-dash-attention-row { grid-template-columns:1fr auto; }.scp-dash-attention-what { grid-column:1 / -1; grid-row:2; } }
+@media(max-width:760px) { .scp-dash { padding:0 12px 24px; }.scp-dash-overview-grid { grid-template-columns:1fr; }.scp-dash-stats { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }.scp-dash-stat { padding:14px 10px; }.scp-dash-stat-value { font-size:25px; }.scp-dash-tab { padding:9px 12px; }.scp-dash-tabs { width:100%; justify-content:space-between; }.scp-dash-view .scp-monitor-overview { grid-template-columns:1fr; }.scp-dash-fleet { display:none; } }
+.scp-dash-attention-what>.scp-job-progress { flex:1 0 100%; max-width:none; }
 #scpPrograms{max-width:760px;width:92vw;border:none;border-radius:14px;padding:20px}
 #scpPrograms header{display:flex;justify-content:space-between;align-items:center;gap:12px}
 #scpPrograms input[type=search]{width:100%;margin:10px 0;padding:8px}

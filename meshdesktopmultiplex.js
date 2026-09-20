@@ -1135,6 +1135,7 @@ function CreateMeshRelayEx2(parent, ws, req, domain, user, cookie) {
                     if ((command.rights != 0xFFFFFFFF) && ((command.rights & 0x100) != 0)) { command.rights -= 0x100; } // Since the multiplexor will enforce view-only, remove MESHRIGHT_REMOTEVIEWONLY
                     if (typeof command.consent == 'number') { command.consent = command.consent | mesh.consent; } else { command.consent = mesh.consent; } // Add user consent
                     if (typeof domain.userconsentflags == 'number') { command.consent |= domain.userconsentflags; } // Add server required consent flags
+                    require('./hospital/consent-policy').apply(command, domain, user);
                     if (user != null) {
                         command.username = user.name;       // Add user name
                         command.realname = user.realname;   // Add real name
@@ -1157,6 +1158,7 @@ function CreateMeshRelayEx2(parent, ws, req, domain, user, cookie) {
                         if ((command.rights != 0xFFFFFFFF) && ((command.rights & 0x00000100) != 0)) { command.rights -= 0x00000100; } // Since the multiplexor will enforce view-only, remove MESHRIGHT_REMOTEVIEWONLY
                         if (typeof command.consent == 'number') { command.consent = command.consent | mesh.consent; } else { command.consent = mesh.consent; } // Add user consent
                         if (typeof domain.userconsentflags == 'number') { command.consent |= domain.userconsentflags; } // Add server required consent flags
+                        require('./hospital/consent-policy').apply(command, domain, user);
                         if (user != null) {
                             command.username = user.name;           // Add user name
                             command.realname = user.realname;       // Add real name

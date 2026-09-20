@@ -675,7 +675,18 @@ function create(title, caption, username, options)
 
     ret._ipc = require('child-container').create(ret.options);
     ret._ipc.master = ret;
-    ret._ipc.once('exit', function () { console.info1('user consent child exited'); });
+    ret._settled = false;
+    ret._finish = function (accepted, value) {
+        if (this._settled) return;
+        this._settled = true;
+        clearTimeout(this._watchdog);
+        if (accepted) this.resolve(value); else this.reject(value);
+    };
+    ret._watchdog = setTimeout(function () {
+        ret._finish(false, 'CONSENT_RESPONSE_TIMEOUT');
+        try { ret._ipc.exit(); } catch (e) { }
+    }, Math.max(1000, typeof options.timeout === 'number' ? options.timeout : 60000) + 15000);
+    ret._ipc.once('exit', function () { this.master._finish(false, 'CONSENT_WINDOW_CLOSED'); });
     ret._ipc.on('ready', function ()
     {
         this.descriptorMetadata = 'win-scp-userconsent';
@@ -688,10 +699,12 @@ function create(title, caption, username, options)
             switch (msg.command)
             {
                 case 'allow':
-                    this.master.resolve(msg.always);
+                    try { this.message({ command: 'dialog-result-received' }); } catch (e) { }
+                    this.master._finish(true, msg.always === true);
                     break;
                 case 'deny':
-                    this.master.reject(msg.reason);
+                    try { this.message({ command: 'dialog-result-received' }); } catch (e) { }
+                    this.master._finish(false, msg.reason || 'DENIED');
                     break;
                 case 'log':
                     console.log(msg.text);
@@ -706,6 +719,7 @@ function create(title, caption, username, options)
     });
     ret.close = function close()
     {
+        this._finish(false, 'CONSENT_CANCELLED');
         this._ipc.exit();
     }
     return (ret);
@@ -714,21 +728,30 @@ function create(title, caption, username, options)
 function _child()
 {
     global.master = require('child-container');
+    var resultSent = false, exitTimer;
+    function sendResult(result) {
+        if (resultSent) return;
+        resultSent = true;
+        // Keep the IPC alive until the service acknowledges receipt. Immediate _exit
+        // can discard buffered writes and leave the tunnel paused forever.
+        exitTimer = setTimeout(function () { process._exit(); }, 10000);
+        global.master.message(result);
+    }
     global.master.on('message', function (msg)
     {
         switch (msg.command)
         {
+            case 'dialog-result-received':
+                if (resultSent) { clearTimeout(exitTimer); process._exit(); }
+                break;
             case 'dialog':
                 var p = createLocal(msg.title, msg.caption, msg.username, msg.options);
                 p.then(function (always)
                 {
-                    global.master.message({ command: 'allow', always: always });
+                    sendResult({ command: 'allow', always: always });
                 }, function (msg)
                 {
-                    global.master.message({ command: 'deny', reason: msg });
-                }).finally(function (msg)
-                {
-                    process._exit();
+                    sendResult({ command: 'deny', reason: msg });
                 });
                 break;
         }

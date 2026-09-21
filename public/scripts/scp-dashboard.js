@@ -34,6 +34,8 @@
         empty: ['No computers yet. Install the agent on a computer to see it here.', 'ยังไม่มีเครื่องในระบบ ติดตั้งเอเจนต์บนเครื่องลูกแล้วจะขึ้นที่นี่'],
         noUser: ['No one signed in', 'ไม่มีผู้ใช้ล็อกอิน'],
         confirmOff: ['Shut down this computer now?', 'สั่งปิดเครื่องนี้เดี๋ยวนี้หรือไม่?'],
+        restart: ['Restart', 'รีสตาร์ต'],
+        confirmRestart: ['Restart this computer now? Anyone using it will be interrupted.', 'สั่งรีสตาร์ตเครื่องนี้เดี๋ยวนี้หรือไม่? คนที่กำลังใช้อยู่จะถูกขัดจังหวะ'],
         offlineAction: ['This computer is not connected.', 'เครื่องนี้ไม่ได้เชื่อมต่ออยู่'],
         scanning: ['Checking installed programs…', 'กำลังตรวจโปรแกรมที่ติดตั้ง…'],
         scanDone: ['Programs checked', 'ตรวจโปรแกรมแล้ว'],
@@ -547,6 +549,12 @@
             window.ScpServices.open(node);
         }));
         if (fixing[node._id]) { cell.appendChild(element('small', 'scp-dash-note', fixing[node._id].text || t('fixWorking'))); if(window.ScpProgress&&fixing[node._id].progress)cell.appendChild(ScpProgress.view(fixing[node._id].progress,'driver')); }
+        cell.appendChild(button(t('restart'), 'scp-dash-off', function () {
+            if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
+            if (!window.confirm(t('confirmRestart') + '\n\n' + node.name)) return;
+            // 8 is the graceful Restart on the device page's power menu (3 is a hard Reset).
+            try { window.meshserver.send({ action: 'poweraction', nodeids: [node._id], actiontype: 8 }); } catch (error) { /* the list refresh shows the outcome */ }
+        }));
         cell.appendChild(button(t('shutdown'), 'scp-dash-off', function () {
             if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
             if (!window.confirm(t('confirmOff') + '\n\n' + node.name)) return;

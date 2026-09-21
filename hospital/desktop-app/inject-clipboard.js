@@ -7,13 +7,23 @@
  const tr=(th,eng)=>en?eng:th;
  let channel,connecting,serial=0,busy=false,signal;
  const pending=new Map();
- const box=document.createElement('div');box.id='scp-clipboard-status';
- box.style.cssText='position:fixed;z-index:10000;bottom:18px;left:50%;transform:translateX(-50%);max-width:80vw;padding:10px 16px;border:1px solid #bedfe2;border-radius:12px;background:#f7ffff;color:#16434c;box-shadow:0 4px 22px #153c4930;font:13px Sarabun,Segoe UI,sans-serif;display:none';
+ if(!document.getElementById('scp-ui-style')){const st=document.createElement('style');st.id='scp-ui-style';st.textContent=`
+.scp-ui-btn{position:fixed;z-index:2147483000;left:18px;bottom:18px;display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border:0;border-radius:24px;background:linear-gradient(180deg,#0e8ba0,#0b7285);color:#fff;font:600 13px/1 Sarabun,"Segoe UI",system-ui,sans-serif;letter-spacing:.2px;cursor:pointer;box-shadow:0 6px 18px rgba(11,114,133,.38);transition:transform .14s ease,box-shadow .14s ease,filter .14s ease}
+.scp-ui-btn:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(11,114,133,.46);filter:brightness(1.06)}
+.scp-ui-btn:active{transform:translateY(0);box-shadow:0 4px 12px rgba(11,114,133,.4)}
+.scp-ui-status{position:fixed;z-index:2147483000;bottom:20px;left:50%;transform:translateX(-50%);max-width:82vw;display:flex;align-items:center;gap:11px;padding:12px 18px;border:1px solid #cfe8ea;border-radius:14px;background:rgba(255,255,255,.97);color:#14434c;font:13px/1.4 Sarabun,"Segoe UI",system-ui,sans-serif;box-shadow:0 12px 30px rgba(21,60,73,.20);backdrop-filter:blur(6px)}
+.scp-ui-dot{width:9px;height:9px;border-radius:50%;background:#0e8ba0;flex:0 0 auto;animation:scpPulse 1.4s ease-in-out infinite}
+.scp-ui-cancel{margin-left:2px;border:1px solid #bcd9dc;border-radius:9px;background:#fff;color:#0b7285;font:600 12px Sarabun,"Segoe UI",sans-serif;padding:6px 13px;cursor:pointer;transition:background .12s}
+.scp-ui-cancel:hover{background:#eef8f9}
+@keyframes scpPulse{0%,100%{box-shadow:0 0 0 3px rgba(14,139,160,.22)}50%{box-shadow:0 0 0 7px rgba(14,139,160,.06)}}
+`;document.head.appendChild(st);}
+ const box=document.createElement('div');box.id='scp-clipboard-status';box.className='scp-ui-status';box.style.display='none';
  const label=document.createElement('span'),cancel=document.createElement('button');
- cancel.textContent=tr('ยกเลิก','Cancel');cancel.style.cssText='margin-left:12px;border:1px solid #a1c6cc;border-radius:6px;background:white;padding:4px 10px;cursor:pointer';
- cancel.onclick=()=>{if(signal)signal.cancelled=true;closeChannel('CANCELLED');};box.append(label,cancel);document.body.appendChild(box);
+ const dot=document.createElement('span');dot.className='scp-ui-dot';
+ cancel.textContent=tr('ยกเลิก','Cancel');cancel.className='scp-ui-cancel';
+ cancel.onclick=()=>{if(signal)signal.cancelled=true;closeChannel('CANCELLED');};box.append(dot,label,cancel);document.body.appendChild(box);
  let hideTimer;
- function status(text,active){clearTimeout(hideTimer);label.textContent=text;box.style.display='block';cancel.style.display=active?'inline-block':'none';if(!active)hideTimer=setTimeout(()=>box.style.display='none',9000);}
+ function status(text,active){clearTimeout(hideTimer);label.textContent=text;box.style.display='flex';cancel.style.display=active?'inline-block':'none';if(!active)hideTimer=setTimeout(()=>box.style.display='none',9000);}
  if(window.scpClipboardReady!==true){status(tr('คลิปบอร์ดไฟล์ต้องอัปเดตเอเจนต์ปลายทางเป็น 2026.09.21.1 ขึ้นไป','File clipboard requires remote agent 2026.09.21.1 or later'),false);return;}
  function rejectAll(reason){for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error(reason));}pending.clear();}
  function closeChannel(reason){const old=channel;channel=null;connecting=null;rejectAll(reason||'DISCONNECTED');if(old)old.Stop();}
@@ -67,7 +77,7 @@
   pasteBtn.type='button';
   pasteBtn.textContent=tr('📋 วางไฟล์ลงเครื่องรีโมต','📋 Paste file to remote');
   pasteBtn.title=tr('คัดลอกไฟล์ในเครื่องคุณก่อน (Ctrl+C หรือคลิกขวา Copy) แล้วกดปุ่มนี้เพื่อวางลงเครื่องปลายทาง','Copy a file on your computer first (Ctrl+C or right-click Copy), then click to paste it onto the remote computer');
-  pasteBtn.style.cssText='position:fixed;z-index:10000;left:16px;bottom:16px;padding:9px 14px;border:1px solid #0b7285;border-radius:8px;background:#0b7285;color:#fff;font:13px "Segoe UI",sans-serif;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+  pasteBtn.className='scp-ui-btn';
   pasteBtn.onmousedown=ev=>{ev.preventDefault();ev.stopPropagation();};
   pasteBtn.onclick=ev=>{ev.preventDefault();ev.stopPropagation();run('out');};
   document.body.appendChild(pasteBtn);

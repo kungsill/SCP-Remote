@@ -23,17 +23,23 @@
     var pending = null, navTimer = null;
 
     function note(msg) {
+        if (!document.getElementById('scp-ui-drop-style')) {
+            var st = document.createElement('style'); st.id = 'scp-ui-drop-style';
+            st.textContent = '.scp-ui-toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:2147483600;display:flex;align-items:center;gap:10px;max-width:80vw;padding:11px 18px;border:1px solid #cfe8ea;border-radius:14px;background:rgba(255,255,255,.97);color:#14434c;font:13px/1.4 Sarabun,"Segoe UI",system-ui,sans-serif;box-shadow:0 12px 30px rgba(21,60,73,.22);pointer-events:none}'
+                + '.scp-ui-toast .scp-ui-drop-dot{width:9px;height:9px;border-radius:50%;background:#0e8ba0;flex:0 0 auto}';
+            document.head.appendChild(st);
+        }
         var b = document.getElementById('scpDropNote');
         if (!b) {
             b = document.createElement('div');
-            b.id = 'scpDropNote';
-            b.style.cssText = 'position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:2147483647;'
-                + 'background:#0b7285;color:#fff;padding:9px 16px;border-radius:8px;'
-                + 'font:14px "Segoe UI",sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.35);max-width:80%;pointer-events:none';
+            b.id = 'scpDropNote'; b.className = 'scp-ui-toast';
+            var d = document.createElement('span'); d.className = 'scp-ui-drop-dot';
+            var t = document.createElement('span'); t.className = 'scp-ui-drop-text';
+            b.append(d, t);
             document.body.appendChild(b);
         }
-        b.textContent = msg;
-        b.style.display = 'block';
+        b.querySelector('.scp-ui-drop-text').textContent = msg;
+        b.style.display = 'flex';
         clearTimeout(b._t);
         b._t = setTimeout(function () { b.style.display = 'none'; }, 6000);
     }

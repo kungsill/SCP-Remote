@@ -12,6 +12,25 @@ test('registered app gets only rooms and devices explicitly approved',async()=>{
 // once the person has consented to a full-control desktop they can already reach any file, so
 // the extra prompt was friction -- but files still NOTIFY (bit 4), so the person is told that
 // files are being accessed, not just the screen watched. This was the operator's explicit call.
+// The administrator can opt an installation into every room with '*', so a room made after
+// the approval -- and an empty one waiting for its first computer -- shows up without another
+// approval. It is a deliberate widening; the remote session still needs consent at the machine.
+test("approving all rooms with '*' shows every room, including empty or later-made ones",async()=>{
+  const s=setup();
+  s.web.meshes['mesh//c']={_id:'mesh//c',name:'Room C',domain:''}; // a new, still-empty department
+  const c=await registered(s);
+  await api.handle(s.ctx,{op:'desktopClientApprove',id:c._id,rooms:'*'});
+  assert.equal(s.rows.get(c._id).rooms,'*','the grant is stored as the wildcard, not a fixed list');
+  const list=await api.api(s.web,{op:'devices'},s.token);
+  assert.deepEqual(list.rooms.map(r=>r.id).sort(),['mesh//a','mesh//b','mesh//c'],'all rooms show, empty one included');
+  assert.deepEqual(list.nodes.map(n=>n.id).sort(),['node//a','node//b'],'devices from every room are visible');
+});
+test("a '*' grant can connect into a room it was never explicitly listed for",async()=>{
+  const s=setup();s.web.wsagents['node//b']={authenticated:2};const c=await registered(s);
+  await api.handle(s.ctx,{op:'desktopClientApprove',id:c._id,rooms:'*'});
+  const r=await api.api(s.web,{op:'connect',nodeid:'node//b'},s.token);
+  assert.match(r.path,/^\/sharing\?c=/,'the wildcard reaches node//b, which no explicit list here named');
+});
 test('the session still needs desktop consent and keeps the bar; files notify but no longer prompt',async()=>{const s=setup();await approved(s);const result=await api.api(s.web,{op:'connect',nodeid:'node//a'},s.token);assert.match(result.path,/^\/sharing\?c=/);const share=[...s.rows.values()].find(r=>r.type==='deviceshare');assert.equal(share.p,6);assert.equal(share.consent&8,8);assert.equal(share.consent&64,64);assert.equal(share.consent&4,4);assert.equal(share.consent&32,0);assert.match(share.guestName,/^SCP-App: IT-TEST/);assert.ok(share.expireTime>Date.now());});
 test('revocation removes active shares, signals the node relay and denies reuse',async()=>{const s=setup(),c=await approved(s);await api.api(s.web,{op:'connect',nodeid:'node//a'},s.token);await api.handle(s.ctx,{op:'desktopClientRevoke',id:c._id});assert.equal([...s.rows.values()].filter(r=>r.type==='deviceshare').length,0);assert.ok(s.events.some(e=>e.event.action==='removedDeviceShare'&&e.targets.includes('node//a')));await assert.rejects(api.api(s.web,{op:'devices'},s.token),/CLIENT_REVOKED/);});
 test('app shares cannot inherit unattended or auto-accept even for the administrator',()=>{const c={type:'tunnel',guestname:'SCP-App: IT [123456]',value:'*/meshrelay.ashx?p=2',soptions:{scpUnattended:true,consentAutoAccept:true,consentAutoAcceptIfNoUser:true,consentAutoAcceptIfLocked:true}};policy.apply(c,{id:'',unattendedadmins:['user//admin']},{_id:'user//admin',domain:'',siteadmin:0xFFFFFFFF});assert.equal(c.consent&8,8);assert.equal(c.soptions.scpUnattended,undefined);assert.equal(c.soptions.consentAutoAccept,false);assert.equal(c.soptions.consentAutoAcceptIfNoUser,false);assert.equal(c.soptions.consentAutoAcceptIfLocked,false);assert.match(c.value,/scpnomux=1/);});

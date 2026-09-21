@@ -18,12 +18,16 @@ exports.handle=async function(ctx,cmd){
   const c=await get(db,cmd.id);if(!c||c.type!=='scpclient'||c.domain!=='')throw Error('INVALID_CLIENT');
   if(cmd.op==='desktopClientApprove'){
    if(c.state==='revoked')throw Error('CLIENT_REVOKED');
-   if(!Array.isArray(cmd.rooms)||!cmd.rooms.length||cmd.rooms.some(id=>!web.meshes[id]||web.meshes[id].domain!==''))throw Error('SELECT_ROOMS');
+   // '*' grants every room in the domain, including rooms created after this approval, so a
+   // new room appears in the app without re-approving. It is a deliberate widening the admin
+   // opts into; every remote session still needs the remote computer's own consent regardless.
+   const allRooms=cmd.rooms==='*';
+   if(!allRooms&&(!Array.isArray(cmd.rooms)||!cmd.rooms.length||cmd.rooms.some(id=>!web.meshes[id]||web.meshes[id].domain!=='')))throw Error('SELECT_ROOMS');
    // The person at the machine sees this name and nothing else, so it has to say who is
    // really asking: the colleague holding this installation, not the administrator whose
    // account the share borrows to exist. Left blank it falls back to the computer name.
    if(cmd.label!==undefined){const l=(typeof cmd.label==='string')?cmd.label.trim():'';if(l.length>60)throw Error('LABEL_TOO_LONG');c.label=l;}
-   c.rooms=[...new Set(cmd.rooms)];c.state='approved';c.owner=ctx.user._id;
+   c.rooms=allRooms?'*':[...new Set(cmd.rooms)];c.state='approved';c.owner=ctx.user._id;
   }else c.state='revoked';
   c.type='scpclient';c.updated=Date.now();await set(db,c);await endShares(web,c._id);return {state:c.state};
  });
@@ -49,11 +53,14 @@ exports.api=async function(web,input,token){
   if(!client||client.state!=='approved')throw Error(client&&client.state==='revoked'?'CLIENT_REVOKED':'APPROVAL_REQUIRED');
   const owner=web.users[client.owner];if(!owner||owner.siteadmin!==0xFFFFFFFF)throw Error('APPROVAL_REQUIRED');
   if(!client.lastSeen||Date.now()-client.lastSeen>60000){client.lastSeen=Date.now();client.type='scpclient';await set(db,client);}
-  const scope=node=>node&&node.domain===''&&client.rooms.includes(node.meshid)&&web.meshes[node.meshid];
+  const grantsAll=client.rooms==='*';
+  const inRooms=id=>grantsAll||(Array.isArray(client.rooms)&&client.rooms.includes(id));
+  const scope=node=>node&&node.domain===''&&inRooms(node.meshid)&&web.meshes[node.meshid];
   if(input.op==='connectionStatus'){const n=await get(db,input.nodeid);if(!scope(n))throw Error('ACCESS_DENIED');return {online:!!(web.wsagents[n._id]&&web.wsagents[n._id].authenticated===2),ready:consentReady(n)};}
   if(input.op==='devices'){
    const positions=await all(db,'scplayout');
-   return {rooms:client.rooms.filter(id=>web.meshes[id]).map(id=>({id,name:web.meshes[id].name})),nodes:(await all(db,'node')).filter(scope).map(n=>({id:n._id,name:n.name,room:n.meshid,ip:n.host||'',online:!!(web.wsagents[n._id]&&web.wsagents[n._id].authenticated===2),ready:consentReady(n),position:positions.find(p=>p.nodeid===n._id)||null}))};
+   const roomIds=grantsAll?Object.keys(web.meshes).filter(id=>web.meshes[id]&&web.meshes[id].domain===''):client.rooms.filter(id=>web.meshes[id]);
+   return {rooms:roomIds.map(id=>({id,name:web.meshes[id].name})),nodes:(await all(db,'node')).filter(scope).map(n=>({id:n._id,name:n.name,room:n.meshid,ip:n.host||'',online:!!(web.wsagents[n._id]&&web.wsagents[n._id].authenticated===2),ready:consentReady(n),position:positions.find(p=>p.nodeid===n._id)||null}))};
   }
   if(input.op==='disconnect'){await endShares(web,id);return {ok:true};}
   if(input.op==='connect'){

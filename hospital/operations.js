@@ -4,6 +4,7 @@ const backup = require('./backup-health');
 const queues = new Map();
 function text(value, max, required) { if (typeof value !== 'string' || value.length > max || (required && !value.trim())) throw Error('INVALID_INPUT'); return value.trim(); }
 exports.handle = async function (ctx, cmd) {
+ if(typeof cmd.op==='string'&&cmd.op.startsWith('power'))return require('./power-safety').handle(ctx,cmd);
  if(typeof cmd.op==='string'&&cmd.op.startsWith('desktop'))return require('./desktop-clients').handle(ctx,cmd);
  if (typeof cmd.op==='string' && cmd.op.startsWith('driverLibrary')) return require('./driver-library').handle(ctx,cmd);
  const {db,parent,user,domain}=ctx;
@@ -27,6 +28,19 @@ exports.handle = async function (ctx, cmd) {
   if (typeof cmd.nodeid!=='string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
   await new Promise((resolve,reject)=>db.Remove('scpdriver/'+cmd.nodeid,e=>e?reject(e):resolve()));
   return {cleared:true};
+ }
+ if (cmd.op==='alertWatch') {
+  // The computers marked to be watched for going offline. The proactive-alert connector reads
+  // the same records; this only lists the ones this user is allowed to see, for the toggle.
+  const rows=await new Promise((resolve,reject)=>db.GetAllTypeNoTypeField('scpwatch',domain.id,(e,r)=>e?reject(e):resolve(r)));
+  const out=[]; for(const row of rows){ if(row.watch===true && await access(row.nodeid)) out.push(row.nodeid); } return out;
+ }
+ if (cmd.op==='alertWatchSet') {
+  if (typeof cmd.nodeid!=='string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
+  const id='scpwatch/'+cmd.nodeid;
+  if (cmd.watch===true) { await save({_id:id,type:'scpwatch',domain:domain.id,nodeid:cmd.nodeid,watch:true}); }
+  else { await new Promise((resolve,reject)=>db.Remove(id,e=>e?reject(e):resolve())); }
+  return {watch:cmd.watch===true};
  }
  if (cmd.op==='tickets') {
   const rows=await new Promise((resolve,reject)=>db.GetAllTypeNoTypeField('scpticket',domain.id,(e,r)=>e?reject(e):resolve(r)));

@@ -66,7 +66,7 @@ class ClipboardHost {
         // Partial transfers contain only data this process created. No recursion
         // through links: refuse cleanup if anything has been replaced externally.
         if(targetRoot!=null && !committed && Directory.Exists(targetRoot)) {
-            try { foreach(var e in target.OrderByDescending(x=>x.full.Length)) { NoLinks(e.full); if(e.directory) Directory.Delete(e.full,false); else File.Delete(e.full); } NoLinks(targetRoot); Directory.Delete(targetRoot,false); } catch { }
+            try { foreach(var e in target.Where(x=>x.full!=null).OrderByDescending(x=>x.full.Length)) { if(!Directory.Exists(e.full)&&!File.Exists(e.full))continue;NoLinks(e.full); if(e.directory) Directory.Delete(e.full,false); else File.Delete(e.full); } NoLinks(targetRoot); Directory.Delete(targetRoot,false); } catch { }
         }
         target=null;targetRoot=null;targetId=null;committed=false;
     }

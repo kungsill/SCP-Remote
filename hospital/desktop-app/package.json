@@ -1,6 +1,6 @@
 {
   "name": "scp-remote-desktop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "SCP-Remote hospital remote desktop client",
   "main": "main.js",

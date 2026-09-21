@@ -3338,6 +3338,10 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                                 if ((command.actiontype == 400) && common.validateInt(command.time, 1, 30000)) { routeCommandToNode({ action: 'msg', type: 'console', nodeid: node._id, value: 'flash ' + command.time }, MESHRIGHT_ADMIN, 0); }
                                 if ((command.actiontype == 401) && common.validateInt(command.time, 1, 30000)) { routeCommandToNode({ action: 'msg', type: 'console', nodeid: node._id, value: 'vibrate ' + command.time }, MESHRIGHT_ADMIN, 0); }
                             } else {
+                                if (node && node.scpPowerPolicy && node.scpPowerPolicy.critical && command.actiontype !== 302) {
+                                    try { ws.send(JSON.stringify({ action:'poweraction', responseid:command.responseid, nodeid:node._id, result:'MAINTENANCE_WORKFLOW_REQUIRED' })); } catch (ex) { }
+                                    return;
+                                }
                                 // Check we have the rights to perform this operation
                                 if ((command.actiontype == 302) && ((rights & MESHRIGHT_WAKEDEVICE) == 0)) return; // This is a Intel AMT power on operation, check if we have WAKE rights
                                 if ((command.actiontype != 302) && ((rights & MESHRIGHT_RESETOFF) == 0)) return; // For all other operations, check that we have RESET/OFF rights

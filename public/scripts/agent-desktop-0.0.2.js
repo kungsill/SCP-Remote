@@ -21,6 +21,7 @@ var CreateAgentRemoteDesktop = function (canvasid, scrolldiv) {
     obj.State = 0;
     obj.PendingOperations = [];
     obj.tilesReceived = 0;
+    obj.scpStats = { bytes: 0, tiles: 0 };
     obj.TilesDrawn = 0;
     obj.KillDraw = 0;
     obj.ipad = false;
@@ -155,7 +156,7 @@ var CreateAgentRemoteDesktop = function (canvasid, scrolldiv) {
                 if (obj.onPreDrawImage != null) obj.onPreDrawImage(); // Notify that we are about to draw on the canvas.
                 if (Msg[1] == 1) { obj.ProcessCopyRectMsg(Msg[2]); }
                 else if (Msg[1] == 2) { obj.Canvas.drawImage(Msg[2], obj.rotX(Msg[3], Msg[4]), obj.rotY(Msg[3], Msg[4])); delete Msg[2]; }
-                if (Msg[1] === 2 && obj.onScpFrameDrawn) obj.onScpFrameDrawn();
+                if (Msg[1] === 2) { obj.scpStats.tiles++; if (obj.onScpFrameDrawn) obj.onScpFrameDrawn(); }
                 obj.PendingOperations.splice(i, 1);
                 obj.TilesDrawn++;
                 if ((obj.TilesDrawn == obj.tilesReceived) && (obj.KillDraw < obj.TilesDrawn)) { obj.KillDraw = obj.TilesDrawn = obj.tilesReceived = 0; }
@@ -218,6 +219,7 @@ var CreateAgentRemoteDesktop = function (canvasid, scrolldiv) {
     }
 
     obj.ProcessBinaryCommand = function (cmd, cmdsize, view) {
+        obj.scpStats.bytes += cmdsize;
         var X, Y;
         if ((cmd == 3) || (cmd == 4) || (cmd == 7)) { X = (view[4] << 8) + view[5]; Y = (view[6] << 8) + view[7]; }
         if (obj.debugmode > 2) { console.log('CMD', cmd, cmdsize, X, Y); }

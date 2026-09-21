@@ -50,6 +50,7 @@ exports.api=async function(web,input,token){
   const owner=web.users[client.owner];if(!owner||owner.siteadmin!==0xFFFFFFFF)throw Error('APPROVAL_REQUIRED');
   if(!client.lastSeen||Date.now()-client.lastSeen>60000){client.lastSeen=Date.now();client.type='scpclient';await set(db,client);}
   const scope=node=>node&&node.domain===''&&client.rooms.includes(node.meshid)&&web.meshes[node.meshid];
+  if(input.op==='connectionStatus'){const n=await get(db,input.nodeid);if(!scope(n))throw Error('ACCESS_DENIED');return {online:!!(web.wsagents[n._id]&&web.wsagents[n._id].authenticated===2),ready:consentReady(n)};}
   if(input.op==='devices'){
    const positions=await all(db,'scplayout');
    return {rooms:client.rooms.filter(id=>web.meshes[id]).map(id=>({id,name:web.meshes[id].name})),nodes:(await all(db,'node')).filter(scope).map(n=>({id:n._id,name:n.name,room:n.meshid,ip:n.host||'',online:!!(web.wsagents[n._id]&&web.wsagents[n._id].authenticated===2),ready:consentReady(n),position:positions.find(p=>p.nodeid===n._id)||null}))};

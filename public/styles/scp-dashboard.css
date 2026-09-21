@@ -232,3 +232,4 @@
 .scp-care-row{padding:10px 12px;border-bottom:1px solid var(--scp-line,#d7e5e4)}
 .scp-care-row small{display:block;font-size:11px;color:#5a6b6a}
 .scp-care-state{font-size:12px;color:var(--scp-accent,#087f83);font-weight:600}
+.scp-dash-watch-on{color:#0b7285!important;border-color:#8fd0c6!important;background:#eaf7f4!important}

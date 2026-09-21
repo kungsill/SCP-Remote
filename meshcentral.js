@@ -1965,6 +1965,11 @@ function CreateMeshCentralServer(config, args) {
                     // so no idle-time report arrives with nowhere to be counted.
                     obj.scpUsage = require('./scp-usage.js').CreateScpUsage(obj);
 
+                    // SCP-Remote: the proactive-alert connector. Built and running, but dormant
+                    // until settings.scpalertwebhook points it at a destination -- until then it
+                    // reads nothing and sends nothing. Wrapped so a fault here can never stop boot.
+                    try { obj.scpAlerts = require('./hospital/alerts.js').CreateScpAlerts(obj); obj.scpAlerts.start(); } catch (ex) { }
+
                     // Start the web server and if needed, the redirection web server.
                     obj.webserver = require('./webserver.js').CreateWebServer(obj, obj.db, obj.args, obj.certificates, obj.StartEx5);
                     if (obj.redirserver != null) { obj.redirserver.hookMainWebServer(obj.certificates); }

@@ -33,6 +33,7 @@ app.whenReady().then(()=>{
  function handle(name,fn){ipcMain.handle(name,async(event,...args)=>{if(event.sender!==home.webContents||!event.senderFrame.url.startsWith('file://'))throw Error('ACCESS_DENIED');try{return {ok:true,result:await fn(...args)};}catch(e){return {ok:false,error:e.message};}});}
  handle('scp:init',()=>request({op:'register',name:os.hostname()}));
  handle('scp:devices',()=>request({op:'devices'}));
+ ipcMain.handle('scp:session-status',async(event)=>{const current=remote;if(!current||current.isDestroyed()||event.sender!==current.webContents||event.senderFrame!==current.webContents.mainFrame)throw Error('ACCESS_DENIED');const u=new URL(event.senderFrame.url);if(u.origin!==origin||u.pathname!=='/sharing')throw Error('ACCESS_DENIED');try{return {ok:true,result:await request({op:'connectionStatus',nodeid:current.scpNodeId})};}catch(e){return {ok:false,error:e.message};}});
  ipcMain.handle('scp:clipboard',async(event,command)=>{
   const current=remote;
   if(!current||current.isDestroyed()||event.sender!==current.webContents||event.senderFrame!==current.webContents.mainFrame)throw Error('ACCESS_DENIED');
@@ -46,6 +47,7 @@ app.whenReady().then(()=>{
   const url=new URL(data.path,origin);if(url.origin!==origin||url.pathname!=='/sharing')throw Error('INVALID_SESSION');
   remote=new BrowserWindow({width:1440,height:950,title:'SCP-Remote — '+(language==='en'?'Remote desktop':'หน้าจอรีโมต'),autoHideMenuBar:true,icon:path.join(__dirname,'scp-logo.ico'),webPreferences:{preload:path.join(__dirname,'remote-preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
   const current=remote;secureWindow(current);
+  current.scpNodeId=nodeid;
   current.on('closed',()=>{if(current.clipboardHost)current.clipboardHost.close();if(remote===current){remote=null;request({op:'disconnect'}).catch(()=>{});}});
   await current.loadURL(url.href);
   await current.webContents.executeJavaScript(`(() => {
@@ -64,6 +66,7 @@ app.whenReady().then(()=>{
   // escaping) and never touches an upstream page; it only uses globals the sharing page exposes.
   try { await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'inject-filedrop.js'),'utf8')); } catch (e) { }
   await current.webContents.executeJavaScript('window.scpClipboardLanguage='+JSON.stringify(language==='en'?'en':'th')+';window.scpClipboardReady='+(data.clipboard===true)+';'+fs.readFileSync(path.join(__dirname,'clipboard-transfer.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'inject-clipboard.js'),'utf8'));
+  await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'session-health.js'),'utf8'));
   return {opened:true};
  });
  home.on('closed',()=>{if(remote&&!remote.isDestroyed())remote.close();home=null;});

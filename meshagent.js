@@ -1211,6 +1211,9 @@ module.exports.CreateMeshAgent = function (parent, db, ws, req, args, domain) {
             }
             if (typeof command != 'object') { return; }
             switch (command.action) {
+                case 'scpPower':
+                    require('./hospital/power-safety').receive(parent, obj, command).catch(function () { try { obj.send(JSON.stringify({ action:'scpPower', op:'cancel', job:command.job })); } catch (e) {} });
+                    break;
                 case 'msg':
                     {
                         // If the same console command is processed many times, kick out this agent.

@@ -35,6 +35,8 @@
         noUser: ['No one signed in', 'ไม่มีผู้ใช้ล็อกอิน'],
         confirmOff: ['Shut down this computer now?', 'สั่งปิดเครื่องนี้เดี๋ยวนี้หรือไม่?'],
         restart: ['Restart', 'รีสตาร์ต'],
+        watchOn: ['🔔 Watching', '🔔 เฝ้าระวังอยู่'],
+        watchOff: ['🔕 Watch', '🔕 เฝ้าระวัง'],
         confirmRestart: ['Restart this computer now? Anyone using it will be interrupted.', 'สั่งรีสตาร์ตเครื่องนี้เดี๋ยวนี้หรือไม่? คนที่กำลังใช้อยู่จะถูกขัดจังหวะ'],
         offlineAction: ['This computer is not connected.', 'เครื่องนี้ไม่ได้เชื่อมต่ออยู่'],
         scanning: ['Checking installed programs…', 'กำลังตรวจโปรแกรมที่ติดตั้ง…'],
@@ -193,7 +195,7 @@
     /* What each computer is made of, as the agent already reported it to the server.
        Asked for once per computer per visit and kept here; nothing is collected that
        the server does not already hold. */
-    var specs = {}, specsAsked = {}, listening = false, searchText = '';
+    var specs = {}, specsAsked = {}, listening = false, searchText = '', watched = {}, watchedLoaded = false;
 
     /* How long each computer has been powered on, and when each was last heard from.
        Both come from what the server already recorded; nothing extra is asked of the
@@ -548,18 +550,22 @@
             if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
             window.ScpServices.open(node);
         }));
+        if (window.ScpOperations) {
+            var on = watched[node._id] === true;
+            cell.appendChild(button(on ? t('watchOn') : t('watchOff'), on ? 'scp-dash-watch-on' : 'scp-dash-scan', function () {
+                var next = !on; watched[node._id] = next; render();
+                window.ScpOperations.request('alertWatchSet', { nodeid: node._id, watch: next })
+                    .catch(function () { watched[node._id] = on; render(); });
+            }));
+        }
         if (fixing[node._id]) { cell.appendChild(element('small', 'scp-dash-note', fixing[node._id].text || t('fixWorking'))); if(window.ScpProgress&&fixing[node._id].progress)cell.appendChild(ScpProgress.view(fixing[node._id].progress,'driver')); }
         cell.appendChild(button(t('restart'), 'scp-dash-off', function () {
             if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
-            if (!window.confirm(t('confirmRestart') + '\n\n' + node.name)) return;
-            // 8 is the graceful Restart on the device page's power menu (3 is a hard Reset).
-            try { window.meshserver.send({ action: 'poweraction', nodeids: [node._id], actiontype: 8 }); } catch (error) { /* the list refresh shows the outcome */ }
+            if (window.ScpPower) window.ScpPower.open(node,'restart');
         }));
         cell.appendChild(button(t('shutdown'), 'scp-dash-off', function () {
             if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
-            if (!window.confirm(t('confirmOff') + '\n\n' + node.name)) return;
-            // 2 is the power-off action the device page uses for the same command.
-            try { window.meshserver.send({ action: 'poweraction', nodeids: [node._id], actiontype: 2 }); } catch (error) { /* the list refresh shows the result */ }
+            if (window.ScpPower) window.ScpPower.open(node,'shutdown');
         }));
         return cell;
     }
@@ -1028,8 +1034,19 @@
         var ticket=fixing[nodeid].ticket;window.setTimeout(function(){var job=fixing[nodeid];if(job&&job.ticket===ticket&&job.state==='working'){job.state='unknown';job.text=t('fixTimeout');render();}},900000);
     }
     var driverStatusLoading=false;
+    // The computers marked to be watched for going offline. Loaded once; the toggle keeps it
+    // current after that, so a redraw does not re-ask on every ten-second refresh.
+    function loadWatched() {
+        if (watchedLoaded || !window.ScpOperations) { return; }
+        watchedLoaded = true;
+        window.ScpOperations.request('alertWatch').then(function (ids) {
+            (ids || []).forEach(function (id) { watched[id] = true; }); render();
+        }).catch(function () { watchedLoaded = false; });
+    }
+
     function loadDriverStatus() {
         if(window.ScpCleanup)window.ScpCleanup.refresh();
+        loadWatched();
         if(driverStatusLoading||!window.ScpOperations)return;
         driverStatusLoading=true;
         window.ScpOperations.request('driverStatus').then(function(rows){rows.forEach(function(row){

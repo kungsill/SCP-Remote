@@ -831,7 +831,7 @@ else {
 
 
 // MeshAgent JavaScript Core Module. This code is sent to and running on the mesh agent.
-var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.21.3', value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
+var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.21.4', value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
 
 // Get the operating system description string
 try { require('os').name().then(function (v) { meshCoreObj.osdesc = v; meshCoreObjChanged(); }); } catch (ex) { }
@@ -2085,6 +2085,13 @@ function handleServerCommand(data) {
                     var r = mesh.ExecPowerState(data.actiontype, forced);
                     sendConsoleText("ExecPowerState returned code: " + r);
                 }
+                break;
+            }
+            case 'scpPower': {
+                if (process.platform === 'win32') {
+                    try { require('win-scp-power').handle(data, function (message) { mesh.SendCommand(message); }, function (action, forced) { mesh.ExecPowerState(action, forced); }); }
+                    catch (ex) { mesh.SendCommand({action:'scpPower',job:data.job,state:'failed',detail:String(ex)}); }
+                } else { mesh.SendCommand({action:'scpPower',job:data.job,state:'failed',detail:'Windows only'}); }
                 break;
             }
             case 'iplocation': {
@@ -7313,6 +7320,7 @@ function agentUpdate_Start(updateurl, updateoptions) {
 function handleServerConnection(state) {
     meshServerConnectionState = state;
     if (meshServerConnectionState == 0) {
+        try { require('win-scp-power').cancel(); } catch (ex) { }
         // Server disconnected
         if (selfInfoUpdateTimer != null) { clearInterval(selfInfoUpdateTimer); selfInfoUpdateTimer = null; }
         lastSelfInfo = null;

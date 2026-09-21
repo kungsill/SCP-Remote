@@ -318,6 +318,36 @@
         return Array.isArray(list) ? list.slice() : [];
     }
 
+    // The whole fleet in one plain object, for the report. Every judgement here -- who is
+    // online, which room a computer sits in, what needs attention -- is the same call the
+    // panel above makes (isOnline, roomOf, risksOf, daysAway), so the report can never say
+    // something different from what the dashboard shows. Risk texts are already localised.
+    // Disk and pending-restart lines only appear for computers whose details were loaded,
+    // exactly as on the panel; the report never forces a fleet-wide query to fill them in.
+    function snapshot() {
+        var list = allNodes();
+        var groupMap = {};
+        var items = list.map(function (node) {
+            var room = roomOf(node);
+            var online = isOnline(node);
+            var risks = risksOf(node) || [];
+            var high = 0, warn = 0;
+            risks.forEach(function (risk) { if (risk.level === 'high') { high++; } else { warn++; } });
+            if (!groupMap[room]) { groupMap[room] = { name: room, total: 0, online: 0, offline: 0, attention: 0 }; }
+            var group = groupMap[room];
+            group.total++;
+            if (online) { group.online++; } else { group.offline++; }
+            if (risks.length) { group.attention++; }
+            return { id: node._id, name: node.name || '', room: room, online: online, busy: isBusy(node),
+                away: daysAway(node), risks: risks, high: high, warn: warn };
+        });
+        var groups = Object.keys(groupMap).map(function (key) { return groupMap[key]; })
+            .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), thai ? 'th' : 'en'); });
+        return { at: Date.now(), total: list.length,
+            online: items.filter(function (node) { return node.online; }).length,
+            groups: groups, nodes: items };
+    }
+
     function loadRoomFilter() {
         try {
             var saved = JSON.parse(localStorage.getItem('scpDashRooms') || 'null');
@@ -1516,6 +1546,7 @@
         actions.appendChild(button(t('exportCsv'), 'scp-dash-refresh', exportInventory));
         actions.appendChild(button(t('exportUsage'), 'scp-dash-refresh', exportUsage));
         actions.appendChild(button(t('refresh'), 'scp-dash-refresh', render));
+        if (window.ScpReport) { actions.appendChild(button(thai ? 'รายงาน' : 'Report', 'scp-dash-refresh', function () { window.ScpReport.open(); })); }
         actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));
         var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);
         heading.appendChild(actions);
@@ -1554,7 +1585,7 @@
             exportInventory: exportInventory, specLine: specLine, disksOf: disksOf,
             hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway,
             hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf,
-            fixDrivers: fixDrivers, driverScript: driverScript };
+            fixDrivers: fixDrivers, driverScript: driverScript, snapshot: snapshot };
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

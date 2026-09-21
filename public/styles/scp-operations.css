@@ -26,3 +26,58 @@
 #scpServices .scp-svc-other{background:#eef1f2;color:#5b6b75}
 .night #scpServices{background:#182c2a;color:#e0efeb}
 .night #scpServices .scp-svc-row{background:#203b37;border-color:#2b4a45}
+
+/* Fleet report dialog */
+#scpReport{width:min(920px,92vw);max-height:88vh;display:flex;flex-direction:column;border:1px solid #bedbd6;border-radius:16px;padding:22px;color:#203b38;background:#f8fbfa;font-family:inherit}
+#scpReport::backdrop{background:#1238}
+#scpReport header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+#scpReport h2{margin:0}
+#scpReport button{font:inherit;padding:8px 14px;border:1px solid #b5d7d1;border-radius:8px;background:#fff;color:#165c52;cursor:pointer}
+#scpReport .scp-report-print-btn{color:#fff;background:#0b7a6a;border-color:#0b7a6a}
+.scp-report-scroll{overflow:auto}
+.scp-report-when{color:#5b6b75;font-size:12px;margin:0 0 12px}
+.scp-report-body h3{margin:20px 0 8px;font-size:15px;border-bottom:1px solid #dbe8e5;padding-bottom:4px}
+.scp-report-stats{display:flex;gap:10px;flex-wrap:wrap}
+.scp-report-stat{flex:1 1 120px;background:#fff;border:1px solid #d6e5e2;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.scp-report-stat strong{font-size:26px;line-height:1}
+.scp-report-stat span{font-size:12px;color:#5b6b75}
+.scp-report-stat-ok strong{color:#0b7a4a}
+.scp-report-stat-off strong{color:#a3341f}
+.scp-report-stat-warn strong{color:#a86a00}
+.scp-report-table{width:100%;border-collapse:collapse;font-size:13px}
+.scp-report-table th,.scp-report-table td{text-align:left;padding:7px 10px;border-bottom:1px solid #e5efec}
+.scp-report-table th{color:#5b6b75;font-weight:600}
+.scp-report-table td:not(:first-child),.scp-report-table th:not(:first-child){text-align:right;width:80px}
+.scp-report-list{list-style:none;margin:0;padding:0}
+.scp-report-list>li{background:#fff;border:1px solid #dbe8e5;border-left-width:4px;border-radius:10px;padding:10px 12px;margin:8px 0}
+.scp-report-list>li.scp-report-high{border-left-color:#d0492c}
+.scp-report-list>li.scp-report-warn{border-left-color:#e0a100}
+.scp-report-risk-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.scp-report-risk-head strong{font-size:14px}
+.scp-report-risk-head span{font-size:12px;color:#5b6b75}
+.scp-report-reasons{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.scp-report-reasons li{font-size:12px;padding:2px 9px;border-radius:20px}
+.scp-report-r-high{background:#f6e4df;color:#a3341f}
+.scp-report-r-warn{background:#f7efd8;color:#8a6400}
+.scp-report-plain{list-style:none;margin:0;padding:0}
+.scp-report-plain li{padding:6px 10px;border-bottom:1px solid #eef3f1;font-size:13px}
+.scp-report-plain strong{font-size:13px}
+.scp-report-off{color:#a3341f}
+.scp-report-ok{color:#0b7a4a}
+.scp-report-warn{color:#a86a00}
+.scp-report-clear{color:#0b7a4a;background:#eaf7f1;border:1px solid #cfe9df;border-radius:8px;padding:10px 12px;font-size:13px}
+.scp-report-title{font-size:20px;margin:0 0 4px}
+.night #scpReport{background:#182c2a;color:#e0efeb}
+.night #scpReport .scp-report-stat,.night #scpReport .scp-report-list>li{background:#203b37;border-color:#2b4a45}
+.night #scpReport .scp-report-body h3{border-color:#2b4a45}
+
+/* Print / save as PDF: the report copy only, nothing else on the page. */
+.scp-print-root{display:none}
+@media print{
+ html.scp-printing body>*:not(.scp-print-root){display:none!important}
+ html.scp-printing .scp-print-root{display:block!important;color:#000;padding:0}
+ html.scp-printing{background:#fff}
+ .scp-print-root .scp-report-stat,.scp-print-root .scp-report-list>li{border:1px solid #888}
+ .scp-print-root .scp-report-body h3{border-color:#888}
+ .scp-print-root a{color:#000;text-decoration:none}
+}

@@ -16,3 +16,22 @@ test('file clipboard cancellation between chunks leaves no ready clipboard',asyn
 test('file clipboard preserves commit errors and cleans partial transfer',async()=>{
  const calls=[];await assert.rejects(transfer(async()=>{},async c=>{calls.push(c.op);if(c.op==='commit')throw Error('CLIPBOARD_CHANGED');return {job:'x'};},{job:'s',entries:[{path:'zero',size:0}]},0,()=>{},{}),/CLIPBOARD_CHANGED/);assert.deepEqual(calls,['prepare','commit','abort']);
 });
+
+test('keeps several writes in flight instead of one round trip per chunk',async()=>{
+ // A 5-chunk file with a mock far side that only resolves writes when released. If the transfer
+ // waited for each ack it would never issue the 2nd write; the window lets it get ahead.
+ const size=5*131072;let read=0,peak=0,live=0;const releases=[];
+ const src=async c=>({data:'YWE=',sha256:'h',length:Math.min(131072,size-c.offset)});
+ const dst=async c=>{
+  if(c.op==='prepare')return {job:'d'};
+  if(c.op==='commit')return {ready:true};
+  if(c.op==='write'){live++;peak=Math.max(peak,live);return new Promise(res=>{releases.push(()=>{live--;res({offset:c.offset+131072});});});}
+ };
+ const run=transfer(src,dst,{job:'s',entries:[{path:'big',size}]},0,()=>{},{});
+ // let the loop issue up to the window, then release acks one by one
+ for(let i=0;i<10;i++){await new Promise(r=>setTimeout(r,0));if(releases.length){releases.shift()();}}
+ while(releases.length){releases.shift()();await new Promise(r=>setTimeout(r,0));}
+ await run;
+ assert.ok(peak>=2,'more than one write was in flight at once (was '+peak+')');
+ assert.ok(peak<=3,'never exceeds the far helper window (was '+peak+')');
+});

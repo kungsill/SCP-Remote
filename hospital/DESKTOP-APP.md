@@ -77,6 +77,10 @@ $env:ELECTRON_RUN_AS_NODE = $null
 
 วิธียืนยันว่าเป็นกรณีนี้: รัน `SCP-Remote.exe --enable-logging` ถ้าขึ้น `bad option: --enable-logging` แสดงว่ากำลังรันเป็น Node.js เพราะ Electron จริงรับตัวเลือกนี้ได้
 
+## ไอคอนโปรแกรม
+
+ไอคอน .exe และหน้าต่างใช้ `hospital/desktop-app/scp-logo.ico` (สร้างจากโลโก้ รพ. `public/images/scp-logo.png` ย่อเป็น 256/48/32/16 แล้วประกอบเป็น ICO) ต่อสายที่ `package.js` (`icon:`) และ `main.js` (`icon:` ของทั้งสองหน้าต่าง) ถ้าเปลี่ยนโลโก้ ให้สร้าง `.ico` ใหม่แล้ว build
+
 ## สร้างโปรแกรม
 
 รันในโฟลเดอร์ `hospital/desktop-app`:

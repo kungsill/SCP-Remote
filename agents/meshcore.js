@@ -408,8 +408,12 @@ var debugConsole = (global._MSH && (_MSH().debugConsole == 1));
 
 var color_options =
     {
-        background: (global._MSH != null) ? global._MSH().background : '0,54,105',
-        foreground: (global._MSH != null) ? global._MSH().foreground : '255,255,255'
+        // SCP-Remote: the consent window defaulted to a dark navy that read as heavy and lifeless.
+        // Default it to the brighter teal the rest of SCP-Remote uses, so the box a person sees
+        // when asked to allow a session looks alive and on-brand. A colour set on the agent at
+        // install time, or one the server sends, still wins over this.
+        background: (global._MSH != null && global._MSH().background) ? global._MSH().background : '14,139,160',
+        foreground: (global._MSH != null && global._MSH().foreground) ? global._MSH().foreground : '255,255,255'
     };
 
 // SCP-Remote: the connection bar defaults to pinned, which parks a full-width bar across the
@@ -827,7 +831,7 @@ else {
 
 
 // MeshAgent JavaScript Core Module. This code is sent to and running on the mesh agent.
-var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.21.1', value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
+var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.21.2', value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
 
 // Get the operating system description string
 try { require('os').name().then(function (v) { meshCoreObj.osdesc = v; meshCoreObjChanged(); }); } catch (ex) { }

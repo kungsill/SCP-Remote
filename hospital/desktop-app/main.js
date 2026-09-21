@@ -2,6 +2,7 @@
 const {app,BrowserWindow,ipcMain,safeStorage,session}=require('electron');
 const fs=require('fs'),path=require('path'),https=require('https'),crypto=require('crypto'),os=require('os');
 const config=require('./server.json');let home,remote,token;
+const ClipboardHost=require('./clipboard/local-host');
 const origin=new URL(config.url).origin,pin=config.certificateSha256.replace(/:/g,'').toUpperCase();
 function certMatches(cert){try{return new crypto.X509Certificate(cert).fingerprint256.replace(/:/g,'')===pin;}catch{return false;}}
 function request(input){return new Promise((resolve,reject)=>{
@@ -32,14 +33,20 @@ app.whenReady().then(()=>{
  function handle(name,fn){ipcMain.handle(name,async(event,...args)=>{if(event.sender!==home.webContents||!event.senderFrame.url.startsWith('file://'))throw Error('ACCESS_DENIED');try{return {ok:true,result:await fn(...args)};}catch(e){return {ok:false,error:e.message};}});}
  handle('scp:init',()=>request({op:'register',name:os.hostname()}));
  handle('scp:devices',()=>request({op:'devices'}));
+ ipcMain.handle('scp:clipboard',async(event,command)=>{
+  const current=remote;
+  if(!current||current.isDestroyed()||event.sender!==current.webContents||event.senderFrame!==current.webContents.mainFrame)throw Error('ACCESS_DENIED');
+  const frameUrl=new URL(event.senderFrame.url);if(frameUrl.origin!==origin||frameUrl.pathname!=='/sharing')throw Error('ACCESS_DENIED');
+  try{if(!current.clipboardHost||current.clipboardHost.closed)current.clipboardHost=new ClipboardHost();return {ok:true,result:await current.clipboardHost.request(command)};}catch(e){return {ok:false,error:e.message};}
+ });
  handle('scp:connect',async(nodeid,language)=>{
   if(typeof nodeid!=='string'||nodeid.length>180)throw Error('INVALID_NODE');
   if(remote&&!remote.isDestroyed()){const previous=remote;remote=null;previous.close();}
   const data=await request({op:'connect',nodeid,language});
   const url=new URL(data.path,origin);if(url.origin!==origin||url.pathname!=='/sharing')throw Error('INVALID_SESSION');
-  remote=new BrowserWindow({width:1440,height:950,title:'SCP-Remote — '+(language==='en'?'Remote desktop':'หน้าจอรีโมต'),autoHideMenuBar:true,webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  remote=new BrowserWindow({width:1440,height:950,title:'SCP-Remote — '+(language==='en'?'Remote desktop':'หน้าจอรีโมต'),autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'remote-preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
   const current=remote;secureWindow(current);
-  current.on('closed',()=>{if(remote===current){remote=null;request({op:'disconnect'}).catch(()=>{});}});
+  current.on('closed',()=>{if(current.clipboardHost)current.clipboardHost.close();if(remote===current){remote=null;request({op:'disconnect'}).catch(()=>{});}});
   await current.loadURL(url.href);
   await current.webContents.executeJavaScript(`(() => {
    // Staff see the screen they came for, not the controls the sharing page carries for an
@@ -56,6 +63,7 @@ app.whenReady().then(()=>{
   // Drag-a-file-onto-the-screen support. Kept in its own file so it stays plain JS (no template
   // escaping) and never touches an upstream page; it only uses globals the sharing page exposes.
   try { await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'inject-filedrop.js'),'utf8')); } catch (e) { }
+  await current.webContents.executeJavaScript('window.scpClipboardLanguage='+JSON.stringify(language==='en'?'en':'th')+';window.scpClipboardReady='+(data.clipboard===true)+';'+fs.readFileSync(path.join(__dirname,'clipboard-transfer.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'inject-clipboard.js'),'utf8'));
   return {opened:true};
  });
  home.on('closed',()=>{if(remote&&!remote.isDestroyed())remote.close();home=null;});

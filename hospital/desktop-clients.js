@@ -65,7 +65,10 @@ exports.api=async function(web,input,token){
    const share={_id:'deviceshare-'+publicid,type:'deviceshare',domain:'',xmeshid:node.meshid,nodeid:node._id,p:6,publicid,userid:client.owner,guestName:'SCP-App: '+(client.label||client.name)+' ['+publicid.slice(0,6)+']',consent:8|32|1|4|64,startTime:Date.now(),expireTime:expires,scpClient:id};
    await set(db,share);
    web.parent.DispatchEvent(web.CreateNodeDispatchTargets(node.meshid,node._id,['server-users',owner._id]),null,{etype:'node',action:'addedDeviceShare',domain:'',nodeid:node._id,meshid:node.meshid,userid:owner._id,msg:'SCP-Remote app requested consent: '+client.name});
-   return {path:'/sharing?c='+encodeURIComponent(cookie)+'&lang='+(input.language==='en'?'en':'th'),expires};
+   const release=String(node.agent&&node.agent.scpRelease||'').split('.').map(Number),clipboardMin=[2026,9,21,1];
+   let clipboard=release.length===4&&release.every(Number.isFinite);
+   if(clipboard){for(let i=0;i<4;i++){if(release[i]!==clipboardMin[i]){clipboard=release[i]>clipboardMin[i];break;}}}
+   return {path:'/sharing?c='+encodeURIComponent(cookie)+'&lang='+(input.language==='en'?'en':'th'),expires,clipboard};
   }
   throw Error('UNKNOWN_OPERATION');
  });

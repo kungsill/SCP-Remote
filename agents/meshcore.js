@@ -827,7 +827,7 @@ else {
 
 
 // MeshAgent JavaScript Core Module. This code is sent to and running on the mesh agent.
-var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.20.3', value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
+var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.21.1', value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
 
 // Get the operating system description string
 try { require('os').name().then(function (v) { meshCoreObj.osdesc = v; meshCoreObjChanged(); }); } catch (ex) { }
@@ -2696,6 +2696,7 @@ function onTunnelClosed()
     }
     */
 
+    if (this.httprequest.scpClipboard) { this.httprequest.scpClipboard.close(); delete this.httprequest.scpClipboard; }
     // If there is a upload or download active on this connection, close the file
     if (this.httprequest.uploadFile) { fs.closeSync(this.httprequest.uploadFile); delete this.httprequest.uploadFile; delete this.httprequest.uploadFileid; delete this.httprequest.uploadFilePath; delete this.httprequest.uploadFileSize; }
     if (this.httprequest.downloadFile) { delete this.httprequest.downloadFile; }
@@ -3361,6 +3362,7 @@ function kvm_consentpromise_resolved(always)
 }
 
 function files_consent_ok(ws){
+    ws.httprequest.scpFilesAccepted = true;
     // User Consent Prompt is not required
     if (ws.httprequest.consent && (ws.httprequest.consent & 4)) {
         // User Notifications is required
@@ -3423,6 +3425,7 @@ function files_consent_ask(ws){
 
 function files_consentpromise_resolved(always)
 {
+    this.ws.httprequest.scpFilesAccepted = true;
     if (always && process.platform == 'win32') { server_set_consentTimer(this.ws.httprequest.userid); }
 
     // Success
@@ -4116,6 +4119,16 @@ function onTunnelData(data)
             if ((cmd.path != null) && (process.platform != 'win32') && (cmd.path[0] != '/')) { cmd.path = '/' + cmd.path; } // Add '/' to paths on non-windows
             //console.log(objToString(cmd, 0, ' '));
             switch (cmd.action) {
+                case 'scpclip': {
+                    // Never start an interactive helper before file access is accepted.
+                    // guestname is server supplied, not a browser command field.
+                    try {
+                        if (process.platform !== 'win32' || this.httprequest.scpFilesAccepted !== true || typeof this.httprequest.guestname !== 'string' || this.httprequest.guestname.indexOf('SCP-App: ') !== 0) { throw new Error('CLIPBOARD_ACCESS_DENIED'); }
+                        if (!this.httprequest.scpClipboard) { this.httprequest.scpClipboard = require('win-scp-clipboard').create(this); }
+                        this.httprequest.scpClipboard.send(cmd);
+                    } catch (ex) { this.write(JSON.stringify({ action: 'scpclip', id: cmd.id, ok: false, error: String(ex.message || ex) })); }
+                    break;
+                }
                 case 'ls': {
                     /*
                     // Close the watcher if required

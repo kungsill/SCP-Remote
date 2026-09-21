@@ -67,28 +67,9 @@
   finally{busy=false;signal=null;}
  }
  function isDesktop(e){const t=e.target;return desktop&&desktop.State===3&&!(t&&t.closest&&t.closest('input,textarea,select,[contenteditable="true"],#dialog'))&&document.getElementById('deskarea0')?.offsetParent!==null;}
- // SCP-Remote: a mouse-only way to do the local->remote paste, for operators who would rather
- // click than press Ctrl+V. It fires the very same run('out') the Ctrl+V handler does -- read
- // this computer's clipboard, carry it over, set the far clipboard and send the paste. The far
- // computer's own right-click menu cannot be reached from here, so this button stands in for it.
- // It appears only once the far agent supports the file clipboard.
- if(window.scpClipboardReady===true){
-  const pasteBtn=document.createElement('button');
-  pasteBtn.type='button';
-  pasteBtn.textContent=tr('📋 วางไฟล์ลงเครื่องรีโมต','📋 Paste file to remote');
-  pasteBtn.title=tr('คัดลอกไฟล์ในเครื่องคุณก่อน (Ctrl+C หรือคลิกขวา Copy) แล้วกดปุ่มนี้เพื่อวางลงเครื่องปลายทาง','Copy a file on your computer first (Ctrl+C or right-click Copy), then click to paste it onto the remote computer');
-  pasteBtn.className='scp-ui-btn';
-  pasteBtn.style.display='none';
-  pasteBtn.onmousedown=ev=>{ev.preventDefault();ev.stopPropagation();};
-  pasteBtn.onclick=ev=>{ev.preventDefault();ev.stopPropagation();run('out');};
-  document.body.appendChild(pasteBtn);
-  // Only show the button once the screen is actually connected. While the far computer is still
-  // being asked to allow the session, the button can do nothing but fail, so it stays hidden --
-  // driven by the page's own desktop state change rather than a poll.
-  const showPasteBtn=function(){pasteBtn.style.display=(typeof desktop!=='undefined'&&desktop&&desktop.State===3)?'inline-flex':'none';};
-  if(typeof window.onDesktopStateChange==='function'){const _odsc=window.onDesktopStateChange;window.onDesktopStateChange=function(){const r=_odsc.apply(this,arguments);try{showPasteBtn();}catch(e){}return r;};}
-  showPasteBtn();
- }
+ // The mouse paste button was removed at the operator's request: Ctrl+V already does the same
+ // local->remote paste, so the on-screen button was redundant. The keyboard handler below is the
+ // paste path now. (To bring the button back, recreate a button that calls run('out').)
  const held=new Set();
  document.addEventListener('keydown',e=>{if(e.ctrlKey&&!e.altKey&&!e.shiftKey&&['KeyC','KeyV'].includes(e.code)&&isDesktop(e)){e.preventDefault();e.stopImmediatePropagation();held.add(e.code);if(!e.repeat)run(e.code==='KeyC'?'in':'out');}},true);
  document.addEventListener('keyup',e=>{if(held.delete(e.code)){e.preventDefault();e.stopImmediatePropagation();}},true);

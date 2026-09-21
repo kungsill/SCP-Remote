@@ -57,6 +57,21 @@
   finally{busy=false;signal=null;}
  }
  function isDesktop(e){const t=e.target;return desktop&&desktop.State===3&&!(t&&t.closest&&t.closest('input,textarea,select,[contenteditable="true"],#dialog'))&&document.getElementById('deskarea0')?.offsetParent!==null;}
+ // SCP-Remote: a mouse-only way to do the local->remote paste, for operators who would rather
+ // click than press Ctrl+V. It fires the very same run('out') the Ctrl+V handler does -- read
+ // this computer's clipboard, carry it over, set the far clipboard and send the paste. The far
+ // computer's own right-click menu cannot be reached from here, so this button stands in for it.
+ // It appears only once the far agent supports the file clipboard.
+ if(window.scpClipboardReady===true){
+  const pasteBtn=document.createElement('button');
+  pasteBtn.type='button';
+  pasteBtn.textContent=tr('📋 วางไฟล์ลงเครื่องรีโมต','📋 Paste file to remote');
+  pasteBtn.title=tr('คัดลอกไฟล์ในเครื่องคุณก่อน (Ctrl+C หรือคลิกขวา Copy) แล้วกดปุ่มนี้เพื่อวางลงเครื่องปลายทาง','Copy a file on your computer first (Ctrl+C or right-click Copy), then click to paste it onto the remote computer');
+  pasteBtn.style.cssText='position:fixed;z-index:10000;left:16px;bottom:16px;padding:9px 14px;border:1px solid #0b7285;border-radius:8px;background:#0b7285;color:#fff;font:13px "Segoe UI",sans-serif;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+  pasteBtn.onmousedown=ev=>{ev.preventDefault();ev.stopPropagation();};
+  pasteBtn.onclick=ev=>{ev.preventDefault();ev.stopPropagation();run('out');};
+  document.body.appendChild(pasteBtn);
+ }
  const held=new Set();
  document.addEventListener('keydown',e=>{if(e.ctrlKey&&!e.altKey&&!e.shiftKey&&['KeyC','KeyV'].includes(e.code)&&isDesktop(e)){e.preventDefault();e.stopImmediatePropagation();held.add(e.code);if(!e.repeat)run(e.code==='KeyC'?'in':'out');}},true);
  document.addEventListener('keyup',e=>{if(held.delete(e.code)){e.preventDefault();e.stopImmediatePropagation();}},true);

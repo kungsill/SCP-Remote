@@ -53,6 +53,9 @@ app.whenReady().then(()=>{
    var original=CreateAgentRemoteDesktop;CreateAgentRemoteDesktop=function(){var m=original.apply(this,arguments);m.ImageType=2;return m;};
    var tries=0,timer=setInterval(function(){var b=document.getElementById('connectbutton1');if(b&&!b.disabled){clearInterval(timer);connectDesktop(null,3);}else if(++tries>=60){clearInterval(timer);}},500);
   })()`);
+  // Drag-a-file-onto-the-screen support. Kept in its own file so it stays plain JS (no template
+  // escaping) and never touches an upstream page; it only uses globals the sharing page exposes.
+  try { await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'inject-filedrop.js'),'utf8')); } catch (e) { }
   return {opened:true};
  });
  home.on('closed',()=>{if(remote&&!remote.isDestroyed())remote.close();home=null;});

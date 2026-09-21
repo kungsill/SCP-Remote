@@ -23,6 +23,7 @@
         riskCol: ['Attention', 'สิ่งที่ต้องดู'],
         actionCol: ['Actions', 'สั่งงาน'],
         remote: ['Remote', 'รีโมต'],
+        services: ['Services', 'เซอร์วิส'],
         shutdown: ['Shut down', 'ปิดเครื่อง'],
         scan: ['Check programs', 'ตรวจโปรแกรม'],
         refresh: ['Refresh', 'รีเฟรช'],
@@ -541,6 +542,10 @@
         cell.appendChild(button(t('scan'), 'scp-dash-scan', function () { scan(node); }));
         if (window.ScpMonitor) cell.appendChild(button(document.documentElement.lang==='th'?'สถานะเครื่อง / Task Manager':'Monitor / Task Manager','scp-dash-scan',function(){window.ScpMonitor.open(node);}));
         if (window.ScpCleanup) cell.appendChild(window.ScpCleanup.control(node));
+        if (window.ScpServices) cell.appendChild(button(t('services'), 'scp-dash-scan', function () {
+            if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
+            window.ScpServices.open(node);
+        }));
         if (fixing[node._id]) { cell.appendChild(element('small', 'scp-dash-note', fixing[node._id].text || t('fixWorking'))); if(window.ScpProgress&&fixing[node._id].progress)cell.appendChild(ScpProgress.view(fixing[node._id].progress,'driver')); }
         cell.appendChild(button(t('shutdown'), 'scp-dash-off', function () {
             if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
@@ -598,6 +603,7 @@
         window.meshserver.onMessage = function (server, message) {
             try {
                 if (window.ScpCare && window.ScpCare.receive(message)) { /* care answered its own request */ }
+                else if (window.ScpServices && window.ScpServices.receive(message)) { /* services answered its own request */ }
                 else if (window.ScpPrograms && window.ScpPrograms.receive(message)) { /* it answered its own question */ }
                 else if (message && (message.action === 'getsysinfo') && message.nodeid) {
                     specs[message.nodeid] = (message.hardware || message.noinfo) ? message : null;

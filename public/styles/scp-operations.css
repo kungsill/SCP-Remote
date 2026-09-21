@@ -3,3 +3,26 @@
 .scp-library-upload{margin:14px 0;padding:12px;background:var(--scp-soft,#eaf4f3);border-radius:10px}.scp-library-upload input{display:block;width:100%;margin:8px 0}.scp-library-upload progress{width:100%}
 
 #scpOperations .scp-client-room-choice{display:inline-flex;align-items:center;gap:8px;margin:8px 16px 8px 0;font-size:13px}#scpOperations .scp-client-room-choice input{display:inline-block;width:auto;padding:0}#scpOperations .scp-client-label{display:block;width:100%;max-width:340px;margin:10px 0 4px;padding:7px 10px;font-size:14px;border:1px solid #c7d6de;border-radius:6px}#scpOperations .scp-client-label:focus{outline:2px solid #2a8c9c;outline-offset:1px;border-color:#2a8c9c}#scpOperations .scp-client-label+small{display:block;margin-bottom:8px;color:#5b6b75;font-size:12px}#scpOperations .scp-layout-coordinate{display:inline-block;width:75px;margin:10px 8px}
+
+/* Service manager dialog */
+#scpServices{width:min(900px,92vw);max-height:86vh;border:1px solid #bedbd6;border-radius:16px;padding:22px;color:#203b38;background:#f8fbfa;font-family:inherit}
+#scpServices::backdrop{background:#1238}
+#scpServices header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#scpServices h2{margin:0}
+#scpServices>p{color:#4a5f5a;font-size:13px}
+#scpServices input[type=search]{width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #c7d6de;border-radius:8px;font:inherit;margin:6px 0}
+#scpServices .scp-svc-list{max-height:58vh;overflow:auto;margin-top:8px}
+#scpServices .scp-svc-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #dbe8e5;border-radius:10px;background:#fff;margin:6px 0}
+#scpServices .scp-svc-row strong{font-size:14px;display:flex;align-items:center;gap:6px}
+#scpServices .scp-svc-row small{display:block;color:#5b6b75;font-size:12px;margin-top:2px}
+#scpServices .scp-svc-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
+#scpServices .scp-svc-actions button{font:inherit;padding:6px 12px;border:1px solid #b5d7d1;border-radius:8px;background:#fff;color:#165c52;cursor:pointer}
+#scpServices .scp-svc-actions button:disabled{opacity:.45;cursor:default}
+#scpServices .scp-svc-start{color:#0b7285!important;border-color:#8fd0c6!important}
+#scpServices .scp-svc-stop{color:#a3341f!important;border-color:#e2b3a8!important}
+#scpServices .scp-svc-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px}
+#scpServices .scp-svc-on{background:#e3f6ee;color:#0b7a4a}
+#scpServices .scp-svc-off{background:#f3e6e2;color:#a3341f}
+#scpServices .scp-svc-other{background:#eef1f2;color:#5b6b75}
+.night #scpServices{background:#182c2a;color:#e0efeb}
+.night #scpServices .scp-svc-row{background:#203b37;border-color:#2b4a45}

@@ -78,9 +78,16 @@
   pasteBtn.textContent=tr('📋 วางไฟล์ลงเครื่องรีโมต','📋 Paste file to remote');
   pasteBtn.title=tr('คัดลอกไฟล์ในเครื่องคุณก่อน (Ctrl+C หรือคลิกขวา Copy) แล้วกดปุ่มนี้เพื่อวางลงเครื่องปลายทาง','Copy a file on your computer first (Ctrl+C or right-click Copy), then click to paste it onto the remote computer');
   pasteBtn.className='scp-ui-btn';
+  pasteBtn.style.display='none';
   pasteBtn.onmousedown=ev=>{ev.preventDefault();ev.stopPropagation();};
   pasteBtn.onclick=ev=>{ev.preventDefault();ev.stopPropagation();run('out');};
   document.body.appendChild(pasteBtn);
+  // Only show the button once the screen is actually connected. While the far computer is still
+  // being asked to allow the session, the button can do nothing but fail, so it stays hidden --
+  // driven by the page's own desktop state change rather than a poll.
+  const showPasteBtn=function(){pasteBtn.style.display=(typeof desktop!=='undefined'&&desktop&&desktop.State===3)?'inline-flex':'none';};
+  if(typeof window.onDesktopStateChange==='function'){const _odsc=window.onDesktopStateChange;window.onDesktopStateChange=function(){const r=_odsc.apply(this,arguments);try{showPasteBtn();}catch(e){}return r;};}
+  showPasteBtn();
  }
  const held=new Set();
  document.addEventListener('keydown',e=>{if(e.ctrlKey&&!e.altKey&&!e.shiftKey&&['KeyC','KeyV'].includes(e.code)&&isDesktop(e)){e.preventDefault();e.stopImmediatePropagation();held.add(e.code);if(!e.repeat)run(e.code==='KeyC'?'in':'out');}},true);

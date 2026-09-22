@@ -1,0 +1,59 @@
+diff --git a/microscript/ILibDuktape_WebRTC.c b/microscript/ILibDuktape_WebRTC.c
+index 3f3f69f..ff4389f 100644
+--- a/microscript/ILibDuktape_WebRTC.c
++++ b/microscript/ILibDuktape_WebRTC.c
+@@ -613,7 +613,8 @@ duk_ret_t ILibDuktape_WebRTC_newFactory(duk_context *ctx)
+ 	ILibDuktape_WriteID(ctx, "webRTC");
+ 	factory = ILibWrapper_WebRTC_ConnectionFactory_CreateConnectionFactory2(duk_ctx_chain(ctx), 0, rtcert);
+ 	duk_push_pointer(ctx, factory);														// [factory][ptr]
+-	duk_put_prop_string(ctx, -2, ILibDuktape_WebRTC_ConnectionFactoryPtr);				// [factory]
++	duk_put_prop_string(ctx, -2, ILibDuktape_WebRTC_ConnectionFactoryPtr);
++	duk_push_true(ctx); duk_put_prop_string(ctx, -2, "scpEcdsa");				// [factory]
+ 	ILibDuktape_CreateFinalizer(ctx, ILibDuktape_WebRTC_ConnectionFactory_Finalizer);
+ 
+ 	ILibDuktape_CreateInstanceMethod(ctx, "createConnection", ILibDuktape_WebRTC_CreateConnection, 0);
+@@ -635,7 +636,8 @@ void ILibDuktape_WebRTC_Push(duk_context *ctx, void *chain)
+ 	ILibDuktape_WriteID(ctx, "webRTC");
+ 	factory = ILibWrapper_WebRTC_ConnectionFactory_CreateConnectionFactory2(chain, 0, rtcert);
+ 	duk_push_pointer(ctx, factory);														// [factory][ptr]
+-	duk_put_prop_string(ctx, -2, ILibDuktape_WebRTC_ConnectionFactoryPtr);				// [factory]
++	duk_put_prop_string(ctx, -2, ILibDuktape_WebRTC_ConnectionFactoryPtr);
++	duk_push_true(ctx); duk_put_prop_string(ctx, -2, "scpEcdsa");				// [factory]
+ 	ILibDuktape_CreateFinalizer(ctx, ILibDuktape_WebRTC_ConnectionFactory_Finalizer);
+ 
+ 	ILibDuktape_CreateInstanceMethod(ctx, "createConnection", ILibDuktape_WebRTC_CreateConnection, 0);
+diff --git a/microstack/ILibWrapperWebRTC.c b/microstack/ILibWrapperWebRTC.c
+index d97adac..9b4a410 100644
+--- a/microstack/ILibWrapperWebRTC.c
++++ b/microstack/ILibWrapperWebRTC.c
+@@ -463,14 +463,23 @@ void ILibWrapper_WebRTC_InitializeCrypto(ILibWrapper_WebRTC_ConnectionFactoryStr
+ 	if (tls != ILibWebWrapperWebRTC_ConnectionFactory_INIT_CRYPTO_LATER && factory->cert.x509 == NULL)
+ 	{
+ 		// Init Certs
+-		if (tls == NULL)
++		/* SCP-Remote: a dedicated P-256 identity for DTLS; keep the agent TLS identity unchanged. */
+ 		{
+-			util_mkCert(NULL, &(factory->cert), 2048, 10000, "localhost", CERTIFICATE_ROOT, NULL);
+-		}
+-		else
+-		{
+-			memcpy_s(&(factory->cert), sizeof(struct util_cert), tls, sizeof(struct util_cert));
+-			factory->cert.flags |= ILibCrypto_Cert_Ownership_Other;
++			EC_KEY *ec = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
++			EVP_PKEY *key = EVP_PKEY_new();
++			X509 *cert = X509_new();
++			if (ec == NULL || key == NULL || cert == NULL || EC_KEY_generate_key(ec) != 1) { ILIBCRITICALEXIT(254); }
++			if (EVP_PKEY_assign_EC_KEY(key, ec) != 1) { ILIBCRITICALEXIT(254); }
++			X509_set_version(cert, 2);
++			ASN1_INTEGER_set(X509_get_serialNumber(cert), 1);
++			X509_gmtime_adj(X509_get_notBefore(cert), -3600);
++			X509_gmtime_adj(X509_get_notAfter(cert), 365 * 24 * 3600);
++			X509_set_pubkey(cert, key);
++			X509_NAME_add_entry_by_txt(X509_get_subject_name(cert), "CN", MBSTRING_ASC, (unsigned char*)"SCP-Remote DTLS", -1, -1, 0);
++			X509_set_issuer_name(cert, X509_get_subject_name(cert));
++			if (X509_sign(cert, key, EVP_sha256()) <= 0) { ILIBCRITICALEXIT(254); }
++			factory->cert.x509 = cert;
++			factory->cert.pkey = key;
+ 		}
+ 
+ 		SSL_CTX_use_certificate(factory->ctx, factory->cert.x509);

@@ -82,6 +82,7 @@
     "service:start": "node scripts/service-hospital.js start",
     "service:stop": "node scripts/service-hospital.js stop",
     "service:restart": "node scripts/service-hospital.js restart",
+    "update:system": "node scripts/update-system.js",
     "check:config": "node scripts/check-config.js",
     "allow:subnet": "node scripts/allow-subnet.js",
     "build:setup-exe": "node scripts/build-setup-exe.js",

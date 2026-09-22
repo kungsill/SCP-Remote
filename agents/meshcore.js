@@ -831,7 +831,7 @@ else {
 
 
 // MeshAgent JavaScript Core Module. This code is sent to and running on the mesh agent.
-var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.21.4', value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
+var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.21.5', scpLanNative: (require('ILibWebRTC').scpEcdsa === true), value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
 
 // Get the operating system description string
 try { require('os').name().then(function (v) { meshCoreObj.osdesc = v; meshCoreObjChanged(); }); } catch (ex) { }
@@ -3591,6 +3591,7 @@ function onTunnelData(data)
     if (this.httprequest.state == 0) {
         // Check if this is a relay connection
         if ((data == 'c') || (data == 'cr')) {
+            this.httprequest.scpServerRecording = (data == 'cr');
             this.httprequest.state = 1;
             //sendConsoleText("Tunnel #" + this.httprequest.index + " now active", this.httprequest.sessionid);
         }
@@ -4511,6 +4512,10 @@ function onTunnelControlData(data, ws) {
     if (ws.httprequest && ws.httprequest.desktopviewonly === true) {
         if (obj.type === 'lock' || obj.type === 'autolock' || obj.type === 'offer') return;
         if (obj.type === 'options') delete obj.autolock;
+    }
+    if (typeof obj.type === 'string' && obj.type.indexOf('scp-lan-') === 0) {
+        try { require('scp-lan').handle(ws, obj, rtc); } catch (e) { }
+        return;
     }
     switch (obj.type) {
         case 'lock': {

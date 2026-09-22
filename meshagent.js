@@ -1917,6 +1917,7 @@ module.exports.CreateMeshAgent = function (parent, db, ws, req, args, domain) {
                 // A full core report confirms the hospital module release, not just the native executable.
                 if (command.caps != null) {
                     const release = (typeof command.scpRelease === 'string' && /^[0-9.]{1,32}$/.test(command.scpRelease)) ? command.scpRelease : null;
+                    if (device.agent.scpLanNative !== (command.scpLanNative === true)) { device.agent.scpLanNative = (command.scpLanNative === true); change = 1; }
                     if (release) { device.agent.scpRelease = release; device.agent.scpReportedAt = Date.now(); change = 1; }
                     else if (device.agent.scpRelease) { delete device.agent.scpRelease; delete device.agent.scpReportedAt; change = 1; }
                 }

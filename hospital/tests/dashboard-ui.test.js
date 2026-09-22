@@ -77,6 +77,15 @@ function liveButton(w) {
     return w.document.querySelector('.scp-dash-live');
 }
 
+test('fleet snapshot returns counts without starting thumbnail capture', (t) => {
+    const { api, connections } = setup(t);
+    const data = api.snapshot();
+    assert.equal(data.total, 3);
+    assert.equal(data.online, 2);
+    assert.equal(data.nodes.length, 3);
+    assert.equal(connections.length, 0);
+});
+
 test('no computer is watched until someone turns the screens on', (t) => {
     const { w, connections, api } = setup(t);
     api.show();

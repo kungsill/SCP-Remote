@@ -1153,7 +1153,7 @@
     // what was seen and has to be readable. So ask that one computer for a single
     // frame at full size and best quality, wait until it has all arrived, save that,
     // and put the small cheap picture back.
-    function snapshot(node, entry) {
+    function captureThumbnail(node, entry) {
         if (entry.capturing) return;
         var desk = entry.desk;
         if (!desk || !desk.m || (desk.m.State !== 3) || (typeof desk.m.SendCompressionLevel !== 'function')) {
@@ -1240,7 +1240,7 @@
         canvas.className = 'scp-dash-tile-canvas';
         var overlay = element('div', 'scp-dash-tile-overlay');
         entry = { box: box, canvas: canvas, overlay: overlay, desk: null, capturing: false, capture: null };
-        var shot = button('⤓', 'scp-dash-tile-shot', function (event) { event.stopPropagation(); snapshot(node, entry); });
+        var shot = button('⤓', 'scp-dash-tile-shot', function (event) { event.stopPropagation(); captureThumbnail(node, entry); });
         shot.title = t('liveShot');
         box.appendChild(canvas);
         box.appendChild(overlay);

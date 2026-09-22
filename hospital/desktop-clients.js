@@ -2,6 +2,7 @@
 const crypto=require('crypto');
 const locks=new Map(),rates=new Map();
 function consentReady(node){const v=String(node.agent&&node.agent.scpRelease||'').split('.').map(Number),min=[2026,9,20,2];if(v.length!==4||v.some(n=>!Number.isFinite(n)))return false;for(let i=0;i<4;i++){if(v[i]!==min[i])return v[i]>min[i];}return true;}
+function compareLan(value){const a=String(value).split('.').map(Number),b=[2026,9,21,5];if(a.length!==4||a.some(n=>!Number.isFinite(n)))return false;for(let i=0;i<4;i++)if(a[i]!==b[i])return a[i]>b[i];return true;}
 const digest=v=>crypto.createHash('sha256').update(v).digest('hex');
 const get=(db,id)=>new Promise((resolve,reject)=>db.Get(id,(e,r)=>e?reject(e):resolve(r&&r[0])));
 const all=(db,type)=>new Promise((resolve,reject)=>db.GetAllTypeNoTypeField(type,'',(e,r)=>e?reject(e):resolve(r||[])));
@@ -76,7 +77,7 @@ exports.api=async function(web,input,token){
    const release=String(node.agent&&node.agent.scpRelease||'').split('.').map(Number),clipboardMin=[2026,9,21,1];
    let clipboard=release.length===4&&release.every(Number.isFinite);
    if(clipboard){for(let i=0;i<4;i++){if(release[i]!==clipboardMin[i]){clipboard=release[i]>clipboardMin[i];break;}}}
-   return {path:'/sharing?c='+encodeURIComponent(cookie)+'&lang='+(input.language==='en'?'en':'th'),expires,clipboard};
+   return {path:'/sharing?c='+encodeURIComponent(cookie)+'&lang='+(input.language==='en'?'en':'th'),expires,clipboard,lan:node.agent.scpLanNative===true&&compareLan(node.agent.scpRelease)};
   }
   throw Error('UNKNOWN_OPERATION');
  });

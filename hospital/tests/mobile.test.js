@@ -441,3 +441,28 @@ test('the page no longer offers a full-site link', () => {
     const page = fs.readFileSync(mobile.pageFile, 'utf8');
     assert.ok(!/id="full"/.test(page), 'it should look like the app, with nothing else on it');
 });
+
+test('a link aimed at a particular device is let through, not sent to the list', () => {
+    // /m opens the remote desktop as /?node=..&viewmode=10. Redirecting that to /m put the
+    // technician back on the device list, so pressing a computer appeared to do nothing.
+    for (const query of [
+        { node: 'abc', viewmode: '10', hide: '16' },
+        { viewmode: '11' },
+        { key: 'something' },
+        { node: 'abc', m: '1' }
+    ]) {
+        const r = reply();
+        let through = false;
+        mobile.root(withAdmin(), { query: query, headers: {}, session: session() }, r, () => { through = true; }, '/');
+        assert.equal(through, true, JSON.stringify(query) + ' should reach the full site');
+        assert.equal(r.redirected, null);
+    }
+});
+
+test('a bare visit to the root is still the front door', () => {
+    for (const query of [{}, { m: '1' }]) {
+        const r = reply();
+        mobile.root(withAdmin(), { query: query, headers: {}, session: session() }, r, () => { }, '/');
+        assert.equal(r.redirected, '/m', JSON.stringify(query) + ' is a plain visit');
+    }
+});

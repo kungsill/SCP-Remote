@@ -57,8 +57,6 @@ exports.root = function (web, req, res, next, url) {
     const q = (req && req.query) || {};
     const signedIn = signedInUser(web, req) != null;
 
-    if ((q.m === '1') && signedIn) { res.redirect(root + 'm'); return; }
-
     // The way to the full MeshCentral site, which is otherwise unreachable now that the link is
     // gone from the page. Device groups, moving a computer between wards and adding an account
     // all live there, so this has to keep working:  https://remote.kpsnana.com/?m=0
@@ -68,6 +66,15 @@ exports.root = function (web, req, res, next, url) {
     if (!signedIn) { next(); return; } // Before that the login page is the same either way.
     if (req.session && (req.session.scpView === 'full')) { next(); return; }
 
+    // Only a bare visit to the root is a request for the front door. Anything carrying a query
+    // was aimed somewhere specific and goes through untouched - above all the remote desktop
+    // itself, which /m opens as /?node=..&viewmode=10. Redirecting that sent the technician
+    // straight back to the device list, so the button looked like it did nothing.
+    //
+    // Checked before the m=1 marker below, so a link to a computer wins over it either way.
+    for (const key in q) { if (key !== 'm') { next(); return; } }
+
+    // A bare root, or the marker that carries someone back here after logging in.
     res.redirect(root + 'm');
 };
 

@@ -9,19 +9,22 @@ const path = require('path');
 // the real source in webserver.js, so the message cannot quietly disappear again.
 const source = fs.readFileSync(path.join(__dirname, '../../webserver.js'), 'utf8');
 
-function loadReporter() {
+// A clock can be passed in to step past the quiet hour without waiting for one.
+function loadReporter(clock) {
     const start = source.indexOf('const refusedAgentRanges = {};');
     assert.ok(start > 0, 'reportRefusedAgent should still exist in webserver.js');
     const end = source.indexOf('\n    }', source.indexOf('function reportRefusedAgent', start));
     assert.ok(end > start, 'could not find the end of reportRefusedAgent');
     const body = source.substring(start, end + 6);
-    const lines = [];
-    const sandbox = new Function('cleanRemoteAddr', 'console', body + '\nreturn reportRefusedAgent;');
+    const lines = [], events = [];
+    const sandbox = new Function('cleanRemoteAddr', 'console', 'obj', 'Date', body + '\nreturn reportRefusedAgent;');
     const reporter = sandbox(
         function (addr) { return (typeof addr != 'string') ? null : (addr.indexOf('::ffff:') === 0 ? addr.substring(7) : addr); },
-        { log: line => lines.push(line) }
+        { log: line => lines.push(line) },
+        { parent: { DispatchEvent: function (targets, source, event) { events.push({ targets: targets, event: event }); } } },
+        clock ? { now: function () { return clock.at; } } : Date
     );
-    return { report: reporter, lines: lines };
+    return { report: reporter, lines: lines, events: events };
 }
 
 test('a refused agent is named, with the range and the command that allows it', () => {
@@ -61,10 +64,61 @@ test('a refusal with no usable address is ignored rather than throwing', () => {
 });
 
 test('both places that refuse an agent by address report it', () => {
-    // Count the call sites only; the declaration reads the same way.
-    const calls = source.split('reportRefusedAgent(req, res);').length - 1;
+    // Count the call sites only; the declaration reads differently. The per-domain check
+    // knows which domain refused and says so, the server-wide one runs before that is known.
+    const calls = source.split(/reportRefusedAgent\(req, res(?:, domain)?\);/).length - 1;
     assert.equal(calls, 2, 'the server-wide and the per-domain address checks must both report');
     // And the refusal must still happen: reporting is added to it, not instead of it.
     assert.ok(source.indexOf('obj.blockedAgents++; reportRefusedAgent(req, res); return null;') > 0,
-        'the connection must still be refused and counted');
+        'the server-wide check must still refuse and count the connection');
+    assert.ok(source.indexOf('obj.blockedAgents++; reportRefusedAgent(req, res, domain); return null;') > 0,
+        'the per-domain check must still refuse and count the connection');
+});
+
+// The log was not enough on its own: 192.168.4.0/24 in September, then 192.168.6.0/24 and
+// 192.168.60.0/24, each waiting days with the answer sitting in a file nobody opens.
+test('a refusal also reaches administrators as a server event, not only the log', () => {
+    const r = loadReporter();
+    r.report({ ip: '192.168.6.195' }, null);
+    assert.equal(r.events.length, 1, 'the refusal must be dispatched as an event');
+    assert.deepEqual(r.events[0].targets, ['*', 'server-users'], 'administrators are the audience');
+    const e = r.events[0].event;
+    assert.equal(e.scpRange, '192.168.6.0/24');
+    assert.equal(e.scpAddress, '192.168.6.195');
+    assert.ok(e.msg.includes('192.168.6.0/24'), 'the event names the range');
+    assert.ok(e.msg.includes('allow-subnet.js add 192.168.6.0/24'), 'the event carries the command that fixes it');
+});
+
+test('the per-domain refusal is filed under the domain that refused it', () => {
+    const r = loadReporter();
+    r.report({ ip: '192.168.6.195' }, null, { id: 'ward' });
+    assert.equal(r.events[0].event.domain, 'ward');
+    const s = loadReporter();
+    s.report({ ip: '192.168.6.195' }, null); // Server-wide check, before any domain is known
+    assert.equal(s.events[0].event.domain, '');
+});
+
+test('every attempt is counted, even while the hourly message stays quiet', () => {
+    const r = loadReporter();
+    for (var i = 0; i < 5; i++) { r.report({ ip: '192.168.6.' + (100 + i) }, null); }
+    assert.equal(r.lines.length, 2, 'one range still says it once an hour, not five times');
+    assert.equal(r.events.length, 1, 'and dispatches once, not five times');
+    assert.equal(r.events[0].event.scpCount, 1, 'the first report is the first attempt');
+});
+
+test('a range that keeps being refused says how many times when it speaks again', () => {
+    const clock = { at: 1000000 };
+    const r = loadReporter(clock);
+    r.report({ ip: '192.168.6.195' }, null);
+    assert.ok(!r.lines[0].includes('พยายามแล้ว'), 'the first message has no repeat count to give');
+
+    // Four more computers try during the quiet hour: counted, nothing said.
+    for (var i = 0; i < 4; i++) { clock.at += 60000; r.report({ ip: '192.168.6.' + (196 + i) }, null); }
+    assert.equal(r.lines.length, 2, 'the hour is not up yet');
+
+    clock.at += 3600001; // An hour and a moment later
+    r.report({ ip: '192.168.6.195' }, null);
+    assert.equal(r.events.length, 2, 'the range speaks again once the hour is up');
+    assert.equal(r.events[1].event.scpCount, 6, 'and reports every attempt since it started, not just this one');
+    assert.ok(r.lines[2].includes('พยายามแล้ว 6 ครั้ง'), 'the log says how many computers have been turned away');
 });

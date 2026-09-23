@@ -878,7 +878,7 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
         if ((parent.config.settings.agentallowedip != null) && (checkIpAddressEx(req, res, parent.config.settings.agentallowedip, null) == false)) { obj.blockedAgents++; reportRefusedAgent(req, res); return null; }
         const domain = (req.url ? getDomain(req) : getDomain(res));
         if ((domain.agentblockedip != null) && (checkIpAddressEx(req, res, domain.agentblockedip, null) == true)) { obj.blockedAgents++; return null; }
-        if ((domain.agentallowedip != null) && (checkIpAddressEx(req, res, domain.agentallowedip, null) == false)) { obj.blockedAgents++; reportRefusedAgent(req, res); return null; }
+        if ((domain.agentallowedip != null) && (checkIpAddressEx(req, res, domain.agentallowedip, null) == false)) { obj.blockedAgents++; reportRefusedAgent(req, res, domain); return null; }
         return domain;
     }
 
@@ -886,18 +886,41 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
     // an address range nobody remembered to allow simply never appears — no message on the
     // server, none on the computer, nothing naming the reason. That is the hard part, not
     // the fix. Name the address once per range per hour, with the command that allows it.
+    //
+    // The log alone was not enough. Twice now a ward has waited days with the answer sitting
+    // in a file nobody opens — 192.168.4.0/24 in September, then 192.168.6.0/24 and
+    // 192.168.60.0/24. So the same refusal is also dispatched as a server event, where an
+    // administrator meets it just by looking at the site, and every attempt is counted even
+    // while the hourly message stays quiet.
     const refusedAgentRanges = {};
-    function reportRefusedAgent(req, res) {
+    function reportRefusedAgent(req, res, domain) {
         try {
             const address = cleanRemoteAddr((req && req.ip) || (res && res.connection && res.connection.remoteAddress) || '');
             if (!address) { return; }
             const parts = address.split('.');
             const range = (parts.length === 4) ? (parts[0] + '.' + parts[1] + '.' + parts[2] + '.0/24') : address;
             const now = Date.now();
-            if (refusedAgentRanges[range] && ((now - refusedAgentRanges[range]) < 3600000)) { return; }
-            refusedAgentRanges[range] = now;
-            console.log('ปฏิเสธเอเจนต์จาก ' + address + ' เพราะวง ' + range + ' ไม่อยู่ใน agentAllowedIP');
+            let seen = refusedAgentRanges[range];
+            if (seen == null) { seen = refusedAgentRanges[range] = { range: range, count: 0, first: now, last: now, told: null }; }
+            seen.count++;
+            seen.last = now;
+            seen.address = address;
+            // Said once an hour per range, however many computers keep trying. told is null
+            // until it has been said once, rather than a zero that only reads as "long ago"
+            // because the clock happens to be large.
+            if ((seen.told != null) && ((now - seen.told) < 3600000)) { return; }
+            const repeat = (seen.told == null) ? '' : (' (พยายามแล้ว ' + seen.count + ' ครั้ง)');
+            seen.told = now;
+            console.log('ปฏิเสธเอเจนต์จาก ' + address + ' เพราะวง ' + range + ' ไม่อยู่ใน agentAllowedIP' + repeat);
             console.log('  อนุญาตด้วย: node scripts/allow-subnet.js add ' + range + '   แล้ว npm run service:restart');
+            try {
+                obj.parent.DispatchEvent(['*', 'server-users'], obj, {
+                    etype: 'server', action: 'scprefusedagent', domain: (domain && domain.id) || '',
+                    scpRange: range, scpAddress: address, scpCount: seen.count,
+                    msg: 'เครื่องจาก ' + address + ' ต่อเข้าเซิร์ฟเวอร์ไม่ได้ เพราะวง ' + range + ' ยังไม่ได้รับอนุญาต' + repeat +
+                        ' — อนุญาตด้วย: node scripts/allow-subnet.js add ' + range + ' แล้ว npm run service:restart'
+                });
+            } catch (ex) { }
         } catch (ex) { }
     }
 

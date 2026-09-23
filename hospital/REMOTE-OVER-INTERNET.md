@@ -143,6 +143,75 @@ MeshCentral แก้ให้แล้วถ้าบอกมัน: [webserve
 
 ---
 
+---
+
+## ค่าที่ต้องกรอกจริง (ตรวจกับเครื่องและเอกสาร Cloudflare แล้ว — 23 ก.ย. 2569)
+
+บัญชี Cloudflare: `Kungsill.15@gmail.com` โดเมน **`kpsnana.com`** ใช้ชื่อตัวอย่างว่า `remote.kpsnana.com`
+
+### 1. Route ของ tunnel
+
+**Networking → Tunnels →** เลือก tunnel **→ Routes → Add route → Published application**
+
+| ช่อง | ค่า | ทำไม |
+| --- | --- | --- |
+| Hostname | `remote` . `kpsnana.com` | |
+| Service URL | `https://127.0.0.1:8443` | `cloudflared` อยู่เครื่องเดียวกับเซิร์ฟเวอร์ |
+| Origin Server Name | `127.0.0.1` | |
+| CA Pool | `F:\EX\sichomphu-remote\.local\scp-remote\root-cert-public.crt` | |
+| Disable TLS certificate verification | **ปิดไว้** | |
+
+**ไม่ต้องปิดการตรวจ TLS** ใบรับรองของเซิร์ฟเวอร์ (`webserver-cert-public.crt`) มี SAN ครอบ `127.0.0.1` และ `localhost` อยู่แล้ว และออกโดย `MeshCentralRoot-e68095` ซึ่งอยู่ในไฟล์ `root-cert-public.crt` — ชี้ CA Pool ไปที่ไฟล์นั้นก็ตรวจผ่านครบ
+
+> ใช้ `noTLSVerify` เฉพาะตอนไล่ปัญหาชั่วคราวเท่านั้น แล้วปิดกลับ
+
+### 2. Access — ยกเว้น 4 เส้นทางที่เอเจนต์ใช้ ไม่ใช่แค่ `agent.ashx`
+
+ตรวจในโค้ดแล้ว **เอเจนต์ไม่ได้ใช้แค่ `/agent.ashx`** — `agents/meshcore.js` ต่อเข้า `meshrelay.ashx?id=...` เองตอนเปิดเซสชัน ถ้าเอา Access ครอบทั้งโดเมน **หน้าจอรีโมตจะเปิดไม่ขึ้นทั้งระบบ** แม้เครื่องจะยังขึ้นออนไลน์
+
+เส้นทางที่ต้องให้ผ่านโดยไม่ต้องล็อกอิน:
+
+| เส้นทาง | ใช้ทำอะไร |
+| --- | --- |
+| `/agent.ashx` | ช่องสัญญาณหลักของเอเจนต์ |
+| `/meshrelay.ashx` | เอเจนต์ต่อเข้ามาเมื่อเปิดหน้าจอ/เทอร์มินัล |
+| `/agenttransfer.ashx` | รับ–ส่งไฟล์ |
+| `/agentdownload.ashx` | เอเจนต์ดึงโมดูลรุ่นใหม่ |
+
+**Zero Trust → Access → Applications** สร้าง 2 ชุด (path ที่เจาะจงกว่าชนะ)
+
+1. **Self-hosted** โดเมน `remote.kpsnana.com` + path ข้างบนแต่ละอัน → policy **Bypass / Everyone**
+2. **Self-hosted** โดเมน `remote.kpsnana.com` (ทั้งโดเมน) → policy **Allow** เฉพาะอีเมลของเจ้าหน้าที่
+
+ทั้งสี่เส้นทางยังมีการยืนยันตัวตนของ MeshCentral เองอยู่ (ใบรับรองเอเจนต์ / คุกกี้ relay) การ bypass นี้แค่ไม่บังคับ "ล็อกอินอีเมล" ซึ่งเอเจนต์ทำไม่ได้อยู่แล้ว
+
+### 3. ฝั่งเซิร์ฟเวอร์
+
+```json
+"trustedProxy": "127.0.0.1"
+```
+
+แล้วเปิด allowlist ให้กว้าง พร้อม `force2factor: true` — **รันตรวจก่อนเริ่มบริการใหม่เสมอ**
+
+```
+npm run check:config
+```
+
+ถ้ายังมีบัญชีที่ไม่ได้ตั้ง Authenticator หรือยังไม่บังคับ 2FA มันจะขึ้น "ยังไม่พร้อมเปิดใช้" และไม่ให้ผ่าน
+
+### 4. เครื่องนอกโรงพยาบาล
+
+เฉพาะเครื่องที่อยู่นอก **ขณะที่ยังต่ออยู่ใน LAN** สั่งผ่านคอนโซลของหน้าเว็บ
+
+```
+msh set MeshServer "wss://remote.kpsnana.com/agent.ashx"
+service restart
+```
+
+**เครื่องในโรงพยาบาลไม่ต้องแตะ** ปล่อยให้ใช้ `wss://192.168.2.25:8443/agent.ashx` ต่อไป
+
+---
+
 ## ⚠️ กับดักที่ทำให้เครื่องหลุดทั้ง 91 เครื่อง
 
 เอเจนต์ผูกกับเซิร์ฟเวอร์ด้วยสองค่า (ดู [MOVING-THE-SERVER.md](MOVING-THE-SERVER.md))

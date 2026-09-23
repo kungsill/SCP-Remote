@@ -138,6 +138,30 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
     // Send data through the websocket
     obj.send = function (object) { try { ws.send(JSON.stringify(object)); } catch(ex) {} }
 
+    // SCP-Remote: two computers carrying the same name inside one ward is a real hazard —
+    // the technician picks a row, takes over a screen, and it is the wrong screen. Upstream
+    // never checks, so check here. Devices are not held in memory (an earlier draft of this
+    // walked parent.nodes, which does not exist, and so found nothing ever), so this asks the
+    // database for the group and answers through a callback.
+    // Returns { field: 'name'|'host', node: <the device already using it> }, or null when free.
+    function findDuplicateDeviceInMesh(meshid, devicename, hostname, excludeNodeId, func) {
+        if ((typeof meshid != 'string') || (meshid == '')) { func(null); return; }
+        const wantedName = (typeof devicename == 'string') ? devicename.trim().toLowerCase() : null;
+        const wantedHost = (typeof hostname == 'string') ? hostname.trim().toLowerCase() : null;
+        if (((wantedName == null) || (wantedName == '')) && ((wantedHost == null) || (wantedHost == ''))) { func(null); return; }
+        db.GetAllTypeNoTypeFieldMeshFiltered([meshid], null, domain.id, 'node', null, 0, 0, function (err, docs) {
+            // A database hiccup must not block a rename: say "no duplicate" and let it through.
+            if ((err != null) || (docs == null)) { func(null); return; }
+            for (var i = 0; i < docs.length; i++) {
+                const node = docs[i];
+                if ((node == null) || (node._id == excludeNodeId) || (node.meshid != meshid)) { continue; }
+                if ((wantedName != null) && (wantedName != '') && (typeof node.name == 'string') && (node.name.trim().toLowerCase() == wantedName)) { func({ field: 'name', node: node }); return; }
+                if ((wantedHost != null) && (wantedHost != '') && (typeof node.host == 'string') && (node.host.trim().toLowerCase() == wantedHost)) { func({ field: 'host', node: node }); return; }
+            }
+            func(null);
+        });
+    }
+
     // Clean a IPv6 address that encodes a IPv4 address
     function cleanRemoteAddr(addr) { if (addr.startsWith('::ffff:')) { return addr.substring(7); } else { return addr; } }
 
@@ -3450,6 +3474,38 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                         break;
                     }
 
+                    // SCP-Remote: a rename that collides with another computer in the same device
+                    // group is refused before anything is written, so a refused rename changes
+                    // nothing at all. Finding the collision needs the database, which is async, so
+                    // the original handler below is wrapped as scpApplyDeviceChange() and called
+                    // only once the name is known to be free. Its body is left at the indentation
+                    // upstream gave it, so that upgrading MeshCentral stays a readable diff.
+                    if ((typeof command.name == 'string') || (typeof command.host == 'string')) {
+                        parent.GetNodeWithRights(domain, user, command.nodeid, function (node, rights, visible) {
+                            // Missing node and access problems are reported by the handler below,
+                            // in the one place that already words them. Do not answer twice.
+                            if ((node == null) || ((rights & MESHRIGHT_MANAGECOMPUTERS) == 0)) { scpApplyDeviceChange(); return; }
+                            const wantName = ((typeof command.name == 'string') && (command.name != node.name)) ? command.name : null;
+                            const wantHost = ((typeof command.host == 'string') && (command.host != node.host)) ? command.host : null;
+                            if ((wantName == null) && (wantHost == null)) { scpApplyDeviceChange(); return; }
+                            findDuplicateDeviceInMesh(node.meshid, wantName, wantHost, node._id, function (dup) {
+                                if (dup == null) { scpApplyDeviceChange(); return; }
+                                const taken = (dup.field == 'name')
+                                    ? ('มีเครื่องอื่นในกลุ่มนี้ใช้ชื่อ "' + wantName + '" อยู่แล้ว')
+                                    : ('มีเครื่องอื่นในกลุ่มนี้ใช้ชื่อเครือข่าย "' + wantHost + '" อยู่แล้ว');
+                                // The rename dialog sends no responseid, so a result alone would be
+                                // refused in silence — the name simply would not change and nobody
+                                // would be told why. Say it on screen the way a clashing email does.
+                                obj.send({ action: 'msg', type: 'notify', id: Math.random(), tag: 'ServerNotify', title: 'เปลี่ยนชื่อเครื่องไม่ได้', value: taken + ' (' + dup.node.name + ')' });
+                                if (command.responseid != null) { try { ws.send(JSON.stringify({ action: 'changedevice', responseid: command.responseid, result: taken })); } catch (ex) { } }
+                            });
+                        });
+                        break;
+                    }
+                    scpApplyDeviceChange();
+                    break;
+
+                    function scpApplyDeviceChange() {
                     // Get the node and the rights for this node
                     parent.GetNodeWithRights(domain, user, command.nodeid, function (node, rights, visible) {
                         if ((rights & MESHRIGHT_MANAGECOMPUTERS) == 0) {
@@ -3583,7 +3639,7 @@ module.exports.CreateMeshUser = function (parent, db, ws, req, args, domain, use
                         // Send response if required
                         if (command.responseid != null) { try { ws.send(JSON.stringify({ action: 'changedevice', responseid: command.responseid, result: 'ok' })); } catch (ex) { } }
                     });
-                    break;
+                    } // end of scpApplyDeviceChange()
                 }
             case 'uploadagentcore':
                 {

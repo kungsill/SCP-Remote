@@ -190,8 +190,8 @@ test('starting a session hands over to the page MeshCentral already serves', () 
     // Reusing that page keeps the consent prompt on the ward computer, and everything else
     // about the session, on the path that is already tested rather than a second one.
     const client = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-mobile.js'), 'utf8');
-    assert.ok(client.includes('viewmode=11'), 'panel 11 is MainDevDesktop; 10 is the details page');
     assert.ok(!/deviceshare|publicid/.test(client), 'it must not mint device shares of its own');
+    assert.ok(/node\.link/.test(client), 'the link is worked out on the server, where the browser is known');
 });
 
 test('the mobile client is served from the same origin and sends the session cookie', () => {
@@ -396,12 +396,16 @@ test('every signed-in device is taken to the remote page', () => {
     }
 });
 
-test('nothing is guessed from the user agent any more', () => {
-    // An iPad reads exactly like a MacBook, so any rule built on the agent was going to be
-    // wrong for one of them. There is no such rule left to be wrong.
+test('which page a visitor lands on is never guessed from the user agent', () => {
+    // An iPad reads exactly like a MacBook, so a rule built on the agent was going to be wrong
+    // for one of them. Everyone goes to /m instead, and nothing about that decision reads the
+    // agent. (Building the link to open a device does read it, but that is a different
+    // question: which URL scheme the page MeshCentral serves will understand.)
     const source = fs.readFileSync(path.join(__dirname, '../mobile.js'), 'utf8');
     const code = withoutComments(source);
-    assert.ok(!/user-agent/i.test(code), 'the user agent must not be read at all');
+    const root = code.slice(code.indexOf('exports.root'), code.indexOf('exports.data'));
+    assert.ok(root.length > 0, 'the root handler should still be there');
+    assert.ok(!/user-agent/i.test(root), 'the front-door decision must not read the agent');
 });
 
 test('signing in is not disturbed: the login page is reached without a redirect', () => {
@@ -475,7 +479,30 @@ test('the button opens the desktop panel, not the page of facts about the comput
     assert.ok(map, 'the panel map should still be in default.handlebars');
     assert.ok(/11:\s*'MainDevDesktop'/.test(map[1]), 'panel 11 is the remote desktop');
 
-    const client = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-mobile.js'), 'utf8');
-    assert.ok(/viewmode=11/.test(client));
-    assert.ok(!/viewmode=10/.test(client), 'panel 10 is the details page');
+    const source = fs.readFileSync(path.join(__dirname, '../mobile.js'), 'utf8');
+    assert.ok(/node=.*viewmode=11/.test(source), 'the desktop page is opened on panel 11');
+});
+
+test('a phone is sent the link its own page understands', () => {
+    // The desktop page wants node= and view 11. The mobile page wants gotonode= with panel=1
+    // inside view 10, and ignores the other form entirely - which is why a phone opened a page
+    // with no device on it. The mobile page keeps its own numbering: panel 1 is the desktop.
+    const mobilePage = fs.readFileSync(path.join(__dirname, '../../views/default-mobile.handlebars'), 'utf8');
+    assert.ok(/args\.gotonode/.test(mobilePage), 'the mobile page reads gotonode');
+    assert.ok(/currentDevicePanel = parseInt\(args\.panel\)/.test(mobilePage), 'and panel');
+    assert.ok(/currentDevicePanel == 1/.test(mobilePage), 'panel 1 is its desktop');
+
+    const o = {
+        users: { 'user//admin': admin },
+        meshes: { 'mesh//er': { _id: 'mesh//er', name: 'ER', domain: '' } },
+        rights: () => ['mesh//er'],
+        nodes: [{ _id: 'node//abc', name: 'ER 1', meshid: 'mesh//er' }]
+    };
+    const onPhone = reply();
+    mobile.data(web(o), { session: { userid: 'user//admin' }, headers: { 'user-agent': 'Chrome/140 Mobile Safari/537.36' } }, onPhone);
+    assert.equal(onPhone.body.nodes[0].link, '?gotonode=abc&panel=1&viewmode=10');
+
+    const onDesktop = reply();
+    mobile.data(web(o), { session: { userid: 'user//admin' }, headers: { 'user-agent': 'Chrome/140 Safari/537.36' } }, onDesktop);
+    assert.equal(onDesktop.body.nodes[0].link, '?node=abc&viewmode=11&hide=16');
 });

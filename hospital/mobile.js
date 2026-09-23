@@ -99,11 +99,25 @@ exports.data = function (web, req, res) {
         if ((err != null) || (docs == null)) { res.status(500).json({ error: 'DEVICES_UNAVAILABLE' }); return; }
         web.db.GetAllTypeNoTypeField('scplayout', domainid, function (layoutErr, layout) {
             const positions = (layoutErr == null && Array.isArray(layout)) ? layout : [];
+            // Which page MeshCentral will serve this browser decides how a device is opened, and
+            // the two schemes are not interchangeable: the desktop page wants node= and panel 11,
+            // the mobile page wants gotonode= with panel=1 inside view 10. Sending the desktop
+            // form to a phone opened a page with no device on it at all. Decided here, once,
+            // from the same request the page itself came from.
+            const ua = (req.headers && req.headers['user-agent']) || '';
+            const mobileView = ua.toLowerCase().indexOf('mobile') >= 0;
+            const openLink = id => {
+                const short = String(id).split('/').pop();
+                return mobileView
+                    ? ('?gotonode=' + encodeURIComponent(short) + '&panel=1&viewmode=10')
+                    : ('?node=' + encodeURIComponent(short) + '&viewmode=11&hide=16');
+            };
             const nodes = docs.map(n => ({
                 id: n._id,
                 name: n.name || n._id,
                 room: n.meshid,
                 ip: n.host || '',
+                link: openLink(n._id),
                 // Same reading of "online" the app uses: an agent websocket that finished
                 // authenticating, not merely a record that once connected.
                 online: !!(web.wsagents[n._id] && web.wsagents[n._id].authenticated === 2),

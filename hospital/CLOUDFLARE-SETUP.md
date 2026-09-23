@@ -165,6 +165,33 @@ PID ต้องเปลี่ยนจากเดิม
 ทำซ้ำกับ `meshrelay.ashx`, `agenttransfer.ashx`, `agentdownload.ashx`
 
 > **ข้อควรรู้:** Cloudflare ระบุว่า Bypass **ไม่บันทึก log ของ Access** สำหรับเส้นทางนั้น ไม่เป็นไรเพราะ MeshCentral บันทึกเองอยู่แล้ว และเส้นทางเหล่านี้ยังมีการยืนยันตัวตนของ MeshCentral เอง (ใบรับรองเอเจนต์ / คุกกี้ relay) การ bypass แค่ไม่บังคับ "ล็อกอินอีเมล" ซึ่งเอเจนต์ทำไม่ได้อยู่แล้ว
+>
+> **อย่า bypass เส้นทางอื่นนอกจาก 4 ตัวนี้** โดยเฉพาะ `/` ซึ่งเป็นหน้าเว็บหลัก
+
+### ตรวจว่า bypass ได้ผลจริง — ไม่ต้องเดา
+
+รันจากเครื่องไหนก็ได้ที่ออกอินเทอร์เน็ตได้ **สิ่งที่ดูคือมี `cloudflareaccess` ในหัว `location` หรือไม่** ไม่ใช่ดูรหัส HTTP
+
+```bash
+for p in "/" "/agent.ashx" "/meshrelay.ashx" "/agenttransfer.ashx" "/agentdownload.ashx"; do
+  curl -sI "https://remote.kpsnana.com${p}" | head -1
+  curl -sI "https://remote.kpsnana.com${p}" | grep -i "^location:" | grep -c cloudflareaccess
+done
+```
+
+ผลที่ถูกต้อง (ตรวจแล้วเมื่อ 23 ก.ย. 2569):
+
+| เส้นทาง | HTTP | Access แทรก |
+| --- | --- | --- |
+| `/` | 302 | **ใช่** — ถูกต้อง หน้าเว็บต้องล็อกอินก่อน |
+| `/agent.ashx` | 404 | ไม่ |
+| `/meshrelay.ashx` | 404 | ไม่ |
+| `/agenttransfer.ashx` | 404 | ไม่ |
+| `/agentdownload.ashx` | 404 | ไม่ |
+
+**404 คือคำตอบที่ถูกต้อง** เส้นทางเหล่านี้เป็น websocket การเปิดด้วย GET ธรรมดาจึงได้ 404 จาก MeshCentral — สิ่งสำคัญคือมัน**ไปถึง MeshCentral** ไม่ได้ถูก Access ดักไว้ก่อน
+
+**ทดสอบเทียบด้วยเสมอ** ลองเส้นทางที่ไม่ได้ bypass เช่น `/notbypassed.ashx` ต้องได้ **302 + Access แทรก** ถ้าเส้นทางนั้นก็ได้ 404 เหมือนกัน แปลว่า bypass กว้างเกินไปและหน้าเว็บอาจไม่ได้ถูกกั้นจริง
 
 ## ขั้นที่ 6 — Access: ล็อกหน้าเว็บทั้งโดเมน
 

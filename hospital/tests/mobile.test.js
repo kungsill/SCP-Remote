@@ -181,3 +181,22 @@ test('webserver wires /m without disturbing the app route beside it', () => {
     assert.ok(server.includes("require('./hospital/mobile').attach"), '/m should be attached');
     assert.ok(server.includes("obj.app.post(url + 'scp-client-api'"), 'the app API must still be registered');
 });
+
+test('the device button leaves /m for the site root instead of reloading /m', () => {
+    // A bare '?node=..' is relative to /m, so it reloads this page with the query ignored -
+    // which on a phone looks exactly like the button doing nothing at all.
+    const client = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-mobile.js'), 'utf8');
+    assert.ok(!/=\s*'\?node=/.test(client), 'the target must not be relative to /m');
+
+    // Run the rule from the file rather than restating it here.
+    const m = /const siteRoot = ([^;]+);/.exec(client);
+    assert.ok(m, 'scp-mobile.js should still work the site root out for itself');
+    const siteRoot = new Function('location', 'return (' + m[1] + ')');
+    assert.equal(siteRoot({ pathname: '/m' })(), '/', 'the default domain');
+    assert.equal(siteRoot({ pathname: '/sub/m' })(), '/sub/', 'a domain served under a sub-path');
+});
+
+test('the full-site link is relative, so a sub-path domain is not sent to the wrong place', () => {
+    const page = fs.readFileSync(mobile.pageFile, 'utf8');
+    assert.ok(/id="full" href="\."/.test(page), 'href="." resolves to the site root from /m');
+});

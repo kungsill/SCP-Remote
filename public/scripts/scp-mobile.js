@@ -50,7 +50,7 @@
         busy = true; $('refresh').disabled = true;
         try {
             const r = await fetch('m-data', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
-            if (r.status === 401) { $('status').textContent = error('NOT_SIGNED_IN'); setTimeout(() => { location.href = '/'; }, 1500); return; }
+            if (r.status === 401) { $('status').textContent = error('NOT_SIGNED_IN'); setTimeout(() => { location.href = siteRoot(); }, 1500); return; }
             const body = await r.json();
             if (body.error) throw Error(body.error);
             data = body;
@@ -62,11 +62,17 @@
         } finally { busy = false; $('refresh').disabled = false; }
     }
 
+    // This page is served at <root>m, and the desktop view lives at <root> itself. A bare
+    // '?node=..' would be relative to /m and just reload this page with the query ignored,
+    // which looks exactly like the button doing nothing. Strip the trailing 'm' instead of
+    // assuming '/', so a domain served under a sub-path still works.
+    const siteRoot = () => location.pathname.replace(/m$/, '') || '/';
+
     function open(node) {
         // MeshCentral's own desktop view, which carries the consent prompt and everything else
         // already tested. node ids are node/<domain>/<id> and the page wants the last part.
         const short = String(node.id).split('/').pop();
-        location.href = '?node=' + encodeURIComponent(short) + '&viewmode=10&hide=16';
+        location.href = siteRoot() + '?node=' + encodeURIComponent(short) + '&viewmode=10&hide=16';
     }
 
     function render() {

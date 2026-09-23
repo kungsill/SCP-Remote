@@ -13,6 +13,7 @@ const dataDir = path.join(root, '.local', 'scp-remote');
 const configFile = process.env.SCP_CONFIG || path.join(dataDir, 'config.json');
 
 const command = process.argv[2];
+const publicHostname = process.argv[3];
 if (!fs.existsSync(configFile)) {
     console.error('ไม่พบไฟล์ตั้งค่า: ' + configFile);
     process.exit(2);
@@ -105,6 +106,16 @@ function enable() {
     delete settings.agentAllowedIP;
     if (!domain.passwordRequirements) { domain.passwordRequirements = {}; }
     domain.passwordRequirements.force2factor = true;
+    // MeshCentral refuses a websocket whose Origin header does not match the server's own
+    // certificate name, which is how it resists another site driving a logged-in session.
+    // Through the tunnel the browser's origin is the public hostname, so the page loads and
+    // then says "invalid origin" and connects to nothing. Name both, rather than setting
+    // allowedOrigin to true and giving the check up altogether.
+    if (publicHostname) {
+        settings.scpLanAllowlist.allowedOrigin = (domain.allowedOrigin !== undefined) ? domain.allowedOrigin : null;
+        const names = [settings.cert, publicHostname].filter(n => typeof n === 'string' && n.length > 0);
+        domain.allowedOrigin = [...new Set(names)];
+    }
     save();
     console.log('เปิดโหมด tunnel แล้ว (สำรองไฟล์เดิมไว้ที่ ' + path.basename(saved) + ')');
     console.log('');
@@ -128,6 +139,9 @@ function disable() {
     delete settings.trustedProxy;
     if (previous.userAllowedIP) { settings.userAllowedIP = previous.userAllowedIP; }
     if (previous.agentAllowedIP) { settings.agentAllowedIP = previous.agentAllowedIP; }
+    if (previous.allowedOrigin !== undefined) {
+        if (previous.allowedOrigin === null) { delete domain.allowedOrigin; } else { domain.allowedOrigin = previous.allowedOrigin; }
+    }
     delete settings.scpLanAllowlist;
     save();
     console.log('กลับเป็นโหมดเครือข่ายภายในแล้ว (สำรองไฟล์เดิมไว้ที่ ' + path.basename(saved) + ')');
@@ -147,6 +161,7 @@ if (command === 'status' || command == null) { status(); }
 else if (command === 'enable') { enable(); }
 else if (command === 'disable') { disable(); }
 else {
-    console.error('ใช้: node scripts/tunnel-mode.js <status|enable|disable>');
+    console.error("ใช้: node scripts/tunnel-mode.js <status|enable|disable> [ชื่อโฮสต์สาธารณะ]");
+    console.error("ตัวอย่าง: node scripts/tunnel-mode.js enable remote.kpsnana.com");
     process.exit(2);
 }

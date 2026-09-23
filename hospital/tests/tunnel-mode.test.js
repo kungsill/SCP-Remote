@@ -32,8 +32,10 @@ function sandbox(accounts) {
     }
     return {
         dir: dir, file: file,
+        // cmd may carry arguments, e.g. "enable remote.example.com".
         run(cmd) {
-            const r = spawnSync(process.execPath, [script, cmd], { encoding: 'utf8', env: Object.assign({}, process.env, { SCP_CONFIG: file }) });
+            const r = spawnSync(process.execPath, [script, ...String(cmd).split(' ').filter(Boolean)],
+                { encoding: 'utf8', env: Object.assign({}, process.env, { SCP_CONFIG: file }) });
             return { out: (r.stdout || '') + (r.stderr || ''), code: r.status };
         },
         config() { return JSON.parse(fs.readFileSync(file, 'utf8')); },
@@ -156,5 +158,36 @@ test('the trusted proxy list covers the loopback form the tunnel actually arrive
             assert.ok(trusted.some(p => ipcheck.match(arriving, p)),
                 'a connection arriving from ' + arriving + ' must be recognised as the tunnel');
         }
+    } finally { s.clean(); }
+});
+
+test('enable names the public hostname as an allowed origin, keeping the check on', () => {
+    // MeshCentral rejects a websocket whose Origin does not match its certificate name. Through
+    // the tunnel the origin is the public hostname, so without this the page loads and then
+    // connects to nothing, reporting "invalid origin" - which reads as a broken server.
+    const s = sandbox(enrolled);
+    try {
+        s.run('enable remote.example.com');
+        const d = s.config().domains[''];
+        assert.deepEqual(d.allowedOrigin, ['192.168.2.25', 'remote.example.com']);
+        assert.notEqual(d.allowedOrigin, true, 'name the hostnames rather than giving the check up');
+    } finally { s.clean(); }
+});
+
+test('disable takes the public hostname back out again', () => {
+    const s = sandbox(enrolled);
+    try {
+        s.run('enable remote.example.com');
+        s.run('disable');
+        assert.equal(s.config().domains[''].allowedOrigin, undefined, 'back to the default list');
+    } finally { s.clean(); }
+});
+
+test('enable without a hostname leaves the origin list alone', () => {
+    // Someone re-running it after the fact should not quietly widen or narrow what is allowed.
+    const s = sandbox(enrolled);
+    try {
+        s.run('enable');
+        assert.equal(s.config().domains[''].allowedOrigin, undefined);
     } finally { s.clean(); }
 });

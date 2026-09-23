@@ -7500,6 +7500,7 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
                 obj.app.get(url + 'player', handlePlayerRequest);
                 obj.app.get(url + 'sharing', handleSharingRequest);
                 if (i === '') obj.app.post(url + 'scp-client-api', function(req,res){require('./hospital/desktop-clients').route(obj,req,res);});
+                if (i === '') require('./hospital/mobile').attach(obj, obj.app, url); // SCP-Remote: /m, the phone and tablet device picker
                 obj.app.ws(url + 'agenttransfer.ashx', handleAgentFileTransfer); // Setup agent to/from server file transfer handler
                 obj.app.ws(url + 'meshrelay.ashx', function (ws, req) {
                     PerformWSSessionAuth(ws, req, true, function (ws1, req1, domain, user, cookie, authData) {

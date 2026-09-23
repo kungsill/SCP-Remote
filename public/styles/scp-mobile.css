@@ -1,0 +1,88 @@
+/* The /m device picker. Same hospital palette as the Desktop App, laid out for a phone first:
+   rooms scroll sideways instead of taking a sidebar, cards fall to one column, and every
+   target a finger has to hit is at least 44px tall. */
+* { box-sizing: border-box }
+body {
+    margin: 0;
+    background: linear-gradient(135deg, #f2f8f8, #f3f6fc);
+    color: #20364c;
+    font: 15px Sarabun, "Noto Sans Thai", Segoe UI, sans-serif;
+    -webkit-text-size-adjust: 100%;
+}
+button, input, select { font: inherit }
+button { cursor: pointer; border: 1px solid #d8e5eb; border-radius: 9px; background: #fff; color: #29485a; padding: 11px 15px; min-height: 44px }
+button:disabled { opacity: .45; cursor: default }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #75cace; outline-offset: 2px }
+[hidden] { display: none !important }
+p { line-height: 1.7; color: #708292 }
+
+header {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top));
+    background: #fff; border-bottom: 1px solid #dce6ee; box-shadow: 0 2px 14px #183f4a06;
+    position: sticky; top: 0; z-index: 5;
+}
+header b { font-size: 21px; letter-spacing: -.5px; color: #163e4c }
+header small { display: block; font-size: 11px; color: #778a98; letter-spacing: .4px; margin-top: 2px }
+.header-tools { display: flex; align-items: center; gap: 8px }
+.header-tools a { font-size: 12px; color: #07828a; text-decoration: none; padding: 10px 8px }
+select { padding: 9px; border: 1px solid #dce6ee; border-radius: 8px; min-height: 44px }
+
+.content { padding: 18px 16px 28px }
+.heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px }
+.eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: #00838b }
+h1 { font-size: 22px; margin: 7px 0 0; letter-spacing: -.3px }
+.heading p { margin-top: 7px; font-size: 13px }
+.heading button { flex: none }
+
+.fleet-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0 }
+.fleet-summary article { background: #ffffffcf; border: 1px solid #dce9ed; padding: 13px 14px; border-radius: 14px; box-shadow: 0 4px 15px #153e4b04 }
+.fleet-summary span { display: block; font-size: 11px; color: #81929d }
+.fleet-summary strong { display: block; font-size: 25px; line-height: 1.4; color: #24465a }
+.fleet-summary article:nth-child(2) { background: linear-gradient(130deg, #edf9f5, #fff) }
+.fleet-summary article:nth-child(2) strong { color: #078974 }
+
+h3 { font-size: 12px; color: #80959e; text-transform: uppercase; letter-spacing: .7px; margin: 18px 0 8px }
+/* Sideways so a long ward list never pushes the devices off the screen. */
+#rooms { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: thin }
+#rooms button { flex: none; border-radius: 10px; padding: 10px 14px; color: #69818e; white-space: nowrap }
+#rooms button.active { background: linear-gradient(110deg, #dff3f0, #edf8f7); color: #087b82; font-weight: 600; border-color: #bcdadd }
+
+.tools { display: flex; gap: 10px; margin: 16px 0 10px; flex-wrap: wrap }
+.tools input { flex: 1; min-width: 180px; padding: 13px 15px; border: 1px solid #d8e5eb; border-radius: 10px; box-shadow: 0 2px 8px #193e4a04 }
+.tools > div { display: flex; gap: 4px; padding: 4px; background: #e8eff3; border-radius: 12px }
+.tools > div button { border: 0; background: transparent }
+.tools > div button[aria-pressed=true] { background: #fff; color: #087e87; box-shadow: 0 2px 6px #173d4b12 }
+
+#status, #mapNote { font-size: 12px; min-height: 18px; color: #66808e; margin: 0 0 14px }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 14px }
+.device { min-width: 0; padding: 18px; border: 1px solid #dce8ec; border-radius: 15px; background: #fff; box-shadow: 0 6px 18px #173d4b07 }
+.device h3 { font-size: 17px; margin: 14px 0 0; color: #20364c; text-transform: none; letter-spacing: 0 }
+.device p { font-size: 12px; margin: 5px 0 }
+.device code { display: block; font: 12px Consolas, monospace; color: #738999; margin: 8px 0 16px; padding: 8px 10px; background: #f6f9fb; border-radius: 7px; border: 1px solid #edf2f5 }
+.device button { width: 100%; min-height: 48px }
+.primary { background: #07828a; color: #fff; border-color: #07828a; box-shadow: 0 4px 10px #07828a1b }
+.online, .offline { display: inline-block; padding: 4px 9px; border-radius: 7px; font-size: 10px }
+.online { background: #e9f7f1; color: #16836e }
+.offline { background: #f0f3f6; color: #8a9aa5 }
+.online:before, .offline:before { content: '●'; margin-right: 6px }
+
+.map {
+    display: grid; grid-auto-columns: 215px; grid-auto-rows: minmax(205px, auto); gap: 14px;
+    overflow: auto; padding: 12px; border-radius: 12px;
+    background-image: radial-gradient(#c8dbe5 1px, transparent 1px); background-size: 16px 16px;
+}
+#consentNote { font-size: 12px; color: #778a98; margin-top: 22px; line-height: 1.8 }
+footer { padding: 14px 16px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 11px; color: #78909c; border-top: 1px solid #dce6ee; background: #fff }
+
+/* One column on a phone; the cards carry long Thai ward names better than a narrow grid. */
+@media (max-width: 560px) {
+    .grid { grid-template-columns: 1fr }
+    .heading { flex-direction: column }
+    .heading button { width: 100%; margin-top: 4px }
+    h1 { font-size: 20px }
+    .fleet-summary strong { font-size: 22px }
+}
+@media (min-width: 900px) { .content { max-width: 1100px; margin: 0 auto; padding: 26px 24px 34px } }
+@media (prefers-reduced-motion: no-preference) { .device { transition: box-shadow .18s, transform .18s } .device:active { transform: scale(.995) } }

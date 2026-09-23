@@ -831,7 +831,7 @@ else {
 
 
 // MeshAgent JavaScript Core Module. This code is sent to and running on the mesh agent.
-var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.21.5', scpLanNative: (require('ILibWebRTC').scpEcdsa === true), value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
+var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.22.2', scpLanNative: (require('ILibWebRTC').scpEcdsa === true), value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
 
 // Get the operating system description string
 try { require('os').name().then(function (v) { meshCoreObj.osdesc = v; meshCoreObjChanged(); }); } catch (ex) { }
@@ -3093,6 +3093,11 @@ function terminal_promise_consent_resolved()
 }
 function tunnel_kvm_end()
 {
+    // Native close/end paths may both call this handler. Never release another viewer's KVM.
+    if (this.scpKvmEnded || !this.desktop || !this.httprequest) { return; }
+    this.scpKvmEnded = true;
+    try { require('scp-session-consent').revoke(this); } catch (ex) { }
+    try { require('scp-lan').dispose(this); } catch (ex) { }
     --this.desktop.kvm.connectionCount;
 
     // Remove ourself from the list of remote desktop session
@@ -3179,12 +3184,6 @@ function tunnel_kvm_end()
         }
     }
 
-    if(this.httprequest.desktop.kvm.connectionBar)
-    {
-        console.info1('Setting ConnectionBar request to NULL');
-        this.httprequest.desktop.kvm.connectionBar.httprequest = null;
-    }
-
     this.httprequest = null;
     this.desktop.tunnel = null;
 }
@@ -3257,6 +3256,9 @@ function kvm_consent_ask(ws){
         if (ws.httprequest.soptions.consentMsgDesktop != null) { consentMessage = ws.httprequest.soptions.consentMsgDesktop.replace(/\{0\}/g, ws.httprequest.realname).replace(/\{1\}/g, ws.httprequest.username); }
     }
     var pr;
+    if (require('scp-session-consent').scoped(ws)) {
+        consentMessage = ws.httprequest.realname + '\n' + (currentTranslation['allow'] === 'Allow' ? 'Allow screen control, clipboard text and file transfer for this remote session? Closing the remote session ends this permission.' : 'อนุญาตให้ควบคุมหน้าจอ ใช้คลิปบอร์ดข้อความ และรับ–ส่งไฟล์ในเซสชันนี้หรือไม่? เมื่อปิดรีโมต สิทธิ์นี้จะสิ้นสุด');
+    }
     if (process.platform == 'win32') {
         var enhanced = false;
         if (ws.httprequest.oldStyle === false) {
@@ -3306,6 +3308,8 @@ function kvm_consentpromise_rejected(e)
 }
 function kvm_consentpromise_resolved(always)
 {
+    if (!this.ws || !this.ws.httprequest || this.ws.scpKvmEnded) { return; }
+    try { require('scp-session-consent').grant(this.ws); } catch (ex) { }
     if (always && process.platform=='win32') { server_set_consentTimer(this.ws.httprequest.userid); }
 
     // Success
@@ -3756,6 +3760,8 @@ function onTunnelData(data)
                 }
                 // Remote desktop using native pipes
                 this.httprequest.desktop = { state: 0, kvm: mesh.getRemoteDesktopStream(tsid), tunnel: this };
+                // Shared native KVM stays on Relay while more than one viewer is present.
+                try { require('scp-lan').shared(this.httprequest.desktop.kvm); } catch (ex) { }
                 this.httprequest.desktop.kvm.parent = this.httprequest.desktop;
                 this.desktop = this.httprequest.desktop;
 
@@ -3909,6 +3915,14 @@ function onTunnelData(data)
                     registry_consent_ok(this);
                 }
             } else if (this.httprequest.protocol == 5) {
+                // Files inherit only this share's explicitly approved, still-live desktop session.
+                if (require('scp-session-consent').scoped(this)) {
+                    if (!require('scp-session-consent').join(this)) {
+                        this.write(JSON.stringify({ctrlChannel:'102938',type:'console',msg:'Approve the desktop session first / กรุณาอนุญาตหน้าจอรีโมตก่อน',msgid:2}));
+                        this.close(); return;
+                    }
+                    this.httprequest.consent &= ~32;
+                }
                 //
                 // Remote Files
                 //

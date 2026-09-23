@@ -2,16 +2,21 @@
 (function(root){
  'use strict';if(root.ScpRecording)return;
  const th=(root.scpClipboardLanguage||document.documentElement.lang)==='th',t=(en,thai)=>th?thai:en;
- const limit=128*1024*1024,maxTime=30*60*1000;let active=null,saved=null,panel,status,startButton,stopButton,download,discard;
+ const limit=128*1024*1024,maxTime=30*60*1000;let active=null,saved=null,panel,body,head,open=false,status,startButton,stopButton,download,discard;
  function element(tag,text){const n=document.createElement(tag);if(text)n.textContent=text;return n;}
- function init(){if(panel)return;panel=element('aside');panel.id='scp-recording';panel.style.cssText='position:fixed;right:14px;bottom:56px;z-index:10006;max-width:min(420px,90vw);padding:12px;border:1px solid #c7dfe3;border-radius:12px;background:#f8ffff;color:#16464b;box-shadow:0 8px 30px #163b4630;font:13px Sarabun,Segoe UI,sans-serif';
+ // Recording details open from the shared desktop toolbar.
+ function applyOpen(){if(!head)return;head.setAttribute('aria-expanded',String(open));head.textContent=(active?'● ':'')+(open?t('Recording ▾','บันทึกวิดีโอ ▾'):t('Record video ▸','บันทึกวิดีโอ ▸'));if(body)body.hidden=!open;}
+ function setOpen(v){open=v;applyOpen();}
+ function init(){if(panel)return;panel=element('aside');panel.id='scp-recording';panel.style.cssText='position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:10006;max-width:min(300px,86vw);border:1px solid #c7dfe3;border-left:0;border-radius:0 12px 12px 0;background:#f8ffff;color:#16464b;box-shadow:0 8px 30px #163b4630;font:13px Sarabun,Segoe UI,sans-serif;overflow:hidden';
+  head=element('button');head.type='button';head.style.cssText='display:block;width:100%;text-align:left;font:inherit;font-weight:600;padding:8px 12px;border:0;background:transparent;color:#087e87;cursor:pointer';head.onclick=()=>setOpen(!open);
+  body=element('div');body.style.cssText='padding:0 12px 12px';
   status=element('div');status.setAttribute('role','status');startButton=element('button',t('Record video','บันทึกวิดีโอ'));stopButton=element('button',t('Stop recording','หยุดบันทึก'));download=element('a',t('Download video','ดาวน์โหลดวิดีโอ'));discard=element('button',t('Discard','ทิ้งวิดีโอ'));
   [startButton,stopButton,discard,download].forEach(n=>{n.style.cssText='font:inherit;padding:7px 10px;margin:6px 5px 0 0;border:1px solid #bfdadd;border-radius:8px;background:white;color:#087e87;cursor:pointer';if(n.tagName==='BUTTON')n.type='button';});
   startButton.onclick=start;stopButton.onclick=()=>stop(t('Stopped','หยุดบันทึกแล้ว'));discard.onclick=()=>{if(!root.confirm(t('Discard this video?','ทิ้งวิดีโอนี้หรือไม่?')))return;if(saved)URL.revokeObjectURL(saved.url);saved=null;render();};
-  const help=element('small',t('Remote image only · up to 30 min / 128 MB · download before closing','เฉพาะภาพรีโมต · ไม่เกิน 30 นาที / 128 MB · ดาวน์โหลดก่อนปิดหน้าต่าง'));help.style.display='block';panel.append(status,startButton,stopButton,download,discard,help);document.body.append(panel);
+  const help=element('small',t('Remote image only · up to 30 min / 128 MB · download before closing','เฉพาะภาพรีโมต · ไม่เกิน 30 นาที / 128 MB · ดาวน์โหลดก่อนปิดหน้าต่าง'));help.style.display='block';body.append(status,startButton,stopButton,download,discard,help);panel.append(head,body);if(root.ScpRemoteUI)root.ScpRemoteUI.mount(panel);else document.body.append(panel);applyOpen();
  }
  function connected(){const d=root.desktop;return d&&d.contype===1&&d.State===3&&d.m&&d.m.CanvasId&&typeof d.m.CanvasId.captureStream==='function'?d:null;}
- function render(){init();const d=connected();panel.hidden=!d&&!active&&!saved;startButton.hidden=!!active||!!saved;startButton.disabled=!d||typeof root.MediaRecorder!=='function';stopButton.hidden=!active;stopButton.disabled=!!(active&&active.stopping);download.hidden=discard.hidden=!saved;
+ function render(){init();if(active&&!open)open=true;applyOpen();const d=connected();panel.hidden=(!d||(typeof root.xxcurrentView==='number'&&root.xxcurrentView!==11))&&!active&&!saved;startButton.hidden=!!active||!!saved;startButton.disabled=!d||typeof root.MediaRecorder!=='function';stopButton.hidden=!active;stopButton.disabled=!!(active&&active.stopping);download.hidden=discard.hidden=!saved;
   if(active){status.textContent=(active.stopping?t('Preparing video…','กำลังเตรียมไฟล์…'):t('● Recording ','● กำลังบันทึก '))+Math.floor((Date.now()-active.started)/1000)+t(' sec',' วินาที')+' · '+(active.bytes/1048576).toFixed(1)+' MB';}
   else if(saved){status.textContent=saved.note+' · '+(saved.blob.size/1048576).toFixed(1)+' MB';download.href=saved.url;download.download=saved.name;}
   else status.textContent=typeof root.MediaRecorder==='function'?t('Local session video','วิดีโอเซสชันเก็บที่เครื่องนี้'):t('Video recording is not supported','เบราว์เซอร์นี้ไม่รองรับการบันทึกวิดีโอ');

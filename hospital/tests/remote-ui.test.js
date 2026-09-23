@@ -1,0 +1,22 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),{JSDOM}=require('jsdom');
+const settle=()=>new Promise(r=>setImmediate(r));
+test('toolbar resize recomputes both canvas dimensions using the real sharing aspect-ratio logic',async t=>{
+ const dom=new JSDOM('<html><body><div id="deskarea1"></div><div id="deskarea3x"><div id="DeskParent"><canvas id="Desk" width="1366" height="768"></canvas></div></div><div id="deskarea4"></div><div id="fileArea2"></div><div id="fileArea4"></div></body></html>',{runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window,d=w.document,viewport=d.getElementById('deskarea3x'),parent=d.getElementById('DeskParent');
+ Object.defineProperty(viewport,'offsetParent',{get:()=>d.body});viewport.getBoundingClientRect=()=>({top:124});Object.defineProperty(parent,'clientHeight',{get:()=>parseFloat(viewport.style.getPropertyValue('--scp-canvas-height'))||900});Object.defineProperty(parent,'clientWidth',{get:()=>1800});w.Q=id=>d.getElementById(id);w.QS=id=>w.Q(id).style;w.xxcurrentView=11;w.deskAspectRatio=0;
+ const source=fs.readFileSync('views/sharing.handlebars','utf8');w.eval(source.slice(source.indexOf('function deskAdjust()'),source.indexOf('function setupDesktop()')));
+ w.eval(fs.readFileSync('public/scripts/scp-remote-ui.js','utf8'));const panel=d.createElement('section');w.ScpRemoteUI.mount(panel);panel.hidden=false;await settle();const canvas=d.getElementById('Desk');
+ const first=parseFloat(canvas.style.width);assert.ok(Math.abs(first/parent.clientHeight-1366/768)<0.001);
+ w.innerHeight=650;w.dispatchEvent(new w.Event('resize'));assert.ok(parseFloat(canvas.style.width)<first);assert.ok(Math.abs(parseFloat(canvas.style.width)/parent.clientHeight-1366/768)<0.001);
+});
+test('remote dock follows visible sections and supports collapse',async t=>{
+ const dom=new JSDOM('<html lang="th"><body></body></html>',{runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
+ w.eval(fs.readFileSync('public/scripts/scp-remote-ui.js','utf8'));
+ const section=w.document.createElement('section');w.ScpRemoteUI.mount(section);await settle();const dock=w.document.getElementById('scp-remote-dock');assert.equal(dock.hidden,true);
+ section.hidden=false;await settle();assert.equal(dock.hidden,false);assert.equal(w.document.body.classList.contains('scp-dock-visible'),true);
+ dock.querySelector('button').click();assert.equal(dock.querySelector('button').getAttribute('aria-expanded'),'false');
+ section.hidden=true;await settle();assert.equal(dock.hidden,true);
+});
+async function app(t){const dom=new JSDOM(fs.readFileSync('hospital/desktop-app/index.html','utf8'),{url:'https://app.test/',runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;w.setInterval=()=>1;w.scp={init:async()=>({ok:true,result:{state:'approved',code:'test',name:'IT'}}),devices:async()=>({ok:true,result:{rooms:[{id:'opd',name:'OPD'}],nodes:[{id:'one',name:'test01',ip:'192.168.1.2',room:'opd',online:true,ready:true}]}}),connect:async()=>({ok:true})};w.eval(fs.readFileSync('hospital/desktop-app/renderer.js','utf8'));await settle();return w;}
+test('app keeps stale device status unknown on refresh failure and recovers',async t=>{const w=await app(t),d=w.document;assert.equal(d.getElementById('onlineCount').textContent,'1');const original=w.scp.devices;w.scp.devices=async()=>{throw Error('SERVER_TIMEOUT');};d.getElementById('refresh').click();await settle();assert.match(d.querySelector('.device span').textContent,/ยังยืนยันไม่ได้/);assert.equal(d.querySelector('.device button').disabled,true);w.scp.devices=original;d.getElementById('refresh').click();await settle();assert.equal(d.querySelector('.device button').disabled,false);});
+test('app prevents duplicate connection requests and recovers from IPC rejection',async t=>{const w=await app(t),d=w.document;let reject,calls=0;w.scp.connect=()=>{calls++;return new Promise((r,j)=>reject=j);};d.querySelector('.device button').click();d.querySelector('.device button').click();assert.equal(calls,1);assert.equal(d.querySelector('.device button').disabled,true);reject(Error('SERVER_TIMEOUT'));await settle();assert.equal(d.querySelector('.device button').disabled,false);assert.match(d.getElementById('status').textContent,/ติดต่อเซิร์ฟเวอร์/);d.getElementById('language').value='en';d.getElementById('language').dispatchEvent(new w.Event('change'));assert.equal(d.getElementById('totalLabel').textContent,'Total devices');});

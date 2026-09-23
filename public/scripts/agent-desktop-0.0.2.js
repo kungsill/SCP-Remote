@@ -314,8 +314,9 @@ var CreateAgentRemoteDesktop = function (canvasid, scrolldiv) {
             case 88: // MNG_KVM_MOUSE_CURSOR
                 if ((cmdsize != 5) || (obj.stopInput)) break;
                 var cursorNum = view[4];
-                if (cursorNum > mouseCursors.length) { cursorNum = 0; }
-                xMouseCursorCurrent = mouseCursors[cursorNum];
+                if (cursorNum >= mouseCursors.length) { cursorNum = 0; }
+                // Keep the operator pointer visible when Windows reports no remote cursor.
+                xMouseCursorCurrent = mouseCursors[cursorNum] === 'none' ? 'default' : mouseCursors[cursorNum];
                 if (xMouseCursorActive) { obj.CanvasId.style.cursor = xMouseCursorCurrent; }
                 break;
             default:

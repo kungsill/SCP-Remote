@@ -19,7 +19,7 @@ test('all generated Thai pages have executable inline JavaScript and local styli
         const html = handlebars.compile(source)(args);
         const dom = new JSDOM(html);
         assert.equal(dom.window.document.documentElement.lang, 'th', file);
-        assert.ok(dom.window.document.querySelector('link[href="/styles/scp-remote.css"]'), file);
+        assert.ok([...dom.window.document.querySelectorAll('link[rel="stylesheet"]')].some(link => link.getAttribute('href').split('?')[0] === '/styles/scp-remote.css'), file);
         for (const script of dom.window.document.querySelectorAll('script:not([src])')) {
             if (script.type && !['text/javascript', 'application/javascript'].includes(script.type)) continue;
             assert.doesNotThrow(() => new vm.Script(script.textContent, { filename: file }));

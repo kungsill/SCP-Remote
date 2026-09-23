@@ -9,7 +9,7 @@
   function close(){const p=pc,c=ch;pc=ch=null;obj.webRtcActive=false;obj.webchannel=null;obj.webrtc=null;if(c){c.onclose=c.onerror=c.onmessage=null;try{c.close();}catch{}}if(p){p.oniceconnectionstatechange=p.onconnectionstatechange=null;try{p.close();}catch{}}}
   function fallback(){if(done||waiting)return;waiting=true;obj.scpLanState='returning';clearTimeout(timer);signal('scp-lan-relay');if(!switching&&!obj.webRtcActive){waiting=false;done=true;close();obj.scpLanState='relay';return;}timer=setTimeout(()=>{if(waiting){obj.scpLanState='failed';obj.Stop();}},5000);}
   function activate(){if(ready&&opened&&!switching&&!waiting&&!done){switching=true;signal('scp-lan-switch');}}
-  obj.xxOnControlCommand=function(raw){let m;try{m=JSON.parse(raw);}catch{return control.call(obj,raw);}if(m.ctrlChannel!='102938'||!String(m.type).startsWith('scp-lan-'))return control(raw);
+  obj.xxOnControlCommand=function(raw){let m;try{m=JSON.parse(raw);}catch{return control.call(obj,raw);}if(m.ctrlChannel!='102938'||!String(m.type).startsWith('scp-lan-'))return control.call(obj,raw);
    if(m.type==='scp-lan-relay-ready'){clearTimeout(timer);waiting=false;done=true;close();obj.scpLanState='relay';if(obj.m.SendRefresh)obj.m.SendRefresh();return;}
    if(done||waiting)return;
    if(m.type==='scp-lan-answer'&&pc)pc.setRemoteDescription({type:'answer',sdp:m.sdp}).catch(fallback);
@@ -29,7 +29,7 @@
    }catch{fallback();}
   }
   const start=obj.Start;obj.Start=function(){
-   const enabled=root.scpLanReady===true||(root.scpLanEnabled===true&&capable(root.currentNode));if(enabled){obj.attemptWebRTC=false;watch=setInterval(()=>{if(obj.State===0){clearInterval(watch);return;}if(obj.State===3&&!attempted&&!obj.viewonly&&!obj.serverIsRecording&&obj.m.scpStats&&obj.m.scpStats.tiles>0&&root.RTCPeerConnection){clearInterval(watch);begin();}},500);}return start.apply(obj,arguments);
+   const enabled=root.scpLanExperimental===true&&(root.scpLanReady===true||(root.scpLanEnabled!==false&&capable(root.currentNode)));obj.attemptWebRTC=false;if(enabled){obj.attemptWebRTC=false;watch=setInterval(()=>{if(obj.State===0){clearInterval(watch);return;}if(obj.State===3&&!attempted&&!obj.viewonly&&!obj.serverIsRecording&&obj.m.scpStats&&obj.m.scpStats.tiles>0&&root.RTCPeerConnection){clearInterval(watch);begin();}},500);}return start.apply(obj,arguments);
   };
   return obj;
  };

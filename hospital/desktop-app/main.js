@@ -56,9 +56,9 @@ app.whenReady().then(()=>{
    // window close button already ends the session, so nothing here is the only way out.
    // The picture area is sized against that bar, so it has to reclaim the height as well.
    var hide=document.createElement('style');
-   hide.textContent='#deskarea1{display:none!important}#deskarea3x{max-height:100vh!important;height:100vh!important}';
+   hide.textContent='#deskarea1{display:block}';
    document.head.appendChild(hide);
-   window.scpLanReady=${config.directLan===true&&data.lan===true};
+   window.scpLanReady=${config.directLan!==false&&data.lan===true};
    desktopsettings.quality=90;desktopsettings.scaling=1024;desktopsettings.framerate=50;
    var original=CreateAgentRemoteDesktop;CreateAgentRemoteDesktop=function(){var m=original.apply(this,arguments);m.ImageType=2;return m;};
    var tries=0,timer=setInterval(function(){var b=document.getElementById('connectbutton1');if(b&&!b.disabled){clearInterval(timer);connectDesktop(null,3);}else if(++tries>=60){clearInterval(timer);}},500);

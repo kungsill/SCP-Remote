@@ -45,3 +45,58 @@ body.night .scp-hospital-notice { color: #a6e6e3; }
 .night .scp-files-panel { background: #173236; color: #e2eeee; border-color: #527377; }
 .night .scp-upload-row[data-state="success"] .scp-upload-status { color: #9ce3b8; }
 .night .scp-upload-row[data-state="error"] .scp-upload-status { color: #ffb1b1; }
+
+/* Unified remote session tools. */
+#scp-remote-dock{padding:0;box-sizing:border-box;position:fixed;right:20px;bottom:60px;z-index:10010;width:340px;max-width:calc(100vw - 32px);color:#173d4a;background:rgba(255,255,255,.98);border:1px solid #dce9ed;border-radius:18px;box-shadow:0 16px 56px #173d4b24,0 2px 8px #173d4b0c;font:13px Sarabun,Segoe UI,sans-serif;overflow:hidden}
+#scp-remote-dock[hidden],#scp-remote-dock [hidden]{display:none!important}
+#scp-remote-dock>header{height:auto;box-sizing:border-box;display:flex;align-items:center;gap:11px;padding:14px 16px;background:linear-gradient(120deg,#eaf8f7,#f7fbff);border-bottom:1px solid #e1edef}
+.scp-dock-brand{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:#07828a;color:white;font-size:11px;font-weight:700;letter-spacing:.5px;box-shadow:0 4px 10px #07828a24}
+#scp-remote-dock strong{font-size:14px}#scp-remote-dock header small{display:block;color:#6b8590;font-size:10px;margin-top:3px}#scp-remote-dock header button{margin-left:auto;width:30px;height:30px;padding:0;font-size:20px;background:#ffffffbb}
+.scp-dock-content{max-height:min(65vh,520px);overflow:auto;padding:4px 0}
+#scp-remote-dock button,#scp-remote-dock select,#scp-remote-dock a{font:inherit!important;box-sizing:border-box;border:1px solid #d4e4e8!important;border-radius:9px!important;padding:8px 11px!important;background:#fff!important;color:#087c85!important;cursor:pointer;text-decoration:none;transition:background .15s,box-shadow .15s}
+#scp-remote-dock button:hover,#scp-remote-dock a:hover{background:#edf8f7!important;box-shadow:0 2px 6px #163b4610}#scp-remote-dock button:disabled,#scp-remote-dock select:disabled{opacity:.5;cursor:default}#scp-remote-dock :focus-visible{outline:3px solid #84d7dc;outline-offset:2px}
+#scp-remote-dock #scp-session-health,#scp-remote-dock #scp-recording{position:static!important;transform:none!important;max-width:none!important;width:auto!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;margin:0!important;color:inherit!important;font:inherit!important}
+#scp-remote-dock #scp-session-health{padding:14px 16px!important}#scp-session-health>[role=status]{line-height:1.65;font-weight:600;padding-left:14px;position:relative;margin-bottom:10px}#scp-session-health>[role=status]:before{content:'';width:6px;height:6px;background:#0e9c89;position:absolute;left:0;top:8px;border-radius:50%;box-shadow:0 0 0 3px #e1f5f0}
+#scp-session-health>small{display:block;line-height:1.9;color:#6b818e;background:#f3f7fa;padding:10px;border:1px solid #e7eef2;border-radius:10px;margin:10px 0;font-size:11px}
+#scp-session-health>select{width:100%;margin-top:8px}#scp-session-health>button{margin:4px 0!important}
+#scp-remote-dock #scp-recording{border-top:1px solid #e5eef1!important;padding:4px 4px 8px!important}#scp-remote-dock #scp-recording>button{border:0!important;font-weight:600!important;text-align:left;width:100%;background:transparent!important}#scp-recording small{color:#82949d;font-size:10px;line-height:1.65;margin-top:12px}#scp-recording [role=status]{line-height:1.7;margin:6px 0}
+body.scp-dock-visible #scpConnection{display:none!important}
+@media(max-width:650px){#scp-remote-dock{right:12px;bottom:56px;width:290px}.scp-dock-content{max-height:45vh}}
+@media(prefers-reduced-motion:reduce){#scp-remote-dock *{transition:none!important}}
+
+#scp-remote-dock header button{padding:0!important;flex-shrink:0}
+
+/* Session tools belong to the desktop toolbar, never over the navigation. */
+#deskarea1:has(.scp-inline){background:#f8fbfc;padding:8px 10px;border:1px solid #dbe7ec;border-radius:12px 12px 0 0;color:#43616f;box-sizing:border-box}
+#deskarea1:has(.scp-inline) input[type=button]{font:12px Sarabun,sans-serif;padding:5px 10px;border:1px solid #cfdee5;border-radius:7px;background:#fff;color:#245262;cursor:pointer}
+#scp-remote-dock.scp-inline{position:relative;inset:auto;clear:both;width:100%;max-width:none;overflow:visible;border:0;border-top:1px solid #e2edf0;border-radius:0;box-shadow:none;background:transparent;margin:8px 0 0;padding:8px 0 0;z-index:5}
+#scp-remote-dock.scp-inline>header{display:none}
+#scp-remote-dock.scp-inline .scp-dock-content{display:flex;align-items:center;gap:16px;padding:0;max-height:none;overflow:visible}
+#scp-remote-dock.scp-inline #scp-session-health{display:grid;grid-template-columns:minmax(220px,1fr) auto;column-gap:20px;row-gap:2px;flex:1;min-width:0;padding:0!important}
+#scp-remote-dock.scp-inline #scp-session-health>[role=status]{grid-column:1;grid-row:1;margin:0;font-size:12px}
+#scp-remote-dock.scp-inline #scp-session-health>small{grid-column:1;grid-row:2;margin:0;padding:0 0 0 14px;background:transparent;border:0;font-size:10px;line-height:1.6;overflow-wrap:anywhere}
+#scp-remote-dock.scp-inline #scp-session-health>small:empty{display:none}
+#scp-remote-dock.scp-inline #scp-session-health>select{grid-column:2;grid-row:1 / span 2;align-self:center;width:180px;margin:0;font-size:12px!important}
+#scp-remote-dock.scp-inline #scp-session-health>button{grid-column:1;grid-row:3;justify-self:start}
+#scp-remote-dock.scp-inline #scp-recording{position:relative!important;flex:0 0 auto;padding:0!important;border:0!important;overflow:visible!important}
+#scp-remote-dock.scp-inline #scp-recording>button{width:auto;border:1px solid #cfdee5!important;background:#fff!important;white-space:nowrap;font-size:12px!important}
+#scp-remote-dock.scp-inline #scp-recording>div{position:absolute;right:0;top:calc(100% + 10px);width:300px;max-width:80vw;padding:16px!important;background:#fff;border:1px solid #d6e5eb;border-radius:12px;box-shadow:0 12px 36px #193e4a26;z-index:20}
+body.scp-inline-tools #deskarea3x{height:var(--scp-canvas-height)!important;max-height:var(--scp-canvas-height)!important}
+#deskarea0>#deskarea1{display:block!important}
+body.fulldesk.scp-inline-tools #deskarea0{grid-template-rows:auto max-content minmax(0,1fr) max-content}
+@media(max-width:800px){#scp-remote-dock.scp-inline .scp-dock-content{gap:8px;flex-wrap:wrap}#scp-remote-dock.scp-inline #scp-session-health{grid-template-columns:minmax(140px,1fr) auto;column-gap:8px}#scp-remote-dock.scp-inline #scp-session-health>select{width:145px}}
+
+/* Left tool rail: reserved space, never drawn over the remote image. */
+body.scp-inline-tools #deskarea0{position:relative;box-sizing:border-box;padding-left:246px;min-height:280px;display:block!important}
+body.scp-inline-tools #deskarea0>#deskarea1{position:absolute;left:0;top:0;bottom:0;width:234px;overflow:auto;padding:16px 12px;border:1px solid #dce8ed;border-radius:12px;background:#f8fbfc;line-height:1.8!important}
+body.scp-inline-tools #deskarea1>.toright2{float:none;display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:14px}
+body.scp-inline-tools #deskarea1 .deskareaicon{float:none}
+body.scp-inline-tools #deskarea1>div:not(.toright2){line-height:2.2}
+body.scp-inline-tools #scp-remote-dock.scp-inline{margin-top:18px;padding-top:14px}
+body.scp-inline-tools #scp-remote-dock.scp-inline .scp-dock-content{display:flex;flex-direction:column;align-items:stretch;gap:18px}
+body.scp-inline-tools #scp-remote-dock.scp-inline #scp-session-health{display:flex;flex-direction:column;gap:8px;order:0;flex:auto}
+body.scp-inline-tools #scp-remote-dock.scp-inline #scp-session-health>select{width:100%;align-self:stretch}
+body.scp-inline-tools #scp-remote-dock.scp-inline #scp-recording{order:1}
+body.scp-inline-tools #scp-remote-dock.scp-inline #scp-recording>button{width:100%}
+body.scp-inline-tools #scp-remote-dock.scp-inline #scp-recording>div{position:static;width:auto;max-width:none;margin-top:10px;padding:10px!important;box-shadow:none}
+@media(max-width:850px){body.scp-inline-tools #deskarea0{padding-left:198px}body.scp-inline-tools #deskarea0>#deskarea1{width:188px}}

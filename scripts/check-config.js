@@ -11,7 +11,9 @@ if (!fs.existsSync(file)) {
     console.error('เริ่มเซิร์ฟเวอร์ครั้งแรกด้วย npm run start:hospital เพื่อสร้างไฟล์นี้');
     process.exit(2);
 }
-const settings = (JSON.parse(fs.readFileSync(file, 'utf8')).settings) || {};
+const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+const settings = config.settings || {};
+const domains = config.domains || {};
 const loopback = ['127.0.0.1', '::1', 'localhost'];
 const list = value => (Array.isArray(value) ? value : (typeof value === 'string' ? value.split(',') : [])).map(item => String(item).trim()).filter(Boolean);
 const remote = key => list(settings[key]).filter(item => !loopback.includes(item));
@@ -50,6 +52,32 @@ for (const [key, ranges] of [['userAllowedIP', userRanges], ['agentAllowedIP', a
 }
 if (settings.selfUpdate !== false) { blocking.push('selfUpdate ไม่ได้ปิด เซิร์ฟเวอร์อาจอัปเดตตัวเองโดยไม่ได้วางแผน'); }
 if (settings.webRTC !== false) { notes.push('webRTC ไม่ได้ปิด การเชื่อมต่อบางส่วนอาจไม่ผ่านเซิร์ฟเวอร์'); }
+
+// The hospital page is about 1.6 MB before compression. Sending it raw over a ward link to an
+// old computer is the difference between a page that opens and one that feels broken.
+if (settings.compression === true) {
+    notes.push('compression เปิดอยู่ หน้าเว็บถูกบีบอัดก่อนส่ง (หน้าไทยเหลือราว 18% ของขนาดเดิม)');
+} else {
+    notes.push('compression ยังไม่เปิด หน้าเว็บถูกส่งแบบไม่บีบอัด ราว 1.6 MB ต่อการเปิดหนึ่งครั้ง');
+    notes.push('  เปิดด้วย settings.compression = true แล้วเริ่มบริการใหม่');
+}
+
+// minify looks like free speed and is a trap here. It does two things: it serves the minified
+// page, which exists, AND it rewrites every core script tag to a -min.js file. Upstream builds
+// those; this fork never has. Turning it on 404s the scripts that draw the whole interface, so
+// the page loads and then does nothing at all. Name the missing files rather than the setting.
+const minifiedCore = ['common-0.0.1', 'meshcentral', 'amt-0.2.0', 'amt-wsman-0.2.0', 'amt-desktop-0.0.2',
+    'amt-terminal-0.0.2', 'amt-redir-ws-0.1.0', 'amt-wsman-ws-0.2.0', 'agent-redir-ws-0.1.1',
+    'agent-redir-rtc-0.1.0', 'agent-desktop-0.0.2', 'agent-rdp-0.0.1'];
+const missingMin = minifiedCore.filter(name => !fs.existsSync(path.join(root, 'public', 'scripts', name + '-min.js')));
+const minifyOn = (settings.minify === true) || Object.keys(domains).some(id => domains[id] && domains[id].minify === true);
+if (minifyOn && (missingMin.length > 0)) {
+    blocking.push('minify เปิดอยู่ แต่ไม่มีไฟล์ย่อของสคริปต์แกนหลัก ' + missingMin.length + ' ตัว หน้าเว็บจะโหลดแล้วใช้งานไม่ได้');
+    blocking.push('  ที่ขาด: ' + missingMin.slice(0, 3).join('-min.js, ') + '-min.js ...');
+    blocking.push('  แก้โดยปิด minify (ใช้ compression แทน ได้ผลดีกว่าและไม่พัง)');
+} else if (missingMin.length > 0) {
+    notes.push('minify ปิดอยู่ และต้องปิดไว้: ไม่มีไฟล์ย่อของสคริปต์แกนหลัก ' + missingMin.length + ' ตัว เปิดแล้วหน้าเว็บจะใช้งานไม่ได้');
+}
 console.log('สรุปสถานะ');
 for (const note of notes) { console.log('  - ' + note); }
 console.log('');

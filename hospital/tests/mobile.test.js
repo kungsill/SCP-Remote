@@ -483,14 +483,16 @@ test('the button opens the desktop panel, not the page of facts about the comput
     assert.ok(/node=.*viewmode=11/.test(source), 'the desktop page is opened on panel 11');
 });
 
-test('a phone is sent the link its own page understands', () => {
-    // The desktop page wants node= and view 11. The mobile page wants gotonode= with panel=1
-    // inside view 10, and ignores the other form entirely - which is why a phone opened a page
-    // with no device on it. The mobile page keeps its own numbering: panel 1 is the desktop.
+test('every device is sent to the full page, which is the only one carrying this work', () => {
+    // MeshCentral's mobile page loads none of the hospital's scripts - no canvas fitting, no
+    // quality ladder, no session health, no direct LAN. A phone sent there gets a bare remote
+    // desktop and loses all of it. mobile=0 is MeshCentral's own override for that.
     const mobilePage = fs.readFileSync(path.join(__dirname, '../../views/default-mobile.handlebars'), 'utf8');
-    assert.ok(/args\.gotonode/.test(mobilePage), 'the mobile page reads gotonode');
-    assert.ok(/currentDevicePanel = parseInt\(args\.panel\)/.test(mobilePage), 'and panel');
-    assert.ok(/currentDevicePanel == 1/.test(mobilePage), 'panel 1 is its desktop');
+    for (const script of ['scp-remote-ui.js', 'scp-session.js', 'scp-lan.js']) {
+        assert.ok(!mobilePage.includes(script), 'the mobile page still does not load ' + script);
+    }
+    const server = fs.readFileSync(path.join(__dirname, '../../webserver.js'), 'utf8');
+    assert.ok(/req.query.mobile == '0'/.test(server), 'the override must still exist upstream');
 
     const o = {
         users: { 'user//admin': admin },
@@ -498,11 +500,9 @@ test('a phone is sent the link its own page understands', () => {
         rights: () => ['mesh//er'],
         nodes: [{ _id: 'node//abc', name: 'ER 1', meshid: 'mesh//er' }]
     };
-    const onPhone = reply();
-    mobile.data(web(o), { session: { userid: 'user//admin' }, headers: { 'user-agent': 'Chrome/140 Mobile Safari/537.36' } }, onPhone);
-    assert.equal(onPhone.body.nodes[0].link, '?gotonode=abc&panel=1&viewmode=10');
-
-    const onDesktop = reply();
-    mobile.data(web(o), { session: { userid: 'user//admin' }, headers: { 'user-agent': 'Chrome/140 Safari/537.36' } }, onDesktop);
-    assert.equal(onDesktop.body.nodes[0].link, '?node=abc&viewmode=11&hide=16');
+    for (const ua of ['Chrome/140 Mobile Safari/537.36', 'Chrome/140 Safari/537.36']) {
+        const r = reply();
+        mobile.data(web(o), { session: { userid: 'user//admin' }, headers: { 'user-agent': ua } }, r);
+        assert.equal(r.body.nodes[0].link, '?node=abc&viewmode=11&hide=16&mobile=0', ua);
+    }
 });

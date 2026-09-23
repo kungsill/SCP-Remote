@@ -99,19 +99,17 @@ exports.data = function (web, req, res) {
         if ((err != null) || (docs == null)) { res.status(500).json({ error: 'DEVICES_UNAVAILABLE' }); return; }
         web.db.GetAllTypeNoTypeField('scplayout', domainid, function (layoutErr, layout) {
             const positions = (layoutErr == null && Array.isArray(layout)) ? layout : [];
-            // Which page MeshCentral will serve this browser decides how a device is opened, and
-            // the two schemes are not interchangeable: the desktop page wants node= and panel 11,
-            // the mobile page wants gotonode= with panel=1 inside view 10. Sending the desktop
-            // form to a phone opened a page with no device on it at all. Decided here, once,
-            // from the same request the page itself came from.
-            const ua = (req.headers && req.headers['user-agent']) || '';
-            const mobileView = ua.toLowerCase().indexOf('mobile') >= 0;
-            const openLink = id => {
-                const short = String(id).split('/').pop();
-                return mobileView
-                    ? ('?gotonode=' + encodeURIComponent(short) + '&panel=1&viewmode=10')
-                    : ('?node=' + encodeURIComponent(short) + '&viewmode=11&hide=16');
-            };
+            // One link for every device, and it asks for the full desktop page even on a phone.
+            //
+            // MeshCentral's own mobile page loads none of this hospital's work - not the canvas
+            // fitting, the quality ladder that keeps the picture on WEBP, the session health
+            // panel, nor direct LAN. A phone sent there gets a bare remote desktop and loses all
+            // of it, which is what the blank screen turned out to be.
+            //
+            // mobile=0 is MeshCentral's own override, read in getRenderPage, so no upstream code
+            // has to change. hide=16 drops the left bar and the main menu for a focused view.
+            const openLink = id =>
+                '?node=' + encodeURIComponent(String(id).split('/').pop()) + '&viewmode=11&hide=16&mobile=0';
             const nodes = docs.map(n => ({
                 id: n._id,
                 name: n.name || n._id,

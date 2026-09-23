@@ -33,8 +33,19 @@ function signedInUser(web, req) {
 exports.page = function (web, req, res, url) {
     const root = url || '/';
     if (signedInUser(web, req) == null) { res.redirect(root + '?m=1'); return; }
+    // Coming here on purpose undoes an earlier "full site" choice, so the phone goes back to
+    // opening this page by itself.
+    if (req.session) { delete req.session.scpFullSite; }
     res.setHeader('Cache-Control', 'no-store');
     res.sendFile(pageFile);
+};
+
+// The same reading of "phone" the rest of the server uses when it picks the mobile views, so
+// the two cannot disagree about what a phone is. Note an iPad reports a desktop agent and is
+// not caught by it - on a tablet the full site is usable anyway, and /m is a tap away.
+exports.isPhone = function (req) {
+    const ua = req && req.headers && req.headers['user-agent'];
+    return (typeof ua === 'string') && (ua.toLowerCase().indexOf('mobile') >= 0);
 };
 
 // Watches the root for that marker. Anything else is none of its business and is passed on
@@ -45,7 +56,21 @@ exports.page = function (web, req, res, url) {
 // request until the browser gave up. While signed out the marker simply rides along in the URL,
 // through the login form's hidden urlargs field, and is acted on when they come back signed in.
 exports.root = function (web, req, res, next, url) {
-    if (req.query && (req.query.m === '1') && (signedInUser(web, req) != null)) { res.redirect((url || '/') + 'm'); return; }
+    const root = url || '/';
+    const q = (req && req.query) || {};
+    const signedIn = signedInUser(web, req) != null;
+
+    if ((q.m === '1') && signedIn) { res.redirect(root + 'm'); return; }
+
+    // The escape hatch. Without it the "full site" link would be bounced straight back here by
+    // the rule below, and there would be no way off the mobile page on a phone at all. The
+    // choice is remembered so a later reload does not undo it.
+    if (q.m === '0') { if (req.session) { req.session.scpFullSite = 1; } next(); return; }
+
+    // A phone that simply opens the site gets the page built for a phone. Only once signed in:
+    // before that there is nothing to show, and the login page is the same either way.
+    if (signedIn && exports.isPhone(req) && !(req.session && req.session.scpFullSite)) { res.redirect(root + 'm'); return; }
+
     next();
 };
 

@@ -234,7 +234,9 @@ test('the device button leaves /m for the site root instead of reloading /m', ()
 
 test('the full-site link is relative, so a sub-path domain is not sent to the wrong place', () => {
     const page = fs.readFileSync(mobile.pageFile, 'utf8');
-    assert.ok(/id="full" href="\."/.test(page), 'href="." resolves to the site root from /m');
+    // "./?m=0" resolves to the site root from /m and carries the opt-out, without which a
+    // phone would be sent straight back here and could never reach the full site.
+    assert.ok(/id="full" href="\.\/\?m=0"/.test(page), 'the link must be relative and carry m=0');
 });
 
 // Added to a phone's home screen, /m should open as its own window with the hospital logo.
@@ -376,4 +378,66 @@ test('the header carries the hospital logo', () => {
     assert.ok(/<img src="images\/scp-logo\.png"/.test(page));
     assert.ok(fs.existsSync(path.join(__dirname, '../../public/images/scp-logo.png')));
     assert.ok(/alt=""/.test(page), 'decorative beside the name, so screen readers should skip it');
+});
+
+const phone = { 'user-agent': 'Mozilla/5.0 (Linux; Android 14) Chrome/140 Mobile Safari/537.36' };
+const laptop = { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140 Safari/537.36' };
+const withAdmin = () => web({ users: { 'user//admin': admin } });
+const session = () => ({ userid: 'user//admin' });
+
+test('a phone opening the site is taken to the page built for a phone', () => {
+    const r = reply();
+    let through = false;
+    mobile.root(withAdmin(), { query: {}, headers: phone, session: session() }, r, () => { through = true; }, '/');
+    assert.equal(r.redirected, '/m');
+    assert.equal(through, false);
+});
+
+test('a computer is left on the full site', () => {
+    const r = reply();
+    let through = false;
+    mobile.root(withAdmin(), { query: {}, headers: laptop, session: session() }, r, () => { through = true; }, '/');
+    assert.equal(through, true);
+    assert.equal(r.redirected, null);
+});
+
+test('a phone that is not signed in reaches the login page rather than bouncing', () => {
+    const r = reply();
+    let through = false;
+    mobile.root(web({}), { query: {}, headers: phone, session: null }, r, () => { through = true; }, '/');
+    assert.equal(through, true);
+    assert.equal(r.redirected, null);
+});
+
+test('the full-site link works on a phone, and keeps working after a reload', () => {
+    // Without the opt-out the link would be sent straight back to /m and a phone could never
+    // reach the full site at all.
+    const s = session();
+    const r = reply();
+    let through = false;
+    mobile.root(withAdmin(), { query: { m: '0' }, headers: phone, session: s }, r, () => { through = true; }, '/');
+    assert.equal(through, true, 'the full site must load');
+    assert.equal(s.scpFullSite, 1, 'and the choice is remembered');
+
+    // A later plain visit, query gone, must respect it.
+    const r2 = reply();
+    let through2 = false;
+    mobile.root(withAdmin(), { query: {}, headers: phone, session: s }, r2, () => { through2 = true; }, '/');
+    assert.equal(through2, true);
+    assert.equal(r2.redirected, null);
+});
+
+test('going back to /m on purpose restores the automatic behaviour', () => {
+    const s = { userid: 'user//admin', scpFullSite: 1 };
+    const r = reply();
+    mobile.page(withAdmin(), { session: s, headers: phone }, r, '/');
+    assert.equal(r.sent, mobile.pageFile);
+    assert.equal(s.scpFullSite, undefined, 'the preference is cleared');
+});
+
+test('phone detection matches the rule the server already uses for its mobile views', () => {
+    assert.equal(mobile.isPhone({ headers: phone }), true);
+    assert.equal(mobile.isPhone({ headers: laptop }), false);
+    assert.equal(mobile.isPhone({ headers: {} }), false, 'no agent at all must not throw');
+    assert.equal(mobile.isPhone({}), false);
 });

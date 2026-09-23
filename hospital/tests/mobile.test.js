@@ -55,11 +55,45 @@ test('a session naming an account the server does not know is refused too', () =
     assert.equal(r.code, 401);
 });
 
-test('the page sends a signed-out browser to the login page, not to a page it cannot use', () => {
+test('a signed-out browser goes to the login page carrying a marker to come back with', () => {
+    // Plain '/' would strand them on MeshCentral's own mobile page after they log in, which is
+    // exactly what happened the first time this was tried on a phone.
     const r = reply();
     mobile.page(web({ users: {} }), { session: null }, r);
-    assert.equal(r.redirected, '/');
+    assert.equal(r.redirected, '/?m=1');
     assert.equal(r.sent, null, 'nothing should be served to a signed-out browser');
+});
+
+test('the marker sends them on to /m once the login has returned them to the root', () => {
+    const r = reply();
+    let passedOn = false;
+    mobile.root(web({ users: { 'user//admin': admin } }), { query: { m: '1' }, session: { userid: 'user//admin' } }, r, () => { passedOn = true; }, '/');
+    assert.equal(r.redirected, '/m');
+    assert.equal(passedOn, false);
+});
+
+test('an ordinary visit to the root is passed straight through', () => {
+    // This sits in front of the busiest route on the server; everything else must be untouched.
+    for (const query of [{}, { m: '0' }, { m: 'yes' }, { node: 'abc', viewmode: '10' }]) {
+        const r = reply();
+        let passedOn = false;
+        mobile.root(web({}), { query: query, session: null }, r, () => { passedOn = true; }, '/');
+        assert.equal(passedOn, true, JSON.stringify(query) + ' should reach the normal site');
+        assert.equal(r.redirected, null);
+    }
+    const r = reply();
+    let passedOn = false;
+    mobile.root(web({}), { session: null }, r, () => { passedOn = true; }, '/');
+    assert.equal(passedOn, true, 'a request with no query at all must not throw');
+});
+
+test('a domain served under a sub-path keeps its prefix on both legs', () => {
+    const r = reply();
+    mobile.page(web({ users: {} }), { session: null }, r, '/sub/');
+    assert.equal(r.redirected, '/sub/?m=1');
+    const r2 = reply();
+    mobile.root(web({ users: { 'user//admin': admin } }), { query: { m: '1' }, session: { userid: 'user//admin' } }, r2, () => { }, '/sub/');
+    assert.equal(r2.redirected, '/sub/m');
 });
 
 test('the page is served from a file outside the publicly served folders', () => {
@@ -179,6 +213,8 @@ test('the page and its assets are wired to each other', () => {
 test('webserver wires /m without disturbing the app route beside it', () => {
     const server = fs.readFileSync(path.join(__dirname, '../../webserver.js'), 'utf8');
     assert.ok(server.includes("require('./hospital/mobile').attach"), '/m should be attached');
+    // It must run before the root route, or Express gives the root away first.
+    assert.ok(server.indexOf("hospital/mobile').attach") < server.indexOf('obj.app.get(url, handleRootRequest)'), 'attach must come before the root route');
     assert.ok(server.includes("obj.app.post(url + 'scp-client-api'"), 'the app API must still be registered');
 });
 
@@ -236,4 +272,44 @@ test('the page links the manifest and an icon for iPhone and iPad', () => {
     assert.ok(/rel="manifest" href="scp-mobile.webmanifest"/.test(page), 'relative, like the other assets');
     assert.ok(/rel="apple-touch-icon"/.test(page), 'iOS ignores the manifest icons');
     assert.ok(/name="theme-color"/.test(page));
+});
+
+test('a signed-out visit to the root with the marker does not bounce back to /m', () => {
+    // The loop this prevents: /m sends a signed-out browser to /?m=1, and if the root sent it
+    // straight back to /m the two would trade the request until the browser gave up. Caught in
+    // production the first time, so it has a test of its own.
+    const r = reply();
+    let passedOn = false;
+    mobile.root(web({ users: {} }), { query: { m: '1' }, session: null }, r, () => { passedOn = true; }, '/');
+    assert.equal(r.redirected, null, 'a signed-out visitor must reach the login page');
+    assert.equal(passedOn, true);
+});
+
+test('the whole round trip ends on the mobile page', () => {
+    const signedOut = web({ users: {} });
+    const signedIn = web({ users: { 'user//admin': admin } });
+    const session = { userid: 'user//admin' };
+
+    // 1. Tap /m while signed out: sent to the root, marker in hand.
+    let r = reply();
+    mobile.page(signedOut, { session: null }, r, '/');
+    assert.equal(r.redirected, '/?m=1');
+
+    // 2. The root lets them through to the login page rather than sending them back.
+    r = reply();
+    let reachedLogin = false;
+    mobile.root(signedOut, { query: { m: '1' }, session: null }, r, () => { reachedLogin = true; }, '/');
+    assert.equal(reachedLogin, true);
+    assert.equal(r.redirected, null);
+
+    // 3. MeshCentral returns them to the root after login, marker carried in urlargs.
+    r = reply();
+    mobile.root(signedIn, { query: { m: '1' }, session: session }, r, () => { }, '/');
+    assert.equal(r.redirected, '/m');
+
+    // 4. And this time /m serves the page.
+    r = reply();
+    mobile.page(signedIn, { session: session }, r, '/');
+    assert.equal(r.sent, mobile.pageFile);
+    assert.equal(r.redirected, null);
 });

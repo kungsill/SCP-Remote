@@ -25,10 +25,28 @@ function signedInUser(web, req) {
 
 // The page itself carries no fleet data, but sending a browser to a working page it cannot use
 // is worse than sending it to the login screen.
-exports.page = function (web, req, res) {
-    if (signedInUser(web, req) == null) { res.redirect('/'); return; }
+//
+// Sending a signed-out visitor plainly to the root is not enough: they log in there and stay
+// there, on MeshCentral's own mobile page, wondering where this one went. MeshCentral returns a
+// user to the root plus whatever query they arrived with - the login form carries it through in
+// a hidden urlargs field - so the marker below survives the login and root() sends them on.
+exports.page = function (web, req, res, url) {
+    const root = url || '/';
+    if (signedInUser(web, req) == null) { res.redirect(root + '?m=1'); return; }
     res.setHeader('Cache-Control', 'no-store');
     res.sendFile(pageFile);
+};
+
+// Watches the root for that marker. Anything else is none of its business and is passed on
+// untouched, so the ordinary site is unaffected by this sitting in front of it.
+//
+// It only sends them on once they are actually signed in. Bouncing a signed-out visitor to /m
+// would put them straight back here - /m redirects them out again - and the two would trade the
+// request until the browser gave up. While signed out the marker simply rides along in the URL,
+// through the login form's hidden urlargs field, and is acted on when they come back signed in.
+exports.root = function (web, req, res, next, url) {
+    if (req.query && (req.query.m === '1') && (signedInUser(web, req) != null)) { res.redirect((url || '/') + 'm'); return; }
+    next();
 };
 
 exports.data = function (web, req, res) {
@@ -68,9 +86,12 @@ exports.data = function (web, req, res) {
     });
 };
 
-// Wired from webserver.js so that file gains two lines rather than this whole module.
+// Wired from webserver.js so that file gains one line rather than this whole module. It has to
+// be called before the root route is registered, or Express hands the root to that one first
+// and the marker is never seen.
 exports.attach = function (web, app, url) {
-    app.get(url + 'm', function (req, res) { exports.page(web, req, res); });
+    app.get(url, function (req, res, next) { exports.root(web, req, res, next, url); });
+    app.get(url + 'm', function (req, res) { exports.page(web, req, res, url); });
     app.get(url + 'm-data', function (req, res) { exports.data(web, req, res); });
 };
 

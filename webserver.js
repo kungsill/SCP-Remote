@@ -7400,6 +7400,9 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
                 if ((parent.config.domains[i].dns != null) || (parent.config.domains[i].share != null)) { continue; } // This is a subdomain with a DNS name, no added HTTP bindings needed.
                 var domain = parent.config.domains[i];
                 var url = domain.url;
+                // SCP-Remote: must sit ahead of the root route below, because it watches the root
+                // for the marker that carries a signed-out visitor back to /m after logging in.
+                if (i === '') require('./hospital/mobile').attach(obj, obj.app, url);
                 if (typeof domain.rootredirect == 'string') {
                     // Root page redirects the user to a different URL
                     obj.app.get(url, handleRootRedirect);
@@ -7500,7 +7503,6 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
                 obj.app.get(url + 'player', handlePlayerRequest);
                 obj.app.get(url + 'sharing', handleSharingRequest);
                 if (i === '') obj.app.post(url + 'scp-client-api', function(req,res){require('./hospital/desktop-clients').route(obj,req,res);});
-                if (i === '') require('./hospital/mobile').attach(obj, obj.app, url); // SCP-Remote: /m, the phone and tablet device picker
                 obj.app.ws(url + 'agenttransfer.ashx', handleAgentFileTransfer); // Setup agent to/from server file transfer handler
                 obj.app.ws(url + 'meshrelay.ashx', function (ws, req) {
                     PerformWSSessionAuth(ws, req, true, function (ws1, req1, domain, user, cookie, authData) {

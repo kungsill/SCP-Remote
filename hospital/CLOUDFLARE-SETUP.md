@@ -12,7 +12,7 @@
 
 ```
 เจ้าหน้าที่ที่บ้าน                Cloudflare                  เซิร์ฟเวอร์ รพ.
-   เบราว์เซอร์  ──────►  remote.kpsnana.com  ──────►  cloudflared ──► 127.0.0.1:8443
+   เบราว์เซอร์  ──────►  remote.kpsnana.com  ──────►  cloudflared ──► localhost:8443
                           (ถาม Access ก่อน)          (ต่อออกจากข้างใน)
 ```
 
@@ -191,20 +191,26 @@ PID ต้องเปลี่ยนจากเดิม
 
 | ช่อง | ค่าที่ต้องกรอก |
 | --- | --- |
-| **Hostname** | `remote` . `kpsnana.com` |
-| **Service URL** | `https://127.0.0.1:8443` |
+| **Subdomain** | `remote` |
+| **Domain** | `kpsnana.com` |
+| **Path** | **เว้นว่าง** |
+| **Service URL** | `https://localhost:8443` |
 
 แล้วกาง **Additional application settings** → หัวข้อ **TLS**
 
 | ช่อง | ค่า |
 | --- | --- |
-| **Origin Server Name** | `127.0.0.1` |
 | **CA Pool** | `F:\EX\sichomphu-remote\.local\scp-remote\root-cert-public.crt` |
+| **Origin Server Name** | **เว้นว่าง** |
 | **Disable TLS certificate verification** | **ปิดไว้** |
 
 กด **Add route**
 
-> **ทำไมไม่ต้องปิดการตรวจ TLS:** ใบรับรองของเซิร์ฟเวอร์มี SAN ครอบ `127.0.0.1` และ `localhost` อยู่แล้ว และออกโดย `MeshCentralRoot-e68095` ซึ่งอยู่ในไฟล์ `root-cert-public.crt` — ชี้ CA Pool ไปที่ไฟล์นั้นก็ตรวจผ่านครบ เอกสาร Cloudflare ระบุชัดว่า `noTLSVerify` ควรใช้เป็นทางออกชั่วคราวเท่านั้น
+> **Path ต้องเว้นว่าง** ช่องนี้เป็นตัวกรองว่าคำขอแบบไหนจะถูกส่งมาที่บริการนี้ (ใส่ได้เป็น regex เช่น `^/blog`) ถ้าใส่อะไรลงไป คำขออื่นที่ไม่ตรงจะไม่ถึงเซิร์ฟเวอร์ — เราต้องการให้ทุกคำขอมาถึง MeshCentral
+>
+> **ทำไมใช้ `localhost` ไม่ใช่ `127.0.0.1`:** ใบรับรองของเซิร์ฟเวอร์มี SAN เป็น `DNS Name=localhost` อยู่แล้ว จึงตรวจสอบผ่านได้ตรง ๆ ส่วนการใส่หมายเลข IP ลงช่อง Origin Server Name นั้น TLS ไม่อนุญาตให้ใช้ IP เป็น SNI (RFC 6066 กำหนดให้เป็นชื่อโฮสต์เท่านั้น) จึงเลี่ยงปัญหานี้ด้วยการใช้ชื่อไปเลย
+>
+> **ทำไมไม่ต้องปิดการตรวจ TLS:** ใบรับรองออกโดย `MeshCentralRoot-e68095` ซึ่งอยู่ในไฟล์ `root-cert-public.crt` — ชี้ CA Pool ไปที่ไฟล์นั้นก็ตรวจผ่านครบ เอกสาร Cloudflare ระบุชัดว่า `noTLSVerify` ควรใช้เป็นทางออกชั่วคราวเท่านั้น
 
 DNS record จะถูกสร้างให้อัตโนมัติ ไม่ต้องไปเพิ่มเอง
 
@@ -271,7 +277,7 @@ service restart
 
 | อาการ | สาเหตุที่น่าจะเป็น | แก้ยังไง |
 | --- | --- | --- |
-| เปิดเว็บแล้วเจอ error 502 | Service URL หรือ CA Pool ผิด | ตรวจว่าเป็น `https://127.0.0.1:8443` และ path ของ CA Pool ถูกต้อง |
+| เปิดเว็บแล้วเจอ error 502 | Service URL หรือ CA Pool ผิด | ตรวจว่าเป็น `https://localhost:8443` และ path ของ CA Pool ถูกต้อง |
 | เจอหน้า SCP-Remote เลย ไม่ผ่าน Access | policy ของ application ยังไม่ได้ใส่ หรือ domain ไม่ตรง | ตรวจ Applications ว่ามี policy **Allow** อยู่จริง |
 | เครื่องลูกหายไปหมด | Access ครอบ `/agent.ashx` | ตรวจว่าสร้าง Bypass ครบ 4 เส้นทาง |
 | เครื่องออนไลน์ แต่หน้าจอรีโมตไม่ขึ้น | ลืม bypass `/meshrelay.ashx` | เพิ่ม Bypass ให้เส้นทางนี้ |

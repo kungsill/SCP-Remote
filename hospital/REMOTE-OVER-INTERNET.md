@@ -173,8 +173,8 @@ MeshCentral แก้ให้แล้วถ้าบอกมัน: [webserve
 | ช่อง | ค่า | ทำไม |
 | --- | --- | --- |
 | Hostname | `remote` . `kpsnana.com` | |
-| Service URL | `https://127.0.0.1:8443` | `cloudflared` อยู่เครื่องเดียวกับเซิร์ฟเวอร์ |
-| Origin Server Name | `127.0.0.1` | |
+| Service URL | `https://localhost:8443` | `cloudflared` อยู่เครื่องเดียวกับเซิร์ฟเวอร์ (ใบรับรองมี SAN `localhost`) |
+| Origin Server Name | เว้นว่าง | ชื่อใน Service URL ตรงกับใบรับรองแล้ว และ TLS ใช้ IP เป็น SNI ไม่ได้ |
 | CA Pool | `F:\EX\sichomphu-remote\.local\scp-remote\root-cert-public.crt` | |
 | Disable TLS certificate verification | **ปิดไว้** | |
 

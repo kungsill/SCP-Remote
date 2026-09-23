@@ -85,6 +85,7 @@
     "update:system": "node scripts/update-system.js",
     "check:config": "node scripts/check-config.js",
     "allow:subnet": "node scripts/allow-subnet.js",
+    "tunnel:mode": "node scripts/tunnel-mode.js",
     "build:setup-exe": "node scripts/build-setup-exe.js",
     "backup:copy": "node scripts/copy-backups.js",
     "drill:restore": "node scripts/restore-drill.js"

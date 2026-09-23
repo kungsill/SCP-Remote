@@ -190,7 +190,7 @@ test('starting a session hands over to the page MeshCentral already serves', () 
     // Reusing that page keeps the consent prompt on the ward computer, and everything else
     // about the session, on the path that is already tested rather than a second one.
     const client = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-mobile.js'), 'utf8');
-    assert.ok(client.includes('viewmode=10'), 'should open the remote desktop view');
+    assert.ok(client.includes('viewmode=11'), 'panel 11 is MainDevDesktop; 10 is the details page');
     assert.ok(!/deviceshare|publicid/.test(client), 'it must not mint device shares of its own');
 });
 
@@ -465,4 +465,17 @@ test('a bare visit to the root is still the front door', () => {
         mobile.root(withAdmin(), { query: query, headers: {}, session: session() }, r, () => { }, '/');
         assert.equal(r.redirected, '/m', JSON.stringify(query) + ' is a plain visit');
     }
+});
+
+test('the button opens the desktop panel, not the page of facts about the computer', () => {
+    // views/default.handlebars keeps the map: 10 is MainDev, 11 is MainDevDesktop. Opening 10
+    // showed the group, hostname and a power chart - correct, and not what was asked for.
+    const page = fs.readFileSync(path.join(__dirname, '../../views/default.handlebars'), 'utf8');
+    const map = /var panels = \{([^}]*)\}/.exec(page);
+    assert.ok(map, 'the panel map should still be in default.handlebars');
+    assert.ok(/11:\s*'MainDevDesktop'/.test(map[1]), 'panel 11 is the remote desktop');
+
+    const client = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-mobile.js'), 'utf8');
+    assert.ok(/viewmode=11/.test(client));
+    assert.ok(!/viewmode=10/.test(client), 'panel 10 is the details page');
 });

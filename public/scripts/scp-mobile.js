@@ -88,8 +88,12 @@
     function open(node) {
         // MeshCentral's own desktop view, which carries the consent prompt and everything else
         // already tested. node ids are node/<domain>/<id> and the page wants the last part.
+        // viewmode is the panel number from the map in views/default.handlebars: 10 is the
+        // device's details page and 11 is the remote desktop. 10 was wrong - it opened the
+        // page of facts about the computer rather than its screen. hide=16 drops the left bar
+        // and the main menu, which is what MeshCentral itself passes for a focused view.
         const short = String(node.id).split('/').pop();
-        location.href = siteRoot() + '?node=' + encodeURIComponent(short) + '&viewmode=10&hide=16';
+        location.href = siteRoot() + '?node=' + encodeURIComponent(short) + '&viewmode=11&hide=16';
     }
 
     function render() {

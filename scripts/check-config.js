@@ -44,7 +44,11 @@ if (settings.portBind == null) {
     notes.push('portBind = ' + settings.portBind + ' จะรับเฉพาะการ์ดที่ถือ IP นี้ วงอื่นต้องมีเส้นทางมาที่ IP นี้');
 }
 for (const [key, ranges] of [['userAllowedIP', userRanges], ['agentAllowedIP', agentRanges]]) {
-    if (ranges.length === 0) {
+    // An absent key is not a narrow list, it is no restriction at all. Reporting that as
+    // "this machine only" says the opposite of what the server will do.
+    if (settings[key] == null) {
+        notes.push(key + ' ไม่ได้กำหนด = ไม่จำกัดที่มา (รับจากทุกที่ ให้ Cloudflare Access กับ 2FA เป็นด่านแทน)');
+    } else if (ranges.length === 0) {
         notes.push(key + ' อนุญาตเฉพาะเครื่องนี้ (loopback) ยังไม่เปิดให้เครือข่ายอื่น');
     } else {
         notes.push(key + ' อนุญาต ' + ranges.length + ' รายการ: ' + ranges.join(', '));

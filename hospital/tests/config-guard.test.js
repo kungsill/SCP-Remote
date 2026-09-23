@@ -147,3 +147,22 @@ test('a checkout with no database beside the config says nothing about accounts'
     const r = review(hospitalConfig());
     assert.ok(!r.out.includes('2FA'), 'nothing is known, so nothing is claimed');
 });
+
+test('an absent allowlist is reported as no restriction, not as loopback only', () => {
+    // list(undefined) is an empty list, which reads the same as "only this machine" unless the
+    // two are told apart. Saying "this machine only" about a server that accepts the whole
+    // internet is the most dangerous sentence this script could print.
+    const config = hospitalConfig({ trustedProxy: '127.0.0.1' });
+    delete config.settings.userAllowedIP;
+    delete config.settings.agentAllowedIP;
+    config.domains[''].passwordRequirements = { force2factor: true };
+    const r = review(config, [{ name: 'admin', otp: true }]);
+    assert.ok(r.out.includes('userAllowedIP ไม่ได้กำหนด = ไม่จำกัดที่มา'), r.out);
+    assert.ok(!r.out.includes('userAllowedIP อนุญาตเฉพาะเครื่องนี้'), 'must not claim the opposite');
+});
+
+test('an allowlist holding only loopback is still reported as this machine only', () => {
+    const config = hospitalConfig({ userAllowedIP: ['127.0.0.1'], agentAllowedIP: ['127.0.0.1'] });
+    const r = review(config);
+    assert.ok(r.out.includes('userAllowedIP อนุญาตเฉพาะเครื่องนี้'));
+});

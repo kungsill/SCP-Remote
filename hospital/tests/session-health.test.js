@@ -63,3 +63,37 @@ test('Sharp agrees with the desktop defaults the page sets, rather than silently
  assert.equal(scaling,read('scaling'));
  assert.equal(framerate,read('framerate'));
 });
+
+test('the Desktop App runs the same session-health code as the browser, not a copy that drifted',()=>{
+ // hospital/desktop-app/main.js injects its own copy of this module into the app window.
+ // The two were byte-identical until the quality ladder was corrected in one of them, which
+ // left every technician using the app still dropping to PNG a few tiles into each session.
+ // Keep them the same file, or the next fix lands in one place again.
+ const web=fs.readFileSync(path.join(__dirname,'../../public/scripts/scp-session.js'),'utf8');
+ const app=fs.readFileSync(path.join(__dirname,'../desktop-app/session-health.js'),'utf8');
+ assert.equal(app,web,'hospital/desktop-app/session-health.js must match public/scripts/scp-session.js');
+});
+
+test('the Desktop App still injects that copy, which is why it has to stay in step',()=>{
+ const main=fs.readFileSync(path.join(__dirname,'../desktop-app/main.js'),'utf8');
+ assert.ok(main.includes("'session-health.js'"),'main.js should still inject session-health.js');
+});
+
+test('the Desktop App opens on the same picture the ladder settles on',()=>{
+ // main.js injects its own desktop settings before the first connect, and used to ask for
+ // PNG at quality 90 - a quality PNG ignores, and an encoding the hospital had chosen to
+ // leave. Three places set this picture; they have to agree or the first seconds of every
+ // session look like something nobody picked.
+ const main=fs.readFileSync(path.join(__dirname,'../desktop-app/main.js'),'utf8');
+ const [encoding,quality,scaling,framerate]=ladder()[0];
+ const injected={};
+ for(const m of main.matchAll(/desktopsettings\.([a-z]+)=(\d+)/g)){injected[m[1]]=Number(m[2]);}
+ const read=key=>{assert.ok(key in injected,'main.js should still set desktopsettings.'+key);return injected[key];};
+ assert.equal(read('agentencoding'),encoding);
+ assert.equal(read('quality'),quality);
+ assert.equal(read('scaling'),scaling);
+ assert.equal(read('framerate'),framerate);
+ const img=/m\.ImageType=(\d+)/.exec(main);
+ assert.ok(img,'main.js should still force the initial ImageType');
+ assert.equal(Number(img[1]),encoding,'the first frames must use the same encoding as the rest');
+});

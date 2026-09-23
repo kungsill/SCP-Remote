@@ -149,3 +149,29 @@ test('the rename dialog still sends no responseid, which is why the notification
     assert.ok(send > 0, 'showEditNodeValueDialogEx should still send changedevice');
     assert.ok(!ui.substring(send, send + 400).includes('responseid'), 'the rename dialog sends no responseid');
 });
+
+test('asking the database for a whole group really returns the whole group', () => {
+    // findDuplicateDeviceInMesh passes skip 0 and limit 0, the way the device list does. If
+    // NeDB ever read limit 0 as "no documents" rather than "no limit", the check would find
+    // nothing and wave every duplicate through - silently, which is how the version it
+    // replaced failed. Ask the installed database rather than trusting the reading.
+    const Datastore = require('@seald-io/nedb');
+    const db = new Datastore();
+    const query = { type: 'node', domain: '', meshid: { $in: ['mesh/x/er'] } };
+    return new Promise((resolve, reject) => {
+        db.insert([
+            { type: 'node', domain: '', meshid: 'mesh/x/er', name: 'ER 1' },
+            { type: 'node', domain: '', meshid: 'mesh/x/er', name: 'ER 2' },
+            { type: 'node', domain: '', meshid: 'mesh/x/lab', name: 'Lab 1' }
+        ], err => {
+            if (err) { reject(err); return; }
+            db.find(query).sort({ name: 1 }).skip(0).limit(0).exec((e, rows) => {
+                try {
+                    assert.equal(e, null);
+                    assert.equal(rows.length, 2, 'limit 0 must mean no limit, not no rows');
+                    resolve();
+                } catch (ex) { reject(ex); }
+            });
+        });
+    });
+});

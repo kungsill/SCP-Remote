@@ -59,8 +59,13 @@ app.whenReady().then(()=>{
    hide.textContent='#deskarea1{display:block}';
    document.head.appendChild(hide);
    window.scpLanReady=${config.directLan!==false&&data.lan===true};
-   desktopsettings.quality=90;desktopsettings.scaling=1024;desktopsettings.framerate=50;
-   var original=CreateAgentRemoteDesktop;CreateAgentRemoteDesktop=function(){var m=original.apply(this,arguments);m.ImageType=2;return m;};
+   // Open on the same picture the browser opens on, and the same one session-health.js asks
+   // for once the first tile lands. These used to say PNG at quality 90 - PNG ignores quality,
+   // and the hospital had already chosen WEBP over PNG for this stream - so the app spent the
+   // first seconds of every session on a picture nobody had chosen. ImageType: 1 JPEG, 2 PNG,
+   // 3 TIFF, 4 WEBP.
+   desktopsettings.agentencoding=4;desktopsettings.quality=100;desktopsettings.scaling=1024;desktopsettings.framerate=50;
+   var original=CreateAgentRemoteDesktop;CreateAgentRemoteDesktop=function(){var m=original.apply(this,arguments);m.ImageType=4;return m;};
    var tries=0,timer=setInterval(function(){var b=document.getElementById('connectbutton1');if(b&&!b.disabled){clearInterval(timer);connectDesktop(null,3);}else if(++tries>=60){clearInterval(timer);}},500);
   })()`);
   // Drag-a-file-onto-the-screen support. Kept in its own file so it stays plain JS (no template

@@ -13,7 +13,20 @@
     const $ = id => document.getElementById(id);
     let lang = 'th';
     try { lang = localStorage.getItem('scpMobileLanguage') || 'th'; } catch (ex) { }
-    let data = { rooms: [], nodes: [] }, room = '', query = '', map = false, busy = false;
+    let data = { rooms: [], nodes: [] }, room = '', query = '', map = false, busy = false, loaded = false;
+
+    // Something to look at while the first list is on its way. A phone on mobile data can sit
+    // on an empty page long enough to look broken.
+    function skeleton() {
+        const canvas = $('devices');
+        canvas.className = 'grid';
+        canvas.textContent = '';
+        for (let i = 0; i < 4; i++) {
+            const card = el('article', null, 'device skeleton');
+            ['title', 'room', 'ip', 'action'].forEach(kind => card.appendChild(el('div', null, 'bar ' + kind)));
+            canvas.appendChild(card);
+        }
+    }
 
     const t = (th, en) => (lang === 'th' ? th : en);
     function el(tag, text, cls) { const n = document.createElement(tag); if (text) n.textContent = text; if (cls) n.className = cls; return n; }
@@ -54,11 +67,15 @@
             const body = await r.json();
             if (body.error) throw Error(body.error);
             data = body;
+            loaded = true;
             $('status').textContent = t('อัปเดตล่าสุด ', 'Updated ') + new Date().toLocaleTimeString(lang === 'th' ? 'th-TH' : 'en-GB');
             render();
         } catch (e) {
             // A failed refresh must not blank a list that is still on screen and still useful.
             $('status').textContent = error(e && e.message ? e.message : 'OFFLINE_FETCH');
+            // But if the first one failed there is no list, and leaving the placeholders up
+            // would go on promising a page that is not coming.
+            if (!loaded) { $('devices').textContent = ''; $('devices').appendChild(el('p', t('ยังโหลดรายชื่อเครื่องไม่ได้ กดรีเฟรชเพื่อลองใหม่', 'The device list has not loaded. Press refresh to try again.'))); }
         } finally { busy = false; $('refresh').disabled = false; }
     }
 
@@ -80,9 +97,13 @@
         $('onlineCount').textContent = data.nodes.filter(n => n.online).length;
         $('roomsCount').textContent = data.rooms.length;
 
+        // The count beside a ward is what tells you at a glance where the machines actually are.
         $('rooms').textContent = '';
         [{ id: '', name: t('ทุกห้อง', 'All rooms') }].concat(data.rooms).forEach(r => {
-            const b = el('button', r.name);
+            const b = el('button');
+            b.appendChild(el('b', r.name));
+            const n = r.id ? data.nodes.filter(x => x.room === r.id).length : data.nodes.length;
+            b.appendChild(el('span', String(n), 'count'));
             b.classList.toggle('active', room === r.id);
             b.onclick = () => { room = r.id; render(); };
             $('rooms').appendChild(b);
@@ -105,7 +126,7 @@
         if (!nodes.length) { canvas.appendChild(el('p', t('ไม่พบเครื่องในรายการนี้', 'No matching devices'))); return; }
 
         nodes.forEach(n => {
-            const card = el('article', null, 'device');
+            const card = el('article', null, n.online ? 'device' : 'device is-offline');
             if (map && n.position) { card.style.gridColumn = String(n.position.x + 1); card.style.gridRow = String(n.position.y + 1); }
             card.appendChild(el('span', n.online ? t('ออนไลน์', 'Online') : t('ออฟไลน์', 'Offline'), n.online ? 'online' : 'offline'));
             card.appendChild(el('h3', n.name));
@@ -131,6 +152,7 @@
     };
 
     labels();
+    skeleton();
     refresh();
     // A phone screen is usually off or on another app; refreshing then would only spend battery.
     setInterval(() => { if (!document.hidden) refresh(); }, 15000);

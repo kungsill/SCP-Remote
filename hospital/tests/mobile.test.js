@@ -313,3 +313,40 @@ test('the whole round trip ends on the mobile page', () => {
     assert.equal(r.sent, mobile.pageFile);
     assert.equal(r.redirected, null);
 });
+
+const cssFile = path.join(__dirname, '../../public/styles/scp-mobile.css');
+
+test('the Thai font is loaded, not merely named', () => {
+    // Naming Sarabun without an @font-face is what made the page fall back to whatever the
+    // phone had and look unfinished beside the rest of the site. The files ship with the server.
+    const css = fs.readFileSync(cssFile, 'utf8');
+    const faces = [...css.matchAll(/url\(([^)]+)\)/g)].map(m => m[1]);
+    assert.ok(faces.length >= 3, 'regular, semibold and bold');
+    for (const ref of faces) {
+        const file = path.resolve(path.dirname(cssFile), ref);
+        assert.ok(fs.existsSync(file), ref + ' is referenced by the stylesheet but not on disk');
+    }
+    assert.ok(/font-display:\s*swap/.test(css), 'text should show before the font arrives, not after');
+});
+
+test('colours come from variables so the dark scheme can replace them', () => {
+    const css = fs.readFileSync(cssFile, 'utf8');
+    assert.ok(/@media \(prefers-color-scheme: dark\)/.test(css), 'wards are dark at night');
+    // A literal colour outside :root would survive into dark mode and glare.
+    const body = css.split('@media (prefers-color-scheme: dark)')[1] || '';
+    assert.ok(body.includes('--surface'), 'the dark scheme should redefine the same names');
+    assert.ok(/color-scheme: light dark/.test(css), 'so form controls and scrollbars follow too');
+});
+
+test('a first load that fails clears the placeholders instead of pretending to load forever', () => {
+    const client = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-mobile.js'), 'utf8');
+    assert.ok(/if \(!loaded\)/.test(client), 'the failure path has to know it is the first one');
+    assert.ok(/skeleton\(\)/.test(client), 'and there has to be something to clear');
+});
+
+test('the page and its stylesheet agree on the version, so a phone picks changes up', () => {
+    const page = fs.readFileSync(mobile.pageFile, 'utf8');
+    const versions = [...page.matchAll(/scp-mobile\.(?:js|css)\?v=([\w-]+)/g)].map(m => m[1]);
+    assert.equal(versions.length, 2, 'both assets carry a version');
+    assert.equal(versions[0], versions[1], 'and the same one, or half the change lands');
+});

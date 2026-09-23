@@ -1,80 +1,150 @@
-/* The /m device picker. Same hospital palette as the Desktop App, laid out for a phone first:
-   rooms scroll sideways instead of taking a sidebar, cards fall to one column, and every
-   target a finger has to hit is at least 44px tall. */
+/* The /m device picker. Hospital palette, laid out for a phone first: wards scroll sideways
+   instead of taking a sidebar, cards fall to one column, and every target a finger has to hit
+   is at least 44px tall.
+
+   Sarabun is loaded rather than merely named. It already ships with the server, and without
+   the @font-face rules Thai fell back to whatever the phone had, which is what made the page
+   look unfinished next to the rest of the site. */
+@font-face { font-family: Sarabun; src: url(../fonts/sarabun/Sarabun-Regular.ttf) format('truetype'); font-weight: 400; font-display: swap }
+@font-face { font-family: Sarabun; src: url(../fonts/sarabun/Sarabun-SemiBold.ttf) format('truetype'); font-weight: 600; font-display: swap }
+@font-face { font-family: Sarabun; src: url(../fonts/sarabun/Sarabun-Bold.ttf) format('truetype'); font-weight: 700; font-display: swap }
+
+:root {
+    color-scheme: light dark;
+    --bg: linear-gradient(135deg, #f2f8f8, #f3f6fc);
+    --surface: #fff;
+    --surface-soft: #ffffffcf;
+    --line: #dce6ee;
+    --line-soft: #edf2f5;
+    --ink: #20364c;
+    --ink-soft: #708292;
+    --ink-faint: #81929d;
+    --brand: #07828a;
+    --brand-deep: #125c63;
+    --brand-ink: #087b82;
+    --brand-wash: #e4f3f2;
+    --ok-bg: #e9f7f1;
+    --ok-ink: #16836e;
+    --off-bg: #f0f3f6;
+    --off-ink: #8a9aa5;
+    --field: #f6f9fb;
+    --shadow: 0 6px 18px #173d4b0f;
+    --shadow-soft: 0 2px 14px #183f4a08;
+}
+/* Wards are dark at night and a phone at full brightness is unkind to everyone in the room. */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: linear-gradient(140deg, #0f1c22, #111d28);
+        --surface: #16242d;
+        --surface-soft: #16242de0;
+        --line: #263c48;
+        --line-soft: #223540;
+        --ink: #e4eef2;
+        --ink-soft: #9fb4bf;
+        --ink-faint: #8399a5;
+        --brand: #2aa7ae;
+        --brand-deep: #7fd4d8;
+        --brand-ink: #74ccd2;
+        --brand-wash: #17383c;
+        --ok-bg: #143a33;
+        --ok-ink: #6fd3b6;
+        --off-bg: #1d2c35;
+        --off-ink: #8399a5;
+        --field: #121e26;
+        --shadow: 0 6px 18px #0006;
+        --shadow-soft: 0 2px 14px #0004;
+    }
+}
+
 * { box-sizing: border-box }
 body {
-    margin: 0;
-    background: linear-gradient(135deg, #f2f8f8, #f3f6fc);
-    color: #20364c;
+    margin: 0; background: var(--bg); color: var(--ink);
     font: 15px Sarabun, "Noto Sans Thai", Segoe UI, sans-serif;
     -webkit-text-size-adjust: 100%;
+    min-height: 100vh;
 }
 button, input, select { font: inherit }
-button { cursor: pointer; border: 1px solid #d8e5eb; border-radius: 9px; background: #fff; color: #29485a; padding: 11px 15px; min-height: 44px }
+button { cursor: pointer; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); padding: 11px 15px; min-height: 44px }
 button:disabled { opacity: .45; cursor: default }
-button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #75cace; outline-offset: 2px }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px }
 [hidden] { display: none !important }
-p { line-height: 1.7; color: #708292 }
+p { line-height: 1.7; color: var(--ink-soft) }
 
 header {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top));
-    background: #fff; border-bottom: 1px solid #dce6ee; box-shadow: 0 2px 14px #183f4a06;
+    background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: var(--shadow-soft);
     position: sticky; top: 0; z-index: 5;
 }
-header b { font-size: 21px; letter-spacing: -.5px; color: #163e4c }
-header small { display: block; font-size: 11px; color: #778a98; letter-spacing: .4px; margin-top: 2px }
+header b { font-size: 21px; letter-spacing: -.5px; color: var(--brand-deep) }
+header small { display: block; font-size: 11px; color: var(--ink-faint); letter-spacing: .4px; margin-top: 2px }
 .header-tools { display: flex; align-items: center; gap: 8px }
-.header-tools a { font-size: 12px; color: #07828a; text-decoration: none; padding: 10px 8px }
-select { padding: 9px; border: 1px solid #dce6ee; border-radius: 8px; min-height: 44px }
+.header-tools a { font-size: 12px; color: var(--brand); text-decoration: none; padding: 10px 8px }
+select { padding: 9px; border: 1px solid var(--line); border-radius: 8px; min-height: 44px; background: var(--surface); color: var(--ink) }
 
 .content { padding: 18px 16px 28px }
 .heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px }
-.eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: #00838b }
-h1 { font-size: 22px; margin: 7px 0 0; letter-spacing: -.3px }
+.eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--brand) }
+h1 { font-size: 22px; margin: 7px 0 0; letter-spacing: -.3px; font-weight: 700 }
 .heading p { margin-top: 7px; font-size: 13px }
 .heading button { flex: none }
 
 .fleet-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0 }
-.fleet-summary article { background: #ffffffcf; border: 1px solid #dce9ed; padding: 13px 14px; border-radius: 14px; box-shadow: 0 4px 15px #153e4b04 }
-.fleet-summary span { display: block; font-size: 11px; color: #81929d }
-.fleet-summary strong { display: block; font-size: 25px; line-height: 1.4; color: #24465a }
-.fleet-summary article:nth-child(2) { background: linear-gradient(130deg, #edf9f5, #fff) }
-.fleet-summary article:nth-child(2) strong { color: #078974 }
+.fleet-summary article { background: var(--surface-soft); border: 1px solid var(--line); padding: 13px 14px; border-radius: 14px; box-shadow: var(--shadow-soft) }
+.fleet-summary span { display: block; font-size: 11px; color: var(--ink-faint) }
+.fleet-summary strong { display: block; font-size: 25px; line-height: 1.4; color: var(--ink); font-weight: 600 }
+.fleet-summary article:nth-child(2) strong { color: var(--ok-ink) }
 
-h3 { font-size: 12px; color: #80959e; text-transform: uppercase; letter-spacing: .7px; margin: 18px 0 8px }
+h3 { font-size: 12px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .7px; margin: 18px 0 8px; font-weight: 600 }
 /* Sideways so a long ward list never pushes the devices off the screen. */
 #rooms { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: thin }
-#rooms button { flex: none; border-radius: 10px; padding: 10px 14px; color: #69818e; white-space: nowrap }
-#rooms button.active { background: linear-gradient(110deg, #dff3f0, #edf8f7); color: #087b82; font-weight: 600; border-color: #bcdadd }
+#rooms button { flex: none; border-radius: 10px; padding: 10px 14px; color: var(--ink-soft); white-space: nowrap }
+#rooms button.active { background: var(--brand-wash); color: var(--brand-ink); font-weight: 600; border-color: var(--brand) }
+#rooms b { font-weight: 600 }
+#rooms .count { margin-left: 7px; font-size: 11px; color: var(--ink-faint) }
+#rooms button.active .count { color: var(--brand-ink) }
 
 .tools { display: flex; gap: 10px; margin: 16px 0 10px; flex-wrap: wrap }
-.tools input { flex: 1; min-width: 180px; padding: 13px 15px; border: 1px solid #d8e5eb; border-radius: 10px; box-shadow: 0 2px 8px #193e4a04 }
-.tools > div { display: flex; gap: 4px; padding: 4px; background: #e8eff3; border-radius: 12px }
-.tools > div button { border: 0; background: transparent }
-.tools > div button[aria-pressed=true] { background: #fff; color: #087e87; box-shadow: 0 2px 6px #173d4b12 }
+.tools input { flex: 1; min-width: 180px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink) }
+.tools > div { display: flex; gap: 4px; padding: 4px; background: var(--off-bg); border-radius: 12px }
+.tools > div button { border: 0; background: transparent; color: var(--ink-soft) }
+.tools > div button[aria-pressed=true] { background: var(--surface); color: var(--brand-ink); box-shadow: var(--shadow-soft) }
 
-#status, #mapNote { font-size: 12px; min-height: 18px; color: #66808e; margin: 0 0 14px }
+#status, #mapNote { font-size: 12px; min-height: 18px; color: var(--ink-soft); margin: 0 0 14px }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 14px }
-.device { min-width: 0; padding: 18px; border: 1px solid #dce8ec; border-radius: 15px; background: #fff; box-shadow: 0 6px 18px #173d4b07 }
-.device h3 { font-size: 17px; margin: 14px 0 0; color: #20364c; text-transform: none; letter-spacing: 0 }
+.device { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); box-shadow: var(--shadow) }
+/* An offline computer cannot be reached, so it should not compete for attention with one that can. */
+.device.is-offline { opacity: .62 }
+.device h3 { font-size: 17px; margin: 14px 0 0; color: var(--ink); text-transform: none; letter-spacing: 0; font-weight: 600 }
 .device p { font-size: 12px; margin: 5px 0 }
-.device code { display: block; font: 12px Consolas, monospace; color: #738999; margin: 8px 0 16px; padding: 8px 10px; background: #f6f9fb; border-radius: 7px; border: 1px solid #edf2f5 }
+.device code { display: block; font: 12px Consolas, monospace; color: var(--ink-faint); margin: 8px 0 16px; padding: 8px 10px; background: var(--field); border-radius: 7px; border: 1px solid var(--line-soft) }
 .device button { width: 100%; min-height: 48px }
-.primary { background: #07828a; color: #fff; border-color: #07828a; box-shadow: 0 4px 10px #07828a1b }
+.primary { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600 }
 .online, .offline { display: inline-block; padding: 4px 9px; border-radius: 7px; font-size: 10px }
-.online { background: #e9f7f1; color: #16836e }
-.offline { background: #f0f3f6; color: #8a9aa5 }
+.online { background: var(--ok-bg); color: var(--ok-ink) }
+.offline { background: var(--off-bg); color: var(--off-ink) }
 .online:before, .offline:before { content: '●'; margin-right: 6px }
+
+/* Shown while the first list is still on its way, so the page does not sit visibly empty. */
+.skeleton { pointer-events: none }
+.skeleton .bar { height: 12px; border-radius: 6px; background: var(--line); margin: 12px 0 }
+.skeleton .bar.title { height: 17px; width: 62%; margin-top: 16px }
+.skeleton .bar.room { width: 40% }
+.skeleton .bar.ip { height: 30px; margin: 10px 0 16px }
+.skeleton .bar.action { height: 48px; border-radius: 9px; margin: 0 }
+@media (prefers-reduced-motion: no-preference) {
+    .skeleton .bar { animation: pulse 1.4s ease-in-out infinite }
+    @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .5 } }
+}
 
 .map {
     display: grid; grid-auto-columns: 215px; grid-auto-rows: minmax(205px, auto); gap: 14px;
     overflow: auto; padding: 12px; border-radius: 12px;
-    background-image: radial-gradient(#c8dbe5 1px, transparent 1px); background-size: 16px 16px;
+    background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 16px 16px;
 }
-#consentNote { font-size: 12px; color: #778a98; margin-top: 22px; line-height: 1.8 }
-footer { padding: 14px 16px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 11px; color: #78909c; border-top: 1px solid #dce6ee; background: #fff }
+#consentNote { font-size: 12px; color: var(--ink-faint); margin-top: 22px; line-height: 1.8 }
+footer { padding: 14px 16px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 11px; color: var(--ink-faint); border-top: 1px solid var(--line); background: var(--surface) }
 
 /* One column on a phone; the cards carry long Thai ward names better than a narrow grid. */
 @media (max-width: 560px) {

@@ -45,7 +45,8 @@ function status() {
     console.log('ไฟล์ตั้งค่า: ' + configFile);
     console.log('');
     console.log('โหมดปัจจุบัน : ' + (isOn() ? 'เปิดให้เข้าถึงผ่าน tunnel' : 'เฉพาะเครือข่ายภายใน (LAN)'));
-    console.log('  trustedProxy   : ' + (settings.trustedProxy || 'ไม่ได้ตั้ง'));
+    const proxy = settings.trustedProxy;
+    console.log('  trustedProxy   : ' + (proxy == null ? 'ไม่ได้ตั้ง' : (Array.isArray(proxy) ? proxy.join(', ') : proxy)));
     console.log('  userAllowedIP  : ' + (settings.userAllowedIP ? (settings.userAllowedIP.length + ' รายการ') : 'ไม่จำกัด'));
     console.log('  agentAllowedIP : ' + (settings.agentAllowedIP ? (settings.agentAllowedIP.length + ' รายการ') : 'ไม่จำกัด'));
     console.log('  force2factor   : ' + (((domain.passwordRequirements || {}).force2factor === true) ? 'บังคับ' : 'ไม่บังคับ'));
@@ -90,10 +91,14 @@ function enable() {
         userAllowedIP: settings.userAllowedIP || null,
         agentAllowedIP: settings.agentAllowedIP || null
     };
-    // cloudflared reaches the server from 127.0.0.1 and passes the caller's real address in a
+    // cloudflared reaches the server over loopback and passes the caller's real address in a
     // header. Without this every visitor is recorded as loopback and the log stops being able
     // to say who took over which ward computer.
-    settings.trustedProxy = '127.0.0.1';
+    //
+    // Both forms are needed. A route whose service URL says "localhost" arrives on ::1 on
+    // Windows, and ipcheck does not treat ::1 as matching 127.0.0.1 - the first login through
+    // this tunnel was recorded as ::1, which is how we found out.
+    settings.trustedProxy = ['127.0.0.1', '::1'];
     // The address allowlist cannot stay: a technician at home never has an address on it. The
     // fence becomes Cloudflare Access plus the second factor below.
     delete settings.userAllowedIP;

@@ -76,7 +76,9 @@ test('enable moves all four settings together once everyone has enrolled', t => 
     const r = s.run('enable');
     assert.equal(r.code, 0, r.out);
     const c = s.config();
-    assert.equal(c.settings.trustedProxy, '127.0.0.1', 'real client addresses must reach the log');
+    // Both loopback forms: a service URL of "localhost" arrives on ::1 on Windows, and
+    // ipcheck does not treat ::1 as matching 127.0.0.1, so listing one silently does nothing.
+    assert.deepEqual(c.settings.trustedProxy, ['127.0.0.1', '::1'], 'real client addresses must reach the log');
     assert.equal(c.settings.userAllowedIP, undefined, 'a technician at home is never on the allowlist');
     assert.equal(c.settings.agentAllowedIP, undefined);
     assert.equal(c.domains[''].passwordRequirements.force2factor, true, 'the second factor is the fence now');
@@ -139,4 +141,20 @@ test('the next steps name every path an agent needs, not only agent.ashx', () =>
     for (const p of ['/agent.ashx', '/meshrelay.ashx', '/agenttransfer.ashx', '/agentdownload.ashx']) {
         assert.ok(source.includes(p), 'the instructions should mention ' + p);
     }
+});
+
+test('the trusted proxy list covers the loopback form the tunnel actually arrives on', () => {
+    // ipcheck.match('::1', '127.0.0.1') is false. A route whose service URL says "localhost"
+    // reaches the server on ::1 on Windows, so trusting only the IPv4 form reads as configured
+    // while changing nothing: every visitor stays recorded as loopback.
+    const ipcheck = require('ipcheck');
+    const s = sandbox(enrolled);
+    try {
+        s.run('enable');
+        const trusted = s.config().settings.trustedProxy;
+        for (const arriving of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+            assert.ok(trusted.some(p => ipcheck.match(arriving, p)),
+                'a connection arriving from ' + arriving + ' must be recognised as the tunnel');
+        }
+    } finally { s.clean(); }
 });

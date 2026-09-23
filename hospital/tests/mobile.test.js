@@ -232,13 +232,6 @@ test('the device button leaves /m for the site root instead of reloading /m', ()
     assert.equal(siteRoot({ pathname: '/sub/m' })(), '/sub/', 'a domain served under a sub-path');
 });
 
-test('the full-site link is relative, so a sub-path domain is not sent to the wrong place', () => {
-    const page = fs.readFileSync(mobile.pageFile, 'utf8');
-    // "./?m=0" resolves to the site root from /m and carries the opt-out, without which a
-    // phone would be sent straight back here and could never reach the full site.
-    assert.ok(/id="full" href="\.\/\?m=0"/.test(page), 'the link must be relative and carry m=0');
-});
-
 // Added to a phone's home screen, /m should open as its own window with the hospital logo.
 // The parts have to agree or it silently falls back to a browser tab with a blank icon.
 const manifestFile = path.join(__dirname, '../../public/scp-mobile.webmanifest');
@@ -380,109 +373,71 @@ test('the header carries the hospital logo', () => {
     assert.ok(/alt=""/.test(page), 'decorative beside the name, so screen readers should skip it');
 });
 
-const phone = { 'user-agent': 'Mozilla/5.0 (Linux; Android 14) Chrome/140 Mobile Safari/537.36' };
-const laptop = { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140 Safari/537.36' };
+
+// Every signed-in visitor lands on /m now, whatever they are using. The hospital wanted one
+// front door that behaves like the app, not a page that guesses at the device.
 const withAdmin = () => web({ users: { 'user//admin': admin } });
 const session = () => ({ userid: 'user//admin' });
+const agents = {
+    'a phone': 'Mozilla/5.0 (Linux; Android 14; SM-S911B) Chrome/140 Mobile Safari/537.36',
+    'a Tab S9 FE': 'Mozilla/5.0 (Linux; Android 14; SM-X510) AppleWebKit/537.36 Chrome/140 Safari/537.36',
+    'an iPad': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Version/17.0 Safari/605.1.15',
+    'a Windows PC': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140 Safari/537.36',
+    'no user agent at all': undefined
+};
 
-test('a phone opening the site is taken to the page built for a phone', () => {
-    const r = reply();
-    let through = false;
-    mobile.root(withAdmin(), { query: {}, headers: phone, session: session() }, r, () => { through = true; }, '/');
-    assert.equal(r.redirected, '/m');
-    assert.equal(through, false);
+test('every signed-in device is taken to the remote page', () => {
+    for (const [what, ua] of Object.entries(agents)) {
+        const r = reply();
+        let through = false;
+        mobile.root(withAdmin(), { query: {}, headers: ua ? { 'user-agent': ua } : {}, session: session() }, r, () => { through = true; }, '/');
+        assert.equal(r.redirected, '/m', what + ' should land on the remote page');
+        assert.equal(through, false);
+    }
 });
 
-test('a computer is left on the full site', () => {
+test('nothing is guessed from the user agent any more', () => {
+    // An iPad reads exactly like a MacBook, so any rule built on the agent was going to be
+    // wrong for one of them. There is no such rule left to be wrong.
+    const source = fs.readFileSync(path.join(__dirname, '../mobile.js'), 'utf8');
+    const code = withoutComments(source);
+    assert.ok(!/user-agent/i.test(code), 'the user agent must not be read at all');
+});
+
+test('signing in is not disturbed: the login page is reached without a redirect', () => {
     const r = reply();
     let through = false;
-    mobile.root(withAdmin(), { query: {}, headers: laptop, session: session() }, r, () => { through = true; }, '/');
+    mobile.root(web({}), { query: {}, headers: {}, session: null }, r, () => { through = true; }, '/');
     assert.equal(through, true);
     assert.equal(r.redirected, null);
 });
 
-test('a phone that is not signed in reaches the login page rather than bouncing', () => {
-    const r = reply();
-    let through = false;
-    mobile.root(web({}), { query: {}, headers: phone, session: null }, r, () => { through = true; }, '/');
-    assert.equal(through, true);
-    assert.equal(r.redirected, null);
-});
-
-test('the full-site link works on a phone, and keeps working after a reload', () => {
-    // Without the opt-out the link would be sent straight back to /m and a phone could never
-    // reach the full site at all.
+test('?m=0 still reaches the full site, which is now the only way to it', () => {
+    // The link is gone from the page, so device groups, moving a computer between wards and
+    // adding an account are reachable only through this. If it breaks, they are unreachable.
     const s = session();
     const r = reply();
     let through = false;
-    mobile.root(withAdmin(), { query: { m: '0' }, headers: phone, session: s }, r, () => { through = true; }, '/');
+    mobile.root(withAdmin(), { query: { m: '0' }, headers: {}, session: s }, r, () => { through = true; }, '/');
     assert.equal(through, true, 'the full site must load');
-    assert.equal(s.scpView, 'full', 'and the choice is remembered');
+    assert.equal(r.redirected, null);
+    assert.equal(s.scpView, 'full', 'and be remembered, or a reload would bounce straight back');
 
-    // A later plain visit, query gone, must respect it.
     const r2 = reply();
     let through2 = false;
-    mobile.root(withAdmin(), { query: {}, headers: phone, session: s }, r2, () => { through2 = true; }, '/');
-    assert.equal(through2, true);
-    assert.equal(r2.redirected, null);
+    mobile.root(withAdmin(), { query: {}, headers: {}, session: s }, r2, () => { through2 = true; }, '/');
+    assert.equal(through2, true, 'a later plain visit stays on the full site');
 });
 
-test('going back to /m on purpose restores the automatic behaviour', () => {
+test('going to /m again puts the device back on the remote page', () => {
     const s = { userid: 'user//admin', scpView: 'full' };
     const r = reply();
-    mobile.page(withAdmin(), { session: s, headers: phone }, r, '/');
-    assert.equal(r.sent, mobile.pageFile);
-    assert.equal(s.scpView, 'm', 'the preference now says this page');
-});
-
-test('phone detection matches the rule the server already uses for its mobile views', () => {
-    assert.equal(mobile.isHandheld({ headers: phone }), true);
-    assert.equal(mobile.isHandheld({ headers: laptop }), false);
-    assert.equal(mobile.isHandheld({ headers: {} }), false, 'no agent at all must not throw');
-    assert.equal(mobile.isHandheld({}), false);
-});
-
-// The two tablets this was actually asked about.
-const tabS9fe = { 'user-agent': 'Mozilla/5.0 (Linux; Android 14; SM-X510) AppleWebKit/537.36 Chrome/140 Safari/537.36' };
-const ipadDefault = { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15' };
-const ipadMobileMode = { 'user-agent': 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) Version/17.0 Mobile/15E148 Safari/604.1' };
-
-test('an Android tablet is recognised even though Chrome leaves "Mobile" off it', () => {
-    assert.equal(mobile.isHandheld({ headers: tabS9fe }), true, 'a Tab S9 FE should open on /m');
-    const r = reply();
-    mobile.root(withAdmin(), { query: {}, headers: tabS9fe, session: session() }, r, () => { }, '/');
-    assert.equal(r.redirected, '/m');
-});
-
-test('an iPad in its default mode is not guessed at, because it reads exactly like a MacBook', () => {
-    // Pretending otherwise would send every Mac to the small-screen page.
-    assert.equal(mobile.isHandheld({ headers: ipadDefault }), false);
-    assert.equal(mobile.isHandheld({ headers: ipadMobileMode }), true, 'asked for the mobile site, so honour it');
-});
-
-test('one visit to /m is enough for a device the agent cannot place', () => {
-    // This is what covers the iPad: it says what it wants once, and is taken at its word after.
-    const s = session();
-    let r = reply();
-    mobile.page(withAdmin(), { session: s, headers: ipadDefault }, r, '/');
+    mobile.page(withAdmin(), { session: s, headers: {} }, r, '/');
     assert.equal(r.sent, mobile.pageFile);
     assert.equal(s.scpView, 'm');
-
-    r = reply();
-    mobile.root(withAdmin(), { query: {}, headers: ipadDefault, session: s }, r, () => { }, '/');
-    assert.equal(r.redirected, '/m', 'and from now on the root takes it there');
 });
 
-test('what the device asked for beats the guess, in both directions', () => {
-    // A phone that chose the full site keeps it...
-    let r = reply();
-    let through = false;
-    mobile.root(withAdmin(), { query: {}, headers: phone, session: { userid: 'user//admin', scpView: 'full' } }, r, () => { through = true; }, '/');
-    assert.equal(through, true);
-    assert.equal(r.redirected, null);
-
-    // ...and a desktop that chose the small page keeps that.
-    r = reply();
-    mobile.root(withAdmin(), { query: {}, headers: laptop, session: { userid: 'user//admin', scpView: 'm' } }, r, () => { }, '/');
-    assert.equal(r.redirected, '/m');
+test('the page no longer offers a full-site link', () => {
+    const page = fs.readFileSync(mobile.pageFile, 'utf8');
+    assert.ok(!/id="full"/.test(page), 'it should look like the app, with nothing else on it');
 });

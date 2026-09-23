@@ -40,24 +40,10 @@ exports.page = function (web, req, res, url) {
     res.sendFile(pageFile);
 };
 
-// Which devices should land on the small-screen page without being asked.
-//
-// The server only has the user agent to go on, and it does not answer this cleanly:
-//   phones             say "Mobile"                                    - caught
-//   Android tablets    do not; Chrome leaves "Mobile" off a tablet     - caught by "android"
-//   older iPads        say "iPad"                                      - caught
-//   iPad since iPadOS 13 reports itself as macOS Safari                - NOT caught, and
-//     cannot be, because that agent is identical to a MacBook's.
-//
-// The remembered choice below is what covers that last case: a visit to /m once is enough, and
-// from then on the device opens there whatever it claims to be.
-exports.isHandheld = function (req) {
-    const ua = req && req.headers && req.headers['user-agent'];
-    if (typeof ua !== 'string') { return false; }
-    const s = ua.toLowerCase();
-    return (s.indexOf('mobile') >= 0) || (s.indexOf('ipad') >= 0) ||
-        (s.indexOf('tablet') >= 0) || (s.indexOf('silk') >= 0) || (s.indexOf('android') >= 0);
-};
+// There is deliberately no device sniffing here any more. Every signed-in visitor gets this
+// page, on a phone, a tablet or a desktop, because the hospital wanted one thing that behaves
+// like the app rather than two front doors. The user agent could never place an iPad anyway -
+// since iPadOS 13 it reports itself as macOS Safari, identical to a MacBook.
 
 // Watches the root for that marker. Anything else is none of its business and is passed on
 // untouched, so the ordinary site is unaffected by this sitting in front of it.
@@ -73,19 +59,16 @@ exports.root = function (web, req, res, next, url) {
 
     if ((q.m === '1') && signedIn) { res.redirect(root + 'm'); return; }
 
-    // The escape hatch. Without it the "full site" link would be bounced straight back here by
-    // the rule below, and there would be no way off the small-screen page at all.
+    // The way to the full MeshCentral site, which is otherwise unreachable now that the link is
+    // gone from the page. Device groups, moving a computer between wards and adding an account
+    // all live there, so this has to keep working:  https://remote.kpsnana.com/?m=0
+    // The choice is remembered, so the full site survives a reload and normal navigation.
     if (q.m === '0') { if (req.session) { req.session.scpView = 'full'; } next(); return; }
 
     if (!signedIn) { next(); return; } // Before that the login page is the same either way.
+    if (req.session && (req.session.scpView === 'full')) { next(); return; }
 
-    // What this device asked for last time beats any guess made from the user agent. It is also
-    // the only thing that works for an iPad, which is indistinguishable from a MacBook here.
-    const asked = req.session && req.session.scpView;
-    if (asked === 'full') { next(); return; }
-    if ((asked === 'm') || exports.isHandheld(req)) { res.redirect(root + 'm'); return; }
-
-    next();
+    res.redirect(root + 'm');
 };
 
 exports.data = function (web, req, res) {

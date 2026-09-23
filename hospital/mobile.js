@@ -33,19 +33,30 @@ function signedInUser(web, req) {
 exports.page = function (web, req, res, url) {
     const root = url || '/';
     if (signedInUser(web, req) == null) { res.redirect(root + '?m=1'); return; }
-    // Coming here on purpose undoes an earlier "full site" choice, so the phone goes back to
-    // opening this page by itself.
-    if (req.session) { delete req.session.scpFullSite; }
+    // Arriving here is the device saying it wants this page. Remembering that is what lets an
+    // iPad - which the user agent cannot tell apart from a MacBook - open here from now on.
+    if (req.session) { req.session.scpView = 'm'; }
     res.setHeader('Cache-Control', 'no-store');
     res.sendFile(pageFile);
 };
 
-// The same reading of "phone" the rest of the server uses when it picks the mobile views, so
-// the two cannot disagree about what a phone is. Note an iPad reports a desktop agent and is
-// not caught by it - on a tablet the full site is usable anyway, and /m is a tap away.
-exports.isPhone = function (req) {
+// Which devices should land on the small-screen page without being asked.
+//
+// The server only has the user agent to go on, and it does not answer this cleanly:
+//   phones             say "Mobile"                                    - caught
+//   Android tablets    do not; Chrome leaves "Mobile" off a tablet     - caught by "android"
+//   older iPads        say "iPad"                                      - caught
+//   iPad since iPadOS 13 reports itself as macOS Safari                - NOT caught, and
+//     cannot be, because that agent is identical to a MacBook's.
+//
+// The remembered choice below is what covers that last case: a visit to /m once is enough, and
+// from then on the device opens there whatever it claims to be.
+exports.isHandheld = function (req) {
     const ua = req && req.headers && req.headers['user-agent'];
-    return (typeof ua === 'string') && (ua.toLowerCase().indexOf('mobile') >= 0);
+    if (typeof ua !== 'string') { return false; }
+    const s = ua.toLowerCase();
+    return (s.indexOf('mobile') >= 0) || (s.indexOf('ipad') >= 0) ||
+        (s.indexOf('tablet') >= 0) || (s.indexOf('silk') >= 0) || (s.indexOf('android') >= 0);
 };
 
 // Watches the root for that marker. Anything else is none of its business and is passed on
@@ -63,13 +74,16 @@ exports.root = function (web, req, res, next, url) {
     if ((q.m === '1') && signedIn) { res.redirect(root + 'm'); return; }
 
     // The escape hatch. Without it the "full site" link would be bounced straight back here by
-    // the rule below, and there would be no way off the mobile page on a phone at all. The
-    // choice is remembered so a later reload does not undo it.
-    if (q.m === '0') { if (req.session) { req.session.scpFullSite = 1; } next(); return; }
+    // the rule below, and there would be no way off the small-screen page at all.
+    if (q.m === '0') { if (req.session) { req.session.scpView = 'full'; } next(); return; }
 
-    // A phone that simply opens the site gets the page built for a phone. Only once signed in:
-    // before that there is nothing to show, and the login page is the same either way.
-    if (signedIn && exports.isPhone(req) && !(req.session && req.session.scpFullSite)) { res.redirect(root + 'm'); return; }
+    if (!signedIn) { next(); return; } // Before that the login page is the same either way.
+
+    // What this device asked for last time beats any guess made from the user agent. It is also
+    // the only thing that works for an iPad, which is indistinguishable from a MacBook here.
+    const asked = req.session && req.session.scpView;
+    if (asked === 'full') { next(); return; }
+    if ((asked === 'm') || exports.isHandheld(req)) { res.redirect(root + 'm'); return; }
 
     next();
 };

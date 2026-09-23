@@ -417,7 +417,7 @@ test('the full-site link works on a phone, and keeps working after a reload', ()
     let through = false;
     mobile.root(withAdmin(), { query: { m: '0' }, headers: phone, session: s }, r, () => { through = true; }, '/');
     assert.equal(through, true, 'the full site must load');
-    assert.equal(s.scpFullSite, 1, 'and the choice is remembered');
+    assert.equal(s.scpView, 'full', 'and the choice is remembered');
 
     // A later plain visit, query gone, must respect it.
     const r2 = reply();
@@ -428,16 +428,61 @@ test('the full-site link works on a phone, and keeps working after a reload', ()
 });
 
 test('going back to /m on purpose restores the automatic behaviour', () => {
-    const s = { userid: 'user//admin', scpFullSite: 1 };
+    const s = { userid: 'user//admin', scpView: 'full' };
     const r = reply();
     mobile.page(withAdmin(), { session: s, headers: phone }, r, '/');
     assert.equal(r.sent, mobile.pageFile);
-    assert.equal(s.scpFullSite, undefined, 'the preference is cleared');
+    assert.equal(s.scpView, 'm', 'the preference now says this page');
 });
 
 test('phone detection matches the rule the server already uses for its mobile views', () => {
-    assert.equal(mobile.isPhone({ headers: phone }), true);
-    assert.equal(mobile.isPhone({ headers: laptop }), false);
-    assert.equal(mobile.isPhone({ headers: {} }), false, 'no agent at all must not throw');
-    assert.equal(mobile.isPhone({}), false);
+    assert.equal(mobile.isHandheld({ headers: phone }), true);
+    assert.equal(mobile.isHandheld({ headers: laptop }), false);
+    assert.equal(mobile.isHandheld({ headers: {} }), false, 'no agent at all must not throw');
+    assert.equal(mobile.isHandheld({}), false);
+});
+
+// The two tablets this was actually asked about.
+const tabS9fe = { 'user-agent': 'Mozilla/5.0 (Linux; Android 14; SM-X510) AppleWebKit/537.36 Chrome/140 Safari/537.36' };
+const ipadDefault = { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15' };
+const ipadMobileMode = { 'user-agent': 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) Version/17.0 Mobile/15E148 Safari/604.1' };
+
+test('an Android tablet is recognised even though Chrome leaves "Mobile" off it', () => {
+    assert.equal(mobile.isHandheld({ headers: tabS9fe }), true, 'a Tab S9 FE should open on /m');
+    const r = reply();
+    mobile.root(withAdmin(), { query: {}, headers: tabS9fe, session: session() }, r, () => { }, '/');
+    assert.equal(r.redirected, '/m');
+});
+
+test('an iPad in its default mode is not guessed at, because it reads exactly like a MacBook', () => {
+    // Pretending otherwise would send every Mac to the small-screen page.
+    assert.equal(mobile.isHandheld({ headers: ipadDefault }), false);
+    assert.equal(mobile.isHandheld({ headers: ipadMobileMode }), true, 'asked for the mobile site, so honour it');
+});
+
+test('one visit to /m is enough for a device the agent cannot place', () => {
+    // This is what covers the iPad: it says what it wants once, and is taken at its word after.
+    const s = session();
+    let r = reply();
+    mobile.page(withAdmin(), { session: s, headers: ipadDefault }, r, '/');
+    assert.equal(r.sent, mobile.pageFile);
+    assert.equal(s.scpView, 'm');
+
+    r = reply();
+    mobile.root(withAdmin(), { query: {}, headers: ipadDefault, session: s }, r, () => { }, '/');
+    assert.equal(r.redirected, '/m', 'and from now on the root takes it there');
+});
+
+test('what the device asked for beats the guess, in both directions', () => {
+    // A phone that chose the full site keeps it...
+    let r = reply();
+    let through = false;
+    mobile.root(withAdmin(), { query: {}, headers: phone, session: { userid: 'user//admin', scpView: 'full' } }, r, () => { through = true; }, '/');
+    assert.equal(through, true);
+    assert.equal(r.redirected, null);
+
+    // ...and a desktop that chose the small page keeps that.
+    r = reply();
+    mobile.root(withAdmin(), { query: {}, headers: laptop, session: { userid: 'user//admin', scpView: 'm' } }, r, () => { }, '/');
+    assert.equal(r.redirected, '/m');
 });

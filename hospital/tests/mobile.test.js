@@ -200,3 +200,40 @@ test('the full-site link is relative, so a sub-path domain is not sent to the wr
     const page = fs.readFileSync(mobile.pageFile, 'utf8');
     assert.ok(/id="full" href="\."/.test(page), 'href="." resolves to the site root from /m');
 });
+
+// Added to a phone's home screen, /m should open as its own window with the hospital logo.
+// The parts have to agree or it silently falls back to a browser tab with a blank icon.
+const manifestFile = path.join(__dirname, '../../public/scp-mobile.webmanifest');
+
+test('the home-screen manifest is valid and points back at the mobile page', () => {
+    const m = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+    assert.equal(m.start_url, 'm', 'relative to the manifest at the site root, this is /m');
+    assert.equal(m.display, 'standalone');
+    assert.ok(m.name && m.short_name, 'a launcher needs both names');
+});
+
+test('the manifest scope covers the remote desktop page, not just /m', () => {
+    // The device button navigates to the site root. With a scope of /m that leaves the
+    // installed window and opens a browser tab instead, which defeats the point.
+    const m = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+    assert.equal(m.scope, '/');
+});
+
+test('every icon the manifest names is actually there', () => {
+    const m = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+    assert.ok(m.icons.length > 0, 'without an icon the home screen shows a screenshot');
+    for (const icon of m.icons) {
+        const file = path.join(__dirname, '../../public', icon.src);
+        assert.ok(fs.existsSync(file), icon.src + ' is named by the manifest but missing');
+        // The declared size has to match the file, or a launcher may reject or blur it.
+        const b = fs.readFileSync(file);
+        assert.equal(b.readUInt32BE(16) + 'x' + b.readUInt32BE(20), icon.sizes, icon.src + ' declares the wrong size');
+    }
+});
+
+test('the page links the manifest and an icon for iPhone and iPad', () => {
+    const page = fs.readFileSync(mobile.pageFile, 'utf8');
+    assert.ok(/rel="manifest" href="scp-mobile.webmanifest"/.test(page), 'relative, like the other assets');
+    assert.ok(/rel="apple-touch-icon"/.test(page), 'iOS ignores the manifest icons');
+    assert.ok(/name="theme-color"/.test(page));
+});

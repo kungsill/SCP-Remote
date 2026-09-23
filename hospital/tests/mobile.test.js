@@ -350,3 +350,30 @@ test('the page and its stylesheet agree on the version, so a phone picks changes
     assert.equal(versions.length, 2, 'both assets carry a version');
     assert.equal(versions[0], versions[1], 'and the same one, or half the change lands');
 });
+
+test('the palette uses the hospital colours, not turquoise alone', () => {
+    // Only the muted turquoise is what made this come out grey and flat the first time.
+    // #b02a72 is the pink of the logo and the consent box the ward computer shows.
+    const css = fs.readFileSync(cssFile, 'utf8');
+    const light = css.split('@media (prefers-color-scheme: dark)')[0];
+    assert.ok(/--pink:/.test(light) && /--green:/.test(light), 'pink and green belong in the palette');
+    assert.ok(light.toLowerCase().includes('#b02a72'), 'the pink should be the hospital\'s own');
+    for (const name of ['--brand', '--pink', '--green', '--surface', '--ink']) {
+        const dark = css.split('@media (prefers-color-scheme: dark)')[1] || '';
+        assert.ok(dark.includes(name + ':'), name + ' must be restated for the dark scheme');
+    }
+});
+
+test('the three fleet numbers are told apart by colour', () => {
+    const css = fs.readFileSync(cssFile, 'utf8');
+    for (const n of [1, 2, 3]) {
+        assert.ok(css.includes('.fleet-summary article:nth-child(' + n + ')'), 'stat ' + n + ' needs its own colour');
+    }
+});
+
+test('the header carries the hospital logo', () => {
+    const page = fs.readFileSync(mobile.pageFile, 'utf8');
+    assert.ok(/<img src="images\/scp-logo\.png"/.test(page));
+    assert.ok(fs.existsSync(path.join(__dirname, '../../public/images/scp-logo.png')));
+    assert.ok(/alt=""/.test(page), 'decorative beside the name, so screen readers should skip it');
+});

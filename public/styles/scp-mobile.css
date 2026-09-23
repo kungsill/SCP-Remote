@@ -1,158 +1,187 @@
-/* The /m device picker. Hospital palette, laid out for a phone first: wards scroll sideways
-   instead of taking a sidebar, cards fall to one column, and every target a finger has to hit
-   is at least 44px tall.
+/* The /m device picker. Laid out for a phone first: wards scroll sideways instead of taking a
+   sidebar, cards fall to one column, and every target a finger has to hit is at least 44px.
 
-   Sarabun is loaded rather than merely named. It already ships with the server, and without
-   the @font-face rules Thai fell back to whatever the phone had, which is what made the page
-   look unfinished next to the rest of the site. */
+   Colours are the hospital's own: the turquoise of the site, the pink of the logo and the agent
+   consent box (#B02A72), and the green it already uses for a healthy state. An earlier version
+   used only the turquoise, muted, and came out grey and flat - especially in the dark scheme,
+   where the cards, the chips and the refresh button were all the same slab of grey.
+
+   Sarabun is loaded rather than merely named; it ships with the server, and without these rules
+   Thai fell back to whatever the phone had. */
 @font-face { font-family: Sarabun; src: url(../fonts/sarabun/Sarabun-Regular.ttf) format('truetype'); font-weight: 400; font-display: swap }
 @font-face { font-family: Sarabun; src: url(../fonts/sarabun/Sarabun-SemiBold.ttf) format('truetype'); font-weight: 600; font-display: swap }
 @font-face { font-family: Sarabun; src: url(../fonts/sarabun/Sarabun-Bold.ttf) format('truetype'); font-weight: 700; font-display: swap }
 
 :root {
     color-scheme: light dark;
-    --bg: linear-gradient(135deg, #f2f8f8, #f3f6fc);
+    --bg: linear-gradient(155deg, #eefaf9 0%, #f4f7fd 45%, #fdf2f8 100%);
     --surface: #fff;
-    --surface-soft: #ffffffcf;
-    --line: #dce6ee;
-    --line-soft: #edf2f5;
-    --ink: #20364c;
-    --ink-soft: #708292;
-    --ink-faint: #81929d;
+    --surface-2: #fff;
+    --line: #dbe8ee;
+    --line-soft: #edf3f6;
+    --ink: #17323f;
+    --ink-soft: #5e7686;
+    --ink-faint: #8099a6;
     --brand: #07828a;
+    --brand-bright: #0aa3ad;
     --brand-deep: #125c63;
-    --brand-ink: #087b82;
-    --brand-wash: #e4f3f2;
-    --ok-bg: #e9f7f1;
-    --ok-ink: #16836e;
-    --off-bg: #f0f3f6;
-    --off-ink: #8a9aa5;
-    --field: #f6f9fb;
-    --shadow: 0 6px 18px #173d4b0f;
-    --shadow-soft: 0 2px 14px #183f4a08;
+    --brand-wash: #dff3f3;
+    --pink: #b02a72;
+    --pink-wash: #fbe8f2;
+    --green: #0e9c89;
+    --green-wash: #e2f6f0;
+    --field: #f6fafb;
+    --shadow: 0 6px 20px #10404e14;
+    --shadow-soft: 0 2px 14px #10404e0d;
+    --glow: 0 6px 18px #07828a26;
 }
-/* Wards are dark at night and a phone at full brightness is unkind to everyone in the room. */
+/* Wards are dark at night and a phone at full brightness is unkind to everyone in the room.
+   The surfaces keep a blue-green cast rather than going grey, and the accents get brighter,
+   not dimmer - a dark theme that drains the colour out is what made this look lifeless. */
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: linear-gradient(140deg, #0f1c22, #111d28);
-        --surface: #16242d;
-        --surface-soft: #16242de0;
-        --line: #263c48;
-        --line-soft: #223540;
-        --ink: #e4eef2;
-        --ink-soft: #9fb4bf;
-        --ink-faint: #8399a5;
-        --brand: #2aa7ae;
-        --brand-deep: #7fd4d8;
-        --brand-ink: #74ccd2;
-        --brand-wash: #17383c;
-        --ok-bg: #143a33;
-        --ok-ink: #6fd3b6;
-        --off-bg: #1d2c35;
-        --off-ink: #8399a5;
-        --field: #121e26;
-        --shadow: 0 6px 18px #0006;
-        --shadow-soft: 0 2px 14px #0004;
+        --bg: linear-gradient(160deg, #0b1b22 0%, #0e1a26 55%, #1a1220 100%);
+        --surface: #15262f;
+        --surface-2: #192c36;
+        --line: #2b4653;
+        --line-soft: #243b46;
+        --ink: #eaf4f7;
+        --ink-soft: #a7c0cb;
+        --ink-faint: #8aa5b1;
+        --brand: #2ec7d0;
+        --brand-bright: #45dde6;
+        --brand-deep: #8fe6ec;
+        --brand-wash: #10414a;
+        --pink: #f472b6;
+        --pink-wash: #3d1b30;
+        --green: #34d9b5;
+        --green-wash: #10403a;
+        --field: #101f28;
+        --shadow: 0 6px 20px #0007;
+        --shadow-soft: 0 2px 14px #0005;
+        --glow: 0 6px 20px #2ec7d033;
     }
 }
 
 * { box-sizing: border-box }
 body {
-    margin: 0; background: var(--bg); color: var(--ink);
+    margin: 0; background: var(--bg); background-attachment: fixed; color: var(--ink);
     font: 15px Sarabun, "Noto Sans Thai", Segoe UI, sans-serif;
-    -webkit-text-size-adjust: 100%;
-    min-height: 100vh;
+    -webkit-text-size-adjust: 100%; min-height: 100vh;
 }
 button, input, select { font: inherit }
-button { cursor: pointer; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); padding: 11px 15px; min-height: 44px }
-button:disabled { opacity: .45; cursor: default }
-button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px }
+button { cursor: pointer; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink); padding: 11px 15px; min-height: 44px }
+button:disabled { opacity: .4; cursor: default }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--brand-bright); outline-offset: 2px }
 [hidden] { display: none !important }
 p { line-height: 1.7; color: var(--ink-soft) }
 
 header {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top));
+    padding: 12px 16px; padding-top: calc(12px + env(safe-area-inset-top));
     background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: var(--shadow-soft);
     position: sticky; top: 0; z-index: 5;
 }
-header b { font-size: 21px; letter-spacing: -.5px; color: var(--brand-deep) }
-header small { display: block; font-size: 11px; color: var(--ink-faint); letter-spacing: .4px; margin-top: 2px }
-.header-tools { display: flex; align-items: center; gap: 8px }
-.header-tools a { font-size: 12px; color: var(--brand); text-decoration: none; padding: 10px 8px }
-select { padding: 9px; border: 1px solid var(--line); border-radius: 8px; min-height: 44px; background: var(--surface); color: var(--ink) }
+/* A thread of the hospital's three colours, so the top of the page is not a plain grey edge. */
+header:after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: linear-gradient(90deg, var(--brand), var(--green) 45%, var(--pink)) }
+.brand { display: flex; align-items: center; gap: 11px; min-width: 0 }
+.brand img { width: 40px; height: 40px; flex: none; border-radius: 11px }
+header b { font-size: 20px; letter-spacing: -.5px; color: var(--brand-deep); display: block }
+header small { display: block; font-size: 11px; color: var(--ink-faint); letter-spacing: .4px; margin-top: 1px }
+.header-tools { display: flex; align-items: center; gap: 6px; flex: none }
+.header-tools a { font-size: 12px; color: var(--brand); text-decoration: none; padding: 11px 8px; font-weight: 600 }
+select { padding: 9px; border: 1px solid var(--line); border-radius: 9px; min-height: 44px; background: var(--surface-2); color: var(--ink) }
 
 .content { padding: 18px 16px 28px }
 .heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px }
 .eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--brand) }
-h1 { font-size: 22px; margin: 7px 0 0; letter-spacing: -.3px; font-weight: 700 }
+h1 { font-size: 23px; margin: 7px 0 0; letter-spacing: -.3px; font-weight: 700 }
 .heading p { margin-top: 7px; font-size: 13px }
-.heading button { flex: none }
+/* Compact and branded. A full-width grey slab was the heaviest thing on the screen. */
+#refresh { flex: none; background: var(--brand-wash); color: var(--brand-deep); border-color: transparent; font-weight: 600; padding: 11px 18px }
 
 .fleet-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0 }
-.fleet-summary article { background: var(--surface-soft); border: 1px solid var(--line); padding: 13px 14px; border-radius: 14px; box-shadow: var(--shadow-soft) }
+.fleet-summary article { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--line); padding: 14px; border-radius: 16px; box-shadow: var(--shadow-soft) }
+.fleet-summary article:before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px }
 .fleet-summary span { display: block; font-size: 11px; color: var(--ink-faint) }
-.fleet-summary strong { display: block; font-size: 25px; line-height: 1.4; color: var(--ink); font-weight: 600 }
-.fleet-summary article:nth-child(2) strong { color: var(--ok-ink) }
+.fleet-summary strong { display: block; font-size: 26px; line-height: 1.35; font-weight: 700 }
+/* One colour each, so the three numbers are told apart at a glance rather than read. */
+.fleet-summary article:nth-child(1):before { background: var(--brand) }
+.fleet-summary article:nth-child(1) strong { color: var(--brand-deep) }
+.fleet-summary article:nth-child(2) { background: linear-gradient(150deg, var(--green-wash), var(--surface) 70%) }
+.fleet-summary article:nth-child(2):before { background: var(--green) }
+.fleet-summary article:nth-child(2) strong { color: var(--green) }
+.fleet-summary article:nth-child(3) { background: linear-gradient(150deg, var(--pink-wash), var(--surface) 70%) }
+.fleet-summary article:nth-child(3):before { background: var(--pink) }
+.fleet-summary article:nth-child(3) strong { color: var(--pink) }
 
 h3 { font-size: 12px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .7px; margin: 18px 0 8px; font-weight: 600 }
-/* Sideways so a long ward list never pushes the devices off the screen. */
-#rooms { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: thin }
-#rooms button { flex: none; border-radius: 10px; padding: 10px 14px; color: var(--ink-soft); white-space: nowrap }
-#rooms button.active { background: var(--brand-wash); color: var(--brand-ink); font-weight: 600; border-color: var(--brand) }
+#rooms { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; -webkit-overflow-scrolling: touch; scrollbar-width: thin }
+#rooms button { flex: none; border-radius: 12px; padding: 10px 15px; color: var(--ink-soft); white-space: nowrap; background: var(--surface-2) }
+#rooms button.active { background: linear-gradient(120deg, var(--brand), var(--brand-bright)); color: #fff; font-weight: 600; border-color: transparent; box-shadow: var(--glow) }
 #rooms b { font-weight: 600 }
-#rooms .count { margin-left: 7px; font-size: 11px; color: var(--ink-faint) }
-#rooms button.active .count { color: var(--brand-ink) }
+#rooms .count { margin-left: 8px; font-size: 11px; color: var(--ink-faint) }
+#rooms button.active .count { color: #ffffffcc }
 
 .tools { display: flex; gap: 10px; margin: 16px 0 10px; flex-wrap: wrap }
-.tools input { flex: 1; min-width: 180px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink) }
-.tools > div { display: flex; gap: 4px; padding: 4px; background: var(--off-bg); border-radius: 12px }
-.tools > div button { border: 0; background: transparent; color: var(--ink-soft) }
-.tools > div button[aria-pressed=true] { background: var(--surface); color: var(--brand-ink); box-shadow: var(--shadow-soft) }
+.tools input { flex: 1; min-width: 180px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink) }
+.tools > div { display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 13px }
+.tools > div button { border: 0; background: transparent; color: var(--ink-soft); min-height: 40px }
+.tools > div button[aria-pressed=true] { background: var(--brand-wash); color: var(--brand-deep); font-weight: 600 }
 
 #status, #mapNote { font-size: 12px; min-height: 18px; color: var(--ink-soft); margin: 0 0 14px }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 14px }
-.device { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); box-shadow: var(--shadow) }
-/* An offline computer cannot be reached, so it should not compete for attention with one that can. */
-.device.is-offline { opacity: .62 }
-.device h3 { font-size: 17px; margin: 14px 0 0; color: var(--ink); text-transform: none; letter-spacing: 0; font-weight: 600 }
-.device p { font-size: 12px; margin: 5px 0 }
-.device code { display: block; font: 12px Consolas, monospace; color: var(--ink-faint); margin: 8px 0 16px; padding: 8px 10px; background: var(--field); border-radius: 7px; border: 1px solid var(--line-soft) }
+.device {
+    min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 17px;
+    background: var(--surface); box-shadow: var(--shadow);
+    position: relative; overflow: hidden;
+}
+/* A live machine gets a turquoise edge; one that cannot be reached gets nothing and steps back. */
+.device:before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, var(--brand), var(--green)) }
+.device.is-offline { opacity: .55 }
+.device.is-offline:before { background: var(--line) }
+.device h3 { font-size: 17px; margin: 13px 0 0; color: var(--ink); text-transform: none; letter-spacing: 0; font-weight: 700 }
+.device p { font-size: 12px; margin: 5px 0; color: var(--pink); font-weight: 600 }
+.device code { display: block; font: 12px Consolas, monospace; color: var(--ink-faint); margin: 8px 0 16px; padding: 9px 11px; background: var(--field); border-radius: 9px; border: 1px solid var(--line-soft) }
 .device button { width: 100%; min-height: 48px }
-.primary { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600 }
-.online, .offline { display: inline-block; padding: 4px 9px; border-radius: 7px; font-size: 10px }
-.online { background: var(--ok-bg); color: var(--ok-ink) }
-.offline { background: var(--off-bg); color: var(--off-ink) }
+.primary { background: linear-gradient(120deg, var(--brand), var(--brand-bright)); color: #fff; border-color: transparent; font-weight: 700; box-shadow: var(--glow) }
+.online, .offline { display: inline-block; padding: 5px 10px; border-radius: 8px; font-size: 10px; font-weight: 600 }
+.online { background: var(--green-wash); color: var(--green) }
+.offline { background: var(--field); color: var(--ink-faint) }
 .online:before, .offline:before { content: '●'; margin-right: 6px }
 
-/* Shown while the first list is still on its way, so the page does not sit visibly empty. */
 .skeleton { pointer-events: none }
+.skeleton:before { background: var(--line) }
 .skeleton .bar { height: 12px; border-radius: 6px; background: var(--line); margin: 12px 0 }
 .skeleton .bar.title { height: 17px; width: 62%; margin-top: 16px }
 .skeleton .bar.room { width: 40% }
-.skeleton .bar.ip { height: 30px; margin: 10px 0 16px }
-.skeleton .bar.action { height: 48px; border-radius: 9px; margin: 0 }
+.skeleton .bar.ip { height: 32px; margin: 10px 0 16px }
+.skeleton .bar.action { height: 48px; border-radius: 11px; margin: 0 }
 @media (prefers-reduced-motion: no-preference) {
     .skeleton .bar { animation: pulse 1.4s ease-in-out infinite }
-    @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .5 } }
+    @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .45 } }
 }
 
 .map {
     display: grid; grid-auto-columns: 215px; grid-auto-rows: minmax(205px, auto); gap: 14px;
-    overflow: auto; padding: 12px; border-radius: 12px;
+    overflow: auto; padding: 12px; border-radius: 14px;
     background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 16px 16px;
 }
-#consentNote { font-size: 12px; color: var(--ink-faint); margin-top: 22px; line-height: 1.8 }
+#consentNote { font-size: 12px; color: var(--ink-faint); margin-top: 22px; line-height: 1.8; padding-left: 12px; border-left: 3px solid var(--pink) }
 footer { padding: 14px 16px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 11px; color: var(--ink-faint); border-top: 1px solid var(--line); background: var(--surface) }
 
-/* One column on a phone; the cards carry long Thai ward names better than a narrow grid. */
 @media (max-width: 560px) {
     .grid { grid-template-columns: 1fr }
-    .heading { flex-direction: column }
-    .heading button { width: 100%; margin-top: 4px }
-    h1 { font-size: 20px }
-    .fleet-summary strong { font-size: 22px }
+    h1 { font-size: 21px }
+    .fleet-summary { gap: 8px }
+    .fleet-summary article { padding: 12px 11px }
+    .fleet-summary strong { font-size: 23px }
+    .brand img { width: 36px; height: 36px }
 }
 @media (min-width: 900px) { .content { max-width: 1100px; margin: 0 auto; padding: 26px 24px 34px } }
-@media (prefers-reduced-motion: no-preference) { .device { transition: box-shadow .18s, transform .18s } .device:active { transform: scale(.995) } }
+@media (prefers-reduced-motion: no-preference) {
+    .device { transition: box-shadow .18s, transform .18s }
+    .device:active { transform: scale(.995) }
+    #rooms button, .primary { transition: background .15s, box-shadow .18s }
+}

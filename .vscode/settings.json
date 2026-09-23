@@ -1,4 +1,8 @@
 {
+    // MeshCentral.sln และ MeshCentralServer.njsproj เป็นไฟล์ Visual Studio ที่ติดมาจาก
+    // MeshCentral ต้นทาง ไม่มีอะไรในระบบนี้ใช้มันเลย (รันด้วย Node ผ่าน service)
+    // C# Dev Kit โหลด .njsproj ไม่ได้จึงขึ้น error ค้างไว้ ปิดการโหลดอัตโนมัติเสีย
+    "dotnet.defaultSolution": "disable",
     "cSpell.words": [
         "abcdf",
         "accountchange",

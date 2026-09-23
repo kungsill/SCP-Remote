@@ -175,7 +175,7 @@ MeshCentral แก้ให้แล้วถ้าบอกมัน: [webserve
 | Hostname | `remote` . `kpsnana.com` | |
 | Service URL | `https://localhost:8443` | `cloudflared` อยู่เครื่องเดียวกับเซิร์ฟเวอร์ (ใบรับรองมี SAN `localhost`) |
 | Origin Server Name | เว้นว่าง | ชื่อใน Service URL ตรงกับใบรับรองแล้ว และ TLS ใช้ IP เป็น SNI ไม่ได้ |
-| CA Pool | `F:\EX\sichomphu-remote\.local\scp-remote\root-cert-public.crt` | |
+| CA Pool | `C:\ProgramData\cloudflared\scp-remote-root.crt` | สำเนาของ `root-cert-public.crt` — ไม่ใส่จะได้ 502 |
 | Disable TLS certificate verification | **ปิดไว้** | |
 
 **ไม่ต้องปิดการตรวจ TLS** ใบรับรองของเซิร์ฟเวอร์ (`webserver-cert-public.crt`) มี SAN ครอบ `127.0.0.1` และ `localhost` อยู่แล้ว และออกโดย `MeshCentralRoot-e68095` ซึ่งอยู่ในไฟล์ `root-cert-public.crt` — ชี้ CA Pool ไปที่ไฟล์นั้นก็ตรวจผ่านครบ

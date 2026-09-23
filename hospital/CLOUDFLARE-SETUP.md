@@ -200,7 +200,7 @@ PID ต้องเปลี่ยนจากเดิม
 
 | ช่อง | ค่า |
 | --- | --- |
-| **CA Pool** | `F:\EX\sichomphu-remote\.local\scp-remote\root-cert-public.crt` |
+| **CA Pool** | `C:\ProgramData\cloudflared\scp-remote-root.crt` |
 | **Origin Server Name** | **เว้นว่าง** |
 | **Disable TLS certificate verification** | **ปิดไว้** |
 
@@ -210,7 +210,16 @@ PID ต้องเปลี่ยนจากเดิม
 >
 > **ทำไมใช้ `localhost` ไม่ใช่ `127.0.0.1`:** ใบรับรองของเซิร์ฟเวอร์มี SAN เป็น `DNS Name=localhost` อยู่แล้ว จึงตรวจสอบผ่านได้ตรง ๆ ส่วนการใส่หมายเลข IP ลงช่อง Origin Server Name นั้น TLS ไม่อนุญาตให้ใช้ IP เป็น SNI (RFC 6066 กำหนดให้เป็นชื่อโฮสต์เท่านั้น) จึงเลี่ยงปัญหานี้ด้วยการใช้ชื่อไปเลย
 >
-> **ทำไมไม่ต้องปิดการตรวจ TLS:** ใบรับรองออกโดย `MeshCentralRoot-e68095` ซึ่งอยู่ในไฟล์ `root-cert-public.crt` — ชี้ CA Pool ไปที่ไฟล์นั้นก็ตรวจผ่านครบ เอกสาร Cloudflare ระบุชัดว่า `noTLSVerify` ควรใช้เป็นทางออกชั่วคราวเท่านั้น
+> **ทำไมไม่ต้องปิดการตรวจ TLS:** ใบรับรองออกโดย `MeshCentralRoot-e68095` ซึ่งอยู่ในไฟล์ `root-cert-public.crt` ของ MeshCentral — ชี้ CA Pool ไปที่สำเนาของไฟล์นั้นก็ตรวจผ่านครบ เอกสาร Cloudflare ระบุชัดว่า `noTLSVerify` ควรใช้เป็นทางออกชั่วคราวเท่านั้น
+>
+> **ถ้าไม่ใส่ CA Pool จะได้ 502** เพราะ "Using defaults" แปลว่าให้ตรวจด้วยชุด CA สาธารณะ ซึ่งไม่รู้จักใบรับรองที่ MeshCentral ออกเอง — cloudflared จึงปฏิเสธการต่อเข้าเซิร์ฟเวอร์
+>
+> **สำเนาใบรับรองวางไว้ที่ `C:\ProgramData\cloudflared\` แล้ว** ไม่ชี้เข้าไปในโฟลเดอร์ `.local` ของโปรเจกต์ เพราะ path นั้นอาจย้ายตอนย้ายเซิร์ฟเวอร์ และโฟลเดอร์นั้นมีไฟล์ลับปนอยู่ ไฟล์ใบรับรองสาธารณะตัวนี้ไม่เป็นความลับ
+>
+> **ถ้าออกใบรับรองเซิร์ฟเวอร์ใหม่** ต้องคัดลอกทับสำเนานี้ด้วย มิฉะนั้น tunnel จะขึ้น 502 อีก:
+> ```powershell
+> Copy-Item F:\EX\sichomphu-remote\.local\scp-remote\root-cert-public.crt C:\ProgramData\cloudflared\scp-remote-root.crt -Force
+> ```
 
 DNS record จะถูกสร้างให้อัตโนมัติ ไม่ต้องไปเพิ่มเอง
 

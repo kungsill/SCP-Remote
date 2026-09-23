@@ -78,6 +78,62 @@ if (minifyOn && (missingMin.length > 0)) {
 } else if (missingMin.length > 0) {
     notes.push('minify ปิดอยู่ และต้องปิดไว้: ไม่มีไฟล์ย่อของสคริปต์แกนหลัก ' + missingMin.length + ' ตัว เปิดแล้วหน้าเว็บจะใช้งานไม่ได้');
 }
+// Reachable from the internet is a different thing from reachable on the ward LAN. Until now
+// the address allowlist has been the fence: a stolen password was only useful to someone
+// already inside the hospital network. A tunnel or a forwarded port removes that fence, and
+// the only thing left is the password. So the moment the configuration looks outward-facing,
+// a second factor stops being good practice and becomes the fence itself.
+const everywhere = ['0.0.0.0/0', '::/0', '0.0.0.0', '*'];
+const openToAll = key => { const v = list(settings[key]); return (v.length === 0) || v.some(item => everywhere.includes(item)); };
+const behindProxy = (settings.trustedProxy != null) || (settings.tlsOffload != null);
+const usersOpen = openToAll('userAllowedIP'), agentsOpen = openToAll('agentAllowedIP');
+const facingInternet = behindProxy || usersOpen || agentsOpen;
+
+const requirements = (domains[''] && domains[''].passwordRequirements) || {};
+const forced = requirements.force2factor === true;
+
+// Accounts live in the database beside the configuration, not in it. A checkout without a
+// server next to it simply has nothing to say here.
+let noSecondFactor = null;
+try {
+    const dbFile = path.join(path.dirname(file), 'meshcentral.db');
+    if (fs.existsSync(dbFile)) {
+        const accounts = new Map();
+        for (const line of fs.readFileSync(dbFile, 'utf8').split('\n')) {
+            if (!line) continue;
+            let row; try { row = JSON.parse(line); } catch (ex) { continue; }
+            if (row.$$deleted) { accounts.delete(row._id); continue; }
+            if (row.type === 'user') accounts.set(row._id, row);
+        }
+        noSecondFactor = [...accounts.values()].filter(u =>
+            !u.otpsecret && !(u.otphkeys && u.otphkeys.length) && !(u.otpkeys && u.otpkeys.keys && u.otpkeys.keys.length)
+        ).map(u => u.name || u._id);
+    }
+} catch (ex) { noSecondFactor = null; }
+
+if (facingInternet) {
+    notes.push('การตั้งค่านี้เปิดให้เข้าถึงจากนอกเครือข่ายโรงพยาบาลได้ (' +
+        [behindProxy && 'ผ่าน proxy/tunnel', usersOpen && 'userAllowedIP ไม่จำกัด', agentsOpen && 'agentAllowedIP ไม่จำกัด'].filter(Boolean).join(', ') + ')');
+    if (!forced) {
+        blocking.push('เปิดให้เข้าถึงจากภายนอกได้ แต่ยังไม่บังคับ 2FA — รหัสผ่านที่หลุดครั้งเดียวได้ทุกเครื่องในโรงพยาบาล');
+        blocking.push('  ตั้ง domains."".passwordRequirements.force2factor = true แล้วเริ่มบริการใหม่');
+    }
+    if (noSecondFactor && noSecondFactor.length > 0) {
+        blocking.push('มีบัญชีที่ยังไม่ได้ตั้ง 2FA ' + noSecondFactor.length + ' บัญชี: ' + noSecondFactor.join(', '));
+        blocking.push('  ให้เจ้าของบัญชีตั้ง Authenticator ที่หน้าเว็บก่อน มิฉะนั้นการบังคับ 2FA จะล็อกคนเหล่านี้ออกจากระบบ');
+    }
+    if (behindProxy && !usersOpen && !agentsOpen) {
+        notes.push('อยู่หลัง proxy/tunnel แต่ allowlist ยังเป็นวงภายใน เครื่องจากภายนอกจะถูกปฏิเสธ (ตั้งใจแบบนี้หรือไม่?)');
+    }
+    if (!behindProxy) {
+        blocking.push('allowlist เปิดกว้างแต่ไม่ได้ตั้ง trustedProxy — บันทึกการใช้งานจะเห็น IP ของ proxy แทน IP จริงของผู้ใช้');
+        blocking.push('  ถ้าใช้ Cloudflare Tunnel ให้ตั้ง settings.trustedProxy = "127.0.0.1"');
+    }
+} else if (noSecondFactor && noSecondFactor.length > 0 && !forced) {
+    notes.push('ยังไม่มีบัญชีใดตั้ง 2FA (' + noSecondFactor.join(', ') + ') — รับได้เพราะยังจำกัดเฉพาะเครือข่ายภายใน');
+    notes.push('  แต่ต้องตั้งก่อนเปิดให้เข้าถึงจากภายนอก ดู hospital/REMOTE-OVER-INTERNET.md');
+}
+
 console.log('สรุปสถานะ');
 for (const note of notes) { console.log('  - ' + note); }
 console.log('');

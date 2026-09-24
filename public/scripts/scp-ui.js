@@ -8,6 +8,134 @@
         if (value) node.textContent = value;
         return node;
     }
+    // The 2FA code entry. MeshCentral asks for the code in one wide text box; on a phone that
+    // is an awkward way to type six digits, and it is the last thing standing between someone
+    // with a stolen password and every computer in the hospital, so it is worth making plain.
+    //
+    // These six boxes drive MeshCentral's own input rather than replacing it. The original keeps
+    // its name=token, keeps its value, and is told to run the page's own checkToken after every
+    // change, so nothing about how this form validates or submits is different. That matters
+    // more than the look: a mistake here locks the hospital out of its own server.
+    //
+    // Backup codes are eight digits, not six, so the boxes are deliberately not the only way in.
+    // The link underneath hands the original input straight back, pasting eight digits switches
+    // to it on its own, and if any of this throws, the catch leaves the original exactly as
+    // MeshCentral shipped it.
+    function segmentToken(inputId, panelId) {
+        try {
+            var input = document.getElementById(inputId);
+            var panel = document.getElementById(panelId);
+            if (!input || !panel || input.getAttribute('data-scp-otp')) return;
+            input.setAttribute('data-scp-otp', '1');
+
+            var boxes = [], wrap = el('div', 'scp-otp');
+            // Announced as one field, because six unlabelled boxes are unreadable aloud.
+            wrap.setAttribute('role', 'group');
+            wrap.setAttribute('aria-label', text('Six digit verification code', 'รหัสยืนยัน 6 หลัก'));
+
+            function publish() {
+                var code = '';
+                for (var i = 0; i < boxes.length; i++) { code += boxes[i].value; }
+                input.value = code;
+                // checkToken is bound with an inline onkeyup/onchange attribute, so a dispatched
+                // event reaches it without this needing to know the function's name.
+                input.dispatchEvent(new Event('keyup', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            var link = el('button', 'scp-otp-alt', text('Use a backup code instead', 'ใช้รหัสสำรอง 8 หลักแทน'));
+            link.type = 'button';
+
+            // Falls back to the box MeshCentral shipped: for a backup code, and for anything
+            // the boxes turn out not to handle.
+            function plain(seed) {
+                wrap.hidden = true;
+                link.hidden = true;
+                input.classList.remove('scp-otp-source');
+                if (seed) { input.value = seed; }
+                input.focus();
+                input.dispatchEvent(new Event('keyup', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            // Autofill and paste both arrive as more than one character at once.
+            function spread(from, value) {
+                var digits = String(value).replace(/\D/g, '');
+                if (!digits) return;
+                if (digits.length > boxes.length) { plain(digits); return; } // an 8 digit backup code
+                for (var i = from, d = 0; i < boxes.length && d < digits.length; i++, d++) { boxes[i].value = digits.charAt(d); }
+                var next = Math.min(from + digits.length, boxes.length - 1);
+                boxes[next].focus(); boxes[next].select();
+                publish();
+            }
+
+            for (var i = 0; i < 6; i++) {
+                var box = document.createElement('input');
+                box.type = 'text'; box.inputMode = 'numeric'; box.maxLength = 1;
+                box.className = 'scp-otp-box'; box.setAttribute('aria-label', String(i + 1));
+                // Only the first is offered the code by the phone, or every box fills with it.
+                box.setAttribute('autocomplete', i === 0 ? 'one-time-code' : 'off');
+                boxes.push(box); wrap.appendChild(box);
+            }
+
+            boxes.forEach(function (box, index) {
+                box.addEventListener('input', function () {
+                    if (box.value.length > 1) { spread(index, box.value); return; }
+                    box.value = box.value.replace(/\D/g, '');
+                    if (box.value && index < boxes.length - 1) { boxes[index + 1].focus(); }
+                    publish();
+                });
+                box.addEventListener('keydown', function (e) {
+                    // Backspace in an empty box should go back, or a mistyped digit is
+                    // unreachable without the mouse.
+                    if (e.key === 'Backspace' && !box.value && index > 0) { boxes[index - 1].focus(); e.preventDefault(); }
+                    else if (e.key === 'ArrowLeft' && index > 0) { boxes[index - 1].focus(); e.preventDefault(); }
+                    else if (e.key === 'ArrowRight' && index < boxes.length - 1) { boxes[index + 1].focus(); e.preventDefault(); }
+                    else if (e.key === 'Enter') { publish(); }
+                });
+                box.addEventListener('paste', function (e) {
+                    e.preventDefault();
+                    spread(index, (e.clipboardData || window.clipboardData).getData('text'));
+                });
+                box.addEventListener('focus', function () { box.select(); });
+            });
+
+            link.addEventListener('click', function () { plain(''); });
+
+            var heading = el('div', 'scp-signin-heading scp-otp-heading');
+            heading.appendChild(el('h2', '', text('Verify your login', 'ยืนยันการเข้าสู่ระบบ')));
+            heading.appendChild(el('p', '', text('Enter the six digit code from your authenticator app.', 'กรอกรหัส 6 หลักจากแอป Authenticator ของคุณ')));
+
+            var row = input.parentNode;
+            row.insertBefore(wrap, input);
+            row.insertBefore(link, input);
+            input.classList.add('scp-otp-source');
+            var form = panel.querySelector('form');
+            if (form) { form.insertBefore(heading, form.firstChild); }
+
+            // The panel starts hidden and MeshCentral shows it when a code is actually wanted.
+            // Putting the cursor in the first box at that moment saves a tap on a phone.
+            if (window.MutationObserver) {
+                new MutationObserver(function () {
+                    if (panel.style.display !== 'none' && !wrap.hidden && !boxes[0].value) { boxes[0].focus(); }
+                }).observe(panel, { attributes: true, attributeFilter: ['style'] });
+            }
+        } catch (ex) {
+            // Leave MeshCentral's own field exactly as it was. Signing in matters more than
+            // this looking nice, so take the half-built boxes back out rather than showing
+            // both and leaving someone guessing which one the server reads.
+            var fallback = document.getElementById(inputId);
+            if (fallback) {
+                fallback.classList.remove('scp-otp-source');
+                var parent = fallback.parentNode;
+                if (parent) {
+                    var stale = parent.querySelectorAll('.scp-otp, .scp-otp-alt');
+                    for (var s = 0; s < stale.length; s++) { stale[s].parentNode.removeChild(stale[s]); }
+                }
+            }
+        }
+    }
+
     function init() {
         var login = document.getElementById('loginpanel');
         document.body.classList.add('scp-ui', login ? 'scp-signin' : 'scp-workspace');
@@ -39,6 +167,8 @@
                 heading.appendChild(el('p', '', text('Sign in to your hospital workspace', 'เข้าสู่พื้นที่ทำงานของโรงพยาบาล')));
                 userpass.insertBefore(heading, userpass.firstChild);
             }
+            segmentToken('tokenInput', 'tokenpanel');
+            segmentToken('resetTokenInput', 'resettokenpanel');
             return;
         }
         var paths = {

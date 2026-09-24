@@ -137,6 +137,41 @@ body.scp-signin { background: var(--scp-bg) !important; overflow-y: auto !import
 }
 .scp-signin form :is(input[type="submit"], #loginButton) { width: 100% !important; min-height: 44px; border-radius: 8px !important; border: 1px solid #b02a72 !important; background: #b02a72 !important; color: #fff !important; font-size: 15px; font-weight: 600; cursor: pointer; padding: 9px 14px !important; }
 .scp-signin form a { color: var(--scp-accent) !important; }
+/* The 2FA code entry, built by scp-ui.js. Six boxes rather than one wide field, because on a
+   phone the code is six taps and where you are in it should be obvious without reading back
+   what you typed. The rule above sets width and padding on every input in this form with
+   !important, so these have to answer in kind.
+   MeshCentral's own input is still there and still carries the value; it is only out of sight,
+   and display:none does not stop a field being submitted. */
+.scp-signin .scp-otp { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
+.scp-signin .scp-otp-box {
+    width: 46px !important; min-width: 0; height: 54px; min-height: 54px; flex: none;
+    padding: 0 !important; text-align: center; font-size: 22px; font-weight: 600;
+    border: 1px solid var(--scp-line) !important; border-radius: 12px !important;
+    background: var(--scp-bg) !important; color: var(--scp-ink); box-sizing: border-box;
+    transition: border-color .15s, box-shadow .15s;
+}
+/* Echoes the gap the authenticator app itself puts in the middle of the code. */
+.scp-signin .scp-otp-box:nth-child(3) { margin-right: 12px; }
+.scp-signin .scp-otp-box:focus { border-color: var(--scp-accent) !important; box-shadow: 0 0 0 3px var(--scp-soft); outline: none; }
+.scp-signin .scp-otp-box:not(:placeholder-shown), .scp-signin .scp-otp-box[value] { border-color: var(--scp-accent) !important; }
+.scp-signin .scp-otp-source { display: none !important; }
+.scp-signin .scp-otp-alt {
+    display: inline-block; margin: 14px 0 0; padding: 0; border: 0; background: transparent;
+    color: var(--scp-accent); font-size: 13px; text-decoration: underline; text-underline-offset: 4px;
+    cursor: pointer; font-family: inherit;
+}
+.scp-signin .scp-otp-alt:hover { color: var(--scp-ink); }
+.scp-signin .scp-otp-heading { margin-bottom: 4px; }
+/* The panel is a table MeshCentral laid out for a label beside a field; the boxes need the
+   whole width, and the "Login token:" cell has nothing left to say once the heading does. */
+.scp-signin :is(#tokenpanel, #resettokenpanel) td[align=right] { display: none; }
+.scp-signin :is(#tokenpanel, #resettokenpanel) :is(table, tbody, tr, td) { display: block; width: auto; }
+@media (max-width: 400px) {
+    .scp-signin .scp-otp { gap: 5px; }
+    .scp-signin .scp-otp-box { width: 40px !important; height: 48px; min-height: 48px; font-size: 19px; }
+    .scp-signin .scp-otp-box:nth-child(3) { margin-right: 8px; }
+}
 .scp-signin-heading h2 { margin: 0 0 8px; font-size: 25px; font-weight: 600; }
 .scp-signin-heading p { margin: 0 0 20px; color: var(--scp-muted); font-size: 13px; }
 .scp-signin #loginpanel form > div > b { display: block; font-size: 22px; font-weight: 600; margin-bottom: 12px; }

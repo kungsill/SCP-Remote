@@ -102,6 +102,51 @@ test('focus is always visible, and it is pink', () => {
     assert.ok(css.toLowerCase().includes(PINK_BRIGHT), 'and the ring should be ' + PINK_BRIGHT);
 });
 
+// ---- The Desktop App ----
+// The app is the third surface, and the one the hospital actually works in. Only its colours
+// were changed; if anything here starts failing because the app was rebuilt from different
+// sources, check that before changing the expectations.
+const APP = path.join(__dirname, '../desktop-app/style.css');
+const APP_ONLINE = ['#05876f', '#078974', '#16836e'];  // the three greens that mean "reachable"
+
+test('the app leads with the same pink as the site and the phone page', () => {
+    // Three surfaces, one product. A different pink in each would look like an accident.
+    const app = fs.readFileSync(APP, 'utf8').toLowerCase();
+    assert.ok(app.includes(PINK), 'the app should use ' + PINK + ' as its primary');
+    const site = (/--scp-accent:\s*(#[0-9a-f]{6})/i.exec(read('scp-ui.css')) || [])[1];
+    assert.equal(site.toLowerCase(), PINK, 'and the site should agree');
+});
+
+test('no turquoise survives in the app either', () => {
+    const app = fs.readFileSync(APP, 'utf8');
+    const strays = colours(app).filter(c => {
+        if (APP_ONLINE.includes(c.slice(0, 7))) { return false; }
+        const { h, s } = hsl(c);
+        return s >= 0.10 && h >= 165 && h <= 225;
+    });
+    assert.deepEqual(strays, [], 'turquoise is back in the app: ' + strays.join(', '));
+});
+
+test('the app still says "online" in green', () => {
+    // These sit in the turquoise band by hue, so the sweep had to be told to leave them. If
+    // that instruction were ever lost they would turn pink and the one thing a technician
+    // scans the list for - which machines can be reached - would stop standing out.
+    const app = fs.readFileSync(APP, 'utf8').toLowerCase();
+    for (const green of APP_ONLINE) {
+        assert.ok(app.includes(green), green + ' is an online colour and must stay green');
+    }
+});
+
+test('the app window opens on the same warm background as its page', () => {
+    // Electron paints backgroundColor before the page loads. Left cool, every launch would
+    // flash blue-grey and then settle to pink.
+    const main = fs.readFileSync(path.join(__dirname, '../desktop-app/main.js'), 'utf8');
+    const shell = (/backgroundColor:\s*'(#[0-9a-f]{6})'/i.exec(main) || [])[1];
+    assert.ok(shell, 'the window should still set a background colour');
+    assert.ok(fs.readFileSync(APP, 'utf8').toLowerCase().includes(shell.toLowerCase()),
+        shell + ' is not a colour the page itself uses, so the launch would flash');
+});
+
 test('every stylesheet still parses', () => {
     // A colour sweep that unbalances a brace blanks a page rather than mis-colouring it.
     for (const sheet of SHEETS.concat('scp-mobile.css')) {

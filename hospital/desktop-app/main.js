@@ -28,7 +28,7 @@ app.whenReady().then(()=>{
  session.defaultSession.setCertificateVerifyProc((verify,callback)=>{
   if((verify.hostname===pinnedHost)&&certMatches(verify.certificate.data)){callback(0);}else{callback(-3);}
  });
- home=new BrowserWindow({width:1180,height:820,minWidth:820,minHeight:600,title:'SCP-Remote',autoHideMenuBar:true,icon:path.join(__dirname,'scp-logo.ico'),backgroundColor:'#f3f7fa',webPreferences:{preload:path.join(__dirname,'preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+ home=new BrowserWindow({width:1180,height:820,minWidth:820,minHeight:600,title:'SCP-Remote',autoHideMenuBar:true,icon:path.join(__dirname,'scp-logo.ico'),backgroundColor:'#faf3f6',webPreferences:{preload:path.join(__dirname,'preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
  secureWindow(home);home.loadFile('index.html');
  function handle(name,fn){ipcMain.handle(name,async(event,...args)=>{if(event.sender!==home.webContents||!event.senderFrame.url.startsWith('file://'))throw Error('ACCESS_DENIED');try{return {ok:true,result:await fn(...args)};}catch(e){return {ok:false,error:e.message};}});}
  handle('scp:init',()=>request({op:'register',name:os.hostname()}));

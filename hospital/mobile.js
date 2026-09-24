@@ -18,6 +18,14 @@ const path = require('path');
 
 const pageFile = path.join(__dirname, 'mobile.html');
 
+// Query keys that name a thing to open: a computer, a group, an account, or a login key.
+// These are MeshCentral's own, read in default.handlebars, and a URL carrying one of them was
+// meant for the full site. Anything else on the root - hide=, mobile=, viewmode= with no
+// device beside it - is what MeshCentral leaves behind when a view closes, and must not be
+// mistaken for someone asking to go somewhere.
+const AIMED_AT_SOMETHING = ['node', 'gotonode', 'gotodevicename', 'gotodevicername',
+    'gotodeviceip', 'gotomesh', 'gotouser', 'gotougrp', 'key'];
+
 function signedInUser(web, req) {
     if ((req.session == null) || (typeof req.session.userid != 'string')) { return null; }
     return web.users[req.session.userid] || null;
@@ -66,15 +74,21 @@ exports.root = function (web, req, res, next, url) {
     if (!signedIn) { next(); return; } // Before that the login page is the same either way.
     if (req.session && (req.session.scpView === 'full')) { next(); return; }
 
-    // Only a bare visit to the root is a request for the front door. Anything carrying a query
-    // was aimed somewhere specific and goes through untouched - above all the remote desktop
-    // itself, which /m opens as /?node=..&viewmode=10. Redirecting that sent the technician
-    // straight back to the device list, so the button looked like it did nothing.
+    // A query that names something goes through untouched - above all a link to a computer,
+    // which /m opens as /?node=..&viewmode=11. Redirecting those sent the technician straight
+    // back to the device list, so the button looked like it did nothing.
+    //
+    // Naming the keys matters. "Any query at all" was the rule before, and it meant the front
+    // door stopped working the moment someone opened a computer and closed it again: MeshCentral
+    // leaves its display flags behind in the URL, so the root became /?hide=16&mobile=0 and
+    // stayed that way. Nothing in that is aimed anywhere - it is debris from a page that has
+    // already closed - but it was enough to pin someone to the full site for good.
     //
     // Checked before the m=1 marker below, so a link to a computer wins over it either way.
-    for (const key in q) { if (key !== 'm') { next(); return; } }
+    for (const key of AIMED_AT_SOMETHING) { if (q[key] != null) { next(); return; } }
 
-    // A bare root, or the marker that carries someone back here after logging in.
+    // A bare root, the marker that carries someone back here after logging in, or a URL
+    // carrying nothing but the leftovers of a screen they have already left.
     res.redirect(root + 'm');
 };
 

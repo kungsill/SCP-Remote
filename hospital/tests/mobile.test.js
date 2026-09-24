@@ -467,9 +467,10 @@ test('a link aimed at a particular device is let through, not sent to the list',
     // /m opens the remote desktop as /?node=..&viewmode=10. Redirecting that to /m put the
     // technician back on the device list, so pressing a computer appeared to do nothing.
     for (const query of [
-        { node: 'abc', viewmode: '10', hide: '16' },
-        { viewmode: '11' },
+        { node: 'abc', viewmode: '11', hide: '31' },
+        { gotonode: '8HPel8S1J2lXl7' },
         { key: 'something' },
+        { gotomesh: 'er' },
         { node: 'abc', m: '1' }
     ]) {
         const r = reply();
@@ -478,6 +479,44 @@ test('a link aimed at a particular device is let through, not sent to the list',
         assert.equal(through, true, JSON.stringify(query) + ' should reach the full site');
         assert.equal(r.redirected, null);
     }
+});
+
+test('the leftovers of a closed screen do not pin anyone to the full site', () => {
+    // Reported from a tablet: open a computer, close it, and the root is now
+    // /?hide=16&mobile=0 - MeshCentral's display flags, left behind when the view closed. The
+    // rule used to be "any query at all goes through", so from then on the front door led to
+    // the full site and there was no way back to /m short of typing it.
+    //
+    // None of these names anything. A viewmode with no device beside it opens nothing either.
+    for (const query of [
+        { hide: '16', mobile: '0' },
+        { hide: '31' },
+        { mobile: '0' },
+        { viewmode: '11' },
+        { viewmode: '11', hide: '16', mobile: '0' }
+    ]) {
+        const r = reply();
+        let through = false;
+        mobile.root(withAdmin(), { query: query, headers: {}, session: session() }, r, () => { through = true; }, '/');
+        assert.equal(through, false, JSON.stringify(query) + ' is debris, not a destination');
+        assert.equal(r.redirected, '/m', 'it should land on the page people actually use');
+    }
+});
+
+test('asking for the full site still outranks all of that', () => {
+    // The gear passes m=0, and the choice is remembered. Debris in the URL must not undo it.
+    const s = session();
+    const first = reply();
+    let through = false;
+    mobile.root(withAdmin(), { query: { m: '0' }, headers: {}, session: s }, first, () => { through = true; }, '/');
+    assert.equal(through, true, 'm=0 is the way to the full site');
+    assert.equal(s.scpView, 'full', 'and it is remembered');
+
+    const later = reply();
+    through = false;
+    mobile.root(withAdmin(), { query: { hide: '16', mobile: '0' }, headers: {}, session: s }, later, () => { through = true; }, '/');
+    assert.equal(through, true, 'someone working on the full site stays there');
+    assert.equal(later.redirected, null);
 });
 
 test('a bare visit to the root is still the front door', () => {

@@ -40,10 +40,26 @@
 .scp-workspace #page_leftbar .lbbutton:hover { background: var(--scp-bg); color: var(--scp-ink); }
 .scp-workspace #page_leftbar :is(.lbbuttonsel, .lbbuttonsel2) { background: var(--scp-soft); color: var(--scp-accent); font-weight: 600; }
 .scp-workspace #page_leftbar .lbtg { display: none; }
-/* The way back to /m, first in the left bar. Set apart from the panels below it by a rule,
-   because it leaves this page rather than switching between parts of it. */
-.scp-workspace #page_leftbar .scp-back-to-devices { display: block; position: relative; text-decoration: none; color: var(--scp-accent); font-weight: 600; padding-bottom: 6px; margin-bottom: 10px; border-bottom: 1px solid var(--scp-line); border-radius: 9px 9px 0 0; }
-.scp-workspace #page_leftbar .scp-back-to-devices:hover { background: var(--scp-soft); }
+/* The way back to /m, in the masthead beside the title. Floated, because the title and the
+   subtitle next to it are, and because the logout controls float right - so this sits between
+   them however wide the window is, and never on top of either. */
+.scp-ui #masthead #scp-back-to-devices {
+    float: left; display: flex; align-items: center; gap: 7px;
+    margin: 14px 0 0 22px; padding: 8px 14px; min-height: 38px; box-sizing: border-box;
+    border: 1px solid var(--scp-line); border-radius: 10px;
+    background: var(--scp-soft); color: var(--scp-accent);
+    font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.scp-ui #masthead #scp-back-to-devices:hover { background: var(--scp-accent); color: #fff; border-color: var(--scp-accent); }
+.scp-ui #masthead #scp-back-to-devices svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* On a narrow window the wordmark and the subtitle already fill the bar, so the arrow speaks
+   for itself rather than pushing the logout controls onto a second line. */
+@media (max-width: 720px) {
+    .scp-ui #masthead #scp-back-to-devices { margin-left: 12px; padding: 8px 11px; }
+    .scp-ui #masthead #scp-back-to-devices span { display: none; }
+}
+/* The left bar is the fallback when there is no masthead at all. */
+.scp-ui #page_leftbar #scp-back-to-devices { float: none; margin: 10px; }
 .scp-nav-icon { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; position: absolute; left: 15px; top: 14px; }
 .scp-nav-label { display: block; padding: 14px 8px 14px 47px; font-size: 14px; line-height: 20px; }
 .scp-workspace #page_leftbar .lbbutton { width: calc(100% - 20px); height: auto; min-height: 48px; margin: 6px 10px; }

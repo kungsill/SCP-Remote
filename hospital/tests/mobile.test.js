@@ -542,14 +542,46 @@ test('the gear is aimed at the site root, not at this page', () => {
     assert.ok(/settings\.href = siteRoot\(\) \+ '\?m=0'/.test(client));
 });
 
-test('the full site offers a way back, so the gear is not a one-way door', () => {
-    // Visiting the full site pins the session to it. Without this the only way back to the
-    // page people actually use is typing the URL.
-    const ui = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-ui.js'), 'utf8');
-    assert.ok(ui.includes('scp-back-to-devices'), 'the full site needs a link back to /m');
-    assert.ok(/back\.href = 'm'/.test(ui), 'and it should point at /m');
+// Built rather than grepped. The first version of this test read the script for the right
+// words and passed, while on the real site the link was nowhere: it was being added to the
+// left bar, and the page the gear actually lands on has no left bar. Only building the page
+// and looking for the link catches that.
+const { JSDOM } = require('jsdom');
+async function fullSite(body) {
+    const dom = new JSDOM('<html lang="th"><body>' + body + '</body></html>', { runScripts: 'outside-only' });
+    const w = dom.window;
+    w.requestAnimationFrame = f => f();
+    if (w.document.readyState === 'loading') { await new Promise(r => w.addEventListener('DOMContentLoaded', r)); }
+    w.eval(fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-ui.js'), 'utf8'));
+    return w.document;
+}
+
+test('the full site offers a way back, whatever else the page is missing', async () => {
+    // Visiting the full site pins the session to it, so without this the gear is a one-way
+    // door. The left bar looks like the place for it, but hide=16 takes the left bar away and
+    // so does a narrow window - and a way out that is sometimes missing is not a way out.
+    const MASTHEAD = '<div id=masthead><div class=title>SCP-Remote</div><div class=title2>Hospital IT</div></div>';
+    const shapes = [
+        ['masthead only, which is what the gear lands on', MASTHEAD + '<div id=p1></div>'],
+        ['masthead and left bar', MASTHEAD + '<div id=page_leftbar></div><div id=p1></div>'],
+        ['no masthead at all', '<div id=page_leftbar></div><div id=p1></div>']
+    ];
+    for (const [what, body] of shapes) {
+        const d = await fullSite(body);
+        const back = d.getElementById('scp-back-to-devices');
+        assert.ok(back, 'no way back to /m when the page is ' + what);
+        assert.equal(back.getAttribute('href'), 'm', 'it should point at /m (' + what + ')');
+        assert.ok(back.textContent.trim().length > 0, 'an arrow alone does not say where it goes');
+    }
+});
+
+test('the way back is styled where it actually lands', () => {
     const css = fs.readFileSync(path.join(__dirname, '../../public/styles/scp-ui.css'), 'utf8');
-    assert.ok(css.includes('.scp-back-to-devices'), 'unstyled it reads as a stray link in the nav');
+    assert.ok(/#masthead #scp-back-to-devices \{/.test(css), 'unstyled it is a bare link in the header');
+    // The title and subtitle beside it float left and the logout controls float right, so it
+    // has to float too or it drops below them and pushes the bar open.
+    const rule = /#masthead #scp-back-to-devices \{[^}]*\}/.exec(css)[0];
+    assert.ok(/float: left/.test(rule), 'it sits among floated siblings, so it has to float');
 });
 
 test('every control in the header can be hit with a thumb', () => {

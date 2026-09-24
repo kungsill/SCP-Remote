@@ -117,7 +117,13 @@ body.scp-app-view #scp-app-state:before{content:'\25CF';margin-right:5px}
 /* Green, because "can I reach this machine" is the same question everywhere else in here. */
 body.scp-app-view #scp-app-state.is-live{background:#e2f6ef;color:#0b8f6f}
 @media(prefers-color-scheme:dark){body.scp-app-view #scp-app-state.is-live{background:#10402f;color:#34d9a8}}
-/* Nothing above the picture but that bar. */
-body.scp-app-view #column_l{padding:0!important}
-body.scp-app-view #page_content{top:0!important}
+/* Nothing on the page but that bar and the picture.
+   /m already asks the server for this with hide=31, so nothing flashes on the way in. These
+   rules are what makes the same thing true when the screen is reached the other way - open a
+   device on the full site, press Desktop - where no query string is involved at all. The tabs
+   beside Desktop go with the rest and come back on the way out. */
+body.scp-app-view :is(#masthead,#topbar,#footer,#page_leftbar,#p11title,#p10title){display:none!important}
+body.scp-app-view #column_l{padding:0!important;left:0!important;width:100%!important}
+body.scp-app-view #page_content{top:0!important;bottom:0!important;left:0!important;right:0!important}
+body.scp-app-view #container{border:0!important;min-width:0!important}
 @media(max-width:560px){body.scp-app-view #scp-app-device{font-size:15px}}

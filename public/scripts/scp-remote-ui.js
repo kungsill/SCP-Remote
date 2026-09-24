@@ -36,14 +36,30 @@
  // What that also drops is the only place the page said which machine you are looking at and
  // the only way back, so this puts those two back and nothing else. It is the shape the
  // Desktop App's window already has, which is the point.
+ // It applies to the remote screen itself, not to the URL that opened it. /m sends people
+ // here with hide=31 so the chrome never flashes before this runs, but the same screen is also
+ // one click away on the full site - open a device, press Desktop - and arriving that way used
+ // to give a completely different-looking page. Watching the view instead of the query means
+ // both roads end in the same place, which is what was asked for.
+ //
+ // While the screen is showing, the tabs beside Desktop - Terminal, Files, Registry, Console -
+ // are out of sight with everything else. They come back on the way out, which is a real cost
+ // and a deliberate one: the hospital asked for the screen and nothing else.
  function appView(){
-  if(!/[?&]scpapp=1(&|$)/.test(location.search))return;
   if(document.getElementById('scp-app-bar'))return;
   const th=document.documentElement.lang==='th';
-  document.body.classList.add('scp-app-view');
-  const bar=document.createElement('header');bar.id='scp-app-bar';
-  const back=document.createElement('a');back.href='m';back.className='scp-app-back';
-  back.setAttribute('aria-label',th?'กลับไปหน้าเลือกเครื่อง':'Back to the device list');
+  // Sent here from /m rather than reached from the full site. It decides where "back" goes:
+  // to the device list for one, and out of the screen to the device's own tabs for the other.
+  const fromList=/[?&]scpapp=1(&|$)/.test(location.search);
+  const bar=document.createElement('header');bar.id='scp-app-bar';bar.hidden=true;
+  const back=document.createElement(fromList?'a':'button');back.className='scp-app-back';
+  if(fromList){back.href='m';}else{back.type='button';back.onclick=function(){
+   // Back to the device, not out of it: whoever came this way was already looking at the
+   // machine and wants the tabs again, not the list.
+   if(typeof root.gotoDevice==='function'&&root.currentNode){root.gotoDevice(root.currentNode._id,10);}
+   else{location.href='m';}
+  };}
+  back.setAttribute('aria-label',th?'ออกจากหน้าจอ':'Leave the screen');
   const arrow=document.createElementNS('http://www.w3.org/2000/svg','svg');
   arrow.setAttribute('viewBox','0 0 24 24');arrow.setAttribute('aria-hidden','true');
   const path=document.createElementNS(arrow.namespaceURI,'path');
@@ -53,10 +69,19 @@
   const state=document.createElement('span');state.id='scp-app-state';state.setAttribute('role','status');
   bar.append(back,name,state);
   document.body.insertBefore(bar,document.body.firstChild);
-  // The name and the connection both arrive after this runs, and the connection keeps
-  // changing, so this reads them rather than being told once.
-  let shown='',live=null;
+
+  // The view, the machine and the connection all change while the page stays put, so all three
+  // are read rather than being told once. 11 is the remote screen; the page's own panel map.
+  let shown='',live=null,showing=null;
   setInterval(function(){
+   const onScreen=root.xxcurrentView===11;
+   if(onScreen!==showing){
+    showing=onScreen;
+    document.body.classList.toggle('scp-app-view',onScreen);
+    bar.hidden=!onScreen;
+    layout();
+   }
+   if(!onScreen)return;
    const node=root.currentNode;
    if(node&&node.name&&node.name!==shown){shown=node.name;name.textContent=node.name;}
    // 3 is connected, the same test the page makes on itself.
@@ -67,7 +92,7 @@
     state.classList.toggle('is-live',connected);
     layout();
    }
-  },1000);
+  },250);
  }
 
  root.ScpRemoteUI={mount(node){ensure();node.hidden=true;body.append(node);}};

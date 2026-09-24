@@ -51,3 +51,80 @@ test('the picture is re-fitted from more than a plain window resize',()=>{
  assert.ok(/orientationchange/.test(source),'a rotation has to be watched for on its own');
  assert.ok(/visualViewport/.test(source),'which settles later and more honestly than window on a phone');
 });
+
+// ---- The remote screen, reached either way ----
+// There are two roads to the same screen: pressed on a card in /m, and pressed on Desktop
+// after opening a device on the full site. They used to end in completely different-looking
+// pages - the hospital's words were "it looks nothing like the app" - because the app chrome
+// keyed off the query string that only /m puts there. It now watches the view instead.
+async function screen(t, search, view) {
+    const dom = new JSDOM('<html lang="th"><body>' +
+        '<div id=masthead></div><div id=topbar></div><div id=page_leftbar></div>' +
+        '<h1 id=p11title>Desktop - test01</h1><div id=footer></div>' +
+        '<div id=deskarea1></div><div id=deskarea3x></div><div id=deskarea4></div>' +
+        '</body></html>', { url: 'https://remote.test/' + search, runScripts: 'outside-only' });
+    t.after(() => dom.window.close());
+    const w = dom.window;
+    w.currentNode = { _id: 'node//abc', name: 'test01' };
+    w.desktop = { State: 3 };
+    w.xxcurrentView = view;
+    w.gotoDevice = (id, v) => { w.xxcurrentView = v; };
+    w.eval(fs.readFileSync('public/scripts/scp-remote-ui.js', 'utf8'));
+    return w;
+}
+const beat = () => new Promise(r => setTimeout(r, 400));   // the watcher runs every 250ms
+
+test('pressing a card in /m lands straight on the screen, with the page around it gone', async t => {
+    const w = await screen(t, '?node=abc&viewmode=11&hide=31&mobile=0&scpapp=1', 11);
+    await beat();
+    const d = w.document;
+    assert.equal(d.body.classList.contains('scp-app-view'), true, 'the screen should take the page');
+    assert.equal(d.getElementById('scp-app-bar').hidden, false, 'and say which machine it is');
+    assert.equal(d.getElementById('scp-app-device').textContent, 'test01');
+    const back = d.querySelector('.scp-app-back');
+    assert.equal(back.tagName, 'A', 'coming from the list, back is a link to the list');
+    assert.equal(back.getAttribute('href'), 'm');
+});
+
+test('pressing Desktop on the full site gets the same screen', async t => {
+    // This is the one that was wrong: no scpapp in the URL, because MeshCentral put the URL
+    // there itself, so nothing turned the app view on.
+    const w = await screen(t, '?viewmode=11&gotonode=8HPel8S1J2lXl7', 10);
+    await beat();
+    const d = w.document;
+    assert.equal(d.body.classList.contains('scp-app-view'), false, 'on the device, not the screen');
+    assert.equal(d.getElementById('scp-app-bar').hidden, true, 'so no bar yet');
+
+    w.xxcurrentView = 11;                    // pressing Desktop
+    await beat();
+    assert.equal(d.body.classList.contains('scp-app-view'), true, 'the screen should look the same either way');
+    assert.equal(d.getElementById('scp-app-bar').hidden, false);
+    assert.equal(d.getElementById('scp-app-device').textContent, 'test01');
+});
+
+test('leaving the screen gives the tabs back', async t => {
+    // Terminal, Files, Registry and Console are hidden while the screen is showing. That is
+    // the cost of asking for the screen and nothing else, so the way out has to work.
+    const w = await screen(t, '?viewmode=11&gotonode=8HPel8S1J2lXl7', 11);
+    await beat();
+    const d = w.document;
+    assert.equal(d.body.classList.contains('scp-app-view'), true);
+    const back = d.querySelector('.scp-app-back');
+    assert.equal(back.tagName, 'BUTTON', 'reached from the device, back returns to the device');
+    back.click();
+    await beat();
+    assert.equal(w.xxcurrentView, 10, 'back should leave the screen, not the machine');
+    assert.equal(d.body.classList.contains('scp-app-view'), false, 'and the page should return');
+    assert.equal(d.getElementById('scp-app-bar').hidden, true);
+});
+
+test('the chrome is hidden by the stylesheet, not by the link that opened it', () => {
+    // hide=31 only reaches the screen opened from /m; on the full site there is no query at
+    // all. Naming the elements in CSS is what makes both roads end the same.
+    const css = fs.readFileSync('public/styles/scp-remote.css', 'utf8');
+    const rule = /body\.scp-app-view :is\(([^)]*)\)\{display:none!important\}/.exec(css);
+    assert.ok(rule, 'the app view has to hide the page chrome itself');
+    for (const id of ['#masthead', '#topbar', '#footer', '#page_leftbar', '#p11title']) {
+        assert.ok(rule[1].includes(id), id + ' should go with the rest of the chrome');
+    }
+});

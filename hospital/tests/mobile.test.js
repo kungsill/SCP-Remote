@@ -520,7 +520,7 @@ test('every device is sent to the full page, which is the only one carrying this
     for (const ua of ['Chrome/140 Mobile Safari/537.36', 'Chrome/140 Safari/537.36']) {
         const r = reply();
         mobile.data(web(o), { session: { userid: 'user//admin' }, headers: { 'user-agent': ua } }, r);
-        assert.equal(r.body.nodes[0].link, '?node=abc&viewmode=11&hide=16&mobile=0', ua);
+        assert.equal(r.body.nodes[0].link, '?node=abc&viewmode=11&hide=31&mobile=0&scpapp=1', ua);
     }
 });
 
@@ -559,4 +559,59 @@ test('every control in the header can be hit with a thumb', () => {
     const size = /width: (\d+)px; height: (\d+)px/.exec(icon[0]);
     assert.ok(size && Number(size[1]) >= 44 && Number(size[2]) >= 44,
         'a 24px icon is a miss on a phone however neat it looks');
+});
+
+test('a device opens on the screen alone, with the page around it dropped', () => {
+    // By the time someone presses a card they have already chosen a machine. The masthead,
+    // the tab strip, the footer and the panel titles are all for choosing and managing
+    // devices, so the page is asked to drop them: hide is 1+2+4+8+16.
+    const o = {
+        users: { 'user//admin': admin },
+        meshes: { 'mesh//er': { _id: 'mesh//er', name: 'ER', domain: '' } },
+        rights: () => ['mesh//er'],
+        nodes: [{ _id: 'node//abc', name: 'ER 1', meshid: 'mesh//er' }]
+    };
+    const r = reply();
+    mobile.data(web(o), { session: { userid: 'user//admin' }, headers: {} }, r);
+    const hide = Number(/hide=(\d+)/.exec(r.body.nodes[0].link)[1]);
+    for (const [bit, what] of [[1, 'masthead'], [2, 'tab strip'], [4, 'footer'], [8, 'panel titles'], [16, 'left bar']]) {
+        assert.ok(hide & bit, what + ' should be hidden on a screen opened from /m');
+    }
+});
+
+test('dropping the page chrome puts back the machine name and the way out', () => {
+    // hide=31 also removes the only place the page said which computer this is, and the only
+    // way back to the list. Leaving it there would be a screen you cannot leave on a phone.
+    const link = (() => {
+        const o = {
+            users: { 'user//admin': admin },
+            meshes: { 'mesh//er': { _id: 'mesh//er', name: 'ER', domain: '' } },
+            rights: () => ['mesh//er'],
+            nodes: [{ _id: 'node//abc', name: 'ER 1', meshid: 'mesh//er' }]
+        };
+        const r = reply();
+        mobile.data(web(o), { session: { userid: 'user//admin' }, headers: {} }, r);
+        return r.body.nodes[0].link;
+    })();
+    assert.ok(/scpapp=1/.test(link), 'the flag the remote page reads');
+
+    const ui = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-remote-ui.js'), 'utf8');
+    assert.ok(/scpapp=1/.test(ui), 'scp-remote-ui.js has to act on it');
+    assert.ok(ui.includes('scp-app-bar'), 'there should be a bar');
+    assert.ok(/back\.href='m'/.test(ui), 'with a way back to the device list');
+    assert.ok(/currentNode/.test(ui), 'and the machine\'s own name on it');
+
+    const css = fs.readFileSync(path.join(__dirname, '../../public/styles/scp-remote.css'), 'utf8');
+    assert.ok(css.includes('#scp-app-bar'), 'unstyled it is three stray elements above the picture');
+    const back = /\.scp-app-back\{[^}]*\}/.exec(css);
+    assert.ok(back && /width:44px;height:44px/.test(back[0]),
+        'this is the only way out of the screen on a phone, so it has to be hittable');
+});
+
+test('connected is green here too', () => {
+    // The same question - can I reach this machine - is answered in green everywhere else.
+    const css = fs.readFileSync(path.join(__dirname, '../../public/styles/scp-remote.css'), 'utf8');
+    const live = /#scp-app-state\.is-live\{[^}]*\}/.exec(css);
+    assert.ok(live, 'the connected state needs its own colour');
+    assert.ok(/#0b8f6f/.test(live[0]), 'and it should be the green /m and the app already use');
 });

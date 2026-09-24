@@ -30,5 +30,46 @@
   body=document.createElement('div');body.className='scp-dock-content';dock.append(head,body);const host=document.getElementById('deskarea1');(host||document.body).append(dock);if(host){dock.classList.add('scp-inline');document.body.classList.add('scp-inline-tools');if(root.ResizeObserver){const resize=new ResizeObserver(layout);resize.observe(host);const viewport=document.getElementById('deskarea3x');if(viewport)resize.observe(viewport);}watchViewport();}
   const observer=new MutationObserver(()=>{const visible=Array.from(body.children).some(n=>!n.hidden);if(dock.hidden===visible)dock.hidden=!visible;document.body.classList.toggle('scp-dock-visible',visible);layout();});observer.observe(body,{attributes:true,attributeFilter:['hidden'],subtree:true,childList:true});
  }
+ // /m sends someone straight to one computer's screen. Everything the site puts around that -
+ // the masthead, the tab strip, the footer, the panel titles - is for choosing and managing
+ // devices, which they have already done, so the page is asked to drop all of it (hide=31).
+ // What that also drops is the only place the page said which machine you are looking at and
+ // the only way back, so this puts those two back and nothing else. It is the shape the
+ // Desktop App's window already has, which is the point.
+ function appView(){
+  if(!/[?&]scpapp=1(&|$)/.test(location.search))return;
+  if(document.getElementById('scp-app-bar'))return;
+  const th=document.documentElement.lang==='th';
+  document.body.classList.add('scp-app-view');
+  const bar=document.createElement('header');bar.id='scp-app-bar';
+  const back=document.createElement('a');back.href='m';back.className='scp-app-back';
+  back.setAttribute('aria-label',th?'กลับไปหน้าเลือกเครื่อง':'Back to the device list');
+  const arrow=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  arrow.setAttribute('viewBox','0 0 24 24');arrow.setAttribute('aria-hidden','true');
+  const path=document.createElementNS(arrow.namespaceURI,'path');
+  path.setAttribute('d','M19 12H5 M12 19l-7-7 7-7');arrow.appendChild(path);back.appendChild(arrow);
+  const name=document.createElement('strong');name.id='scp-app-device';
+  name.textContent=th?'กำลังเปิด…':'Opening…';
+  const state=document.createElement('span');state.id='scp-app-state';state.setAttribute('role','status');
+  bar.append(back,name,state);
+  document.body.insertBefore(bar,document.body.firstChild);
+  // The name and the connection both arrive after this runs, and the connection keeps
+  // changing, so this reads them rather than being told once.
+  let shown='',live=null;
+  setInterval(function(){
+   const node=root.currentNode;
+   if(node&&node.name&&node.name!==shown){shown=node.name;name.textContent=node.name;}
+   // 3 is connected, the same test the page makes on itself.
+   const connected=!!(root.desktop&&root.desktop.State===3);
+   if(connected!==live){
+    live=connected;
+    state.textContent=connected?(th?'เชื่อมต่อแล้ว':'Connected'):(th?'ยังไม่เชื่อมต่อ':'Not connected');
+    state.classList.toggle('is-live',connected);
+    layout();
+   }
+  },1000);
+ }
+
  root.ScpRemoteUI={mount(node){ensure();node.hidden=true;body.append(node);}};
+ appView();
 })(window);

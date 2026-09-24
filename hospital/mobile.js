@@ -107,9 +107,13 @@ exports.data = function (web, req, res) {
             // of it, which is what the blank screen turned out to be.
             //
             // mobile=0 is MeshCentral's own override, read in getRenderPage, so no upstream code
-            // has to change. hide=16 drops the left bar and the main menu for a focused view.
+            // has to change. hide=31 drops the masthead, the tab strip, the footer, the panel
+            // titles and the left bar: all of it is for choosing and managing devices, and by
+            // this point a device has been chosen. scpapp=1 is read by scp-remote-ui.js, which
+            // puts back the two things that removes - which machine, and the way back - so the
+            // screen reads the way the Desktop App's window does.
             const openLink = id =>
-                '?node=' + encodeURIComponent(String(id).split('/').pop()) + '&viewmode=11&hide=16&mobile=0';
+                '?node=' + encodeURIComponent(String(id).split('/').pop()) + '&viewmode=11&hide=31&mobile=0&scpapp=1';
             const nodes = docs.map(n => ({
                 id: n._id,
                 name: n.name || n._id,

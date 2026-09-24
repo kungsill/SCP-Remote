@@ -100,3 +100,24 @@ body.scp-inline-tools #scp-remote-dock.scp-inline #scp-recording{order:1}
 body.scp-inline-tools #scp-remote-dock.scp-inline #scp-recording>button{width:100%}
 body.scp-inline-tools #scp-remote-dock.scp-inline #scp-recording>div{position:static;width:auto;max-width:none;margin-top:10px;padding:10px!important;box-shadow:none}
 @media(max-width:850px){body.scp-inline-tools #deskarea0{padding-left:198px}body.scp-inline-tools #deskarea0>#deskarea1{width:188px}}
+
+/* The app-like remote screen, used when /m sends someone straight to one computer.
+   The page itself is asked to drop its chrome (hide=31); this is the slim bar that replaces
+   it, carrying only the three things still worth saying - which machine, whether it is
+   connected, and the way back. scp-remote-ui.js builds it. */
+body.scp-app-view #scp-app-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top));background:var(--scp-surface,#fff);border-bottom:1px solid var(--scp-line,#f0dbe6);box-sizing:border-box}
+body.scp-app-view #scp-app-bar:after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,var(--scp-accent,#b02a72),#d1428c)}
+/* 44px because this is the only way out of the screen on a phone. */
+body.scp-app-view .scp-app-back{display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:12px;border:1px solid var(--scp-line,#f0dbe6);color:var(--scp-accent,#b02a72);text-decoration:none}
+body.scp-app-view .scp-app-back:hover{background:var(--scp-soft,#fce9f3)}
+body.scp-app-view .scp-app-back svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+body.scp-app-view #scp-app-device{flex:1;min-width:0;font-size:16px;font-weight:600;color:var(--scp-ink,#2a1520);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.scp-app-view #scp-app-state{flex:none;font-size:11px;font-weight:600;padding:5px 11px;border-radius:9px;background:var(--scp-soft,#fce9f3);color:var(--scp-muted,#6d5560);white-space:nowrap}
+body.scp-app-view #scp-app-state:before{content:'\25CF';margin-right:5px}
+/* Green, because "can I reach this machine" is the same question everywhere else in here. */
+body.scp-app-view #scp-app-state.is-live{background:#e2f6ef;color:#0b8f6f}
+@media(prefers-color-scheme:dark){body.scp-app-view #scp-app-state.is-live{background:#10402f;color:#34d9a8}}
+/* Nothing above the picture but that bar. */
+body.scp-app-view #column_l{padding:0!important}
+body.scp-app-view #page_content{top:0!important}
+@media(max-width:560px){body.scp-app-view #scp-app-device{font-size:15px}}

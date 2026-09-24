@@ -47,6 +47,15 @@
  // and a deliberate one: the hospital asked for the screen and nothing else.
  function appView(){
   if(document.getElementById('scp-app-bar'))return;
+  // Only on the full site. The Desktop App loads the sharing page, which also loads this file
+  // (for the dock) and also calls its Desktop view 11 - so watching the view alone put this bar
+  // inside the app's own window, where the back arrow would have led out of the session and the
+  // machine's name never arrives at all. The app was to be left exactly as it was.
+  //
+  // Two tests rather than one, because they say different things: the sharing page is the app's
+  // and is never ours to restyle, and there is nothing to strip on a page with no chrome.
+  if(document.getElementById('LeftMenuDesktop'))return;
+  if(!document.getElementById('page_leftbar')&&!document.getElementById('masthead'))return;
   const th=document.documentElement.lang==='th';
   // Sent here from /m rather than reached from the full site. It decides where "back" goes:
   // to the device list for one, and out of the screen to the device's own tabs for the other.

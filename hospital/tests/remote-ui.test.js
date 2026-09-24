@@ -128,3 +128,37 @@ test('the chrome is hidden by the stylesheet, not by the link that opened it', (
         assert.ok(rule[1].includes(id), id + ' should go with the rest of the chrome');
     }
 });
+
+test('the Desktop App is left exactly as it was', async t => {
+    // The app loads the sharing page, which loads this same file for the dock and also calls
+    // its own Desktop view 11. Watching the view alone put the site's bar inside the app's
+    // window: a back arrow that would have led out of the session, and a machine name that
+    // never arrives because the sharing page has no currentNode. The app was to be untouched.
+    const dom = new JSDOM('<html lang="th"><body>' +
+        '<div id=LeftMenuDesktop></div><div id=LeftMenuTerminal></div><div id=LeftMenuFiles></div>' +
+        '<div id=deskarea1></div><div id=deskarea3x></div><div id=deskarea4></div>' +
+        '</body></html>', { url: 'https://remote.test/sharing', runScripts: 'outside-only' });
+    t.after(() => dom.window.close());
+    const w = dom.window;
+    w.xxcurrentView = 11;
+    w.desktop = { State: 3 };
+    w.eval(fs.readFileSync('public/scripts/scp-remote-ui.js', 'utf8'));
+    await new Promise(r => setTimeout(r, 400));
+    assert.equal(w.document.getElementById('scp-app-bar'), null, 'nothing of the site belongs in the app');
+    assert.equal(w.document.body.classList.contains('scp-app-view'), false, 'and it must not restyle the app either');
+    // The one thing this file is on that page for has to keep working.
+    assert.equal(typeof w.ScpRemoteUI.mount, 'function', 'the dock is why the app loads this at all');
+});
+
+test('a page with no site chrome is left alone', async t => {
+    // Belt and braces beside the test above, and a different statement: there is nothing to
+    // strip on a page that never had a masthead or a left bar.
+    const dom = new JSDOM('<html lang="th"><body><div id=deskarea3x></div></body></html>',
+        { url: 'https://remote.test/somewhere?scpapp=1', runScripts: 'outside-only' });
+    t.after(() => dom.window.close());
+    const w = dom.window;
+    w.xxcurrentView = 11;
+    w.eval(fs.readFileSync('public/scripts/scp-remote-ui.js', 'utf8'));
+    await new Promise(r => setTimeout(r, 400));
+    assert.equal(w.document.getElementById('scp-app-bar'), null);
+});

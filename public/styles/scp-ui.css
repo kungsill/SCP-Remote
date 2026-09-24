@@ -1,17 +1,24 @@
 /* Original SCP-Remote design, inspired by the card and navigation patterns on 21st.dev.
-   Scoped to the application shell; remote canvases and terminals retain their layout. */
+   Scoped to the application shell; remote canvases and terminals retain their layout.
+
+   Pink leads. #b02a72 is the hospital's own - the logo, and the consent box a ward computer
+   puts on screen - and it is the same value /m uses, so the two pages read as one product.
+   The neutrals are warmed to sit under it; a pink accent on cool blue-grey looks like a colour
+   that was swapped rather than a palette. Status colours are deliberately left alone: green
+   still means reachable, amber idle, red a problem, and the dashboard's own teal still means
+   a session is running right now. A status colour that follows the brand stops being one. */
 .scp-ui {
-    --scp-bg: #f5f7fa; --scp-surface: #fff; --scp-ink: #182b3a;
-    --scp-muted: #637588; --scp-line: #e1e8ef; --scp-accent: #087e83;
-    --scp-soft: #e8f5f3; --scp-shadow: 0 12px 40px #18394f0a;
+    --scp-bg: #faf6f9; --scp-surface: #fff; --scp-ink: #2a1520;
+    --scp-muted: #6d5560; --scp-line: #f0dbe6; --scp-accent: #b02a72;
+    --scp-soft: #fce9f3; --scp-shadow: 0 12px 40px #4a11340a;
     color: var(--scp-ink); background: var(--scp-bg); font-family: Sarabun, sans-serif !important;
 }
 .scp-ui.night, .scp-ui[data-bs-theme="dark"], [data-bs-theme="dark"] .scp-ui {
-    --scp-bg: #111c26; --scp-surface: #1a2835; --scp-ink: #e5edf4;
-    --scp-muted: #a4b5c4; --scp-line: #344555; --scp-accent: #79d6d0; --scp-soft: #243e46;
+    --scp-bg: #1b0f18; --scp-surface: #241825; --scp-ink: #f7e9f1;
+    --scp-muted: #c6a9b8; --scp-line: #42293e; --scp-accent: #f472b6; --scp-soft: #46172f;
 }
 .scp-ui :is(button, input, select, textarea) { font-family: Sarabun, sans-serif; }
-.scp-ui :is(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid #32aeb4 !important; outline-offset: 3px; }
+.scp-ui :is(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid #d1428c !important; outline-offset: 3px; }
 .scp-ui #masthead { background: var(--scp-surface) !important; color: var(--scp-ink); border-bottom: 1px solid var(--scp-line); box-sizing: border-box; }
 .scp-ui #masthead .title { color: var(--scp-ink); font-size: 27px; padding: 13px 0 0 20px; height: auto; letter-spacing: -.7px; }
 .scp-ui #masthead .title2 { color: var(--scp-muted); font-size: 12px; font-weight: 400; padding: 23px 0 0 14px; height: auto; }
@@ -52,10 +59,10 @@
 }
 .scp-workspace :is(#p1, #p2, #p3, #p4, #p5, #p6) :is(button, input[type="button"]):hover:not(:disabled) { background: var(--scp-soft); border-color: var(--scp-accent); }
 .scp-ui :is(button, input[type="button"], input[type="submit"]):disabled { opacity: .45; cursor: not-allowed; }
-.scp-workspace #p5UploadButton { background: #087e83 !important; color: white !important; border-color: #087e83 !important; font-weight: 600; }
+.scp-workspace #p5UploadButton { background: #b02a72 !important; color: white !important; border-color: #b02a72 !important; font-weight: 600; }
 .scp-workspace #p5DeleteFileButton:not(:disabled) { color: #bf3945; }
 .scp-workspace #p5filesubhead { background: var(--scp-surface); color: var(--scp-muted); padding: 10px; border-block: 1px solid var(--scp-line); }
-.scp-workspace .scp-files-panel { position: relative; margin: 16px 0; padding: 18px; border: 1px dashed #9dc4c5; border-radius: 12px; background: var(--scp-surface); color: var(--scp-ink); box-shadow: var(--scp-shadow); }
+.scp-workspace .scp-files-panel { position: relative; margin: 16px 0; padding: 18px; border: 1px dashed #c59db1; border-radius: 12px; background: var(--scp-surface); color: var(--scp-ink); box-shadow: var(--scp-shadow); }
 /* Leave room on the right so the help text never runs under the close button. */
 .scp-workspace .scp-files-help { font-size: 14px; color: var(--scp-muted); margin-bottom: 12px; padding-right: 34px; }
 .scp-workspace .scp-files-close { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; padding: 0; line-height: 1; font-size: 18px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--scp-muted); cursor: pointer; }
@@ -90,8 +97,8 @@
 .scp-workspace #p5files .scp-file-thumb { background-color: var(--scp-line); border: 1px solid var(--scp-line); }
 .scp-workspace #p5files .scp-file-thumb::after { content: ''; }
 .scp-workspace .scp-files-empty { padding: 46px 16px; color: var(--scp-muted); }
-.scp-ui #dialog { border: 1px solid var(--scp-line); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 80px #081a3540; }
-.scp-ui #dialog :is(#dialogtitle, .dialogtitle) { background: #087e83; color: white; }
+.scp-ui #dialog { border: 1px solid var(--scp-line); border-radius: 14px; overflow: hidden; box-shadow: 0 24px 80px #35081a40; }
+.scp-ui #dialog :is(#dialogtitle, .dialogtitle) { background: #b02a72; color: white; }
 /* Sign-in: a quiet split layout, with the original login/2FA/reset forms intact. */
 body.scp-signin { background: var(--scp-bg) !important; overflow-y: auto !important; }
 /* Stack the page as a column and let the sign-in block take the space left between the
@@ -116,7 +123,7 @@ body.scp-signin { background: var(--scp-bg) !important; overflow-y: auto !import
 .scp-intro-tags span { border: 1px solid var(--scp-line); background: var(--scp-surface); border-radius: 24px; padding: 6px 12px; font-size: 12px; color: var(--scp-muted); }
 .scp-signin #logincell { width: 46%; }
 .scp-signin :is(#loginpanel, #createpanel, #resetpanel, #tokenpanel, #resettokenpanel, #resetpasswordpanel, #checkemailpanel, #waitpushpanel) {
-    background: var(--scp-surface) !important; color: var(--scp-ink); border: 1px solid var(--scp-line); border-radius: 18px !important; box-shadow: 0 16px 60px #1734460a !important; padding: 30px !important; width: 100% !important; max-width: 420px; box-sizing: border-box; text-align: left !important;
+    background: var(--scp-surface) !important; color: var(--scp-ink); border: 1px solid var(--scp-line); border-radius: 18px !important; box-shadow: 0 16px 60px #46172f0a !important; padding: 30px !important; width: 100% !important; max-width: 420px; box-sizing: border-box; text-align: left !important;
 }
 .scp-signin form { margin: 0; }
 .scp-signin form table { width: 100%; border-spacing: 0 9px; }
@@ -128,7 +135,7 @@ body.scp-signin { background: var(--scp-bg) !important; overflow-y: auto !import
 .scp-signin form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]) {
     border: 1px solid var(--scp-line) !important; border-radius: 8px !important; background: var(--scp-bg) !important; color: var(--scp-ink); padding: 11px 12px !important; min-height: 44px; box-sizing: border-box; width: 100% !important; font-size: 16px;
 }
-.scp-signin form :is(input[type="submit"], #loginButton) { width: 100% !important; min-height: 44px; border-radius: 8px !important; border: 1px solid #087e83 !important; background: #087e83 !important; color: #fff !important; font-size: 15px; font-weight: 600; cursor: pointer; padding: 9px 14px !important; }
+.scp-signin form :is(input[type="submit"], #loginButton) { width: 100% !important; min-height: 44px; border-radius: 8px !important; border: 1px solid #b02a72 !important; background: #b02a72 !important; color: #fff !important; font-size: 15px; font-weight: 600; cursor: pointer; padding: 9px 14px !important; }
 .scp-signin form a { color: var(--scp-accent) !important; }
 .scp-signin-heading h2 { margin: 0 0 8px; font-size: 25px; font-weight: 600; }
 .scp-signin-heading p { margin: 0 0 20px; color: var(--scp-muted); font-size: 13px; }

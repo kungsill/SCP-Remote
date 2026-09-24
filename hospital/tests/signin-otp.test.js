@@ -169,7 +169,44 @@ test('the boxes are styled, and in the hospital pink', async t => {
     const css = fs.readFileSync('public/styles/scp-ui.css', 'utf8');
     assert.ok(css.includes('.scp-otp-box'), 'the boxes need styling or they are six tiny fields');
     assert.ok(/\.scp-otp-source \{ display: none/.test(css), 'and the original has to be hidden');
-    // The form sets width and padding on every input with !important, so these must answer.
-    assert.ok(/\.scp-otp-box \{[^}]*width: 46px !important/.test(css), 'otherwise they stretch full width');
+    assert.ok(/\.scp-otp-box \{[^}]*width: 46px/.test(css), 'otherwise they stretch full width');
     assert.ok(/\.scp-otp-box:focus \{[^}]*var\(--scp-accent\)/.test(css), 'focus follows the brand');
+});
+
+test('the general input rule cannot reach the code boxes', async t => {
+    // This one is written from a real failure. Every input in this form is given width:100%
+    // with !important, and five :not([type=..]) clauses put that rule at a specificity two
+    // class names cannot beat - so the boxes each took the full width and six of them ran off
+    // the side of the page. Declaring the width again, even with !important, did nothing.
+    //
+    // Checking the declaration exists is what missed it, so this compares the two selectors
+    // the way a browser does and insists the boxes are excluded outright.
+    const css = fs.readFileSync('public/styles/scp-ui.css', 'utf8');
+    const general = /\.scp-signin form input(:not\([^)]*\))+/.exec(css);
+    assert.ok(general, 'the shared input rule is no longer recognisable; re-check this by hand');
+    assert.ok(general[0].includes(':not(.scp-otp-box)'),
+        'the code boxes must be excluded from the shared input rule, not merely outrank it');
+
+    // And the exclusion has to sit on the rule that sets the width, not some other one.
+    const rule = css.slice(css.indexOf(general[0]));
+    const body = rule.slice(rule.indexOf('{'), rule.indexOf('}'));
+    assert.ok(body.includes('width: 100%'), 'this is the rule that was overriding the boxes');
+});
+
+function specificity(selector) {
+    // Enough of the real algorithm for this comparison: ids, then classes, attributes and
+    // pseudo-classes, then elements. :not() and :is() contribute their argument's weight.
+    let s = selector;
+    const ids = (s.match(/#[\w-]+/g) || []).length;
+    const classes = (s.match(/\.[\w-]+|\[[^\]]+\]|:(?!not|is|:)[\w-]+/g) || []).length;
+    const elements = (s.match(/(^|[\s>+~])[a-z]+/g) || []).length;
+    return [ids, classes, elements];
+}
+
+test('the box rule would still lose on specificity, which is why exclusion is the fix', async t => {
+    // Guards the reasoning above rather than the code: if someone removes the :not() and
+    // tries to win on weight instead, this says why that will not work.
+    const general = specificity('.scp-signin form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"])');
+    const boxes = specificity('.scp-signin .scp-otp-box');
+    assert.ok(general[1] > boxes[1], 'the shared rule carries more weight, and !important does not break the tie');
 });

@@ -132,15 +132,17 @@ body.scp-signin { background: var(--scp-bg) !important; overflow-y: auto !import
 .scp-signin .scp-login-fields, .scp-signin .scp-login-fields > tbody { display: block; width: 100%; }
 .scp-signin .scp-login-fields > tbody > tr { display: block; width: 100%; }
 .scp-signin .scp-login-fields > tbody > tr > td { display: block; width: 100%; box-sizing: border-box; }
-.scp-signin form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]) {
+/* The :not(.scp-otp-box) is load bearing. Five :not([type=..]) clauses put this rule at a
+   specificity the code boxes cannot outrank from two class names, so without it they inherit
+   width:100% and six of them run off the side of the page. */
+.scp-signin form input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not(.scp-otp-box) {
     border: 1px solid var(--scp-line) !important; border-radius: 8px !important; background: var(--scp-bg) !important; color: var(--scp-ink); padding: 11px 12px !important; min-height: 44px; box-sizing: border-box; width: 100% !important; font-size: 16px;
 }
 .scp-signin form :is(input[type="submit"], #loginButton) { width: 100% !important; min-height: 44px; border-radius: 8px !important; border: 1px solid #b02a72 !important; background: #b02a72 !important; color: #fff !important; font-size: 15px; font-weight: 600; cursor: pointer; padding: 9px 14px !important; }
 .scp-signin form a { color: var(--scp-accent) !important; }
 /* The 2FA code entry, built by scp-ui.js. Six boxes rather than one wide field, because on a
    phone the code is six taps and where you are in it should be obvious without reading back
-   what you typed. The rule above sets width and padding on every input in this form with
-   !important, so these have to answer in kind.
+   what you typed.
    MeshCentral's own input is still there and still carries the value; it is only out of sight,
    and display:none does not stop a field being submitted. */
 .scp-signin .scp-otp { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
@@ -167,6 +169,14 @@ body.scp-signin { background: var(--scp-bg) !important; overflow-y: auto !import
    whole width, and the "Login token:" cell has nothing left to say once the heading does. */
 .scp-signin :is(#tokenpanel, #resettokenpanel) td[align=right] { display: none; }
 .scp-signin :is(#tokenpanel, #resettokenpanel) :is(table, tbody, tr, td) { display: block; width: auto; }
+/* Unstacking the table leaves MeshCentral's floated button row with nothing to sit against,
+   so the rule below it climbs up alongside the button. Take the float off and the sign-in
+   button reaches full width, which is what it should be as the only action here. */
+.scp-signin :is(#tokenpanel, #resettokenpanel) td > div[style*="float"] { float: none !important; }
+.scp-signin :is(#tokenpanel, #resettokenpanel) hr { clear: both; border: 0; border-top: 1px solid var(--scp-line); margin: 20px 0 14px; }
+.scp-signin :is(#tokenpanel, #resettokenpanel) #tokenInputRememberLabel,
+.scp-signin :is(#tokenpanel, #resettokenpanel) label { display: flex; align-items: center; gap: 8px; margin: 16px 0 4px; font-size: 13px; color: var(--scp-muted); }
+.scp-signin :is(#tokenpanel, #resettokenpanel) input[type=checkbox] { margin: 0; flex: none; accent-color: var(--scp-accent); width: 17px; height: 17px; }
 @media (max-width: 400px) {
     .scp-signin .scp-otp { gap: 5px; }
     .scp-signin .scp-otp-box { width: 40px !important; height: 48px; min-height: 48px; font-size: 19px; }

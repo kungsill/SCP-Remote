@@ -61,18 +61,68 @@ test('the site and the phone page lead with the same pink', () => {
     assert.equal(of(site, '--scp-accent'), of(phone, '--brand'), 'one brand colour, not two');
 });
 
+// Colours do not only live in stylesheets. These scripts draw charts, bars and status dots by
+// writing colours straight into style properties and SVG attributes, and an earlier sweep of
+// this palette missed every one of them because it only looked at .css - so the monitor stayed
+// turquoise while the tests said the turquoise was gone. The list is derived rather than typed
+// out, so a new script is covered the day it is added.
+const SCRIPTS = fs.readdirSync(path.join(__dirname, '../../public/scripts'))
+    .filter(f => f.startsWith('scp-') && f.endsWith('.js'));
+const readScript = f => fs.readFileSync(path.join(__dirname, '../../public/scripts/', f), 'utf8');
+
+// Status colours, by name, across both stylesheets and scripts. Green says a machine can be
+// reached or a job finished, amber that something is running, red that it failed, and the
+// dashboard's teal that a session is live. None of them may follow the brand.
+const STATUS = new Set([BUSY, '#168065', '#16745c', '#6b9f72', '#0b8f6f']);
+
+function strayTeal(source, low = 165) {
+    return colours(source).filter(c => {
+        if (STATUS.has(c.slice(0, 7))) { return false; }
+        const { h, s } = hsl(c);
+        return s >= 0.10 && h >= low && h <= 205;
+    });
+}
+
 test('no turquoise survives anywhere in the fork\'s own stylesheets', () => {
     // This is the regression guard. Any teal added or restored later fails here by hue, so it
     // catches a colour nobody thought to name as well as the ones that were replaced.
     const strays = [];
-    for (const sheet of SHEETS) {
-        for (const c of colours(read(sheet))) {
-            if (c.slice(0, 7) === BUSY) { continue; }
+    for (const sheet of SHEETS) { for (const c of strayTeal(read(sheet))) { strays.push(sheet + ' ' + c); } }
+    assert.deepEqual(strays, [], 'turquoise is back in: ' + strays.join(', '));
+});
+
+test('nor in the scripts, which is where the last sweep missed it', () => {
+    const strays = [];
+    for (const script of SCRIPTS) { for (const c of strayTeal(readScript(script), 168)) { strays.push(script + ' ' + c); } }
+    assert.deepEqual(strays, [], 'turquoise is back in: ' + strays.join(', '));
+});
+
+test('the scripts lead with the same pink as everything else', () => {
+    // Not just "no teal" - the charts and bars a script paints have to actually be the brand.
+    // Not every script needs it: some draw only status colours and soft backgrounds, and
+    // demanding the accent there would be asking for a colour with nothing to say.
+    const branded = SCRIPTS.filter(f => readScript(f).toLowerCase().includes(PINK));
+    assert.ok(branded.length >= 4,
+        'only ' + branded.length + ' scripts paint anything in the brand colour: ' + branded.join(', '));
+});
+
+test('nothing a script paints is off the palette', () => {
+    // Everything drawn from JavaScript should be one of: the brand, a status colour, a neutral,
+    // or the one blue that separates the RAM line from the CPU line on the same chart.
+    const SERIES_BLUE = '#568acc';
+    const strays = [];
+    for (const script of SCRIPTS) {
+        for (const c of colours(readScript(script))) {
+            const base = c.slice(0, 7);
+            if (STATUS.has(base) || base === SERIES_BLUE) { continue; }
             const { h, s } = hsl(c);
-            if (s >= 0.10 && h >= 165 && h <= 205) { strays.push(sheet + ' ' + c); }
+            if (s < 0.10) { continue; }                       // a grey
+            if (h >= 300 || h <= 20) { continue; }            // the pink family
+            if (h >= 20 && h <= 60) { continue; }             // amber, for a warning
+            strays.push(script + ' ' + c + ' (hue ' + Math.round(h) + ')');
         }
     }
-    assert.deepEqual(strays, [], 'turquoise is back in: ' + strays.join(', '));
+    assert.deepEqual(strays, [], 'off-palette: ' + strays.join(', '));
 });
 
 test('the status colours are left alone', () => {

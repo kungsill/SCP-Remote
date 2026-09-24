@@ -13,7 +13,7 @@
 
 /* A short message that does not steal focus, so dropping files says something even
    while the file page is still asking the far end for permission. */
-.scp-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 2000; max-width: min(560px, 92vw); padding: 11px 18px; border-radius: 10px; border: 1px solid var(--scp-line, #e5d5de); background: var(--scp-surface, #fff); color: var(--scp-ink, #2a1520); font-size: 13px; line-height: 1.5; box-shadow: 0 8px 28px rgba(16, 32, 48, .18); }
+.scp-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 2000; max-width: min(560px, 92vw); padding: 11px 18px; border-radius: 10px; border: 1px solid var(--scp-line, #e5d5de); background: var(--scp-surface, #fff); color: var(--scp-ink, #2a1520); font-size: 13px; line-height: 1.5; box-shadow: 0 8px 28px rgba(42, 21, 32, .18); }
 .scp-toast[data-error="true"] { border-color: #c0392b66; color: #a93226; background: #fdf3f2; }
 
 /* The number the upload dialog never showed. */

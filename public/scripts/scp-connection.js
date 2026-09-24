@@ -32,7 +32,7 @@
         var box = document.getElementById('scpConnection');
         if (!box) {
             box = document.createElement('div'); box.id = 'scpConnection';
-            box.style.cssText = 'padding:10px 14px;background:#edf7f6;color:#164e48;border:1px solid #c8e5e1;border-radius:8px;margin:6px 0;font-size:14px;white-space:normal';
+            box.style.cssText = 'padding:10px 14px;background:#f7edf2;color:#4e1632;border:1px solid #e5c8d7;border-radius:8px;margin:6px 0;font-size:14px;white-space:normal';
             var text = document.createElement('span'); text.id = 'scpConnectionText'; text.setAttribute('role','status'); box.appendChild(text);
             var retry = document.createElement('button'); retry.id = 'scpConnectionRetry'; retry.type = 'button';
             retry.textContent = t('Retry connection','ลองเชื่อมต่อใหม่'); retry.style.cssText = 'margin-inline-start:12px;padding:5px 10px;cursor:pointer'; retry.hidden = true;

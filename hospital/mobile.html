@@ -15,7 +15,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SCP-Remote">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="styles/scp-mobile.css?v=20260924-pink">
+<link rel="stylesheet" href="styles/scp-mobile.css?v=20260924-home">
 </head>
 <body>
 <header>
@@ -25,6 +25,16 @@
   </div>
   <div class="header-tools">
     <select id="language" aria-label="Language"><option value="th">ไทย</option><option value="en">English</option></select>
+    <!-- The way to the full MeshCentral site. Device groups, moving a computer between wards
+         and adding an account all live there, and with the old "full site" link gone this is
+         the only door left. The script fills in the href, because this page is served at
+         <root>m and a bare "?m=0" would reload this page instead of leaving it. -->
+    <a id="settings" class="icon-button" href="?m=0" title="ตั้งค่าทั้งหมด" aria-label="ตั้งค่าทั้งหมด">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </a>
   </div>
 </header>
 
@@ -64,6 +74,6 @@
 </main>
 
 <footer id="footer">SCP-Remote · Hospital IT</footer>
-<script src="scripts/scp-mobile.js?v=20260924-pink"></script>
+<script src="scripts/scp-mobile.js?v=20260924-home"></script>
 </body>
 </html>

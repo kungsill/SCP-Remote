@@ -98,6 +98,15 @@ header:after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
 header b { font-size: 21px; letter-spacing: -.5px; color: var(--brand); display: block }
 header small { display: block; font-size: 11px; color: var(--ink-faint); letter-spacing: .4px; margin-top: 1px }
 .header-tools { display: flex; align-items: center; gap: 6px; flex: none }
+/* The one way out to the full site. Sized like every other target here, because a 24px icon
+   is a miss on a phone however neat it looks. */
+.icon-button {
+    display: grid; place-items: center; width: 48px; height: 48px; flex: none;
+    border: 1px solid var(--line); border-radius: 13px;
+    background: var(--surface-2); color: var(--ink-soft); text-decoration: none;
+}
+.icon-button svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round }
+.icon-button:hover { border-color: var(--brand); color: var(--brand) }
 select { padding: 10px; border: 1px solid var(--line); border-radius: 11px; min-height: 48px; background: var(--surface-2); color: var(--ink) }
 
 .content { padding: 18px 16px 30px }

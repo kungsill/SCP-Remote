@@ -40,6 +40,10 @@
 .scp-workspace #page_leftbar .lbbutton:hover { background: var(--scp-bg); color: var(--scp-ink); }
 .scp-workspace #page_leftbar :is(.lbbuttonsel, .lbbuttonsel2) { background: var(--scp-soft); color: var(--scp-accent); font-weight: 600; }
 .scp-workspace #page_leftbar .lbtg { display: none; }
+/* The way back to /m, first in the left bar. Set apart from the panels below it by a rule,
+   because it leaves this page rather than switching between parts of it. */
+.scp-workspace #page_leftbar .scp-back-to-devices { display: block; position: relative; text-decoration: none; color: var(--scp-accent); font-weight: 600; padding-bottom: 6px; margin-bottom: 10px; border-bottom: 1px solid var(--scp-line); border-radius: 9px 9px 0 0; }
+.scp-workspace #page_leftbar .scp-back-to-devices:hover { background: var(--scp-soft); }
 .scp-nav-icon { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; position: absolute; left: 15px; top: 14px; }
 .scp-nav-label { display: block; padding: 14px 8px 14px 47px; font-size: 14px; line-height: 20px; }
 .scp-workspace #page_leftbar .lbbutton { width: calc(100% - 20px); height: auto; min-height: 48px; margin: 6px 10px; }

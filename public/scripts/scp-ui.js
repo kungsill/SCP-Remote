@@ -202,6 +202,27 @@
         }
         var alternate = document.getElementById('textnewui');
         if (alternate) alternate.textContent = text('Switch interface style', 'เปลี่ยนรูปแบบหน้าจอ');
+
+        // The way back to the device list, first in the left bar where navigation already lives.
+        // Arriving on the full site sets the session to it and it stays that way, so without
+        // this the gear on /m is a one-way door: everything still works, but the page people
+        // actually use is only reachable by typing the URL.
+        var leftbar = document.getElementById('page_leftbar');
+        if (leftbar && !document.getElementById('scp-back-to-devices')) {
+            var back = document.createElement('a');
+            back.id = 'scp-back-to-devices';
+            back.href = 'm';
+            back.className = 'lbbutton scp-back-to-devices';
+            back.title = text('Back to the remote device list', 'กลับไปหน้าเลือกเครื่อง');
+            var arrow = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            arrow.setAttribute('viewBox', '0 0 24 24'); arrow.setAttribute('aria-hidden', 'true');
+            arrow.classList.add('scp-nav-icon');
+            var line = document.createElementNS(arrow.namespaceURI, 'path');
+            line.setAttribute('d', 'M19 12H5 M12 19l-7-7 7-7');
+            arrow.appendChild(line); back.appendChild(arrow);
+            back.appendChild(el('span', 'scp-nav-label', text('Remote', 'หน้ารีโมต')));
+            leftbar.insertBefore(back, leftbar.firstChild);
+        }
         // Upstream uses fixed toolbar offsets. Measure the visible shell so the
         // new heading and wrapped buttons cannot hide the bottom of a file/device list.
         if (document.getElementById('column_l')) {

@@ -54,6 +54,17 @@
         ['full', 'เว็บเต็ม', 'Full site'],
         ['consentNote', 'ทุกครั้งต้องได้รับอนุญาตจากเครื่องปลายทาง', 'Every connection needs permission on the remote computer']
         ].forEach(([id, th, en]) => { const n = $(id); if (n) n.textContent = t(th, en); });
+        // The gear is a link, so its label belongs on the title and the accessible name rather
+        // than in the page text, where it would print next to the icon.
+        const settings = $('settings');
+        if (settings) {
+            const label = t('ตั้งค่าทั้งหมด', 'All settings');
+            settings.title = label;
+            settings.setAttribute('aria-label', label);
+            // Same reason open() works this way: this page is served at <root>m, so a bare
+            // "?m=0" reloads it with the query ignored instead of leaving for the full site.
+            settings.href = siteRoot() + '?m=0';
+        }
         $('search').placeholder = t('ค้นหาชื่อเครื่อง หรือ IP', 'Search device name or IP');
         $('footer').textContent = t('SCP-Remote · Hospital IT', 'SCP-Remote · Hospital IT');
     }

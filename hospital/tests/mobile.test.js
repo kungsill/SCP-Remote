@@ -523,3 +523,40 @@ test('every device is sent to the full page, which is the only one carrying this
         assert.equal(r.body.nodes[0].link, '?node=abc&viewmode=11&hide=16&mobile=0', ua);
     }
 });
+
+test('there is one door to the full site, and it is a link', () => {
+    // Device groups, moving a computer between wards and adding an account all live on the
+    // full site. The old "full site" button was removed on purpose; this replaces it, and it
+    // has to be a real link so it can be opened in a new tab and shows where it goes.
+    const page = fs.readFileSync(mobile.pageFile, 'utf8');
+    const gear = /<a id="settings"[^>]*>/.exec(page);
+    assert.ok(gear, 'the settings link is gone, and nothing else reaches the full site');
+    assert.ok(/href="\?m=0"/.test(gear[0]), 'm=0 is what the server reads as "the full site"');
+    assert.ok(/aria-label=/.test(gear[0]), 'an icon on its own has no accessible name');
+});
+
+test('the gear is aimed at the site root, not at this page', () => {
+    // /m is served at <root>m, so a bare "?m=0" reloads this page with the query ignored -
+    // the same trap the device buttons fell into. The script rewrites it.
+    const client = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-mobile.js'), 'utf8');
+    assert.ok(/settings\.href = siteRoot\(\) \+ '\?m=0'/.test(client));
+});
+
+test('the full site offers a way back, so the gear is not a one-way door', () => {
+    // Visiting the full site pins the session to it. Without this the only way back to the
+    // page people actually use is typing the URL.
+    const ui = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-ui.js'), 'utf8');
+    assert.ok(ui.includes('scp-back-to-devices'), 'the full site needs a link back to /m');
+    assert.ok(/back\.href = 'm'/.test(ui), 'and it should point at /m');
+    const css = fs.readFileSync(path.join(__dirname, '../../public/styles/scp-ui.css'), 'utf8');
+    assert.ok(css.includes('.scp-back-to-devices'), 'unstyled it reads as a stray link in the nav');
+});
+
+test('every control in the header can be hit with a thumb', () => {
+    const css = fs.readFileSync(cssFile, 'utf8');
+    const icon = /\.icon-button \{[^}]*\}/.exec(css);
+    assert.ok(icon, 'the gear needs its own rule');
+    const size = /width: (\d+)px; height: (\d+)px/.exec(icon[0]);
+    assert.ok(size && Number(size[1]) >= 44 && Number(size[2]) >= 44,
+        'a 24px icon is a miss on a phone however neat it looks');
+});

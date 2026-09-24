@@ -1,65 +1,75 @@
-/* The /m device picker. Laid out for a phone first: wards scroll sideways instead of taking a
-   sidebar, cards fall to one column, and every target a finger has to hit is at least 44px.
+/* The /m device picker.
 
-   Colours are the hospital's own: the turquoise of the site, the pink of the logo and the agent
-   consent box (#B02A72), and the green it already uses for a healthy state. An earlier version
-   used only the turquoise, muted, and came out grey and flat - especially in the dark scheme,
-   where the cards, the chips and the refresh button were all the same slab of grey.
+   Pink leads. #b02a72 is the hospital's own - the logo, and the consent box a ward computer
+   puts on screen - so the page and the thing it asks permission for now look like each other.
+   Turquoise stays as the quieter second colour and green keeps its one job, saying a machine
+   is reachable; a status colour that drifts with the theme stops being a status colour.
 
-   Sarabun is loaded rather than merely named; it ships with the server, and without these rules
-   Thai fell back to whatever the phone had. */
+   Phone first: wards scroll sideways instead of taking a sidebar, cards fall to one column,
+   and anything a finger has to hit is at least 48px.
+
+   Sarabun is loaded rather than merely named; it ships with the server, and without these
+   rules Thai falls back to whatever the phone happens to have. */
 @font-face { font-family: Sarabun; src: url(../fonts/sarabun/Sarabun-Regular.ttf) format('truetype'); font-weight: 400; font-display: swap }
 @font-face { font-family: Sarabun; src: url(../fonts/sarabun/Sarabun-SemiBold.ttf) format('truetype'); font-weight: 600; font-display: swap }
 @font-face { font-family: Sarabun; src: url(../fonts/sarabun/Sarabun-Bold.ttf) format('truetype'); font-weight: 700; font-display: swap }
 
 :root {
     color-scheme: light dark;
-    --bg: linear-gradient(155deg, #eefaf9 0%, #f4f7fd 45%, #fdf2f8 100%);
+    --bg: linear-gradient(165deg, #fff5fa 0%, #fdf4f8 40%, #f4f8fb 100%);
     --surface: #fff;
-    --surface-2: #fff;
-    --line: #dbe8ee;
-    --line-soft: #edf3f6;
-    --ink: #17323f;
-    --ink-soft: #5e7686;
-    --ink-faint: #8099a6;
-    --brand: #07828a;
-    --brand-bright: #0aa3ad;
-    --brand-deep: #125c63;
-    --brand-wash: #dff3f3;
-    --pink: #b02a72;
-    --pink-wash: #fbe8f2;
-    --green: #0e9c89;
-    --green-wash: #e2f6f0;
-    --field: #f6fafb;
-    --shadow: 0 6px 20px #10404e14;
-    --shadow-soft: 0 2px 14px #10404e0d;
-    --glow: 0 6px 18px #07828a26;
+    --surface-2: #fdf7fa;
+    --line: #f0dbe6;
+    --line-soft: #f7ebf1;
+    --ink: #2a1520;
+    --ink-soft: #6d5560;
+    --ink-faint: #9a8189;
+
+    --brand: #b02a72;
+    --brand-bright: #d1428c;
+    --brand-deep: #8a1f59;
+    --brand-wash: #fce9f3;
+    --on-brand: #fff;
+
+    --teal: #07828a;
+    --teal-wash: #e2f4f4;
+    --green: #0b8f6f;
+    --green-wash: #e2f6ef;
+
+    --field: #fdf8fa;
+    --shadow: 0 8px 24px #4a11341a;
+    --shadow-soft: 0 2px 14px #4a113412;
+    --glow: 0 8px 20px #b02a7240;
+    --radius: 18px;
 }
-/* Wards are dark at night and a phone at full brightness is unkind to everyone in the room.
-   The surfaces keep a blue-green cast rather than going grey, and the accents get brighter,
-   not dimmer - a dark theme that drains the colour out is what made this look lifeless. */
+/* Wards are dark at night. The pink is lifted rather than dimmed - a dark theme that drains
+   the colour out is exactly what made an earlier version of this look lifeless. */
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg: linear-gradient(160deg, #0b1b22 0%, #0e1a26 55%, #1a1220 100%);
-        --surface: #15262f;
-        --surface-2: #192c36;
-        --line: #2b4653;
-        --line-soft: #243b46;
-        --ink: #eaf4f7;
-        --ink-soft: #a7c0cb;
-        --ink-faint: #8aa5b1;
-        --brand: #2ec7d0;
-        --brand-bright: #45dde6;
-        --brand-deep: #8fe6ec;
-        --brand-wash: #10414a;
-        --pink: #f472b6;
-        --pink-wash: #3d1b30;
-        --green: #34d9b5;
-        --green-wash: #10403a;
-        --field: #101f28;
-        --shadow: 0 6px 20px #0007;
-        --shadow-soft: 0 2px 14px #0005;
-        --glow: 0 6px 20px #2ec7d033;
+        --bg: linear-gradient(165deg, #1b0f18 0%, #180f16 40%, #131820 100%);
+        --surface: #241825;
+        --surface-2: #2c1d2d;
+        --line: #42293e;
+        --line-soft: #372234;
+        --ink: #f7e9f1;
+        --ink-soft: #c6a9b8;
+        --ink-faint: #a98da0;
+
+        --brand: #f472b6;
+        --brand-bright: #fb93cb;
+        --brand-deep: #ffc4e2;
+        --brand-wash: #46172f;
+        --on-brand: #2a0a1b;
+
+        --teal: #3fc9d1;
+        --teal-wash: #123c40;
+        --green: #34d9a8;
+        --green-wash: #10402f;
+
+        --field: #1a1019;
+        --shadow: 0 8px 24px #0008;
+        --shadow-soft: 0 2px 14px #0006;
+        --glow: 0 8px 22px #f472b63d;
     }
 }
 
@@ -70,7 +80,7 @@ body {
     -webkit-text-size-adjust: 100%; min-height: 100vh;
 }
 button, input, select { font: inherit }
-button { cursor: pointer; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink); padding: 11px 15px; min-height: 44px }
+button { cursor: pointer; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); color: var(--ink); padding: 12px 16px; min-height: 48px }
 button:disabled { opacity: .4; cursor: default }
 button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--brand-bright); outline-offset: 2px }
 [hidden] { display: none !important }
@@ -82,71 +92,66 @@ header {
     background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: var(--shadow-soft);
     position: sticky; top: 0; z-index: 5;
 }
-/* A thread of the hospital's three colours, so the top of the page is not a plain grey edge. */
-header:after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: linear-gradient(90deg, var(--brand), var(--green) 45%, var(--pink)) }
+header:after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: linear-gradient(90deg, var(--brand), var(--brand-bright) 55%, var(--teal)) }
 .brand { display: flex; align-items: center; gap: 11px; min-width: 0 }
-.brand img { width: 40px; height: 40px; flex: none; border-radius: 11px }
-header b { font-size: 20px; letter-spacing: -.5px; color: var(--brand-deep); display: block }
+.brand img { width: 42px; height: 42px; flex: none; border-radius: 13px }
+header b { font-size: 21px; letter-spacing: -.5px; color: var(--brand); display: block }
 header small { display: block; font-size: 11px; color: var(--ink-faint); letter-spacing: .4px; margin-top: 1px }
 .header-tools { display: flex; align-items: center; gap: 6px; flex: none }
-.header-tools a { font-size: 12px; color: var(--brand); text-decoration: none; padding: 11px 8px; font-weight: 600 }
-select { padding: 9px; border: 1px solid var(--line); border-radius: 9px; min-height: 44px; background: var(--surface-2); color: var(--ink) }
+select { padding: 10px; border: 1px solid var(--line); border-radius: 11px; min-height: 48px; background: var(--surface-2); color: var(--ink) }
 
-.content { padding: 18px 16px 28px }
+.content { padding: 18px 16px 30px }
 .heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px }
 .eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 2px; color: var(--brand) }
-h1 { font-size: 23px; margin: 7px 0 0; letter-spacing: -.3px; font-weight: 700 }
+h1 { font-size: 24px; margin: 7px 0 0; letter-spacing: -.4px; font-weight: 700 }
 .heading p { margin-top: 7px; font-size: 13px }
-/* Compact and branded. A full-width grey slab was the heaviest thing on the screen. */
-#refresh { flex: none; background: var(--brand-wash); color: var(--brand-deep); border-color: transparent; font-weight: 600; padding: 11px 18px }
+#refresh { flex: none; background: var(--brand-wash); color: var(--brand-deep); border-color: transparent; font-weight: 600 }
 
 .fleet-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0 }
-.fleet-summary article { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--line); padding: 14px; border-radius: 16px; box-shadow: var(--shadow-soft) }
+.fleet-summary article { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--line); padding: 15px 14px; border-radius: var(--radius); box-shadow: var(--shadow-soft) }
 .fleet-summary article:before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px }
 .fleet-summary span { display: block; font-size: 11px; color: var(--ink-faint) }
-.fleet-summary strong { display: block; font-size: 26px; line-height: 1.35; font-weight: 700 }
-/* One colour each, so the three numbers are told apart at a glance rather than read. */
+.fleet-summary strong { display: block; font-size: 27px; line-height: 1.3; font-weight: 700 }
+/* Pink leads, green keeps the one job of saying a machine can be reached, turquoise follows. */
+.fleet-summary article:nth-child(1) { background: linear-gradient(155deg, var(--brand-wash), var(--surface) 72%) }
 .fleet-summary article:nth-child(1):before { background: var(--brand) }
-.fleet-summary article:nth-child(1) strong { color: var(--brand-deep) }
-.fleet-summary article:nth-child(2) { background: linear-gradient(150deg, var(--green-wash), var(--surface) 70%) }
+.fleet-summary article:nth-child(1) strong { color: var(--brand) }
 .fleet-summary article:nth-child(2):before { background: var(--green) }
 .fleet-summary article:nth-child(2) strong { color: var(--green) }
-.fleet-summary article:nth-child(3) { background: linear-gradient(150deg, var(--pink-wash), var(--surface) 70%) }
-.fleet-summary article:nth-child(3):before { background: var(--pink) }
-.fleet-summary article:nth-child(3) strong { color: var(--pink) }
+.fleet-summary article:nth-child(3):before { background: var(--teal) }
+.fleet-summary article:nth-child(3) strong { color: var(--teal) }
 
-h3 { font-size: 12px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .7px; margin: 18px 0 8px; font-weight: 600 }
+h3 { font-size: 12px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .8px; margin: 20px 0 9px; font-weight: 600 }
 #rooms { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; -webkit-overflow-scrolling: touch; scrollbar-width: thin }
-#rooms button { flex: none; border-radius: 12px; padding: 10px 15px; color: var(--ink-soft); white-space: nowrap; background: var(--surface-2) }
-#rooms button.active { background: linear-gradient(120deg, var(--brand), var(--brand-bright)); color: #fff; font-weight: 600; border-color: transparent; box-shadow: var(--glow) }
+#rooms button { flex: none; border-radius: 14px; padding: 11px 16px; color: var(--ink-soft); white-space: nowrap; background: var(--surface-2) }
+#rooms button.active { background: linear-gradient(120deg, var(--brand), var(--brand-bright)); color: var(--on-brand); font-weight: 600; border-color: transparent; box-shadow: var(--glow) }
 #rooms b { font-weight: 600 }
 #rooms .count { margin-left: 8px; font-size: 11px; color: var(--ink-faint) }
-#rooms button.active .count { color: #ffffffcc }
+#rooms button.active .count { color: var(--on-brand); opacity: .82 }
 
 .tools { display: flex; gap: 10px; margin: 16px 0 10px; flex-wrap: wrap }
-.tools input { flex: 1; min-width: 180px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink) }
-.tools > div { display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 13px }
-.tools > div button { border: 0; background: transparent; color: var(--ink-soft); min-height: 40px }
+.tools input { flex: 1; min-width: 180px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink) }
+.tools > div { display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 15px }
+.tools > div button { border: 0; background: transparent; color: var(--ink-soft); min-height: 42px }
 .tools > div button[aria-pressed=true] { background: var(--brand-wash); color: var(--brand-deep); font-weight: 600 }
 
 #status, #mapNote { font-size: 12px; min-height: 18px; color: var(--ink-soft); margin: 0 0 14px }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 14px }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 14px }
 .device {
-    min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 17px;
-    background: var(--surface); box-shadow: var(--shadow);
-    position: relative; overflow: hidden;
+    min-width: 0; padding: 19px; border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--surface); box-shadow: var(--shadow); position: relative; overflow: hidden;
 }
-/* A live machine gets a turquoise edge; one that cannot be reached gets nothing and steps back. */
-.device:before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, var(--brand), var(--green)) }
-.device.is-offline { opacity: .55 }
+.device:before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, var(--brand), var(--brand-bright)) }
+/* A computer that cannot be reached should not compete with the ones that can. */
+.device.is-offline { opacity: .5 }
 .device.is-offline:before { background: var(--line) }
-.device h3 { font-size: 17px; margin: 13px 0 0; color: var(--ink); text-transform: none; letter-spacing: 0; font-weight: 700 }
-.device p { font-size: 12px; margin: 5px 0; color: var(--pink); font-weight: 600 }
-.device code { display: block; font: 12px Consolas, monospace; color: var(--ink-faint); margin: 8px 0 16px; padding: 9px 11px; background: var(--field); border-radius: 9px; border: 1px solid var(--line-soft) }
-.device button { width: 100%; min-height: 48px }
-.primary { background: linear-gradient(120deg, var(--brand), var(--brand-bright)); color: #fff; border-color: transparent; font-weight: 700; box-shadow: var(--glow) }
-.online, .offline { display: inline-block; padding: 5px 10px; border-radius: 8px; font-size: 10px; font-weight: 600 }
+.device h3 { font-size: 18px; margin: 13px 0 0; color: var(--ink); text-transform: none; letter-spacing: 0; font-weight: 700 }
+.device p { font-size: 12px; margin: 5px 0; color: var(--brand); font-weight: 600 }
+.device code { display: block; font: 12px Consolas, monospace; color: var(--ink-faint); margin: 9px 0 17px; padding: 9px 11px; background: var(--field); border-radius: 10px; border: 1px solid var(--line-soft) }
+.device button { width: 100%; min-height: 50px }
+.primary { background: linear-gradient(120deg, var(--brand), var(--brand-bright)); color: var(--on-brand); border-color: transparent; font-weight: 700; box-shadow: var(--glow); font-size: 16px }
+.online, .offline { display: inline-block; padding: 5px 11px; border-radius: 9px; font-size: 10px; font-weight: 700; letter-spacing: .3px }
 .online { background: var(--green-wash); color: var(--green) }
 .offline { background: var(--field); color: var(--ink-faint) }
 .online:before, .offline:before { content: '●'; margin-right: 6px }
@@ -154,34 +159,34 @@ h3 { font-size: 12px; color: var(--ink-faint); text-transform: uppercase; letter
 .skeleton { pointer-events: none }
 .skeleton:before { background: var(--line) }
 .skeleton .bar { height: 12px; border-radius: 6px; background: var(--line); margin: 12px 0 }
-.skeleton .bar.title { height: 17px; width: 62%; margin-top: 16px }
+.skeleton .bar.title { height: 18px; width: 62%; margin-top: 16px }
 .skeleton .bar.room { width: 40% }
-.skeleton .bar.ip { height: 32px; margin: 10px 0 16px }
-.skeleton .bar.action { height: 48px; border-radius: 11px; margin: 0 }
+.skeleton .bar.ip { height: 33px; margin: 10px 0 17px }
+.skeleton .bar.action { height: 50px; border-radius: 13px; margin: 0 }
 @media (prefers-reduced-motion: no-preference) {
     .skeleton .bar { animation: pulse 1.4s ease-in-out infinite }
     @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .45 } }
 }
 
 .map {
-    display: grid; grid-auto-columns: 215px; grid-auto-rows: minmax(205px, auto); gap: 14px;
-    overflow: auto; padding: 12px; border-radius: 14px;
+    display: grid; grid-auto-columns: 225px; grid-auto-rows: minmax(210px, auto); gap: 14px;
+    overflow: auto; padding: 12px; border-radius: var(--radius);
     background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 16px 16px;
 }
-#consentNote { font-size: 12px; color: var(--ink-faint); margin-top: 22px; line-height: 1.8; padding-left: 12px; border-left: 3px solid var(--pink) }
+#consentNote { font-size: 12px; color: var(--ink-faint); margin-top: 24px; line-height: 1.8; padding-left: 13px; border-left: 3px solid var(--brand) }
 footer { padding: 14px 16px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 11px; color: var(--ink-faint); border-top: 1px solid var(--line); background: var(--surface) }
 
 @media (max-width: 560px) {
     .grid { grid-template-columns: 1fr }
-    h1 { font-size: 21px }
+    h1 { font-size: 22px }
     .fleet-summary { gap: 8px }
-    .fleet-summary article { padding: 12px 11px }
-    .fleet-summary strong { font-size: 23px }
-    .brand img { width: 36px; height: 36px }
+    .fleet-summary article { padding: 13px 11px }
+    .fleet-summary strong { font-size: 24px }
+    .brand img { width: 38px; height: 38px }
 }
-@media (min-width: 900px) { .content { max-width: 1100px; margin: 0 auto; padding: 26px 24px 34px } }
+@media (min-width: 900px) { .content { max-width: 1120px; margin: 0 auto; padding: 28px 24px 36px } }
 @media (prefers-reduced-motion: no-preference) {
     .device { transition: box-shadow .18s, transform .18s }
-    .device:active { transform: scale(.995) }
+    .device:active { transform: scale(.994) }
     #rooms button, .primary { transition: background .15s, box-shadow .18s }
 }

@@ -346,17 +346,34 @@ test('the page and its stylesheet agree on the version, so a phone picks changes
     assert.equal(versions[0], versions[1], 'and the same one, or half the change lands');
 });
 
-test('the palette uses the hospital colours, not turquoise alone', () => {
-    // Only the muted turquoise is what made this come out grey and flat the first time.
-    // #b02a72 is the pink of the logo and the consent box the ward computer shows.
+test('pink leads, and it is the hospital\'s own pink', () => {
+    // #b02a72 is the logo, and the consent box a ward computer puts on screen. Using it as the
+    // primary makes the page and the thing it asks permission for look like each other.
     const css = fs.readFileSync(cssFile, 'utf8');
     const light = css.split('@media (prefers-color-scheme: dark)')[0];
-    assert.ok(/--pink:/.test(light) && /--green:/.test(light), 'pink and green belong in the palette');
-    assert.ok(light.toLowerCase().includes('#b02a72'), 'the pink should be the hospital\'s own');
-    for (const name of ['--brand', '--pink', '--green', '--surface', '--ink']) {
+    assert.ok(/--brand:\s*#b02a72/i.test(light), 'the primary should be the hospital pink');
+    assert.ok(/--teal:/.test(light) && /--green:/.test(light), 'with turquoise and green behind it');
+    for (const name of ['--brand', '--teal', '--green', '--surface', '--ink', '--on-brand']) {
         const dark = css.split('@media (prefers-color-scheme: dark)')[1] || '';
         assert.ok(dark.includes(name + ':'), name + ' must be restated for the dark scheme');
     }
+});
+
+test('the dark scheme lifts the pink rather than dimming it', () => {
+    // Draining the colour out is what made an earlier dark theme look lifeless.
+    const css = fs.readFileSync(cssFile, 'utf8');
+    const value = s => { const m = /--brand:\s*#([0-9a-f]{6})/i.exec(s); return m ? parseInt(m[1], 16) : 0; };
+    const light = value(css.split('@media (prefers-color-scheme: dark)')[0]);
+    const dark = value(css.split('@media (prefers-color-scheme: dark)')[1] || '');
+    assert.ok(dark > light, 'the dark scheme\'s pink should be the brighter of the two');
+});
+
+test('every colour is a variable, so the dark scheme can actually replace them', () => {
+    // A literal left in a rule survives into dark mode and glares.
+    const css = fs.readFileSync(cssFile, 'utf8');
+    const body = css.slice(css.indexOf('* { box-sizing'));
+    const literals = [...body.matchAll(/#[0-9a-f]{3,8}\b/gi)].map(m => m[0]);
+    assert.deepEqual(literals, [], 'these belong in :root: ' + literals.join(', '));
 });
 
 test('the three fleet numbers are told apart by colour', () => {

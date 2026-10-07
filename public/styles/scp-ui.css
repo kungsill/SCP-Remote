@@ -248,3 +248,654 @@ body.scp-signin { background: var(--scp-bg) !important; overflow-y: auto !import
 .scpLiveScreens { float: left; height: 32px; line-height: 30px; margin-right: 10px; padding: 0 14px; border: 1px solid var(--scp-line); border-radius: 8px; background: var(--scp-surface); color: var(--scp-ink); font-size: 13px; white-space: nowrap; cursor: pointer; }
 .scpLiveScreens:hover { background: var(--scp-soft); }
 .scpLiveScreensOn { border-color: var(--scp-accent); background: var(--scp-accent); color: #fff; }
+
+/* ==========================================================================
+   SCP-Remote: Hardware Details (รายละเอียดเครื่อง #p17) - Modern Card Layout
+   ========================================================================== */
+
+#p17 {
+    margin-left: 0 !important;
+}
+
+#p17title {
+    margin-left: 0 !important;
+    max-width: 1040px;
+    margin: 0 auto 14px !important;
+    padding: 0 16px;
+}
+
+#p17title h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+#p17info {
+    overflow-y: auto;
+    padding: 12px 16px 48px;
+    background: #f8fafc;
+}
+
+#p17info2 {
+    max-width: 1040px;
+    margin: 0 auto;
+}
+
+/* Hero Summary Card */
+.scp-detail-hero-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+    border: 1px solid #cbd5e1;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 22px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+}
+
+.scp-detail-hero-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.scp-hero-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #fce7f3;
+    color: #be185d;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+}
+
+.scp-hero-title {
+    margin: 0 0 4px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.scp-hero-sub {
+    margin: 0;
+    font-size: 14px;
+    color: #64748b;
+}
+
+.scp-hero-score {
+    text-align: right;
+    padding: 10px 18px;
+    border-radius: 12px;
+    background: #f1f5f9;
+}
+
+.scp-hero-score.good { background: #ecfdf5; border: 1px solid #a7f3d0; }
+.scp-hero-score.fair { background: #eff6ff; border: 1px solid #bfdbfe; }
+.scp-hero-score.risk { background: #fef2f2; border: 1px solid #fecaca; }
+
+.scp-score-num {
+    font-size: 30px;
+    font-weight: 800;
+    color: #059669;
+}
+
+.scp-hero-score.fair .scp-score-num { color: #2563eb; }
+.scp-hero-score.risk .scp-score-num { color: #dc2626; }
+
+.scp-score-lbl {
+    display: block;
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.scp-score-yr {
+    display: block;
+    margin-top: 4px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.scp-hero-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 14px;
+}
+
+.scp-hero-cell {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.scp-h-label {
+    display: block;
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.scp-h-val {
+    display: block;
+    font-size: 14px;
+    color: #0f172a;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.scp-h-val.ok { color: #16a34a; }
+.scp-h-val.warn { color: #d97706; }
+.scp-h-val.risk { color: #dc2626; }
+
+/* Detail Section Cards */
+.scp-detail-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    padding: 20px 24px !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+}
+
+.scp-detail-card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.scp-detail-card-icon {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+    border-radius: 10px;
+    padding: 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.scp-detail-card-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.scp-detail-card-body {
+    padding-left: 4px;
+}
+
+/* Detail Table Key-Value Rows (No more 1500px void!) */
+#p17info2 table {
+    width: 100% !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    margin: 0 0 2px 0 !important;
+}
+
+#p17info2 table td {
+    padding: 6px 0 !important;
+    border-bottom: 1px solid #f8fafc !important;
+}
+
+#p17info2 table td:first-child,
+#p17info2 .scp-detail-label {
+    width: 220px !important;
+    min-width: 180px !important;
+    max-width: 260px !important;
+    color: #64748b !important;
+    font-weight: 600 !important;
+    font-size: 13.5px !important;
+    text-align: left !important;
+    padding-right: 16px !important;
+    vertical-align: top !important;
+}
+
+#p17info2 table td:last-child,
+#p17info2 .scp-detail-value {
+    text-align: left !important;
+    color: #0f172a !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    vertical-align: top !important;
+    word-break: break-word !important;
+}
+
+/* Sub-device blocks (Memory banks, Disks, Volumes) */
+#p17info2 .style10 {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    padding: 14px 18px !important;
+    margin: 12px 0 !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+}
+
+#p17info2 .style10 > div:first-child b {
+    display: inline-block !important;
+    color: #1d4ed8 !important;
+    font-size: 14.5px !important;
+    font-weight: 700 !important;
+    margin-bottom: 8px !important;
+    background: #eff6ff !important;
+    padding: 3px 10px !important;
+    border-radius: 6px !important;
+    border: 1px solid #dbeafe !important;
+}
+
+/* Asset & Procurement Bar in Hero Card */
+.scp-hero-asset-bar {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px dashed #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.scp-asset-items {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.scp-asset-chip {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.scp-asset-lbl {
+    font-size: 12.5px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.scp-asset-val {
+    font-size: 13.5px;
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.scp-asset-edit-btn {
+    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+    color: #ffffff !important;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(225, 29, 72, 0.25);
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.scp-asset-edit-btn:hover {
+    background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+    box-shadow: 0 4px 8px rgba(225, 29, 72, 0.35);
+    transform: translateY(-1px);
+}
+
+/* Badge for Dashboard Device Table */
+.scp-badge-asset {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #fdf2f8;
+    color: #be185d;
+    border: 1px solid #fbcfe8;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-right: 6px;
+}
+
+.scp-badge-asset:hover {
+    background: #fce7f3;
+    border-color: #f472b6;
+    color: #9d174d;
+}
+
+.scp-badge-asset.empty {
+    background: #f1f5f9;
+    color: #64748b;
+    border-color: #cbd5e1;
+    font-weight: 500;
+}
+
+/* Modal Overlay & Box */
+.scp-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: scpFadeIn 0.15s ease-out;
+}
+
+@keyframes scpFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.scp-modal-box {
+    background: #ffffff;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    animation: scpPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scpPopIn {
+    from { transform: scale(0.96) translateY(8px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.scp-modal-header {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 18px 24px 14px;
+}
+
+.scp-modal-header h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.scp-modal-subtitle {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.scp-modal-body {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.scp-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.scp-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.scp-form-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+}
+
+.scp-form-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: #0f172a;
+    background: #ffffff;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.scp-form-input:focus {
+    border-color: #f43f5e;
+    box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.15);
+}
+
+.scp-modal-footer {
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    padding: 14px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.scp-btn-cancel {
+    background: #ffffff;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.scp-btn-cancel:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.scp-btn-save {
+    background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(225, 29, 72, 0.2);
+    transition: all 0.15s ease;
+}
+
+.scp-btn-save:hover {
+    background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+    box-shadow: 0 4px 8px rgba(225, 29, 72, 0.3);
+}
+
+.scp-btn-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
+   RealVNC-Style Floating Control Toolbar for Remote Desktop (p11)
+   Modeled after RealVNC Connect Viewer 8.5.0
+   ========================================================================== */
+#vncFloatingToolbar {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    background: rgba(24, 32, 47, 0.94);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 30px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+    user-select: none;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#vncFloatingToolbar.unpinned {
+    top: -46px;
+    opacity: 0.25;
+}
+
+#vncFloatingToolbar.unpinned:hover,
+#vncFloatingToolbarTrigger:hover + #vncFloatingToolbar {
+    top: 10px;
+    opacity: 1;
+}
+
+#vncFloatingToolbarTrigger {
+    position: absolute;
+    top: 0;
+    left: 30%;
+    right: 30%;
+    height: 18px;
+    z-index: 9999;
+    cursor: pointer;
+}
+
+.vnc-tb-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 10px;
+    margin-right: 4px;
+    border-right: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.vnc-tb-logo {
+    width: 20px;
+    height: 20px;
+    vertical-align: middle;
+}
+
+.vnc-tb-title-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.vnc-tb-devname {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    max-width: 170px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.vnc-tb-devip {
+    color: #94a3b8;
+    font-size: 10.5px;
+    font-family: monospace;
+    line-height: 1.2;
+}
+
+.vnc-tb-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.vnc-tb-status-dot.disconnected {
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+}
+
+.vnc-tb-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #f1f5f9;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.vnc-tb-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.vnc-tb-btn:active {
+    transform: translateY(1px);
+}
+
+.vnc-tb-btn img {
+    width: 15px;
+    height: 15px;
+    filter: brightness(0) invert(1);
+    vertical-align: middle;
+}
+
+.vnc-tb-btn.disconnect {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    border-color: #ef4444;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.vnc-tb-btn.disconnect:hover {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    box-shadow: 0 0 12px rgba(220, 38, 38, 0.5);
+}
+
+.vnc-tb-btn.disconnect img {
+    filter: none;
+}
+
+.vnc-tb-btn.cad {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.5);
+    color: #fbbf24;
+}
+
+.vnc-tb-btn.cad:hover {
+    background: rgba(245, 158, 11, 0.35);
+    color: #ffffff;
+}
+
+.vnc-tb-btn.cad img {
+    filter: none;
+}
+
+.vnc-tb-btn.pin {
+    padding: 6px 8px;
+    border-radius: 50%;
+}
+

@@ -73,6 +73,7 @@
     <script defer src="{{{domainurl}}}scripts/scp-care-center.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-care.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-operations.css" />
+    <script defer src="{{{domainurl}}}scripts/scp-assess.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-dashboard.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-transfer.css" />
     <script defer src="{{{domainurl}}}scripts/scp-transfer.js"></script>
@@ -817,6 +818,44 @@
                         </div>
                     </div>
                     <div id=deskarea3x>
+                        <div id="vncFloatingToolbarTrigger"></div>
+                        <div id="vncFloatingToolbar">
+                            <div class="vnc-tb-brand">
+                                <img src="images/vnc/icn_rvnc_logo.svg" class="vnc-tb-logo" alt="RealVNC" />
+                                <div class="vnc-tb-title-group">
+                                    <span id="vncDevName" class="vnc-tb-devname">Remote Device</span>
+                                    <span id="vncDevIp" class="vnc-tb-devip">Connecting...</span>
+                                </div>
+                                <span id="vncStatusDot" class="vnc-tb-status-dot"></span>
+                            </div>
+                            <button type="button" class="vnc-tb-btn cad" onclick="deskSendCADDirect()" title="Ctrl+Alt+Del">
+                                <img src="images/vnc/icn_key_combo.svg" alt="" />
+                                <span>Ctrl+Alt+Del</span>
+                            </button>
+                            <button type="button" class="vnc-tb-btn" onclick="deskToggleFull(event)" title="Full Screen">
+                                <img src="images/vnc/da_summary_general.svg" alt="" />
+                                <span>Full Screen</span>
+                            </button>
+                            <button type="button" class="vnc-tb-btn" onclick="toggleAspectRatio(1)" title="Scaling / View Mode">
+                                <img src="images/vnc/icn_manage.svg" alt="" />
+                                <span>Scale</span>
+                            </button>
+                            <button type="button" class="vnc-tb-btn" onclick="showDeskClip()" title="Clipboard">
+                                <img src="images/vnc/da_summary_options.svg" alt="" />
+                                <span>Clipboard</span>
+                            </button>
+                            <button type="button" class="vnc-tb-btn" onclick="vncRebootDevice()" title="Reboot Remote Computer">
+                                <img src="images/vnc/icn_reboot.svg" alt="" />
+                                <span>Reboot</span>
+                            </button>
+                            <button type="button" class="vnc-tb-btn disconnect" onclick="connectDesktop(event, 0)" title="Disconnect Remote Session">
+                                <img src="images/vnc/icn_end_conn.svg" alt="" />
+                                <span>Disconnect</span>
+                            </button>
+                            <button type="button" class="vnc-tb-btn pin" onclick="vncTogglePinToolbar()" title="Pin/Unpin Toolbar">
+                                📌
+                            </button>
+                        </div>
                         <div id="p11bigok" style="display:none"><b>&checkmark;</b></div>
                         <div id="p11bigfail" style="display:none"><b>&#10007;</b></div>
                         <div id=DeskFocus oncontextmenu="return false" onmousedown=dmousedown(event) onmouseup=dmouseup(event) onmousemove=dmousemove(event)></div>
@@ -8309,18 +8348,14 @@
 
                 // Show or hide the tabs
                 // mesh.mtype: 1 = Intel AMT only, 2 = Mesh Agent, 3 = Local Device
-                // node.agent.caps (bitmask): 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console
-                QV('MainDevDesktop', desktopAccess && ((((node.agent == null) && (node.intelamt != null) && ((typeof node.intelamt.sku !== 'number') || ((node.intelamt.sku & 8) != 0)))
-                    || ((node.agent != null) && ((node.agent.caps == null) || ((node.agent.caps & 1) != 0) || (node.intelamt && (node.intelamt.state == 2)))) || ((node.mtype == 3) && ((node.agent.id == 3) || (node.agent.id == 4))))
-                    && ((meshrights & 8) || (meshrights & 256)))
-                    );
-                QV('MainDevTerminal', (((node.agent == null) && (node.intelamt != null)) || ((node.agent) && (node.agent.caps == null)) || ((node.agent) && ((node.agent.caps & 2) != 0)) || (node.intelamt && (node.intelamt.state == 2))) && (meshrights & 8) && terminalAccess);
-                QV('MainDevFiles', (node.agent != null) && (node.agent.caps != null) && ((node.agent.caps & 4) != 0) && (meshrights & 8) && fileAccess);
-                QV('MainDevRegistry', (node.agent != null) && isWindowsNode(node) && (meshrights & 8) && ((meshrights == 0xFFFFFFFF) || ((meshrights & 4194304) == 0)));
+                QV('MainDevDesktop', false);
+                QV('MainDevTerminal', false);
+                QV('MainDevFiles', false);
+                QV('MainDevRegistry', false);
                 QV('MainDevInfo', (node.mtype < 3) && ((meshrights & 1048576) != 0));
-                QV('MainDevApps', (node.agent != null) && (meshrights & 8) && ((meshrights == 0xFFFFFFFF) || ((meshrights & 8388608) == 0)));
-                QV('MainDevAmt', (node.intelamt != null) && ((node.intelamt.state == 2) || (node.conn & 2)) && (meshrights & 8) && amtAccess);
-                QV('MainDevConsole', (consoleRights && ((node.agent != null) && (node.agent.caps != null) && ((node.agent.caps & 8) != 0))) && (meshrights & 8));
+                QV('MainDevApps', false);
+                QV('MainDevAmt', false);
+                QV('MainDevConsole', false);
                 QV('MainDevPlugins', false);
                 QV('p15uploadCore', (node.agent != null) && (node.agent.caps != null) && ((node.agent.caps & 16) != 0));
                 QH('p15coreName', ((node.agent != null) && (node.agent.core != null)) ? EscapeHtml(node.agent.core) : '');
@@ -8489,6 +8524,16 @@
             setupDesktop(); // Always refresh the desktop, even if we are on the same device, we need to do some canvas switching.
             if (!panel) panel = 10;
             go(panel);
+            if (panel == 11) {
+                if (typeof updateVncToolbarInfo === 'function') updateVncToolbarInfo();
+                if (desktop == null || desktop.State == 0) {
+                    setTimeout(function() {
+                        if (desktop == null || desktop.State == 0) {
+                            connectDesktop(null, 3);
+                        }
+                    }, 100);
+                }
+            }
         }
 
         function setIpPduState(op) {
@@ -10072,6 +10117,7 @@
             deskAdjust();
             setTimeout(deskAdjust, 50);
             updateMetadata(desktop, 'deskmetadata');
+            updateVncToolbarInfo();
         }
 
         function updateSessionTime() {
@@ -10764,6 +10810,50 @@
         function sendCAD() {
             if (xxdialogMode || desktop == null || desktop.State != 3) return;
             desktop.m.sendcad();
+        }
+
+        // Direct CAD trigger for RealVNC Floating Toolbar
+        function deskSendCADDirect() {
+            if (desktop && desktop.m && typeof desktop.m.sendcad === 'function') {
+                desktop.m.sendcad();
+            } else if (typeof sendCAD === 'function') {
+                sendCAD();
+            }
+        }
+
+        // RealVNC Floating Toolbar: Device Reboot
+        function vncRebootDevice() {
+            if (!currentNode) return;
+            if (window.confirm('คุณต้องการรีบูตเครื่อง ' + (currentNode.name || '') + ' หรือไม่?')) {
+                if (window.ScpPower) {
+                    window.ScpPower.open(currentNode, 'restart');
+                } else if (typeof deviceActionFunction === 'function') {
+                    deviceActionFunction('reboot');
+                }
+            }
+        }
+
+        // RealVNC Floating Toolbar: Pin/Unpin auto-hide
+        function vncTogglePinToolbar() {
+            var tb = document.getElementById('vncFloatingToolbar');
+            if (!tb) return;
+            tb.classList.toggle('unpinned');
+        }
+
+        // Update RealVNC Floating Toolbar Title & Status
+        function updateVncToolbarInfo() {
+            var nameEl = document.getElementById('vncDevName');
+            var ipEl = document.getElementById('vncDevIp');
+            var dotEl = document.getElementById('vncStatusDot');
+            if (currentNode) {
+                if (nameEl) nameEl.textContent = currentNode.name || currentNode.rname || 'Remote Computer';
+                if (ipEl) ipEl.textContent = 'IP: ' + (currentNode.host || currentNode.ip || 'LAN');
+            }
+            if (dotEl) {
+                var isLive = (desktop && desktop.State === 3);
+                dotEl.className = 'vnc-tb-status-dot' + (isLive ? '' : ' disconnected');
+                dotEl.title = isLive ? 'Connected' : 'Disconnected / Connecting';
+            }
         }
 
         // Show process dialogs
@@ -13205,6 +13295,189 @@
             }
         }
 
+        function buildDeviceSummaryCard(node, hardware) {
+            var ident = (hardware && hardware.identifiers) || {};
+            var win = (hardware && hardware.windows) || {};
+            var os = (win.osinfo && win.osinfo.Caption) || node.osdesc || '-';
+            var cpu = (ident.cpu_name || '-').replace(/\s+/g, ' ');
+            var model = ident.product_name || (ident.chassis_manufacturer ? (ident.chassis_manufacturer + ' ' + (ident.board_name || '')) : '-');
+            var serial = ident.chassis_serial || ident.bios_serial || '-';
+            if (/to be filled|none|default/i.test(serial)) serial = '-';
+
+            // RAM calculation
+            var totalRam = 0;
+            if (win.memory && Array.isArray(win.memory)) {
+                win.memory.forEach(function(m) { totalRam += Number(m.Capacity) || 0; });
+            }
+            var ramStr = totalRam > 0 ? (Math.round(totalRam / (1024 * 1024 * 1024)) + ' GB') : '-';
+            if (win.memory && win.memory[0] && win.memory[0].Speed) {
+                ramStr += ' (' + win.memory[0].Speed + ' MHz)';
+            }
+
+            // Storage drive
+            var driveStr = '-';
+            if (ident.storage_devices && ident.storage_devices.length) {
+                var d0 = ident.storage_devices[0];
+                var dGb = d0.Size ? Math.round(Number(d0.Size) / (1024 * 1024 * 1024)) : 0;
+                var isSsd = /SSD|NVME|SN520|SN530|SN740/i.test(d0.Caption || d0.Model || '');
+                driveStr = (d0.Caption || d0.Model || '') + (dGb > 0 ? (' · ' + dGb + ' GB') : '') + (isSsd ? ' (SSD)' : ' (HDD)');
+            }
+
+            // TPM & Windows 11
+            var hasTpm = !!(hardware && hardware.tpm && hardware.tpm.SpecVersion === '2.0');
+            var isWin11 = /Windows 11/i.test(os);
+
+            // Assessment info
+            var assess = (window.ScpCachedDeviceAssessments && window.ScpCachedDeviceAssessments[node._id]) || (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice && window.ScpFleetAssess.assessDevice(Object.assign({}, node, { hardware: hardware })));
+            var score = assess ? (assess.healthScore || assess.score) : null;
+            var replYear = assess ? (assess.replacementYear || assess.replaceByYear) : null;
+            var wStatus = assess ? assess.win11Status : (isWin11 ? 'eligible' : (hasTpm ? 'eligible' : 'ineligible'));
+
+            var thai = document.documentElement.lang === 'th';
+            var h = '<div class="scp-detail-hero-card">';
+            h += '<div class="scp-detail-hero-top">';
+            h += '<div>';
+            h += '<span class="scp-hero-badge">' + (thai ? 'สรุปข้อมูลและสภาพเครื่อง (Hardware Summary)' : 'Hardware & Health Summary') + '</span>';
+            h += '<h2 class="scp-hero-title">' + EscapeHtml(node.name || node.rname || '') + '</h2>';
+            h += '<p class="scp-hero-sub">' + EscapeHtml(model) + ' &middot; Serial: <strong style="font-family:monospace;letter-spacing:0.5px">' + EscapeHtml(serial) + '</strong></p>';
+            h += '</div>';
+
+            if (score !== null) {
+                var sTone = score >= 80 ? 'good' : (score >= 60 ? 'fair' : 'risk');
+                h += '<div class="scp-hero-score ' + sTone + '">';
+                h += '<span class="scp-score-num">' + score + '</span>';
+                h += '<span class="scp-score-lbl">/ 100 ' + (thai ? 'คะแนนสุขภาพ' : 'Health Score') + '</span>';
+                if (replYear) {
+                    h += '<span class="scp-score-yr">' + (thai ? ('แผนเปลี่ยนปี ' + (replYear + 543)) : ('Replace Year: ' + replYear)) + '</span>';
+                }
+                h += '</div>';
+            }
+            h += '</div>';
+
+            h += '<div class="scp-hero-grid">';
+            h += '<div class="scp-hero-cell"><span class="scp-h-label">⚡ ' + (thai ? 'หน่วยประมวลผล (CPU)' : 'Processor (CPU)') + '</span><strong class="scp-h-val">' + EscapeHtml(cpu) + '</strong></div>';
+            h += '<div class="scp-hero-cell"><span class="scp-h-label">🧠 ' + (thai ? 'หน่วยความจำ (RAM)' : 'Memory (RAM)') + '</span><strong class="scp-h-val">' + EscapeHtml(ramStr) + '</strong></div>';
+            h += '<div class="scp-hero-cell"><span class="scp-h-label">💾 ' + (thai ? 'ดิสก์หลัก (Storage)' : 'Primary Drive') + '</span><strong class="scp-h-val">' + EscapeHtml(driveStr) + '</strong></div>';
+            h += '<div class="scp-hero-cell"><span class="scp-h-label">🛡️ ' + (thai ? 'ความปลอดภัย TPM' : 'TPM Security') + '</span><strong class="scp-h-val ' + (hasTpm ? 'ok' : 'warn') + '">' + (hasTpm ? (thai ? 'TPM 2.0 พร้อมใช้งาน' : 'TPM 2.0 Enabled') : (thai ? 'ไม่พบ TPM 2.0' : 'No TPM 2.0')) + '</strong></div>';
+            h += '<div class="scp-hero-cell"><span class="scp-h-label">🪟 ' + (thai ? 'ระบบปฏิบัติการ (OS)' : 'Operating System') + '</span><strong class="scp-h-val">' + EscapeHtml(os) + '</strong></div>';
+            var wLabel = wStatus === 'eligible' ? (thai ? 'พร้อมใช้งาน Win 11' : 'Win 11 Ready') : (wStatus === 'upgradable' ? (thai ? 'อัปเกรดเพื่อรองรับ' : 'Upgradable') : (thai ? 'ไม่รองรับ' : 'Ineligible'));
+            h += '<div class="scp-hero-cell"><span class="scp-h-label">🚀 ' + (thai ? 'ความพร้อม Windows 11' : 'Windows 11 Readiness') + '</span><strong class="scp-h-val ' + (wStatus === 'eligible' ? 'ok' : (wStatus === 'upgradable' ? 'warn' : 'risk')) + '">' + wLabel + '</strong></div>';
+            h += '</div>';
+
+            // Asset & Procurement metadata (เลขครุภัณฑ์, ปีงบประมาณ พ.ศ., ราคาจัดซื้อ)
+            var asset = (window.ScpCachedAssets && window.ScpCachedAssets[node._id]) || {};
+            var assetNo = asset.assetNumber || (assess && assess.assetNumber) || '';
+            var fiscalYr = asset.fiscalYear || (assess && assess.fiscalYear) || '';
+            var purPrice = (asset.price != null && asset.price !== '') ? asset.price : (assess && assess.purchasePrice != null ? assess.purchasePrice : '');
+            var assetNoDisplay = assetNo ? EscapeHtml(assetNo) : '<span style="color:#94a3b8;font-weight:normal"><em>' + (thai ? 'ยังไม่ระบุ' : 'Not specified') + '</em></span>';
+            var fiscalYrDisplay = fiscalYr ? ('พ.ศ. ' + fiscalYr) : (assess && assess.biosYear ? ('คำนวณจาก BIOS: ' + (assess.biosYear + 543)) : '<span style="color:#94a3b8;font-weight:normal"><em>' + (thai ? 'ยังไม่ระบุ' : 'Not specified') + '</em></span>');
+            var priceDisplay = (purPrice !== '' && !isNaN(purPrice)) ? (Number(purPrice).toLocaleString('th-TH') + ' บาท') : '<span style="color:#94a3b8;font-weight:normal"><em>' + (thai ? 'ยังไม่ระบุ' : 'Not specified') + '</em></span>';
+
+            h += '<div class="scp-hero-asset-bar">';
+            h += '<div class="scp-asset-items">';
+            h += '<div class="scp-asset-chip"><span class="scp-asset-lbl">🏷️ ' + (thai ? 'เลขครุภัณฑ์:' : 'Asset No:') + '</span> <strong class="scp-asset-val">' + assetNoDisplay + '</strong></div>';
+            h += '<div class="scp-asset-chip"><span class="scp-asset-lbl">📅 ' + (thai ? 'ปีงบประมาณ:' : 'Fiscal Year:') + '</span> <strong class="scp-asset-val">' + fiscalYrDisplay + '</strong></div>';
+            h += '<div class="scp-asset-chip"><span class="scp-asset-lbl">💰 ' + (thai ? 'ราคาจัดซื้อ:' : 'Price:') + '</span> <strong class="scp-asset-val">' + priceDisplay + '</strong></div>';
+            h += '</div>';
+            h += '<button type="button" class="scp-asset-edit-btn" onclick="openAssetEditDialog(\'' + EscapeHtml(node._id) + '\')">✏️ ' + (thai ? 'แก้ไขข้อมูลครุภัณฑ์ / งบประมาณ' : 'Edit Asset & Budget') + '</button>';
+            h += '</div>';
+
+            h += '</div>';
+            return h;
+        }
+
+        window.openAssetEditDialog = function (nodeId) {
+            var n = (typeof getNodeFromId === 'function' ? getNodeFromId(nodeId) : null) || (window.nodes && window.nodes[nodeId]) || currentNode;
+            var nodeName = (n && (n.name || n.rname)) || nodeId;
+            var cur = (window.ScpCachedAssets && window.ScpCachedAssets[nodeId]) || {};
+            var thai = document.documentElement.lang === 'th';
+
+            var existing = document.getElementById('scpAssetModal');
+            if (existing) existing.remove();
+
+            var overlay = document.createElement('div');
+            overlay.id = 'scpAssetModal';
+            overlay.className = 'scp-modal-overlay';
+
+            var modal = document.createElement('div');
+            modal.className = 'scp-modal-box';
+            modal.innerHTML = '<div class="scp-modal-header">' +
+                '<h3>🏷️ ' + (thai ? 'บันทึก / แก้ไขข้อมูลครุภัณฑ์และงบประมาณ' : 'Edit Asset & Budget Info') + '</h3>' +
+                '<p class="scp-modal-subtitle">' + EscapeHtml(nodeName) + '</p>' +
+            '</div>' +
+            '<div class="scp-modal-body">' +
+                '<div class="scp-form-group">' +
+                    '<label class="scp-form-label">🏷️ ' + (thai ? 'เลขครุภัณฑ์คอมพิวเตอร์' : 'Asset Number / Tag') + ' <small style="color:#64748b">(เช่น 7440-001-0001/65)</small></label>' +
+                    '<input type="text" id="scpInputAssetNo" class="scp-form-input" placeholder="ระบุเลขครุภัณฑ์..." value="' + EscapeHtml(cur.assetNumber || '') + '" autofocus>' +
+                '</div>' +
+                '<div class="scp-form-row">' +
+                    '<div class="scp-form-group">' +
+                        '<label class="scp-form-label">📅 ' + (thai ? 'ปีงบประมาณที่จัดซื้อ (พ.ศ.)' : 'Fiscal Year (B.E.)') + '</label>' +
+                        '<input type="number" id="scpInputFiscalYear" class="scp-form-input" placeholder="เช่น 2565" min="2540" max="2620" value="' + (cur.fiscalYear || '') + '">' +
+                    '</div>' +
+                    '<div class="scp-form-group">' +
+                        '<label class="scp-form-label">💰 ' + (thai ? 'ราคาที่จัดซื้อ (บาท)' : 'Purchase Price (THB)') + '</label>' +
+                        '<input type="number" id="scpInputPrice" class="scp-form-input" placeholder="เช่น 24000" min="0" step="100" value="' + (cur.price != null ? cur.price : '') + '">' +
+                    '</div>' +
+                '</div>' +
+                '<div class="scp-form-group">' +
+                    '<label class="scp-form-label">📝 ' + (thai ? 'หมายเหตุ / แหล่งงบประมาณ' : 'Notes / Budget Source') + '</label>' +
+                    '<input type="text" id="scpInputNote" class="scp-form-input" placeholder="เช่น งบลงทุน รพ.สีชมพู / เครื่องประจำห้องตรวจ..." value="' + EscapeHtml(cur.note || '') + '">' +
+                '</div>' +
+            '</div>' +
+            '<div class="scp-modal-footer">' +
+                '<button type="button" class="scp-btn-cancel" id="scpAssetBtnCancel">' + (thai ? 'ยกเลิก' : 'Cancel') + '</button>' +
+                '<button type="button" class="scp-btn-save" id="scpAssetBtnSave">💾 ' + (thai ? 'บันทึกข้อมูล' : 'Save') + '</button>' +
+            '</div>';
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            document.getElementById('scpAssetBtnCancel').onclick = function () { overlay.remove(); };
+            overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+
+            document.getElementById('scpAssetBtnSave').onclick = async function () {
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = thai ? 'กำลังบันทึก...' : 'Saving...';
+                var assetNo = document.getElementById('scpInputAssetNo').value.trim();
+                var fy = document.getElementById('scpInputFiscalYear').value.trim();
+                var pr = document.getElementById('scpInputPrice').value.trim();
+                var nt = document.getElementById('scpInputNote').value.trim();
+
+                try {
+                    var reqData = {
+                        nodeid: nodeId,
+                        assetNumber: assetNo,
+                        fiscalYear: fy ? parseInt(fy, 10) : null,
+                        price: pr ? parseFloat(pr) : null,
+                        note: nt
+                    };
+                    if (window.ScpOperations && window.ScpOperations.request) {
+                        var saved = await window.ScpOperations.request('saveAssetInfo', reqData);
+                        if (!window.ScpCachedAssets) window.ScpCachedAssets = {};
+                        window.ScpCachedAssets[nodeId] = saved;
+                    } else if (window.meshserver) {
+                        window.meshserver.send(Object.assign({ action: 'scpops', op: 'saveAssetInfo', tag: 'save-asset-' + Date.now() }, reqData));
+                        if (!window.ScpCachedAssets) window.ScpCachedAssets = {};
+                        window.ScpCachedAssets[nodeId] = reqData;
+                    }
+                    overlay.remove();
+                    // Re-render hero card / details
+                    if (typeof updateDeviceDetails === 'function') {
+                        updateDeviceDetails(currentNode);
+                    }
+                    if (window.ScpDashboard && typeof window.ScpDashboard.reloadAssessment === 'function') {
+                        window.ScpDashboard.reloadAssessment();
+                    }
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.textContent = thai ? 'บันทึกข้อมูล' : 'Save';
+                    alert((thai ? 'ไม่สามารถบันทึกข้อมูลได้: ' : 'Failed to save: ') + err.message);
+                }
+            };
+        };
+
         var DeviceDetailsHardware = null;
         var DeviceDetailsNetwork = null;
         var DeviceDetailsNodeId = null;
@@ -13219,6 +13492,16 @@
             network = DeviceDetailsNetwork;
             if (hardware == null) { hardware = {}; }
             if (network == null) { network = {}; }
+
+            if (!window.ScpCachedAssets && window.ScpOperations && window.ScpOperations.request) {
+                window.ScpOperations.request('getAssetInfo').then(function(map) {
+                    window.ScpCachedAssets = map || {};
+                    if (currentNode && currentNode._id === node._id) {
+                        updateDeviceDetails(currentNode);
+                    }
+                }).catch(function(){});
+            }
+
             var sections = [], s = {};
 
             // Operating System
@@ -13456,7 +13739,7 @@
                 if (ident.board_version) { x += addDetailItem("Version", EscapeHtml(ident.board_version), s); }
                 if (ident.product_uuid) { x += addDetailItem("Identifier", EscapeHtml(ident.product_uuid), s); }
                 if (ident.cpu_name) { x += addDetailItem("CPU", EscapeHtml(ident.cpu_name).split('(TM)').join('&trade;').split('(R)').join('&reg;'), s); }
-                if (ident.gpu_name) {  for (var i in ident.gpu_name) { x += addDetailItem("GPU", EscapeHtml(ident.gpu_name[i]).split('(TM)').join('&trade;').split('(R)').join('&reg;'), s); } }
+                if (ident.gpu_name) {  for (var i in ident.gpu_name) { if (/mirror/i.test(ident.gpu_name[i])) continue; x += addDetailItem("GPU", EscapeHtml(ident.gpu_name[i]).split('(TM)').join('&trade;').split('(R)').join('&reg;'), s); } }
                 if (x != '') { sections.push({ name: "Motherboard", html: x, img: 'motherboard64.png'}); }
 
                 // System
@@ -13521,8 +13804,18 @@
                         var m = hardware.windows.memory[i];
                         x += '<tr><td><div class=style10 style=border-radius:5px;padding:8px>';
                         x += '<div style=margin-bottom:3px><b>' + EscapeHtml((m.BankLabel ? m.BankLabel : (m.DeviceLocator ? m.DeviceLocator : 'Unknown'))) + '</b></div>';
-                        if (m.Capacity && m.Speed) { x += addDetailItem("Capacity / Speed", EscapeHtml(format('{0} Mb, {1} Mhz', (m.Capacity / 1024 / 1024), m.Speed)), s); }
-                        else if (m.Capacity) { x += addDetailItem("Capacity", EscapeHtml(format('{0} Mb', (m.Capacity / 1024 / 1024))), s); }
+                        if (m.Capacity && m.Speed) { 
+                            var cGb = Math.round((m.Capacity / 1024 / 1024 / 1024) * 10) / 10;
+                            var cMb = Math.round(m.Capacity / 1024 / 1024);
+                            var cTxt = (cGb >= 1 ? (cGb + ' GB (' + cMb.toLocaleString() + ' MB)') : (cMb + ' MB')) + ', ' + m.Speed + ' MHz';
+                            x += addDetailItem("Capacity / Speed", EscapeHtml(cTxt), s); 
+                        }
+                        else if (m.Capacity) { 
+                            var cGb = Math.round((m.Capacity / 1024 / 1024 / 1024) * 10) / 10;
+                            var cMb = Math.round(m.Capacity / 1024 / 1024);
+                            var cTxt = cGb >= 1 ? (cGb + ' GB (' + cMb.toLocaleString() + ' MB)') : (cMb + ' MB');
+                            x += addDetailItem("Capacity", EscapeHtml(cTxt), s); 
+                        }
                         if (m.PartNumber) { x += addDetailItem("Part Number", EscapeHtml((m.Manufacturer && m.Manufacturer != 'Undefined')?(m.Manufacturer + ', '):'') + EscapeHtml(m.PartNumber), s); }
                         x += '</div>';
                     }
@@ -13589,8 +13882,13 @@
                         if (m.Model && (m.Model != m.Caption)) { x += addDetailItem("Model", EscapeHtml(m.Model), s); }
                         if (m.Size) {
                             if ((typeof m.Size == 'string') && (parseInt(m.Size) == m.Size)) { m.Size = parseInt(m.Size); }
-                            if (typeof m.Size == 'number') { x += addDetailItem("Capacity", format('{0} Mb', Math.floor(m.Size / 1024 / 1024)), s); }
-                            if (typeof m.Size == 'string') { x += addDetailItem("Capacity", EscapeHtml(m.Size), s); }
+                            if (typeof m.Size == 'number') { 
+                                var dGb = Math.round(m.Size / (1024 * 1024 * 1024));
+                                var isSsd = /SSD|NVME|SN520|SN530|SN740/i.test(m.Caption || m.Model || '');
+                                var capStr = (dGb >= 1 ? (dGb + ' GB (' + Math.floor(m.Size / 1024 / 1024).toLocaleString() + ' MB)') : (Math.floor(m.Size / 1024 / 1024) + ' MB')) + (isSsd ? ' · SSD ความเร็วสูง' : ' · HDD');
+                                x += addDetailItem("Capacity", EscapeHtml(capStr), s); 
+                            }
+                            else if (typeof m.Size == 'string') { x += addDetailItem("Capacity", EscapeHtml(m.Size), s); }
                         }
                         if(hardware.windows && hardware.windows.drives && m.Model){
                             const foundObject = hardware.windows.drives.find(obj => obj['Model'] === m.Model);
@@ -13715,15 +14013,19 @@
 
             // Render the sections
             var x = '';
+            var sumHw = buildDeviceSummaryCard(node, hardware);
+            if (sumHw) { x += sumHw; }
+
             for (var i in sections) {
-                if (sections[i].img == null) {
-                    x += '<div class=DevSt style=margin-bottom:3px;margin-left:16px><b>' + sections[i].name + '</b></div><div style=margin-bottom:10px;margin-left:16px>' + sections[i].html + '</div>';
-                } else {
-                    x += '<table style=width:100%><tr>';
-                    x += '<td style=width:64px;vertical-align:top><img src=images/details/' + sections[i].img + ' border=0 width=64 /></td>'; // height=12
-                    x += '<td><div class=DevSt style=margin-bottom:3px;margin-left:16px><b>' + sections[i].name + '</b></div><div style=margin-bottom:10px;margin-left:16px>' + sections[i].html + '</div></td>';
-                    x += '</tr></table>';
+                x += '<div class="scp-detail-card">';
+                x += '<div class="scp-detail-card-header">';
+                if (sections[i].img != null) {
+                    x += '<img src="images/details/' + sections[i].img + '" class="scp-detail-card-icon" alt="" />';
                 }
+                x += '<h3 class="scp-detail-card-title">' + sections[i].name + '</h3>';
+                x += '</div>';
+                x += '<div class="scp-detail-card-body">' + sections[i].html + '</div>';
+                x += '</div>';
             }
 
             if (x == '') {
@@ -20269,8 +20571,9 @@
 
         function goBack() {
             setSessionActivity();
-            if (xxdialogMode || (goBackStack.length == 0)) return;
+            if (xxdialogMode) return;
             if (fullscreen) { deskToggleFull(); }
+            if (goBackStack.length == 0) { go(1); return; }
             go(goBackStack.pop());
             goBackStack.pop();
         }
@@ -21540,7 +21843,7 @@
         function printDateTime(d) { return EscapeHtml(d.toLocaleString(args.locale)); }
         function printTimer(d) { return EscapeHtml(zeroPad(Math.floor(d / 3600), 2) + ':' + zeroPad((Math.floor(d / 60) % 60), 2) + ':' + zeroPad((d % 60), 2)); }
         function printFlexDateTime(d) { if (printDate(new Date()) == printDate(d)) { return printTime(d); } else { return printDateTime(d); } }
-        function addDetailItem(title, value, state) { return '<table style=width:100%><td>' + nobreak(title) + '<td style=text-align:right>' + value + '</table>'; }
+        function addDetailItem(title, value, state) { return '<table style="width:100%"><tr><td class="scp-detail-label">' + nobreak(title) + '</td><td class="scp-detail-value">' + value + '</td></tr></table>'; }
         function format(format) { var args = Array.prototype.slice.call(arguments, 1); return format.replace(/{(\d+)}/g, function (match, number) { return typeof args[number] != 'undefined' ? EscapeHtml(args[number]) : match; }); };
         function addTextLink(subtext, text, link) { var i = text.toLowerCase().indexOf(subtext.toLowerCase()); if (i == -1) { return text; } return text.substring(0, i) + '<a href="' + link + '">' + subtext + '</a>' + text.substring(i + subtext.length); }
         function getOrderedList(objList, oname) { var r = []; for (var i in objList) { r.push(objList[i]); } r.sort(function(a, b) { var aa = a[oname].toLowerCase(), bb = b[oname].toLowerCase(); if (aa > bb) return 1; if (aa < bb) return -1; return 0; }); return r; }

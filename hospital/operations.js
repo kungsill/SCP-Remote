@@ -66,5 +66,93 @@ exports.handle = async function (ctx, cmd) {
    row.history.push({at:row.updated,by:user._id,status:row.status,assignee,note});await save(row);return row;
   });queues.set(id,job);try{return await job;}finally{if(queues.get(id)===job)queues.delete(id);}
  }
+ if (cmd.op === 'fleetAssessment') {
+  const assessEngine = require('./fleet-assess');
+  const nodes = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('node', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const allowedNodes = [];
+  for (const n of nodes) {
+   if (await access(n._id)) allowedNodes.push(n);
+  }
+  const sysinfos = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('sysinfo', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const criteriaDoc = await get('scpcriteria/' + domain.id).catch(() => null);
+  const criteria = criteriaDoc && criteriaDoc.criteria ? criteriaDoc.criteria : assessEngine.DEFAULT_CRITERIA;
+  const meshes = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('mesh', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const meshMap = {};
+  for (const m of (meshes || [])) {
+   if (m && m._id && m.name) meshMap[m._id] = m.name;
+  }
+  const assetRows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scpasset', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const assetMap = {};
+  for (const a of (assetRows || [])) {
+   if (a && a.nodeid) assetMap[a.nodeid] = a;
+  }
+  return assessEngine.assessFleet(allowedNodes, sysinfos, criteria, meshMap, assetMap);
+ }
+ if (cmd.op === 'getCriteria') {
+  const assessEngine = require('./fleet-assess');
+  const criteriaDoc = await get('scpcriteria/' + domain.id).catch(() => null);
+  return criteriaDoc && criteriaDoc.criteria ? criteriaDoc.criteria : assessEngine.DEFAULT_CRITERIA;
+ }
+ if (cmd.op === 'saveCriteria') {
+  if (!admin && !(user.siteadmin & 2)) throw Error('ACCESS_DENIED');
+  const assessEngine = require('./fleet-assess');
+  const newCriteria = Object.assign({}, assessEngine.DEFAULT_CRITERIA, cmd.criteria);
+  const row = {
+   _id: 'scpcriteria/' + domain.id,
+   type: 'scpcriteria',
+   domain: domain.id,
+   criteria: newCriteria,
+   updated: Date.now(),
+   updatedBy: user._id
+  };
+  await save(row);
+  return row.criteria;
+ }
+ if (cmd.op === 'getAssetInfo') {
+  if (cmd.nodeid) {
+   if (!await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
+   const row = await get('scpasset/' + domain.id + '/' + cmd.nodeid).catch(() => null);
+   return row || { nodeid: cmd.nodeid, assetNumber: '', fiscalYear: null, price: null, note: '' };
+  }
+  const rows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scpasset', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const map = {};
+  for (const row of rows) {
+   if (row && row.nodeid && await access(row.nodeid)) {
+    map[row.nodeid] = row;
+   }
+  }
+  return map;
+ }
+ if (cmd.op === 'saveAssetInfo') {
+  if (typeof cmd.nodeid !== 'string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
+  const assetNumber = text(cmd.assetNumber || '', 100);
+  let fiscalYear = null;
+  if (cmd.fiscalYear !== null && cmd.fiscalYear !== undefined && cmd.fiscalYear !== '') {
+   fiscalYear = parseInt(cmd.fiscalYear, 10);
+   if (isNaN(fiscalYear) || fiscalYear < 2000 || (fiscalYear > 2100 && fiscalYear < 2500) || fiscalYear > 2650) {
+    throw Error('INVALID_FISCAL_YEAR');
+   }
+  }
+  let price = null;
+  if (cmd.price !== null && cmd.price !== undefined && cmd.price !== '') {
+   price = parseFloat(cmd.price);
+   if (isNaN(price) || price < 0 || price > 100000000) throw Error('INVALID_PRICE');
+  }
+  const note = text(cmd.note || '', 1000);
+  const row = {
+   _id: 'scpasset/' + domain.id + '/' + cmd.nodeid,
+   type: 'scpasset',
+   domain: domain.id,
+   nodeid: cmd.nodeid,
+   assetNumber: assetNumber,
+   fiscalYear: fiscalYear,
+   price: price,
+   note: note,
+   updated: Date.now(),
+   updatedBy: user._id
+  };
+  await save(row);
+  return row;
+ }
  throw Error('UNKNOWN_OPERATION');
 };

@@ -196,6 +196,46 @@
        Asked for once per computer per visit and kept here; nothing is collected that
        the server does not already hold. */
     var specs = {}, specsAsked = {}, listening = false, searchText = '', watched = {}, watchedLoaded = false;
+    var cachedFleetAssessment = null, fleetAssessmentLoading = false;
+    window.__scpSpecs = specs;
+
+    function loadFleetAssessment(force) {
+        if (!window.ScpOperations || !window.ScpOperations.request) return;
+        if (fleetAssessmentLoading) return;
+        if (cachedFleetAssessment && !force) return;
+        fleetAssessmentLoading = true;
+        if (!window.ScpCachedAssets && window.ScpOperations && window.ScpOperations.request) {
+            window.ScpOperations.request('getAssetInfo').then(function (map) {
+                window.ScpCachedAssets = map || {};
+            }).catch(function(){});
+        }
+        window.ScpOperations.request('fleetAssessment').then(function (result) {
+            fleetAssessmentLoading = false;
+            if (result && result.devices) {
+                cachedFleetAssessment = result;
+                window.ScpCachedFleetAssessment = result;
+                window.ScpCachedDeviceAssessments = {};
+                if (!window.ScpCachedAssets) window.ScpCachedAssets = {};
+                result.devices.forEach(function (d) {
+                    var nid = d.nodeid || d.nodeId;
+                    window.ScpCachedDeviceAssessments[nid] = d;
+                    if (d.assetNumber || d.fiscalYear || d.purchasePrice != null) {
+                        window.ScpCachedAssets[nid] = {
+                            nodeid: nid,
+                            assetNumber: d.assetNumber || '',
+                            fiscalYear: d.fiscalYear || null,
+                            price: d.purchasePrice != null ? d.purchasePrice : null,
+                            note: d.assetNote || ''
+                        };
+                    }
+                });
+                render();
+            }
+        }).catch(function (err) {
+            fleetAssessmentLoading = false;
+            console.error('fleetAssessment error:', err);
+        });
+    }
 
     /* How long each computer has been powered on, and when each was last heard from.
        Both come from what the server already recorded; nothing extra is asked of the
@@ -572,7 +612,23 @@
 
     function actionCell(node) {
         var cell = element('div', 'scp-dash-actions');
-        cell.appendChild(button(t('remote'), 'scp-dash-go', function () { openRemote(node); }));
+        var online = isOnline(node);
+        // Instant RealVNC Remote button (Direct 1-click connection)
+        var remoteBtn = button(thai ? 'รีโมท' : 'Remote', 'scp-dash-remote-btn' + (online ? '' : ' off'), function () {
+            if (!online) { window.alert(t('offlineAction')); return; }
+            openRemote(node);
+        });
+        remoteBtn.title = thai ? ('เชื่อมต่อรีโมตหน้าจอ: ' + (node.name || '')) : ('Remote control: ' + (node.name || ''));
+        var rIcon = document.createElement('img');
+        rIcon.src = 'images/vnc/da_summary_general.svg';
+        rIcon.className = 'scp-dash-remote-icon';
+        rIcon.alt = '';
+        remoteBtn.insertBefore(rIcon, remoteBtn.firstChild);
+        cell.appendChild(remoteBtn);
+
+        cell.appendChild(button(thai ? 'ใบประเมิน' : 'Fact sheet', 'scp-dash-scan', function () {
+            if (window.ScpReport) window.ScpReport.open('device', node._id);
+        }));
         cell.appendChild(button(t('scan'), 'scp-dash-scan', function () { scan(node); }));
         if (window.ScpMonitor) cell.appendChild(button(document.documentElement.lang==='th'?'สถานะเครื่อง / Task Manager':'Monitor / Task Manager','scp-dash-scan',function(){window.ScpMonitor.open(node);}));
         if (window.ScpCleanup) cell.appendChild(window.ScpCleanup.control(node));
@@ -854,7 +910,19 @@
 
     function specLine(node) {
         var hardware = hardwareOf(node);
-        if (!hardware) return null;
+        if (!hardware) {
+            var devAss = window.ScpCachedDeviceAssessments && (window.ScpCachedDeviceAssessments[node._id] || window.ScpCachedDeviceAssessments[node.id]);
+            if (devAss) {
+                var p = [];
+                if (devAss.cpu && devAss.cpu !== '-') p.push(devAss.cpu);
+                if (devAss.ramGb) p.push(devAss.ramGb + ' GB');
+                var dType = (devAss.diskHasSsd || devAss.hasSsd) ? 'SSD' : 'HDD';
+                if (devAss.cFreeGb) p.push(dType + ' · C: ' + devAss.cFreeGb + ' GB (' + (devAss.cFreePercent || devAss.cDriveFreePct || 0) + '%)');
+                else p.push(dType);
+                return p.length ? p.join('  ·  ') : null;
+            }
+            return null;
+        }
         var identifiers = hardware.identifiers || {}, windows = hardware.windows || {};
         var parts = [];
         if (identifiers.cpu_name) { parts.push(String(identifiers.cpu_name).replace(/\s+/g, ' ').trim()); }
@@ -887,8 +955,8 @@
     function exportInventory() {
         var rows = allNodes().filter(function (node) { return hardwareOf(node); });
         if (!rows.length) { window.alert(t('exportNone')); return; }
-        var header = ['ชื่อเครื่อง', 'หน่วยงาน', 'ชื่อเครื่องใน Windows', 'IP', 'รุ่นเครื่อง', 'ยี่ห้อเมนบอร์ด',
-                      'CPU', 'การ์ดจอ', 'แรม (GB)', 'ดิสก์', 'ระบบปฏิบัติการ', 'Serial', 'วันที่ BIOS'];
+        var header = ['ชื่อเครื่อง', 'หน่วยงาน', 'เลขครุภัณฑ์', 'ปีงบประมาณ_พศ', 'ราคาจัดซื้อ_บาท', 'ชื่อเครื่องใน Windows', 'IP', 'รุ่นเครื่อง', 'ยี่ห้อเมนบอร์ด',
+                      'CPU', 'การ์ดจอ', 'แรม (GB)', 'ดิสก์', 'ระบบปฏิบัติการ', 'Serial', 'วันที่ BIOS', 'หมายเหตุ'];
         var lines = [header.map(csvCell).join(',')];
         rows.forEach(function (node) {
             var hardware = hardwareOf(node), identifiers = hardware.identifiers || {}, windows = hardware.windows || {};
@@ -898,13 +966,19 @@
             if (/to be filled|default string|none/i.test(serial)) { serial = ''; }
             var bios = String(identifiers.bios_date || '');
             if (/^\d{8}/.test(bios)) { bios = bios.substring(6, 8) + '/' + bios.substring(4, 6) + '/' + bios.substring(0, 4); }
+            var asset = (window.ScpCachedAssets && window.ScpCachedAssets[node._id]) || {};
+            var devAss = (window.ScpCachedDeviceAssessments && window.ScpCachedDeviceAssessments[node._id]) || {};
+            var assetNo = asset.assetNumber || devAss.assetNumber || '';
+            var fy = asset.fiscalYear || devAss.fiscalYear || '';
+            var pr = asset.price != null ? asset.price : (devAss.purchasePrice != null ? devAss.purchasePrice : '');
+            var nt = asset.note || devAss.assetNote || '';
             lines.push([
-                node.name, roomOf(node), node.rname || node.host || '', node.ip || '',
+                node.name, roomOf(node), assetNo, fy, pr, node.rname || node.host || '', node.ip || '',
                 identifiers.product_name || '', identifiers.board_vendor || '',
                 identifiers.cpu_name || '', identifiers.gpu_name || '',
                 ram > 0 ? gigabytes(ram) : '',
                 disksOf(node).map(function (d) { return d.letter + ':' + d.free + 'GB'; }).join(' '),
-                (node.osdesc || '').replace('Microsoft ', ''), serial, bios
+                (node.osdesc || '').replace('Microsoft ', ''), serial, bios, nt
             ].map(csvCell).join(','));
         });
         saveCsv('SCP-Remote_ครุภัณฑ์คอมพิวเตอร์_' + stamp() + '.csv', lines);
@@ -1280,15 +1354,77 @@
         var name = element('div', 'scp-dash-cell scp-dash-name');
         name.appendChild(element('span', 'scp-dash-dot ' + (online ? (busy ? 'busy' : 'idle') : 'off')));
         var label = element('span', 'scp-dash-label');
-        label.appendChild(element('strong', '', node.name || node.rname || ''));
-        var meta = [node.host || node.ip || '', (node.osdesc || '').replace('Microsoft ', '')].filter(Boolean).join(' · ');
-        label.appendChild(element('small', '', meta));
-        // Only when it needs saying: up to date, or offline and therefore stale, is what
-        // the reader already assumes, and the status column says the offline part again.
+        
+        var titleRow = element('div', 'scp-device-title-row');
+        titleRow.appendChild(element('strong', 'scp-device-name-text', node.name || node.rname || ''));
         var release = window.ScpConnection ? window.ScpConnection.releaseBadge(node, true) : null;
-        if (release) { label.appendChild(release); }
+        if (release) { titleRow.appendChild(release); }
+        label.appendChild(titleRow);
+
+        var metaRow = element('div', 'scp-device-meta-row');
+        var ipAddr = node.ip || node.host || '';
+        if (ipAddr) {
+            var ipPill = element('span', 'scp-ip-pill' + (online ? '' : ' off'), 'IP ' + ipAddr);
+            ipPill.title = thai ? 'หมายเลข IP ของเครื่อง' : 'Device IP Address';
+            metaRow.appendChild(ipPill);
+        }
+        var osTxt = (node.osdesc || '').replace('Microsoft ', '');
+        if (osTxt) {
+            metaRow.appendChild(element('span', 'scp-os-desc', osTxt));
+        }
+        label.appendChild(metaRow);
         var line = specLine(node);
         if (line) { label.appendChild(element('small', 'scp-dash-specs', line)); }
+        if (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice) {
+            var devAss = window.ScpFleetAssess.assessDevice(node);
+            var tagWrap = element('div', 'scp-dash-assess-tags');
+            var assetData = (window.ScpCachedAssets && window.ScpCachedAssets[node._id]) || {};
+            var assetNo = assetData.assetNumber || (devAss && devAss.assetNumber) || '';
+            var aTag = element('span', 'scp-badge-asset' + (assetNo ? '' : ' empty'), assetNo ? ('🏷️ ' + assetNo) : (thai ? '+ ระบุเลขครุภัณฑ์' : '+ Asset Tag'));
+            aTag.title = thai ? 'คลิกเพื่อระบุ/แก้ไข เลขครุภัณฑ์, ปี พ.ศ., งบประมาณ, ราคา' : 'Click to edit asset tag, fiscal year, budget & price';
+            aTag.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (typeof window.openAssetEditDialog === 'function') {
+                    window.openAssetEditDialog(node._id);
+                }
+            });
+            tagWrap.appendChild(aTag);
+            if (assetData.fiscalYear) {
+                var fyTag = element('span', 'scp-badge-fy', (thai ? 'พ.ศ. ' : 'FY ') + assetData.fiscalYear);
+                fyTag.title = thai ? 'ปีงบประมาณ' : 'Fiscal Year';
+                fyTag.style.cursor = 'pointer';
+                fyTag.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    if (typeof window.openAssetEditDialog === 'function') window.openAssetEditDialog(node._id);
+                });
+                tagWrap.appendChild(fyTag);
+            }
+            if (assetData.price != null && assetData.price > 0) {
+                var prTag = element('span', 'scp-badge-price', Number(assetData.price).toLocaleString() + (thai ? ' บ.' : ' THB'));
+                prTag.title = thai ? 'ราคาจัดซื้อ' : 'Purchase Price';
+                prTag.style.cursor = 'pointer';
+                prTag.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    if (typeof window.openAssetEditDialog === 'function') window.openAssetEditDialog(node._id);
+                });
+                tagWrap.appendChild(prTag);
+            }
+            if (assetData.note) {
+                var ntTag = element('span', 'scp-badge-note', assetData.note);
+                ntTag.title = thai ? 'งบประจำปี / หมายเหตุ' : 'Budget / Note';
+                ntTag.style.cursor = 'pointer';
+                ntTag.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    if (typeof window.openAssetEditDialog === 'function') window.openAssetEditDialog(node._id);
+                });
+                tagWrap.appendChild(ntTag);
+            }
+            var wTag = element('span', 'scp-badge-' + devAss.win11Status, devAss.win11Status === 'eligible' ? (thai ? 'พร้อม Win 11' : 'Win 11 Ready') : (devAss.win11Status === 'upgradable' ? (thai ? 'อัปเกรดได้' : 'Win 11 Upgradable') : (thai ? 'ไม่รองรับ' : 'Win 11 Unsupported')));
+            var hTag = element('span', 'scp-health-' + devAss.healthStatus, 'Health: ' + devAss.healthScore);
+            tagWrap.appendChild(wTag);
+            tagWrap.appendChild(hTag);
+            label.appendChild(tagWrap);
+        }
         name.appendChild(label);
         row.appendChild(name);
 
@@ -1320,6 +1456,7 @@
 
     function render() {
         if (!body || panel.hidden) return;
+        loadFleetAssessment();
         // This redraws every ten seconds. Without keeping the scroll position, anyone
         // reading a room further down the page is thrown back to the top each time.
         var libraryButton=document.getElementById('scpDriverLibraryButton');if(libraryButton)libraryButton.hidden=!(window.userinfo&&window.userinfo.siteadmin===4294967295);
@@ -1381,7 +1518,15 @@
         var tabs = element('nav', 'scp-dash-tabs');
         tabs.setAttribute('aria-label', thai ? 'มุมมองแดชบอร์ด' : 'Dashboard views');
         var sections = {};
-        [['overview','ภาพรวม','Overview'],['devices','เครื่องทั้งหมด','Devices'],['jobs','สถานะงาน','Jobs'],['reports','รายงาน','Reports']].forEach(function (entry) {
+        var tabEntries = [
+            ['overview', 'ภาพรวม', 'Overview'],
+            ['assess', 'การประเมินสภาพเครื่อง', 'Assessment'],
+            ['budget', 'แผนงบประมาณ 5 ปี', 'Budget'],
+            ['devices', 'เครื่องทั้งหมด', 'Devices'],
+            ['jobs', 'สถานะงาน', 'Jobs'],
+            ['reports', 'รายงาน & ชาร์ต', 'Reports']
+        ];
+        tabEntries.forEach(function (entry) {
             var tab = button(entry[thai ? 1 : 2], 'scp-dash-tab', function () {
                 activeView = entry[0];
                 if (activeView !== 'devices' && liveOn) { liveOn = false; stopAllTiles(); updateLiveControls(); }
@@ -1396,6 +1541,9 @@
         });
         body.appendChild(tabs);
         Object.keys(sections).forEach(function (key) { body.appendChild(sections[key]); });
+
+        var fleetAssess = cachedFleetAssessment || ((window.ScpFleetAssess && window.ScpFleetAssess.assessFleet) ? window.ScpFleetAssess.assessFleet(list) : { win11: {}, health: {}, forecast: {}, budget: {}, devices: [] });
+
         var overview = element('div', 'scp-dash-overview-grid');
         var fleet = element('section', 'scp-dash-fleet');
         fleet.appendChild(element('h3', '', thai ? 'ความพร้อมของเครื่อง' : 'Device availability'));
@@ -1409,6 +1557,184 @@
         fleet.appendChild(element('small', '', thai ? 'เลือกเครื่องเพื่อดู CPU, RAM และโปรเซสแบบสด' : 'Select a device for live CPU, RAM and processes'));
         fleet.appendChild(button(thai ? 'ดูสถานะเครื่อง / Task Manager' : 'Monitor / Task Manager', 'scp-dash-refresh', function () { if(window.ScpMonitor) window.ScpMonitor.open(); }));
         overview.appendChild(fleet); overview.appendChild(attentionPanel(list)); sections.overview.appendChild(overview);
+
+        // --- Assess Tab ---
+        var assessSec = sections.assess;
+        assessSec.appendChild(element('h3', '', thai ? 'การประเมินสภาพเครื่องและความพร้อมอัปเกรด Windows 11' : 'Hardware Lifespan & Windows 11 Assessment'));
+        var fWin11 = (fleetAssess && fleetAssess.win11) || {};
+        var fHealth = (fleetAssess && fleetAssess.health) || {};
+        var aStats = element('div', 'scp-dash-stats');
+        aStats.appendChild(stat(thai ? 'พร้อมใช้ Win 11' : 'Win 11 Ready', fWin11.eligible || 0, 'ok'));
+        aStats.appendChild(stat(thai ? 'อัปเกรดเพื่อรองรับ' : 'Win 11 Upgradable', fWin11.upgradable || 0, 'idle'));
+        aStats.appendChild(stat(thai ? 'ไม่รองรับ / ปลดระวาง' : 'Ineligible', fWin11.ineligible || 0, 'risk'));
+        aStats.appendChild(stat(thai ? 'คะแนนสุขภาพเฉลี่ย' : 'Avg Health', (fHealth.averageScore || 0) + ' / 100', 'busy'));
+        assessSec.appendChild(aStats);
+
+        var aFilterWrap = element('div', 'scp-dash-assess-filters');
+        aFilterWrap.appendChild(element('span', 'scp-dash-rooms-label', thai ? 'กรองตามสถานะ:' : 'Filter:'));
+        var currentAssessFilter = window.__assessFilter || 'all';
+        [
+            ['all', thai ? 'ทุกเครื่อง' : 'All'],
+            ['eligible', thai ? 'พร้อมใช้งาน' : 'Eligible'],
+            ['upgradable', thai ? 'อัปเกรดได้' : 'Upgradable'],
+            ['ineligible', thai ? 'ไม่รองรับ' : 'Ineligible'],
+            ['critical', thai ? 'วิกฤต/ต้องเปลี่ยน' : 'Critical/Replace']
+        ].forEach(function (f) {
+            var chip = button(f[1], 'scp-assess-pill' + (currentAssessFilter === f[0] ? ' on' : ''), function () {
+                window.__assessFilter = f[0];
+                render();
+            });
+            aFilterWrap.appendChild(chip);
+        });
+        assessSec.appendChild(aFilterWrap);
+
+        var aTable = element('table', 'scp-dash-table');
+        var aHead = element('thead');
+        var aHTr = element('tr');
+        [
+            thai ? 'ชื่อเครื่อง / แผนก' : 'Computer / Room',
+            thai ? 'CPU' : 'CPU',
+            thai ? 'RAM' : 'RAM',
+            thai ? 'ดิสก์' : 'Disk',
+            thai ? 'สถานะ Win 11' : 'Win 11 Status',
+            thai ? 'คะแนนสุขภาพ' : 'Health Score',
+            thai ? 'ปีที่ควรเปลี่ยน' : 'Replace Year',
+            thai ? 'ใบประเมิน' : 'Fact Sheet'
+        ].forEach(function (h) { aHTr.appendChild(element('th', '', h)); });
+        aHead.appendChild(aHTr);
+        aTable.appendChild(aHead);
+
+        var aBody = element('tbody');
+        var filteredAssessed = (fleetAssess.devices || []).filter(function (d) {
+            if (shownRooms.length && shownRooms.indexOf(d.room) === -1) return false;
+            if (searchText) {
+                var hay = [d.name, d.room, d.cpu, d.cpuName, d.os].join(' ').toLowerCase();
+                if (hay.indexOf(searchText) === -1) return false;
+            }
+            if (currentAssessFilter === 'eligible') return d.win11Status === 'eligible';
+            if (currentAssessFilter === 'upgradable') return d.win11Status === 'upgradable';
+            if (currentAssessFilter === 'ineligible') return d.win11Status === 'ineligible';
+            if (currentAssessFilter === 'critical') return d.healthStatus === 'critical' || d.recommendation === 'replace';
+            return true;
+        });
+
+        if (!filteredAssessed.length) {
+            var emptyRow = element('tr');
+            var emptyCell = element('td', '', thai ? 'ไม่พบเครื่องในเงื่อนไขที่เลือก' : 'No devices match this filter');
+            emptyCell.colSpan = 8;
+            emptyRow.appendChild(emptyCell);
+            aBody.appendChild(emptyRow);
+        } else {
+            filteredAssessed.forEach(function (d) {
+                var tr = element('tr');
+                var tdName = element('td');
+                tdName.appendChild(element('strong', '', d.name));
+                tdName.appendChild(element('small', 'scp-dash-note', ' · ' + (d.room || 'General') + ' (' + (d.os || d.osCaption || '').replace('Microsoft ', '') + ')'));
+                tr.appendChild(tdName);
+
+                var tdCpu = element('td');
+                tdCpu.appendChild(element('span', '', d.cpu || d.cpuName || '-'));
+                var cpuReason = (d.cpuEval && !d.cpuEval.supported && d.cpuEval.reason) || (!d.cpuSupported && d.cpuReason) || null;
+                if (cpuReason) {
+                    tdCpu.appendChild(element('small', 'scp-dash-flag high', cpuReason));
+                }
+                tr.appendChild(tdCpu);
+
+                tr.appendChild(element('td', '', (d.ramGb || 0) + ' GB'));
+                tr.appendChild(element('td', '', (d.diskHasSsd || d.hasSsd) ? 'SSD' : 'HDD'));
+
+                var tdWin = element('td');
+                tdWin.appendChild(element('span', 'scp-badge-' + d.win11Status, d.win11Status === 'eligible' ? (thai ? 'พร้อมใช้' : 'Eligible') : (d.win11Status === 'upgradable' ? (thai ? 'อัปเกรดได้' : 'Upgradable') : (thai ? 'ไม่รองรับ' : 'Ineligible'))));
+                tr.appendChild(tdWin);
+
+                var tdHealth = element('td');
+                tdHealth.appendChild(element('span', 'scp-health-' + (d.healthStatus || 'fair'), (d.healthScore || d.score || 0) + ' / 100'));
+                tr.appendChild(tdHealth);
+
+                tr.appendChild(element('td', '', String(d.replacementYear || d.replaceByYear || '-')));
+
+                var tdAct = element('td');
+                tdAct.appendChild(button(thai ? 'ใบประเมิน' : 'Fact sheet', 'scp-dash-refresh', function () {
+                    if (window.ScpReport) window.ScpReport.open('device', d.nodeid || d.nodeId);
+                }));
+                tr.appendChild(tdAct);
+
+                aBody.appendChild(tr);
+            });
+        }
+        aTable.appendChild(aBody);
+        assessSec.appendChild(aTable);
+
+        // --- Budget Tab ---
+        var budgetSec = sections.budget;
+        var currentYear = new Date().getFullYear();
+        var bg = (fleetAssess && fleetAssess.budget) || {};
+        var bgCur = bg.currentYear || {};
+        var bgNext = bg.nextYear || {};
+        var bgY23 = bg.year2to3 || {};
+        budgetSec.appendChild(element('h3', '', thai ? 'ประมาณการงบประมาณจัดซื้อและอัปเกรด 1-5 ปี' : '5-Year Hardware Budget Forecast'));
+
+        var bStats = element('div', 'scp-dash-stats');
+        bStats.appendChild(stat(thai ? 'ปีนี้ (' + (currentYear + 543) + ')' : 'This Year', (bgCur.total || 0).toLocaleString() + ' ฿', 'risk'));
+        bStats.appendChild(stat(thai ? 'ปีหน้า (' + (currentYear + 544) + ')' : 'Next Year', (bgNext.total || 0).toLocaleString() + ' ฿', 'idle'));
+        bStats.appendChild(stat(thai ? 'ปี ' + (currentYear + 545) + '-' + (currentYear + 546) : 'Years 2-3', (bgY23.total || 0).toLocaleString() + ' ฿', 'busy'));
+        bStats.appendChild(stat(thai ? 'รวมงบประมาณ 5 ปี' : '5-Year Total', (bg.fiveYearTotal || 0).toLocaleString() + ' ฿', 'ok'));
+        budgetSec.appendChild(bStats);
+
+        if (window.ScpReport && window.ScpReport.createBarChart) {
+            var bChartBox = element('div', 'scp-dash-chart-box');
+            bChartBox.style.margin = '16px 0';
+            bChartBox.appendChild(element('h4', '', thai ? 'กราฟสัดส่วนงบประมาณจัดซื้อและอัปเกรดรายปี (บาท)' : 'Yearly Budget Allocation (THB)'));
+            bChartBox.appendChild(window.ScpReport.createBarChart([
+                { label: String(currentYear + 543), value: (bgCur.replace || bgCur.total || 0), color: '#ef4444', secondary: (bgCur.upgrade || 0), secondaryColor: '#f59e0b' },
+                { label: String(currentYear + 544), value: (bgNext.replace || bgNext.total || 0), color: '#3b82f6' },
+                { label: (currentYear + 545) + '-' + (currentYear + 546), value: (bgY23.replace || bgY23.total || 0), color: '#6366f1' },
+                { label: (currentYear + 547) + '-' + (currentYear + 548), value: (bg.year4to5 ? (bg.year4to5.replace || bg.year4to5.total) : 0), color: '#10b981' }
+            ], 560, 200, '฿'));
+            budgetSec.appendChild(bChartBox);
+        }
+
+        var bActions = element('div', 'scp-dash-heading-actions');
+        bActions.style.position = 'static';
+        bActions.style.margin = '14px 0';
+        bActions.appendChild(button(thai ? 'พิมพ์รายงานแผนงบประมาณ (PDF)' : 'Print Budget Report (PDF)', 'scp-dash-refresh', function () {
+            if (window.ScpReport) window.ScpReport.open('budget');
+        }));
+        budgetSec.appendChild(bActions);
+
+        budgetSec.appendChild(element('h4', '', thai ? 'ประมาณการแยกตามหน่วยงาน / วอร์ด' : 'Department Budget Allocation'));
+        var bTable = element('table', 'scp-dash-table');
+        var bHead = element('thead'), bHTr = element('tr');
+        [
+            thai ? 'หน่วยงาน' : 'Department',
+            thai ? 'เครื่องทั้งหมด' : 'Total',
+            thai ? 'ต้องเปลี่ยนปีนี้' : 'Replace Now',
+            thai ? 'อัปเกรดได้' : 'Upgradable',
+            thai ? 'งบประมาณประมาณการ (บาท)' : 'Est. Budget (THB)'
+        ].forEach(function (h) { bHTr.appendChild(element('th', '', h)); });
+        bHead.appendChild(bHTr);
+        bTable.appendChild(bHead);
+        var bBody = element('tbody');
+        var roomKeys = Object.keys(fleetAssess.byRoom || {}).sort();
+        if (!roomKeys.length) {
+            var bEr = element('tr'), bEc = element('td', '', thai ? 'ไม่มีข้อมูล' : 'No data');
+            bEc.colSpan = 5; bEr.appendChild(bEc); bBody.appendChild(bEr);
+        } else {
+            roomKeys.forEach(function (rName) {
+                var r = fleetAssess.byRoom[rName];
+                var tr = element('tr');
+                tr.appendChild(element('td', '', rName));
+                tr.appendChild(element('td', '', String(r.total)));
+                tr.appendChild(element('td', '', String(r.replaceNow || 0)));
+                tr.appendChild(element('td', '', String(r.upgradable || 0)));
+                tr.appendChild(element('td', '', (r.cost || 0).toLocaleString() + ' ฿'));
+                bBody.appendChild(tr);
+            });
+        }
+        bTable.appendChild(bBody);
+        budgetSec.appendChild(bTable);
+
+        // --- Jobs Tab ---
         var jobs = list.filter(function (node) { return !!fixing[node._id]; });
         sections.jobs.appendChild(element('h3', '', thai ? 'สถานะงานไดรเวอร์ล่าสุด' : 'Latest driver jobs'));
         var jobGrid = element('div', 'scp-dash-job-grid');
@@ -1421,6 +1747,26 @@
         });
         sections.jobs.appendChild(jobGrid);
         if (!jobs.length) sections.jobs.appendChild(element('div', 'scp-dash-empty', thai ? 'ยังไม่มีงานไดรเวอร์ในรายการที่เลือก' : 'No driver jobs for the selected devices'));
+
+        // --- Reports Tab ---
+        sections.reports.appendChild(element('h3', '', thai ? 'รายงานและแบบฟอร์มประเมิน (สำหรับพิมพ์ / PDF)' : 'Printable Fleet & Assessment Reports'));
+        var repCards = element('div', 'scp-dash-report-cards');
+        [
+            ['overview', thai ? '1. รายงานภาพรวมทั้งโรงพยาบาล' : '1. Hospital Fleet Overview', thai ? 'สรุปจำนวนเครื่อง ความพร้อม Windows 11 และสถิติภาพรวม' : 'Fleet availability and Windows 11 readiness'],
+            ['department', thai ? '2. รายงานแยกตามหน่วยงาน / วอร์ด' : '2. By Department / Ward', thai ? 'รายงานผลการประเมินฮาร์ดแวร์และสรุปรายแผนก' : 'Department hardware status and replacement priorities'],
+            ['device', thai ? '3. ใบประเมินสภาพเครื่องรายเครื่อง' : '3. Individual Device Fact Sheet', thai ? 'สเปกเครื่อง คะแนนสุขภาพ และกราฟความน่าจะเป็น 1-5 ปี' : 'Detailed device fact sheet with survival sparkline'],
+            ['budget', thai ? '4. แผนงบประมาณจัดซื้อและอัปเกรด 1-5 ปี' : '4. 5-Year Budget Forecast', thai ? 'ประมาณการค่าใช้จ่ายครุภัณฑ์คอมพิวเตอร์ล่วงหน้า 5 ปี' : '5-year hardware budget breakdown']
+        ].forEach(function (rItem) {
+            var card = element('article', 'scp-dash-report-card');
+            card.appendChild(element('strong', '', rItem[1]));
+            card.appendChild(element('p', '', rItem[2]));
+            card.appendChild(button(thai ? 'เปิดรายงาน / พิมพ์' : 'Open / Print', 'scp-dash-refresh', function () {
+                if (window.ScpReport) window.ScpReport.open(rItem[0]);
+            }));
+            repCards.appendChild(card);
+        });
+        sections.reports.appendChild(repCards);
+
         if(window.ScpMonitor) sections.reports.appendChild(window.ScpMonitor.overview());
         sections.reports.appendChild(usageRanking(rooms, shownRooms));
 
@@ -1477,16 +1823,51 @@
         var available = window.innerHeight - top - 8;
         panel.style.maxHeight = Math.max(240, available) + 'px';
     }
+    function stripUnwantedNav() {
+        [
+            'scp-back-to-devices',
+            'LeftMenuMyDevices',
+            'LeftMenuMyFiles',
+            'MainMenuMyDevices',
+            'MainMenuMyFiles',
+            'MainDevDesktop',
+            'MainDevTerminal',
+            'MainDevFiles',
+            'MainDevRegistry',
+            'MainDevApps',
+            'MainDevAmt',
+            'MainDevConsole',
+            'MainDevPlugins',
+            'p9',
+            'p12',
+            'p13',
+            'p14',
+            'p15',
+            'p18',
+            'p19'
+        ].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.style.setProperty('display', 'none', 'important');
+        });
+    }
     function show() {
+        stripUnwantedNav();
         if (!panel) return;
         document.querySelectorAll('#page_leftbar .lbbutton').forEach(function (item) { item.classList.remove('lbbuttonsel'); });
         var navButton = document.getElementById('LeftMenuScpDashboard');
         if (navButton) navButton.classList.add('lbbuttonsel');
-        // Hide whatever page the site is showing without touching how it manages them.
-        ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].forEach(function (id) {
-            var page = document.getElementById(id);
+        // Hide whatever page the site is showing (p0-p60) without touching how it manages them.
+        for (var i = 0; i <= 60; i++) {
+            var page = document.getElementById('p' + i);
             if (page && page.style.display !== 'none') { page.dataset.scpHidden = '1'; page.style.display = 'none'; }
+        }
+        ['MainSubMenuSpan', 'MeshSubMenuSpan', 'EventsSubMenuSpan', 'UserSubMenuSpan', 'ServerSubMenuSpan', 'UsersSubMenuSpan'].forEach(function (id) {
+            var sub = document.getElementById(id);
+            if (sub && sub.style.display !== 'none') { sub.dataset.scpHidden = '1'; sub.style.display = 'none'; }
         });
+        if (typeof window.xxcurrentView !== 'undefined' && window.xxcurrentView !== 1) {
+            window.xxcurrentView = 1;
+        }
         panel.hidden = false;
         listen();
         loadDriverStatus();
@@ -1506,6 +1887,138 @@
         });
         if (timer) { window.clearInterval(timer); timer = null; }
     }
+
+    function openAssetEditDialog(nodeid) {
+        var node = (window.currentDevices && window.currentDevices.find(function (n) { return n._id === nodeid; })) ||
+                   (window.nodes && window.nodes[nodeid]) || { _id: nodeid, name: nodeid };
+        var asset = (window.ScpCachedAssets && window.ScpCachedAssets[nodeid]) || {};
+        var devAss = (window.ScpCachedDeviceAssessments && window.ScpCachedDeviceAssessments[nodeid]) || {};
+
+        var existingDialog = document.getElementById('scpAssetDialog');
+        if (existingDialog) existingDialog.remove();
+
+        var dialog = element('div', 'scp-asset-dialog-overlay');
+        dialog.id = 'scpAssetDialog';
+
+        var box = element('div', 'scp-asset-dialog-box');
+
+        var header = element('div', 'scp-asset-dialog-header');
+        var title = element('h3', '', thai ? '🏷️ จัดการข้อมูลครุภัณฑ์และงบประมาณ' : '🏷️ Asset & Budget Management');
+        var closeBtn = element('button', 'scp-dialog-close-btn', '✕');
+        closeBtn.type = 'button';
+        closeBtn.onclick = function () { dialog.remove(); };
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+        box.appendChild(header);
+
+        var devInfo = element('div', 'scp-asset-dialog-device');
+        devInfo.innerHTML = '<strong>' + (node.name || node.rname || nodeid) + '</strong>' +
+            ((node.ip || node.host) ? (' <span class="scp-ip-pill">IP: ' + (node.ip || node.host) + '</span>') : '');
+        box.appendChild(devInfo);
+
+        var form = element('div', 'scp-asset-dialog-form');
+
+        var fAsset = element('div', 'scp-form-group');
+        fAsset.appendChild(element('label', '', thai ? 'เลขครุภัณฑ์ (Asset Number)' : 'Asset Number'));
+        var inpAsset = document.createElement('input');
+        inpAsset.type = 'text';
+        inpAsset.className = 'scp-form-input';
+        inpAsset.placeholder = thai ? 'เช่น 7440-001-0001/67' : 'e.g. 7440-001-0001/67';
+        inpAsset.value = asset.assetNumber || devAss.assetNumber || '';
+        fAsset.appendChild(inpAsset);
+        form.appendChild(fAsset);
+
+        var fYear = element('div', 'scp-form-group');
+        fYear.appendChild(element('label', '', thai ? 'พ.ศ. (ปีงบประมาณ เช่น 2567)' : 'Fiscal Year (e.g. 2567)'));
+        var inpYear = document.createElement('input');
+        inpYear.type = 'number';
+        inpYear.className = 'scp-form-input';
+        inpYear.placeholder = '2567';
+        inpYear.value = asset.fiscalYear || devAss.fiscalYear || '';
+        fYear.appendChild(inpYear);
+        form.appendChild(fYear);
+
+        var fNote = element('div', 'scp-form-group');
+        fNote.appendChild(element('label', '', thai ? 'งบประจำปี / ประเภทงบ (เช่น งบประจำปี 67, เงินบำรุง, งบลงทุน)' : 'Budget Source / Category'));
+        var inpNote = document.createElement('input');
+        inpNote.type = 'text';
+        inpNote.className = 'scp-form-input';
+        inpNote.placeholder = thai ? 'เช่น งบประจำปี 2567, เงินบำรุง' : 'e.g. Annual Budget 2024';
+        inpNote.value = asset.note || asset.assetNote || devAss.assetNote || '';
+        fNote.appendChild(inpNote);
+        form.appendChild(fNote);
+
+        var fPrice = element('div', 'scp-form-group');
+        fPrice.appendChild(element('label', '', thai ? 'ราคาที่จัดซื้อ (บาท)' : 'Purchase Price (THB)'));
+        var inpPrice = document.createElement('input');
+        inpPrice.type = 'number';
+        inpPrice.step = 'any';
+        inpPrice.className = 'scp-form-input';
+        inpPrice.placeholder = '25000';
+        inpPrice.value = (asset.price != null) ? asset.price : ((devAss.purchasePrice != null) ? devAss.purchasePrice : '');
+        fPrice.appendChild(inpPrice);
+        form.appendChild(fPrice);
+
+        box.appendChild(form);
+
+        var actions = element('div', 'scp-asset-dialog-actions');
+        var statusMsg = element('span', 'scp-save-status');
+
+        var cancelBtn = element('button', 'scp-btn-cancel', thai ? 'ยกเลิก' : 'Cancel');
+        cancelBtn.type = 'button';
+        cancelBtn.onclick = function () { dialog.remove(); };
+
+        var saveBtn = element('button', 'scp-btn-save', thai ? '💾 บันทึกข้อมูล' : '💾 Save');
+        saveBtn.type = 'button';
+
+        saveBtn.onclick = function () {
+            saveBtn.disabled = true;
+            statusMsg.textContent = thai ? 'กำลังบันทึก...' : 'Saving...';
+            var assetVal = inpAsset.value.trim();
+            var yearVal = inpYear.value ? parseInt(inpYear.value, 10) : null;
+            var priceVal = inpPrice.value ? parseFloat(inpPrice.value) : null;
+            var noteVal = inpNote.value.trim();
+
+            if (window.ScpOperations && window.ScpOperations.request) {
+                window.ScpOperations.request('saveAssetInfo', {
+                    nodeid: nodeid,
+                    assetNumber: assetVal,
+                    fiscalYear: yearVal,
+                    price: priceVal,
+                    note: noteVal
+                }).then(function (res) {
+                    if (!window.ScpCachedAssets) window.ScpCachedAssets = {};
+                    window.ScpCachedAssets[nodeid] = {
+                        nodeid: nodeid,
+                        assetNumber: assetVal,
+                        fiscalYear: yearVal,
+                        price: priceVal,
+                        note: noteVal
+                    };
+                    dialog.remove();
+                    render();
+                }).catch(function (err) {
+                    saveBtn.disabled = false;
+                    statusMsg.textContent = thai ? ('เกิดข้อผิดพลาด: ' + (err.message || err)) : ('Error: ' + (err.message || err));
+                });
+            } else {
+                if (!window.ScpCachedAssets) window.ScpCachedAssets = {};
+                window.ScpCachedAssets[nodeid] = { nodeid: nodeid, assetNumber: assetVal, fiscalYear: yearVal, price: priceVal, note: noteVal };
+                dialog.remove();
+                render();
+            }
+        };
+
+        actions.appendChild(statusMsg);
+        actions.appendChild(cancelBtn);
+        actions.appendChild(saveBtn);
+        box.appendChild(actions);
+
+        dialog.appendChild(box);
+        document.body.appendChild(dialog);
+        inpAsset.focus();
+    }
+    window.openAssetEditDialog = openAssetEditDialog;
 
     function init() {
         if (panel) return;
@@ -1528,8 +2041,12 @@
         svg.appendChild(path);
         navButton.appendChild(svg);
         navButton.appendChild(element('span', 'scp-nav-label', t('title')));
-        navButton.addEventListener('click', show);
-        navButton.addEventListener('keypress', function (event) { if (event.key === 'Enter') show(); });
+        navButton.addEventListener('click', function () {
+            if (typeof window.go === 'function') { window.go(1); } else { show(); }
+        });
+        navButton.addEventListener('keypress', function (event) {
+            if (event.key === 'Enter') { if (typeof window.go === 'function') { window.go(1); } else { show(); } }
+        });
         var first = document.getElementById('LeftMenuMyDevices');
         if (first) bar.insertBefore(navButton, first); else bar.appendChild(navButton);
 
@@ -1542,11 +2059,13 @@
         heading.appendChild(element('p', '', t('intro')));
         var actions = element('div', 'scp-dash-heading-actions');
         liveToggle = button(t('liveOn'), 'scp-dash-live', function () { setLive(!liveOn); });
+        liveToggle.hidden = true;
         actions.appendChild(liveToggle);
+        actions.appendChild(button(thai ? 'เกณฑ์ประเมิน' : 'Criteria', 'scp-dash-refresh', function () { if (window.ScpOperations) window.ScpOperations.openCriteria(); }));
         actions.appendChild(button(t('exportCsv'), 'scp-dash-refresh', exportInventory));
         actions.appendChild(button(t('exportUsage'), 'scp-dash-refresh', exportUsage));
         actions.appendChild(button(t('refresh'), 'scp-dash-refresh', render));
-        if (window.ScpReport) { actions.appendChild(button(thai ? 'รายงาน' : 'Report', 'scp-dash-refresh', function () { window.ScpReport.open(); })); }
+        if (window.ScpReport) { actions.appendChild(button(thai ? 'รายงานและชาร์ต (พิมพ์)' : 'Reports & Print', 'scp-dash-refresh', function () { window.ScpReport.open(); })); }
         actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));
         var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);
         heading.appendChild(actions);
@@ -1567,10 +2086,23 @@
         panel.appendChild(body);
         devices.parentElement.insertBefore(panel, devices);
 
-        // Leaving through any of the site's own menu buttons closes the dashboard.
+        // Leaving through other menu buttons closes dashboard, but My Devices (1) opens dashboard.
         if (typeof window.go === 'function') {
             var original = window.go;
-            window.go = function () { hide(); return original.apply(this, arguments); };
+            window.go = function (page) {
+                if (page === 1) {
+                    if (original) original.call(this, 1);
+                    show();
+                    return;
+                }
+                if (page === 9 || page === 12 || page === 13 || page === 14 || page === 15 || page === 18 || page === 19) {
+                    page = 10;
+                }
+                hide();
+                var res = original.call(this, page);
+                stripUnwantedNav();
+                return res;
+            };
         }
         if (typeof window.handleInstalledAppsResponse === 'function') {
             var originalApps = window.handleInstalledAppsResponse;
@@ -1585,7 +2117,9 @@
             exportInventory: exportInventory, specLine: specLine, disksOf: disksOf,
             hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway,
             hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf,
-            fixDrivers: fixDrivers, driverScript: driverScript, snapshot: snapshot };
+            fixDrivers: fixDrivers, driverScript: driverScript, snapshot: snapshot,
+            reloadAssessment: function () { loadFleetAssessment(true); render(); } };
+        setTimeout(show, 50);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

@@ -6,7 +6,9 @@ const path = require('path');
 const https = require('https');
 const vm = require('vm');
 const { JSDOM } = require('jsdom');
-const base = 'https://127.0.0.1:8443';
+// Check this copy's own server: read the port from its config (dev and production can differ).
+const port = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, '..', '.local', 'scp-remote', 'config.json'), 'utf8')).settings.port || 8443; } catch (e) { return 8443; } })();
+const base = 'https://127.0.0.1:' + port;
 const languageScript = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'scp-language.js'), 'utf8');
 const phoneAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 function get(route, headers = {}) {

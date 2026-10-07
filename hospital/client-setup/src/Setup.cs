@@ -324,16 +324,24 @@ namespace ScpRemoteSetup
         // Write the name where the agent reads it. The .tag file is the documented
         // source for the server-side device name; the same value goes into the agent
         // settings file so the two never disagree if one of them is rebuilt.
-        public static void WriteDeviceName(string agentExePath, string deviceName)
+        public static void WriteDeviceName(string agentExePath, string deviceName, string assetNo = "", string fiscalYear = "", string price = "")
         {
             string dir = Path.GetDirectoryName(agentExePath);
             string baseName = Path.GetFileNameWithoutExtension(agentExePath);
             // Invariant culture keeps the year Gregorian, so it matches the server's own
             // logs instead of switching to the Buddhist era on a Thai-locale machine.
             string stamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            string desc = deviceName;
+            List<string> meta = new List<string>();
+            if (!string.IsNullOrEmpty(assetNo)) meta.Add("ครุภัณฑ์: " + assetNo);
+            if (!string.IsNullOrEmpty(fiscalYear)) meta.Add("พ.ศ." + fiscalYear);
+            if (!string.IsNullOrEmpty(price)) meta.Add("ราคา: " + price + " บ.");
+            if (meta.Count > 0) desc += " (" + string.Join(" | ", meta.ToArray()) + ")";
+            desc += " [ติดตั้ง " + stamp + "]";
+
             string[] tagLines = new string[] {
                 "~ServerName:" + deviceName,
-                "~ServerDesc:" + deviceName + " (ติดตั้ง " + stamp + ")"
+                "~ServerDesc:" + desc
             };
             UTF8Encoding utf8 = new UTF8Encoding(false);
 
@@ -388,11 +396,14 @@ namespace ScpRemoteSetup
         Panel pageWelcome, pageConsent, pageName, pageInstall, pageDone;
         Panel[] pages;
         CheckBox agree;
-        TextBox nameBox;
+        TextBox nameBox, assetBox, yearBox, priceBox;
         ProgressBar progress;
         Button btnBack, btnNext, btnCancel;
         int step = 1;
         string deviceName = "";
+        string assetNumber = "";
+        string fiscalYear = "";
+        string purchasePrice = "";
 
         public Wizard()
         {
@@ -554,29 +565,67 @@ namespace ScpRemoteSetup
 
             pageName = NewPage();
             Label nameLead = new Label();
-            nameLead.Location = new Point(0, 6);
-            nameLead.Size = new Size(430, 70);
-            nameLead.Text = "ตั้งชื่อที่ฝ่ายไอทีจะเห็นในระบบ เช่น เลขครุภัณฑ์ ห้อง หรือชื่อจุดบริการ\r\n\r\n" +
-                "ชื่อที่สื่อว่าเครื่องอยู่ที่ไหน จะช่วยให้ตามหาเครื่องได้เร็วตอนมีปัญหา";
+            nameLead.Location = new Point(0, 0);
+            nameLead.Size = new Size(430, 40);
+            nameLead.Text = "ตั้งชื่อเครื่องและระบุข้อมูลครุภัณฑ์ เพื่อให้ไอทีและฝ่ายพัสดุค้นหาเครื่องได้ง่าย\r\nสามารถแก้ไขหรือระบุเพิ่มเติมผ่านหน้าเว็บได้ตลอดเวลา";
             pageName.Controls.Add(nameLead);
 
             Label nameLabel = new Label();
-            nameLabel.Location = new Point(0, 92);
-            nameLabel.Size = new Size(430, 22);
-            nameLabel.Text = "ชื่อเครื่อง";
+            nameLabel.Location = new Point(0, 44);
+            nameLabel.Size = new Size(430, 20);
+            nameLabel.Text = "ชื่อเครื่อง / จุดบริการ / ห้อง *";
+            nameLabel.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             pageName.Controls.Add(nameLabel);
 
             nameBox = new TextBox();
-            nameBox.Location = new Point(0, 116);
-            nameBox.Size = new Size(430, 30);
-            nameBox.MaxLength = 0;
-            nameBox.Font = new Font("Segoe UI", 12F);
+            nameBox.Location = new Point(0, 66);
+            nameBox.Size = new Size(430, 26);
+            nameBox.Font = new Font("Segoe UI", 10F);
             pageName.Controls.Add(nameBox);
 
+            Label assetLabel = new Label();
+            assetLabel.Location = new Point(0, 98);
+            assetLabel.Size = new Size(430, 20);
+            assetLabel.Text = "เลขครุภัณฑ์ (ถ้ามี เช่น 7440-001-0001/67)";
+            assetLabel.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            pageName.Controls.Add(assetLabel);
+
+            assetBox = new TextBox();
+            assetBox.Location = new Point(0, 120);
+            assetBox.Size = new Size(430, 26);
+            assetBox.Font = new Font("Segoe UI", 10F);
+            pageName.Controls.Add(assetBox);
+
+            Label yearLabel = new Label();
+            yearLabel.Location = new Point(0, 154);
+            yearLabel.Size = new Size(200, 20);
+            yearLabel.Text = "ปี พ.ศ. งบประมาณ (เช่น 2567)";
+            yearLabel.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            pageName.Controls.Add(yearLabel);
+
+            yearBox = new TextBox();
+            yearBox.Location = new Point(0, 176);
+            yearBox.Size = new Size(195, 26);
+            yearBox.Font = new Font("Segoe UI", 10F);
+            pageName.Controls.Add(yearBox);
+
+            Label priceLabel = new Label();
+            priceLabel.Location = new Point(215, 154);
+            priceLabel.Size = new Size(215, 20);
+            priceLabel.Text = "ราคาจัดซื้อ (บาท)";
+            priceLabel.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            pageName.Controls.Add(priceLabel);
+
+            priceBox = new TextBox();
+            priceBox.Location = new Point(215, 176);
+            priceBox.Size = new Size(215, 26);
+            priceBox.Font = new Font("Segoe UI", 10F);
+            pageName.Controls.Add(priceBox);
+
             Label nameHint = new Label();
-            nameHint.Location = new Point(0, 152);
-            nameHint.Size = new Size(430, 60);
-            nameHint.Text = "พิมพ์ภาษาไทยได้ และไม่จำกัดความยาว\r\n\r\nตอนนี้ใส่ชื่อเครื่องของ Windows ไว้ให้แล้ว ถ้าพอใจกดถัดไปได้เลย";
+            nameHint.Location = new Point(0, 214);
+            nameHint.Size = new Size(430, 48);
+            nameHint.Text = "พิมพ์ภาษาไทยได้ ไม่จำกัดความยาว และสามารถปรับปรุงข้อมูลย้อนหลังได้";
             nameHint.ForeColor = Muted;
             pageName.Controls.Add(nameHint);
 
@@ -653,6 +702,9 @@ namespace ScpRemoteSetup
                 string entered = nameBox.Text.Trim();
                 if (entered.Length == 0) entered = Environment.MachineName;
                 deviceName = entered;
+                assetNumber = assetBox.Text.Trim();
+                fiscalYear = yearBox.Text.Trim();
+                purchasePrice = priceBox.Text.Trim();
                 RunInstall();
             }
             else if (step == 5) { Close(); }
@@ -777,7 +829,7 @@ namespace ScpRemoteSetup
             SetStatus("กำลังบันทึกชื่อเครื่อง");
             try
             {
-                Agent.WriteDeviceName(agent.ExePath, deviceName);
+                Agent.WriteDeviceName(agent.ExePath, deviceName, assetNumber, fiscalYear, purchasePrice);
                 Agent.RestartService(agent.ServiceName);
             }
             catch (Exception ex)
@@ -786,7 +838,12 @@ namespace ScpRemoteSetup
                 step = 3; UpdateStep(); return;
             }
 
-            doneText.Text = "ชื่อเครื่องนี้ในระบบคือ\r\n\r\n        " + deviceName + "\r\n\r\n" +
+            string summary = "ชื่อเครื่องในระบบ: " + deviceName;
+            if (!string.IsNullOrEmpty(assetNumber)) summary += "\r\nเลขครุภัณฑ์: " + assetNumber;
+            if (!string.IsNullOrEmpty(fiscalYear)) summary += "\r\nปีงบประมาณ: พ.ศ. " + fiscalYear;
+            if (!string.IsNullOrEmpty(purchasePrice)) summary += "\r\nราคาจัดซื้อ: " + purchasePrice + " บาท";
+
+            doneText.Text = summary + "\r\n\r\n" +
                 "เครื่องนี้จะแสดงให้ฝ่ายไอทีเห็นภายในไม่กี่นาที และโปรแกรมจะเริ่มทำงานเองทุกครั้งที่เปิดเครื่อง\r\n\r\n" +
                 "ทุกครั้งที่เจ้าหน้าที่ขอเข้าใช้งาน จะมีหน้าต่างขึ้นที่เครื่องนี้ให้กดอนุญาตก่อนเสมอ\r\n\r\n" +
                 "กด เสร็จสิ้น เพื่อปิดหน้าต่างนี้";

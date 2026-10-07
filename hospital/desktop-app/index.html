@@ -1,4 +1,101 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:;"><title>SCP-Remote</title><link rel="stylesheet" href="style.css"></head>
-<body><header><div><b>SCP-Remote</b><small>สุขภาพดิจิทัล · Hospital IT</small></div><select id="language" aria-label="Language"><option value="th">ไทย</option><option value="en">English</option></select></header>
-<section id="pair" hidden><div class="pair-card"><span class="eyebrow">SCP-REMOTE</span><h1 id="pairTitle">ลงทะเบียนโปรแกรม</h1><p id="pairText"></p><strong id="code"></strong><p id="machine"></p><button id="retry">ตรวจสอบอีกครั้ง</button></div></section>
-<main id="workspace" hidden><aside><h3 id="roomTitle">ห้อง / หน่วยงาน</h3><div id="rooms"></div><p id="consentNote">ทุกครั้งต้องได้รับอนุญาตจากเครื่องปลายทาง</p></aside><section class="content"><div class="heading"><div><span class="eyebrow">REMOTE DESKTOP</span><h1 id="heading">เลือกเครื่องที่ต้องการรีโมต</h1><p id="hint">ค้นหาตามชื่อเครื่องหรือ IP แล้วส่งคำขออนุญาต</p></div><button id="refresh">รีเฟรช</button></div><div class="fleet-summary"><article><span id="totalLabel">เครื่องทั้งหมด</span><strong id="totalCount">—</strong></article><article><span id="onlineLabel">พร้อมออนไลน์</span><strong id="onlineCount">—</strong></article><article><span id="roomsLabel">ห้อง / หน่วยงาน</span><strong id="roomsCount">—</strong></article></div><div class="tools"><input id="search" type="search" placeholder="ค้นหาชื่อเครื่อง หรือ IP"><div><button id="listView" aria-pressed="true">รายชื่อ</button><button id="mapView" aria-pressed="false">ผังห้อง</button></div></div><p id="status" role="status" aria-live="polite"></p><p id="mapNote" hidden></p><div id="devices"></div></section></main><footer id="footer">SCP-Remote · ภาพความละเอียดจริง · LAN / Wi-Fi</footer><script src="renderer.js"></script></body></html>
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RealVNC Viewer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- RealVNC Menu Bar -->
+  <div class="vnc-menu-bar">
+    <span class="vnc-menu-item">File</span>
+    <span class="vnc-menu-item">View</span>
+    <span class="vnc-menu-item">Help</span>
+  </div>
+
+  <!-- RealVNC Connect Top Header -->
+  <header class="vnc-top-header">
+    <div class="vnc-brand">
+      <span class="vnc-logo-rvnc">r<span class="vnc-logo-v">v</span>nc</span>
+      <span class="vnc-logo-connect">connect</span>
+    </div>
+
+    <div class="vnc-search-box">
+      <input id="search" type="search" placeholder="Search or enter an IP address..." autocomplete="off" spellcheck="false">
+    </div>
+
+    <div class="vnc-user-profile" title="บัญชีผู้ใช้งาน RealVNC">
+      <span class="vnc-status-check">✓</span>
+      <span class="vnc-user-name" id="userName">ชัยรัตน์ ประภัศรังษ์</span>
+      <span class="vnc-user-arrow">▾</span>
+    </div>
+  </header>
+
+  <!-- Workspace Split Layout -->
+  <div class="vnc-workspace" id="workspace">
+    <!-- Left Sidebar -->
+    <aside class="vnc-sidebar">
+      <div class="vnc-sidebar-nav">
+        <div class="vnc-nav-item active" id="btnAddressBook">
+          <svg class="vnc-nav-icon" viewBox="0 0 16 16"><path fill="currentColor" d="M1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5v-11zM2.5 2a.5.5 0 0 0-.5.5v4h5v-4.5h-4.5zm5.5 0v4.5h6v-4a.5.5 0 0 0-.5-.5H8zm6 5.5H8v6h5.5a.5.5 0 0 0 .5-.5v-5.5zm-6.5 0H2v5.5a.5.5 0 0 0 .5.5H7.5v-6z"/></svg>
+          <span>Address book</span>
+        </div>
+      </div>
+
+      <div class="vnc-rooms-section">
+        <div class="vnc-rooms-header" id="roomsLabel">หมวดหมู่ / แผนก</div>
+        <div id="rooms" class="vnc-rooms-list"></div>
+      </div>
+
+      <div class="vnc-sidebar-help">
+        <span class="vnc-help-icon">?</span>
+        <span class="vnc-help-text">Need help connecting?</span>
+        <span class="vnc-help-close">✕</span>
+      </div>
+    </aside>
+
+    <!-- Main Grid Content -->
+    <main class="vnc-main-area">
+      <div id="devices" class="vnc-device-grid"></div>
+    </main>
+  </div>
+
+  <!-- Bottom Status Bar -->
+  <footer class="vnc-status-bar">
+    <div id="statusCount" class="vnc-status-text">Loading devices...</div>
+    <div class="vnc-status-right">
+      <span id="statusSync" class="vnc-status-sync">● เชื่อมต่อเซิร์ฟเวอร์เรียบร้อย</span>
+      <span id="status" class="vnc-status-msg"></span>
+      <button id="refresh" class="vnc-btn-refresh" title="รีเฟรช">⟳</button>
+    </div>
+  </footer>
+
+  <!-- Compatibility layer for tests & headless validation -->
+  <div style="display:none" aria-hidden="true">
+    <span id="totalCount">0</span>
+    <span id="onlineCount">0</span>
+    <span id="roomsCount">0</span>
+    <span id="totalLabel"></span>
+    <span id="onlineLabel"></span>
+    <span id="roomTitle"></span>
+    <h1 id="heading"></h1>
+    <p id="hint"></p>
+    <button id="listView"></button>
+    <button id="mapView"></button>
+    <p id="mapNote"></p>
+    <button id="retry"></button>
+    <p id="consentNote"></p>
+    <footer id="footer"></footer>
+    <select id="language"><option value="th">ไทย</option><option value="en">English</option></select>
+    <div id="pair">
+      <h2 id="pairTitle"></h2>
+      <p id="pairText"></p>
+      <code id="code"></code>
+      <span id="machine"></span>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

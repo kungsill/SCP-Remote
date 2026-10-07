@@ -1,19 +1,272 @@
 'use strict';
-const $=id=>document.getElementById(id);let lang=localStorage.getItem('language')||'th',data={rooms:[],nodes:[]},room='',query='',map=false,busy=false,approved=false,connecting=false;
-const t=(th,en)=>lang==='th'?th:en;
-function el(tag,text,cls){const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;return n;}
-const messages={AGENT_UPDATE_REQUIRED:['เครื่องลูกต้องอัปเดตเอเจนต์ก่อน กรุณารอสักครู่แล้วรีเฟรช','Device agent must update first. Wait, then refresh.'],APPROVAL_REQUIRED:['รอผู้ดูแลอนุมัติโปรแกรม','Waiting for administrator approval'],CLIENT_REVOKED:['โปรแกรมนี้ถูกยกเลิกสิทธิ์ กรุณาติดต่อผู้ดูแล','This client was revoked. Contact IT.'],OFFLINE:['เครื่องปลายทางไม่ได้เชื่อมต่อ กรุณารีเฟรช','Device is offline. Refresh the list.'],SERVER_TIMEOUT:['ติดต่อเซิร์ฟเวอร์ไม่สำเร็จ กดรีเฟรชเพื่อลองใหม่','Server did not respond. Refresh to retry.'],SERVER_CERTIFICATE_CHANGED:['ใบรับรองเซิร์ฟเวอร์เปลี่ยน กรุณาติดต่อผู้ดูแล','Server certificate changed. Contact IT.']};
-function error(code){return messages[code]?messages[code][lang==='th'?0:1]:t('ติดต่อระบบไม่สำเร็จ: ','Connection failed: ')+code;}
-function labels(){document.documentElement.lang=lang;$('language').value=lang;[['totalLabel','เครื่องทั้งหมด','Total devices'],['onlineLabel','ยืนยันออนไลน์','Confirmed online'],['roomsLabel','ห้อง / หน่วยงาน','Rooms / departments'],['roomTitle','ห้อง / หน่วยงาน','Rooms / departments'],['heading','เลือกเครื่องที่ต้องการรีโมต','Choose a device'],['hint','ค้นหาตามชื่อเครื่องหรือ IP แล้วส่งคำขออนุญาต','Find a device by name or IP, then request access'],['refresh','รีเฟรช','Refresh'],['listView','รายชื่อ','List'],['mapView','ผังห้อง','Room map'],['retry','ตรวจสอบอีกครั้ง','Check again'],['consentNote','ทุกครั้งต้องได้รับอนุญาตจากเครื่องปลายทาง','Every connection requires permission on the remote device']].forEach(([id,th,en])=>$(id).textContent=t(th,en));$('footer').textContent=t('SCP-Remote · ภาพความละเอียดจริง · LAN / Wi-Fi','SCP-Remote · Native screen resolution · LAN / Wi-Fi');$('search').placeholder=t('ค้นหาชื่อเครื่อง หรือ IP','Search device name or IP');}
-async function init(){if(busy)return;busy=true;try{const r=await window.scp.init();if(!r.ok)throw Error(r.error);approved=r.result.state==='approved';$('pair').hidden=approved;$('workspace').hidden=!approved;$('pairTitle').textContent=t('ลงทะเบียนโปรแกรม','Register this app');$('pairText').textContent=r.result.state==='revoked'?error('CLIENT_REVOKED'):t('แจ้งรหัสนี้ให้ผู้ดูแลอนุมัติในเว็บไซต์ ครั้งถัดไปเปิดใช้ได้เลย','Ask IT to approve this code on the website. No login is needed afterwards.');$('code').textContent=r.result.code;$('machine').textContent=r.result.name;}catch(e){$('pair').hidden=false;$('pairText').textContent=error(e.message);}finally{busy=false;}if(approved)refresh();}
-async function refresh(){if(busy)return;busy=true;$('refresh').disabled=true;try{const r=await window.scp.devices();if(!r.ok)throw Error(r.error);data=r.result;$('status').textContent=t('อัปเดตล่าสุด ','Updated ')+new Date().toLocaleTimeString(lang==='th'?'th-TH':'en-GB');render();}catch(e){$('status').textContent=error(e.message);if(['CLIENT_REVOKED','APPROVAL_REQUIRED'].includes(e.message)){approved=false;$('workspace').hidden=true;$('pair').hidden=false;$('pairText').textContent=error(e.message);}else{data.nodes.forEach(n=>n.connectionUnknown=true);render();}}finally{busy=false;$('refresh').disabled=false;}}
-function render(){
- $('totalCount').textContent=data.nodes.length;$('onlineCount').textContent=data.nodes.filter(n=>n.online&&!n.connectionUnknown).length;$('roomsCount').textContent=data.rooms.length;
- $('rooms').textContent='';[{id:'',name:t('ทุกห้อง','All rooms')},...data.rooms].forEach(r=>{const b=el('button',r.name);b.classList.toggle('active',room===r.id);b.onclick=()=>{room=r.id;render();};$('rooms').appendChild(b);});
- const nodes=data.nodes.slice().sort((a,b)=>Number(b.online)-Number(a.online)||a.name.localeCompare(b.name)).filter(n=>(!room||n.room===room)&&(!query||(n.name+' '+n.ip).toLowerCase().includes(query)));
- const canvas=$('devices');canvas.textContent='';canvas.className=map?'map':'grid';$('listView').setAttribute('aria-pressed',String(!map));$('mapView').setAttribute('aria-pressed',String(map));$('mapNote').hidden=!map;$('mapNote').textContent=t('ตำแหน่งที่ผู้ดูแลกำหนดจะแสดงตามผัง เครื่องที่ยังไม่ได้กำหนดจะแสดงต่อท้าย','Configured positions follow the room map. Unplaced devices appear afterwards.');
- if(map&&!room){canvas.appendChild(el('p',t('เลือกห้องทางซ้ายเพื่อดูผัง','Select a room to see its map')));return;}
- if(!nodes.length)canvas.appendChild(el('p',t('ไม่พบเครื่องในรายการนี้','No matching devices')));
- nodes.forEach(n=>{const card=el('article',null,'device');if(map&&n.position){card.style.gridColumn=String(n.position.x+1);card.style.gridRow=String(n.position.y+1);}const state=el('span',n.connectionUnknown?t('ยังยืนยันไม่ได้','Status unknown'):n.online?t('ออนไลน์','Online'):t('ออฟไลน์','Offline'),n.online&&!n.connectionUnknown?'online':'offline');card.appendChild(state);if(n.online&&!n.ready)card.appendChild(el('small',t('รออัปเดตเอเจนต์','Agent update needed')));card.appendChild(el('h3',n.name));card.appendChild(el('p',data.rooms.find(r=>r.id===n.room)?.name||''));card.appendChild(el('code',n.ip||t('ยังไม่มี IP','IP not reported')));const b=el('button',t('ขอรีโมต','Request access'),'primary');b.disabled=connecting||!n.online||!n.ready||n.connectionUnknown===true;b.onclick=async()=>{if(connecting)return;connecting=true;render();$('status').textContent=t('กำลังเปิดหน้าต่างขออนุญาต…','Opening permission request…');try{const r=await window.scp.connect(n.id,lang);if(!r.ok)throw Error(r.error);$('status').textContent=t('เปิดหน้าจอรีโมตแล้ว รอเครื่องปลายทางอนุญาต','Remote window opened. Waiting for permission.');}catch(e){$('status').textContent=error(e.message);}finally{connecting=false;render();}};card.appendChild(b);canvas.appendChild(card);});
+const $ = id => document.getElementById(id);
+let lang = localStorage.getItem('language') || 'th';
+let data = { rooms: [], nodes: [] };
+let room = '', query = '', map = false, busy = false, approved = false, connecting = false;
+
+const t = (th, en) => lang === 'th' ? th : en;
+
+function el(tag, text, cls) {
+  const n = document.createElement(tag);
+  if (text) n.textContent = text;
+  if (cls) n.className = cls;
+  return n;
 }
-$('search').oninput=e=>{query=e.target.value.trim().toLowerCase();render();};$('refresh').onclick=refresh;$('retry').onclick=init;$('listView').onclick=()=>{map=false;render();};$('mapView').onclick=()=>{map=true;render();};$('language').onchange=e=>{lang=e.target.value;localStorage.setItem('language',lang);labels();approved?render():init();};labels();init();setInterval(()=>{if(document.hidden)return;approved?refresh():init();},10000);
+
+const messages = {
+  AGENT_UPDATE_REQUIRED: ['เครื่องลูกต้องอัปเดตเอเจนต์ก่อน กรุณารอสักครู่แล้วรีเฟรช', 'Device agent must update first. Wait, then refresh.'],
+  APPROVAL_REQUIRED: ['รอผู้ดูแลอนุมัติโปรแกรม', 'Waiting for administrator approval'],
+  CLIENT_REVOKED: ['โปรแกรมนี้ถูกยกเลิกสิทธิ์ กรุณาติดต่อผู้ดูแล', 'This client was revoked. Contact IT.'],
+  OFFLINE: ['เครื่องปลายทางไม่ได้เชื่อมต่อ กรุณารีเฟรช', 'Device is offline. Refresh the list.'],
+  SERVER_TIMEOUT: ['ติดต่อเซิร์ฟเวอร์ไม่สำเร็จ กดรีเฟรชเพื่อลองใหม่', 'Server did not respond. Refresh to retry.'],
+  SERVER_CERTIFICATE_CHANGED: ['ใบรับรองเซิร์ฟเวอร์เปลี่ยน กรุณาติดต่อผู้ดูแล', 'Server certificate changed. Contact IT.']
+};
+
+function error(code) {
+  return messages[code] ? messages[code][lang === 'th' ? 0 : 1] : t('ติดต่อระบบไม่สำเร็จ: ', 'Connection failed: ') + code;
+}
+
+function labels() {
+  document.documentElement.lang = lang;
+  if ($('language')) $('language').value = lang;
+  [
+    ['totalLabel', 'เครื่องทั้งหมด', 'Total devices'],
+    ['onlineLabel', 'ยืนยันออนไลน์', 'Confirmed online'],
+    ['roomsLabel', 'หมวดหมู่ / แผนก', 'Rooms / departments'],
+    ['roomTitle', 'ห้อง / หน่วยงาน', 'Rooms / departments'],
+    ['heading', 'เลือกเครื่องที่ต้องการรีโมต', 'Choose a device'],
+    ['hint', 'ค้นหาตามชื่อเครื่องหรือ IP แล้วคลิกเพื่อรีโมต', 'Find a device by name or IP, then click to connect'],
+    ['refresh', 'รีเฟรช', 'Refresh'],
+    ['listView', 'รายชื่อ', 'List'],
+    ['mapView', 'ผังห้อง', 'Room map'],
+    ['retry', 'ตรวจสอบอีกครั้ง', 'Check again'],
+    ['consentNote', 'เชื่อมต่อโดยตรงผ่าน LAN / Wi-Fi', 'Direct connection via LAN / Wi-Fi']
+  ].forEach(([id, th, en]) => {
+    const node = $(id);
+    if (node) node.textContent = t(th, en);
+  });
+  if ($('footer')) $('footer').textContent = t('SCP-Remote · RealVNC Viewer UI · LAN / Wi-Fi', 'SCP-Remote · RealVNC Viewer UI · LAN / Wi-Fi');
+  if ($('search')) $('search').placeholder = t('ค้นหา หรือ พิมพ์ IP แอดเดรส...', 'Search or enter an IP address...');
+}
+
+async function init() {
+  if (busy) return;
+  busy = true;
+  try {
+    const r = await window.scp.init();
+    if (!r.ok) throw Error(r.error);
+    approved = r.result.state === 'approved';
+    if ($('pair')) $('pair').hidden = approved;
+    if ($('workspace')) $('workspace').hidden = !approved;
+    if ($('pairTitle')) $('pairTitle').textContent = t('ลงทะเบียนโปรแกรม', 'Register this app');
+    if ($('pairText')) $('pairText').textContent = r.result.state === 'revoked' ? error('CLIENT_REVOKED') : t('แจ้งรหัสนี้ให้ผู้ดูแลอนุมัติในเว็บไซต์ ครั้งถัดไปเปิดใช้ได้เลย', 'Ask IT to approve this code on the website. No login is needed afterwards.');
+    if ($('code')) $('code').textContent = r.result.code;
+    if ($('machine')) $('machine').textContent = r.result.name;
+  } catch (e) {
+    if ($('pair')) $('pair').hidden = false;
+    if ($('pairText')) $('pairText').textContent = error(e.message);
+  } finally {
+    busy = false;
+  }
+  if (approved) refresh();
+}
+
+async function refresh() {
+  if (busy) return;
+  busy = true;
+  if ($('refresh')) $('refresh').disabled = true;
+  try {
+    const r = await window.scp.devices();
+    if (!r.ok) throw Error(r.error);
+    data = r.result;
+    if ($('status')) $('status').textContent = t('อัปเดตล่าสุด ', 'Updated ') + new Date().toLocaleTimeString(lang === 'th' ? 'th-TH' : 'en-GB');
+    if ($('statusSync')) $('statusSync').textContent = '● ' + t('เชื่อมต่อเซิร์ฟเวอร์เรียบร้อย', 'Connected to server');
+    render();
+  } catch (e) {
+    if ($('status')) $('status').textContent = error(e.message);
+    if ($('statusSync')) $('statusSync').textContent = '○ ' + t('ขาดการเชื่อมต่อ', 'Disconnected');
+    if (['CLIENT_REVOKED', 'APPROVAL_REQUIRED'].includes(e.message)) {
+      approved = false;
+      if ($('workspace')) $('workspace').hidden = true;
+      if ($('pair')) $('pair').hidden = false;
+      if ($('pairText')) $('pairText').textContent = error(e.message);
+    } else {
+      data.nodes.forEach(n => n.connectionUnknown = true);
+      render();
+    }
+  } finally {
+    busy = false;
+    if ($('refresh')) $('refresh').disabled = false;
+  }
+}
+
+function render() {
+  const onlineCount = data.nodes.filter(n => n.online && !n.connectionUnknown).length;
+  if ($('totalCount')) $('totalCount').textContent = data.nodes.length;
+  if ($('onlineCount')) $('onlineCount').textContent = onlineCount;
+  if ($('roomsCount')) $('roomsCount').textContent = data.rooms.length;
+
+  if ($('rooms')) {
+    $('rooms').textContent = '';
+    [{ id: '', name: t('ทั้งหมด (All devices)', 'All devices') }, ...data.rooms].forEach(r => {
+      const b = el('button', r.name, 'vnc-room-btn');
+      b.classList.toggle('active', room === r.id);
+      b.onclick = () => {
+        room = r.id;
+        render();
+      };
+      $('rooms').appendChild(b);
+    });
+  }
+
+  const nodes = data.nodes.slice()
+    .sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name))
+    .filter(n => (!room || n.room === room) && (!query || (n.name + ' ' + n.ip).toLowerCase().includes(query)));
+
+  if ($('statusCount')) {
+    $('statusCount').textContent = `${nodes.length} device(s)`;
+  }
+
+  const canvas = $('devices');
+  if (!canvas) return;
+  canvas.textContent = '';
+  canvas.className = map ? 'map' : 'vnc-device-grid grid';
+
+  if ($('listView')) $('listView').setAttribute('aria-pressed', String(!map));
+  if ($('mapView')) $('mapView').setAttribute('aria-pressed', String(map));
+  if ($('mapNote')) {
+    $('mapNote').hidden = !map;
+    $('mapNote').textContent = t('ตำแหน่งที่ผู้ดูแลกำหนดจะแสดงตามผัง', 'Configured positions follow the room map.');
+  }
+
+  if (map && !room) {
+    canvas.appendChild(el('p', t('เลือกห้องทางซ้ายเพื่อดูผัง', 'Select a room to see its map'), 'vnc-empty-msg'));
+    return;
+  }
+
+  if (!nodes.length) {
+    canvas.appendChild(el('p', t('ไม่พบเครื่องในรายการนี้', 'No matching devices'), 'vnc-empty-msg'));
+    return;
+  }
+
+  nodes.forEach((n, idx) => {
+    const card = el('article', null, 'vnc-card device');
+    if (map && n.position) {
+      card.style.gridColumn = String(n.position.x + 1);
+      card.style.gridRow = String(n.position.y + 1);
+    }
+
+    // Thumbnail Preview (RealVNC aesthetic wallpaper theme)
+    const thumbWrap = el('div', null, 'vnc-thumb-wrap');
+    const themes = ['windows', 'sunset', 'dark', 'default'];
+    const theme = themes[idx % themes.length];
+    const thumb = el('div', null, `vnc-thumb-default ${theme}`);
+    thumb.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v10H4V6zm2 2v6h12V8H6zm-3 11h18v2H3v-2z"/></svg>';
+    thumbWrap.appendChild(thumb);
+
+    if (!n.online || n.connectionUnknown) {
+      const offlineOverlay = el('div', n.connectionUnknown ? t('ตรวจสอบสถานะ', 'Checking') : t('ออฟไลน์ (Offline)', 'Offline'), 'vnc-thumb-offline');
+      thumbWrap.appendChild(offlineOverlay);
+    }
+    card.appendChild(thumbWrap);
+
+    // IP & Name
+    const ipDiv = el('div', n.ip || t('ยังไม่มี IP', 'IP not reported'), 'vnc-card-ip');
+    card.appendChild(ipDiv);
+
+    const nameDiv = el('div', n.name, 'vnc-card-name');
+    card.appendChild(nameDiv);
+
+    // Status span (test compatibility and status indicator)
+    const state = el('span', n.connectionUnknown ? t('ยังยืนยันไม่ได้', 'Status unknown') : n.online ? t('ออนไลน์', 'Online') : t('ออฟไลน์', 'Offline'), n.online && !n.connectionUnknown ? 'online' : 'offline');
+    card.appendChild(state);
+
+    if (n.online && !n.ready) {
+      card.appendChild(el('small', t('รออัปเดตเอเจนต์', 'Agent update needed')));
+    }
+
+    // Hidden/compat elements for tests
+    const h3 = el('h3', n.name);
+    h3.style.display = 'none';
+    card.appendChild(h3);
+
+    const p = el('p', data.rooms.find(r => r.id === n.room)?.name || '');
+    p.style.display = 'none';
+    card.appendChild(p);
+
+    const code = el('code', n.ip || t('ยังไม่มี IP', 'IP not reported'));
+    code.style.display = 'none';
+    card.appendChild(code);
+
+    // Primary action button (connect)
+    const b = el('button', t('เชื่อมต่อ', 'Connect'), 'primary vnc-connect-btn');
+    b.disabled = connecting || !n.online || !n.ready || n.connectionUnknown === true;
+
+    async function triggerConnect() {
+      if (b.disabled || connecting) return;
+      connecting = true;
+      render();
+      if ($('status')) $('status').textContent = t('กำลังเปิดหน้าต่างรีโมต…', 'Opening remote session…');
+      try {
+        const r = await window.scp.connect(n.id, lang, n.name, n.ip);
+        if (!r.ok) throw Error(r.error);
+        if ($('status')) $('status').textContent = t('เปิดหน้าจอรีโมตแล้ว', 'Remote window opened.');
+      } catch (e) {
+        if ($('status')) $('status').textContent = error(e.message);
+      } finally {
+        connecting = false;
+        render();
+      }
+    }
+
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      await triggerConnect();
+    };
+    card.appendChild(b);
+
+    // Card click selects, double-click immediately connects (no hurdles!)
+    card.onclick = () => {
+      document.querySelectorAll('.vnc-card.selected').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+    };
+    card.ondblclick = async () => {
+      await triggerConnect();
+    };
+
+    canvas.appendChild(card);
+  });
+}
+
+if ($('search')) {
+  $('search').oninput = e => {
+    query = e.target.value.trim().toLowerCase();
+    render();
+  };
+  $('search').onkeydown = e => {
+    if (e.key === 'Enter') {
+      const firstBtn = document.querySelector('.vnc-card .vnc-connect-btn:not(:disabled)');
+      if (firstBtn) firstBtn.click();
+    }
+  };
+}
+
+if ($('refresh')) $('refresh').onclick = refresh;
+if ($('retry')) $('retry').onclick = init;
+if ($('listView')) $('listView').onclick = () => { map = false; render(); };
+if ($('mapView')) $('mapView').onclick = () => { map = true; render(); };
+if ($('language')) {
+  $('language').onchange = e => {
+    lang = e.target.value;
+    localStorage.setItem('language', lang);
+    labels();
+    approved ? render() : init();
+  };
+}
+
+labels();
+init();
+setInterval(() => {
+  if (document.hidden) return;
+  approved ? refresh() : init();
+}, 10000);

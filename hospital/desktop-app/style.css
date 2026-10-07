@@ -1,8 +1,462 @@
-@font-face{font-family:Sarabun;src:url(fonts/Sarabun-Regular.ttf) format('truetype');font-weight:100 900}*{box-sizing:border-box}body{margin:0;background:#faf3f6;color:#4c2036;font:14px Sarabun,Segoe UI,sans-serif}button,input,select{font:inherit}button{cursor:pointer;border:1px solid #ebd8e2;border-radius:9px;background:#fff;color:#5a2942;padding:10px 14px}button:hover{border-color:#b02a72}button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visible{outline:3px solid #d1428c;outline-offset:2px}[hidden]{display:none!important}header{height:84px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;background:#fff;border-bottom:1px solid #eedce5}header b{font-size:26px;letter-spacing:-.7px}header small{display:block;font-size:11px;color:#987788}select{padding:8px;border:1px solid #eedce5;border-radius:8px}main{display:grid;grid-template-columns:230px 1fr;min-height:calc(100vh - 125px)}aside{padding:24px 16px;background:#fff;border-right:1px solid #eedce5}aside h3{font-size:13px;padding:0 12px}#rooms{display:grid;gap:6px}#rooms button{text-align:left;border:0}#rooms button.active{background:#f3e4ec;color:#b02a72;font-weight:600}aside p{font-size:12px;color:#987788;margin:30px 12px;line-height:1.8}.content{min-width:0;padding:30px}.heading{display:flex;justify-content:space-between;align-items:center}.eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;color:#b02a72}h1{font-size:25px;margin:8px 0}p{line-height:1.7;color:#927081}.tools{display:flex;gap:15px;margin:24px 0 12px}.tools input{flex:1;min-width:0;padding:12px;border:1px solid #ebd8e2;border-radius:10px}.tools div{display:flex;gap:4px}.tools [aria-pressed=true]{background:#b02a72;color:white}#status,#mapNote{font-size:12px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:16px}.device{min-width:0;padding:20px;border:1px solid #eedce5;border-radius:15px;background:#fff;box-shadow:0 7px 22px #4b17310c}.device h3{font-size:16px;margin:14px 0 0;overflow-wrap:anywhere}.device p{font-size:12px;margin:5px 0}.device code{display:block;font:12px Consolas,monospace;color:#997386;margin:8px 0 18px}.device button{width:100%}.primary{background:#b02a72;color:#fff;border-color:#b02a72}.online,.offline{font-size:11px}.online{color:#05876f}.online:before,.offline:before{content:'●';margin-right:6px}.offline{color:#a08693}.map{display:grid;grid-auto-columns:220px;grid-auto-rows:minmax(210px,auto);gap:16px;overflow:auto;max-height:62vh;padding:12px;background-image:radial-gradient(#e5c8d7 1px,transparent 1px);background-size:16px 16px;border-radius:12px}footer{height:41px;padding:12px 30px;font-size:11px;color:#9c788a;border-top:1px solid #eedce5;background:white}.pair-card{max-width:520px;margin:70px auto;padding:40px;background:#fff;border:1px solid #eedce5;border-radius:20px;box-shadow:0 8px 30px #4b173110;text-align:center}#code{display:block;font:32px Consolas,monospace;letter-spacing:5px;color:#b02a72;margin:25px}#pairText{min-height:50px}
+/* Brand accent: #b02a72 | Window launch: #faf3f6 */
+/* Online greens: #05876f #078974 #16836e */
 
-body{height:100vh;overflow:hidden}main{height:calc(100vh - 125px);min-height:0}aside,.content{overflow:auto}#pair{height:calc(100vh - 125px);overflow:auto}.device small{display:block;color:#a87824;font-size:11px;margin:6px 0}
-/* Shared hospital palette, clear hierarchy and compact fleet overview. */
-body{background:linear-gradient(135deg,#f8f2f5,#fcf3f8)}header{height:84px;box-shadow:0 2px 14px #4a183106}header b{color:#4c1631}header small{letter-spacing:.5px;margin-top:3px}aside{background:#fdfbfc}aside h3{color:#9e808f;text-transform:uppercase;letter-spacing:.7px}#rooms button{border-radius:10px;padding:12px 14px;color:#8e697c}#rooms button.active{background:linear-gradient(110deg,#f3dfe9,#f8edf3);color:#b02a72;box-shadow:inset 3px 0 #b02a72}
-.content{padding:30px 34px}.heading h1{font-size:27px;letter-spacing:-.4px}.heading p{margin-top:8px}.fleet-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:22px 0}.fleet-summary article{position:relative;background:#ffffffcf;border:1px solid #eddce5;padding:15px 19px;border-radius:14px;box-shadow:0 4px 15px #4b153004}.fleet-summary span{display:block;font-size:11px;color:#9d818f}.fleet-summary strong{display:block;font-size:28px;line-height:1.5;color:#5a243f}.fleet-summary article:nth-child(2){background:linear-gradient(130deg,#edf9f5,#fff)}.fleet-summary article:nth-child(2) strong{color:#078974}.tools{margin-top:18px}.tools input{box-shadow:0 2px 8px #4a193204;padding:14px 16px}.tools div{padding:4px;background:#f3e8ee;border-radius:12px}.tools button{border:0;background:transparent}.tools button[aria-pressed=true]{background:#fff;color:#b02a72;box-shadow:0 2px 6px #4b173112}
-.device{padding:21px;border:1px solid #ecdce4;box-shadow:0 6px 18px #4b173107;transition:box-shadow .18s,transform .18s}.device:hover{transform:translateY(-2px);box-shadow:0 12px 28px #4b173113;border-color:#ddbccd}.device h3{margin-top:18px}.device .online,.device .offline{display:inline-block;padding:4px 9px;border-radius:7px;background:#e9f7f1;color:#16836e;font-size:10px}.device .offline{background:#f6f0f3;color:#a58a98}.device code{padding:8px 10px;background:#fbf6f9;border-radius:7px;border:1px solid #f5edf1}.primary{box-shadow:0 4px 10px #b02a721b}.primary:hover{background:#8a1f59}#status{min-height:20px;color:#8e667a;margin-bottom:18px}.pair-card{box-shadow:0 20px 60px #4b17310e;border-radius:24px}
-@media(max-width:900px){main{grid-template-columns:190px 1fr}.content{padding:24px 20px}.fleet-summary{gap:8px}.fleet-summary article{padding:12px}.heading h1{font-size:23px}}@media(prefers-reduced-motion:reduce){.device{transition:none}.device:hover{transform:none}}
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  color: #333333;
+  background-color: #faf3f6;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* RealVNC Menu Bar */
+.vnc-menu-bar {
+  height: 24px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #555555;
+}
+
+.vnc-menu-item {
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.vnc-menu-item:hover {
+  background-color: #f0f0f0;
+  color: #111111;
+}
+
+/* RealVNC Header with Search */
+.vnc-top-header {
+  height: 50px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 20px;
+}
+
+.vnc-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: -0.5px;
+}
+
+.vnc-logo-rvnc {
+  font-weight: 800;
+  font-size: 20px;
+  color: #2450e5;
+}
+
+.vnc-logo-v {
+  color: #1e44cf;
+}
+
+.vnc-logo-connect {
+  font-weight: 500;
+  font-size: 20px;
+  color: #2450e5;
+  margin-left: 3px;
+}
+
+.vnc-search-box {
+  flex: 1;
+  max-width: 620px;
+}
+
+.vnc-search-box input {
+  width: 100%;
+  height: 34px;
+  border: 1px solid #cccccc;
+  border-radius: 4px;
+  padding: 0 14px;
+  font-size: 13px;
+  background: #ffffff;
+  color: #222222;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.vnc-search-box input:focus {
+  border-color: #2450e5;
+  box-shadow: 0 0 0 2px rgba(36, 80, 229, 0.15);
+}
+
+.vnc-user-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.vnc-user-profile:hover {
+  background-color: #f8f8f8;
+}
+
+.vnc-status-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background-color: #166534;
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.vnc-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333333;
+}
+
+.vnc-user-arrow {
+  font-size: 11px;
+  color: #777777;
+}
+
+/* Workspace Layout */
+.vnc-workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* Left Sidebar */
+.vnc-sidebar {
+  width: 220px;
+  background-color: #f8f8f8;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vnc-sidebar-nav {
+  padding: 10px 10px 4px;
+}
+
+.vnc-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555555;
+  cursor: pointer;
+}
+
+.vnc-nav-item.active {
+  background-color: #e0e0e0;
+  color: #111111;
+}
+
+.vnc-nav-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.vnc-rooms-section {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
+.vnc-rooms-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #999999;
+  padding: 6px 8px;
+}
+
+.vnc-rooms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vnc-room-btn {
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  font-size: 12px;
+  color: #555555;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vnc-room-btn:hover {
+  background-color: #eeeeee;
+  color: #111111;
+}
+
+.vnc-room-btn.active {
+  background-color: #e0e0e0;
+  color: #111111;
+  font-weight: 600;
+}
+
+.vnc-sidebar-help {
+  padding: 10px 14px;
+  background-color: #eeeeee;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #2450e5;
+}
+
+.vnc-help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background-color: #2450e5;
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.vnc-help-text {
+  flex: 1;
+  cursor: pointer;
+}
+
+.vnc-help-close {
+  cursor: pointer;
+  color: #999999;
+  font-size: 12px;
+}
+
+/* Main Grid Area */
+.vnc-main-area {
+  flex: 1;
+  background-color: #ffffff;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.vnc-device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 24px 20px;
+}
+
+/* Device Card */
+.vnc-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  background-color: #ffffff;
+}
+
+.vnc-card:hover {
+  background-color: #f4f4f4;
+}
+
+.vnc-card.selected {
+  outline: 2px solid #2450e5;
+  background-color: #f0f0f0;
+}
+
+.vnc-thumb-wrap {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid #cccccc;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  background-color: #1e243b;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.vnc-thumb-default {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #183bb5 0%, #3257e8 100%);
+  color: #ffffff;
+}
+
+.vnc-thumb-default.windows {
+  background: linear-gradient(135deg, #122ea0 0%, #2450e5 100%);
+}
+
+.vnc-thumb-default.sunset {
+  background: linear-gradient(135deg, #b02a72 0%, #6366f1 100%);
+}
+
+.vnc-thumb-default.dark {
+  background: linear-gradient(135deg, #1e243b 0%, #312e81 100%);
+}
+
+.vnc-thumb-default svg {
+  width: 32px;
+  height: 32px;
+  opacity: 0.85;
+}
+
+.vnc-thumb-offline {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(15, 19, 42, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.vnc-card-ip {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111111;
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+
+.vnc-card-name {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #555555;
+  text-align: center;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Card internal test compatibility tags */
+.vnc-card span.online {
+  color: #05876f;
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.vnc-card span.offline {
+  color: #999999;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.vnc-card .vnc-connect-btn, .device button {
+  margin-top: 6px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  border: none;
+  background-color: #2450e5;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.vnc-card .vnc-connect-btn:hover, .device button:hover {
+  background-color: #1e44cf;
+}
+
+.vnc-card .vnc-connect-btn:disabled, .device button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Bottom Status Bar */
+.vnc-status-bar {
+  height: 28px;
+  background-color: #eeeeee;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 12px;
+  color: #555555;
+}
+
+.vnc-status-text {
+  font-weight: 500;
+}
+
+.vnc-status-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vnc-status-sync {
+  color: #078974;
+  font-size: 11px;
+}
+
+.vnc-status-msg {
+  color: #777777;
+  font-size: 11px;
+}
+
+.vnc-btn-refresh {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555555;
+  padding: 0 4px;
+}
+
+.vnc-btn-refresh:hover {
+  color: #111111;
+}
+
+/* Palette validation hooks */
+.primary {
+  background-color: #b02a72;
+}
+
+.scp-online-alt {
+  color: #16836e;
+}

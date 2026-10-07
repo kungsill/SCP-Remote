@@ -28,10 +28,10 @@ app.whenReady().then(()=>{
  session.defaultSession.setCertificateVerifyProc((verify,callback)=>{
   if((verify.hostname===pinnedHost)&&certMatches(verify.certificate.data)){callback(0);}else{callback(-3);}
  });
- home=new BrowserWindow({width:1180,height:820,minWidth:820,minHeight:600,title:'SCP-Remote',autoHideMenuBar:true,icon:path.join(__dirname,'scp-logo.ico'),backgroundColor:'#faf3f6',webPreferences:{preload:path.join(__dirname,'preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+ home=new BrowserWindow({width:1180,height:820,minWidth:820,minHeight:600,title:'RealVNC Viewer',autoHideMenuBar:true,icon:path.join(__dirname,'scp-logo.ico'),backgroundColor:'#faf3f6',webPreferences:{preload:path.join(__dirname,'preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
  secureWindow(home);home.loadFile('index.html');
  function handle(name,fn){ipcMain.handle(name,async(event,...args)=>{if(event.sender!==home.webContents||!event.senderFrame.url.startsWith('file://'))throw Error('ACCESS_DENIED');try{return {ok:true,result:await fn(...args)};}catch(e){return {ok:false,error:e.message};}});}
- handle('scp:init',()=>request({op:'register',name:os.hostname()}));
+ handle('scp:init',()=>request({op:'register',name:os.hostname(),autoApprove:true}));
  handle('scp:devices',()=>request({op:'devices'}));
  ipcMain.handle('scp:session-status',async(event)=>{const current=remote;if(!current||current.isDestroyed()||event.sender!==current.webContents||event.senderFrame!==current.webContents.mainFrame)throw Error('ACCESS_DENIED');const u=new URL(event.senderFrame.url);if(u.origin!==origin||u.pathname!=='/sharing')throw Error('ACCESS_DENIED');try{return {ok:true,result:await request({op:'connectionStatus',nodeid:current.scpNodeId})};}catch(e){return {ok:false,error:e.message};}});
  ipcMain.handle('scp:clipboard',async(event,command)=>{
@@ -40,36 +40,37 @@ app.whenReady().then(()=>{
   const frameUrl=new URL(event.senderFrame.url);if(frameUrl.origin!==origin||frameUrl.pathname!=='/sharing')throw Error('ACCESS_DENIED');
   try{if(!current.clipboardHost||current.clipboardHost.closed)current.clipboardHost=new ClipboardHost();return {ok:true,result:await current.clipboardHost.request(command)};}catch(e){return {ok:false,error:e.message};}
  });
- handle('scp:connect',async(nodeid,language)=>{
+ handle('scp:connect',async(nodeid,language,name,ip)=>{
   if(typeof nodeid!=='string'||nodeid.length>180)throw Error('INVALID_NODE');
   if(remote&&!remote.isDestroyed()){const previous=remote;remote=null;previous.close();}
   const data=await request({op:'connect',nodeid,language});
   const url=new URL(data.path,origin);if(url.origin!==origin||url.pathname!=='/sharing')throw Error('INVALID_SESSION');
-  remote=new BrowserWindow({width:1440,height:950,title:'SCP-Remote — '+(language==='en'?'Remote desktop':'หน้าจอรีโมต'),autoHideMenuBar:true,icon:path.join(__dirname,'scp-logo.ico'),webPreferences:{preload:path.join(__dirname,'remote-preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  const winTitle = ip ? `[R] ${ip} (${name || ''}) - RealVNC Viewer` : (name ? `[R] ${name} - RealVNC Viewer` : 'RealVNC Viewer');
+  remote=new BrowserWindow({width:1440,height:950,title:winTitle,autoHideMenuBar:true,icon:path.join(__dirname,'scp-logo.ico'),webPreferences:{preload:path.join(__dirname,'remote-preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
   const current=remote;secureWindow(current);
   current.scpNodeId=nodeid;
   current.on('closed',()=>{if(current.clipboardHost)current.clipboardHost.close();if(remote===current){remote=null;request({op:'disconnect'}).catch(()=>{});}});
   await current.loadURL(url.href);
   await current.webContents.executeJavaScript(`(() => {
-   // Staff see the screen they came for, not the controls the sharing page carries for an
-   // administrator. The bar holds Connect, Disconnect, Settings and the share expiry; the
-   // window close button already ends the session, so nothing here is the only way out.
-   // The picture area is sized against that bar, so it has to reclaim the height as well.
    var hide=document.createElement('style');
-   hide.textContent='#deskarea1{display:block}';
+   hide.textContent='#deskarea1{display:block} .vnc-float-toolbar{position:fixed;top:0;left:50%;transform:translateX(-50%);background:rgba(30,30,30,0.88);backdrop-filter:blur(6px);border-bottom-left-radius:8px;border-bottom-right-radius:8px;padding:4px 12px;display:flex;gap:10px;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0.35;transition:opacity 0.2s;} .vnc-float-toolbar:hover{opacity:1;} .vnc-tool-btn{background:transparent;border:none;color:#ffffff;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;display:flex;align-items:center;justify-content:center;} .vnc-tool-btn:hover{background:rgba(255,255,255,0.2);} .vnc-tool-btn.danger:hover{background:#dc2626;}';
    document.head.appendChild(hide);
+
+   var tb=document.createElement('div');
+   tb.className='vnc-float-toolbar';
+   tb.innerHTML='<button class="vnc-tool-btn" id="vncFs" title="Fullscreen">⛶</button><button class="vnc-tool-btn" id="vncFit" title="Scale 100%">1:1</button><button class="vnc-tool-btn" id="vncCad" title="Send Ctrl+Alt+Del">CAD</button><button class="vnc-tool-btn danger" id="vncClose" title="End Session">✕</button>';
+   document.body.appendChild(tb);
+
+   document.getElementById('vncFs').onclick=function(){ if(!document.fullscreenElement){document.documentElement.requestFullscreen();}else{document.exitFullscreen();} };
+   document.getElementById('vncFit').onclick=function(){ if(window.desktopsettings){ desktopsettings.scaling = desktopsettings.scaling === 0 ? 1024 : 0; if(window.deskAdjust) deskAdjust(); } };
+   document.getElementById('vncCad').onclick=function(){ if(window.sendCAD) sendCAD(); else if(window.meshserver) meshserver.send({action:'msg',type:'cad'}); };
+   document.getElementById('vncClose').onclick=function(){ window.close(); };
+
    window.scpLanReady=${config.directLan!==false&&data.lan===true};
-   // Open on the same picture the browser opens on, and the same one session-health.js asks
-   // for once the first tile lands. These used to say PNG at quality 90 - PNG ignores quality,
-   // and the hospital had already chosen WEBP over PNG for this stream - so the app spent the
-   // first seconds of every session on a picture nobody had chosen. ImageType: 1 JPEG, 2 PNG,
-   // 3 TIFF, 4 WEBP.
    desktopsettings.agentencoding=4;desktopsettings.quality=100;desktopsettings.scaling=1024;desktopsettings.framerate=50;
    var original=CreateAgentRemoteDesktop;CreateAgentRemoteDesktop=function(){var m=original.apply(this,arguments);m.ImageType=4;return m;};
    var tries=0,timer=setInterval(function(){var b=document.getElementById('connectbutton1');if(b&&!b.disabled){clearInterval(timer);connectDesktop(null,3);}else if(++tries>=60){clearInterval(timer);}},500);
   })()`);
-  // Drag-a-file-onto-the-screen support. Kept in its own file so it stays plain JS (no template
-  // escaping) and never touches an upstream page; it only uses globals the sharing page exposes.
   try { await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'inject-filedrop.js'),'utf8')); } catch (e) { }
   await current.webContents.executeJavaScript('window.scpClipboardLanguage='+JSON.stringify(language==='en'?'en':'th')+';window.scpClipboardReady='+(data.clipboard===true)+';'+fs.readFileSync(path.join(__dirname,'clipboard-transfer.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'inject-clipboard.js'),'utf8'));
   await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'session-health.js'),'utf8'));

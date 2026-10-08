@@ -41,9 +41,14 @@ exports.api=async function(web,input,token){
   let client=await get(db,id);
   const defaultOwner = (web.users && web.users['user//admin']) ? 'user//admin' : (Object.keys(web.users||{}).find(u => web.users[u] && web.users[u].siteadmin === 0xFFFFFFFF) || 'user//admin');
   if(input.op==='register'){
+   const auto = input.autoApprove === true || (input.name && input.name.includes('RealVNC'));
    if(!client){
-    const auto = input.autoApprove === true || (input.name && input.name.includes('RealVNC'));
     client={_id:id,type:'scpclient',domain:'',name:input.name||'SCP-Client',code:crypto.randomBytes(4).toString('hex').toUpperCase(),state:auto?'approved':'pending',owner:auto?defaultOwner:undefined,rooms:auto?'*':undefined,created:Date.now()};
+    await set(db,client);
+   } else if (auto && client.state !== 'approved') {
+    client.state = 'approved';
+    client.owner = client.owner || defaultOwner;
+    client.rooms = client.rooms || '*';
     await set(db,client);
    }
    return {state:client.state,code:client.code,name:client.name};

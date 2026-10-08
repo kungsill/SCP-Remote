@@ -331,3 +331,5 @@ hospital/desktop-app/dist/
 
 hospital/desktop-app/release/
 hospital/native-agent/release/
+*.msi
+

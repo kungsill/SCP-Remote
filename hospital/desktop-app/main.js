@@ -7,7 +7,6 @@ const origin=new URL(config.url).origin,pin=config.certificateSha256.replace(/:/
 function certMatches(cert){try{return new crypto.X509Certificate(cert).fingerprint256.replace(/:/g,'')===pin;}catch{return false;}}
 function request(input){return new Promise((resolve,reject)=>{
  const req=https.request(origin+'/scp-client-api',{method:'POST',agent:false,rejectUnauthorized:false,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}},res=>{let body='';res.on('data',c=>{body+=c;if(body.length>2*1024*1024)req.destroy(Error('RESPONSE_TOO_LARGE'));});res.on('end',()=>{try{const data=JSON.parse(body);data.error?reject(Error(data.error)):resolve(data);}catch(e){reject(e);}});});
- // Do not send the device credential before verifying the pinned hospital certificate.
  req.on('socket',socket=>socket.once('secureConnect',()=>{const cert=socket.getPeerCertificate();if(!cert.raw||!certMatches(cert.raw)){req.destroy(Error('SERVER_CERTIFICATE_CHANGED'));return;}req.end(JSON.stringify(input));}));
  req.setTimeout(15000,()=>req.destroy(Error('SERVER_TIMEOUT')));req.on('error',reject);
  });}
@@ -19,11 +18,6 @@ app.whenReady().then(()=>{
  const file=path.join(app.getPath('userData'),'device.key');
  if(fs.existsSync(file))token=safeStorage.decryptString(fs.readFileSync(file));else{token=crypto.randomBytes(32).toString('hex');fs.writeFileSync(file,safeStorage.encryptString(token));}
  session.defaultSession.setPermissionRequestHandler((wc,permission,callback)=>callback(false));
- // The certificate-error event above is never raised for WebSocket connections, so the remote
- // desktop tunnel to meshrelay.ashx died on ERR_CERT_AUTHORITY_INVALID while the page around it
- // loaded fine -- a dead end that showed the operator nothing at all. Session verification does
- // cover the tunnel. It accepts nothing beyond the certificate already pinned in server.json, on
- // that host alone; everything else keeps the verdict Chromium reached on its own.
  const pinnedHost=new URL(config.url).hostname;
  session.defaultSession.setCertificateVerifyProc((verify,callback)=>{
   if((verify.hostname===pinnedHost)&&certMatches(verify.certificate.data)){callback(0);}else{callback(-3);}
@@ -49,11 +43,14 @@ app.whenReady().then(()=>{
   remote=new BrowserWindow({width:1440,height:950,title:winTitle,autoHideMenuBar:true,icon:path.join(__dirname,'scp-logo.ico'),webPreferences:{preload:path.join(__dirname,'remote-preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
   const current=remote;secureWindow(current);
   current.scpNodeId=nodeid;
+  current.on('page-title-updated',(e)=>{e.preventDefault();current.setTitle(winTitle);});
   current.on('closed',()=>{if(current.clipboardHost)current.clipboardHost.close();if(remote===current){remote=null;request({op:'disconnect'}).catch(()=>{});}});
   await current.loadURL(url.href);
+  current.setTitle(winTitle);
   await current.webContents.executeJavaScript(`(() => {
+   document.body.classList.remove('scp-inline-tools');
    var hide=document.createElement('style');
-   hide.textContent='#deskarea1{display:block} .vnc-float-toolbar{position:fixed;top:0;left:50%;transform:translateX(-50%);background:rgba(30,30,30,0.88);backdrop-filter:blur(6px);border-bottom-left-radius:8px;border-bottom-right-radius:8px;padding:4px 12px;display:flex;gap:10px;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0.35;transition:opacity 0.2s;} .vnc-float-toolbar:hover{opacity:1;} .vnc-tool-btn{background:transparent;border:none;color:#ffffff;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;display:flex;align-items:center;justify-content:center;} .vnc-tool-btn:hover{background:rgba(255,255,255,0.2);} .vnc-tool-btn.danger:hover{background:#dc2626;}';
+   hide.textContent='#LeftSideToolBar,#deskarea1,#deskarea4,#scp-remote-dock,#scpConnection,.areaHead,.areaFoot{display:none!important;width:0!important;height:0!important;min-height:0!important;padding:0!important;margin:0!important;border:none!important} html,body{margin:0!important;padding:0!important;width:100vw!important;height:100vh!important;overflow:hidden!important;background:#000000!important} #p11{position:absolute!important;left:0!important;top:0!important;right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;display:block!important} #deskarea0{position:absolute!important;left:0!important;top:0!important;padding:0!important;margin:0!important;width:100vw!important;height:100vh!important;display:block!important} #deskarea3x{position:absolute!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:100vh!important;margin:0!important;padding:0!important} #DeskParent{width:100%!important;height:100%!important;display:flex!important;align-items:center!important;justify-content:center!important} .vnc-float-toolbar{position:fixed;top:0;left:50%;transform:translateX(-50%);background:rgba(30,30,30,0.88);backdrop-filter:blur(6px);border-bottom-left-radius:8px;border-bottom-right-radius:8px;padding:4px 12px;display:flex;gap:10px;z-index:999999;box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0.35;transition:opacity 0.2s;} .vnc-float-toolbar:hover{opacity:1;} .vnc-tool-btn{background:transparent;border:none;color:#ffffff;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;display:flex;align-items:center;justify-content:center;} .vnc-tool-btn:hover{background:rgba(255,255,255,0.2);} .vnc-tool-btn.danger:hover{background:#dc2626;}';
    document.head.appendChild(hide);
 
    var tb=document.createElement('div');
@@ -69,7 +66,8 @@ app.whenReady().then(()=>{
    window.scpLanReady=${config.directLan!==false&&data.lan===true};
    desktopsettings.agentencoding=4;desktopsettings.quality=100;desktopsettings.scaling=1024;desktopsettings.framerate=50;
    var original=CreateAgentRemoteDesktop;CreateAgentRemoteDesktop=function(){var m=original.apply(this,arguments);m.ImageType=4;return m;};
-   var tries=0,timer=setInterval(function(){var b=document.getElementById('connectbutton1');if(b&&!b.disabled){clearInterval(timer);connectDesktop(null,3);}else if(++tries>=60){clearInterval(timer);}},500);
+   var tries=0,timer=setInterval(function(){var b=document.getElementById('connectbutton1');if(b&&!b.disabled){clearInterval(timer);connectDesktop(null,3);if(window.deskAdjust)setTimeout(deskAdjust,200);}else if(++tries>=60){clearInterval(timer);}},500);
+   window.addEventListener('resize',function(){if(window.deskAdjust)deskAdjust();});
   })()`);
   try { await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'inject-filedrop.js'),'utf8')); } catch (e) { }
   await current.webContents.executeJavaScript('window.scpClipboardLanguage='+JSON.stringify(language==='en'?'en':'th')+';window.scpClipboardReady='+(data.clipboard===true)+';'+fs.readFileSync(path.join(__dirname,'clipboard-transfer.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'inject-clipboard.js'),'utf8'));

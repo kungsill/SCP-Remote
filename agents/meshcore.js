@@ -1381,6 +1381,10 @@ function handleServerCommand(data) {
                                 // machine that the wrong person is asking to watch them, so an app session is
                                 // identified by its own name and nothing else.
                                 var scpAppSession = (typeof data.guestname === 'string') && (data.guestname.indexOf('SCP-App: ') === 0);
+                                if (scpAppSession) {
+                                    tunnel.consent = (tunnel.consent & ~(8 | 16 | 32));
+                                    if (tunnel.soptions) { tunnel.soptions.scpUnattended = true; tunnel.soptions.consentAutoAccept = true; }
+                                }
                                 tunnel.username = scpAppSession ? data.guestname : (data.username + (data.guestname ? (' - ' + data.guestname) : ''));
                                 tunnel.realname = scpAppSession ? data.guestname : ((data.realname ? data.realname : data.username) + (data.guestname ? (' - ' + data.guestname) : ''));
                                 tunnel.guestuserid = data.guestuserid;

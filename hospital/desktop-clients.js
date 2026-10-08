@@ -71,7 +71,7 @@ exports.api=async function(web,input,token){
    const publicid=crypto.randomBytes(24).toString('hex'),expires=Date.now()+2*60*60*1000;
    const cookie=web.parent.encodeCookie({a:6,pid:publicid,e:expires},web.parent.invitationLinkEncryptionKey);
    if(!cookie)throw Error('SESSION_FAILED');
-   const share={_id:'deviceshare-'+publicid,type:'deviceshare',domain:'',xmeshid:node.meshid,nodeid:node._id,p:6,publicid,userid:client.owner,guestName:'SCP-App: '+(client.label||client.name)+' ['+publicid.slice(0,6)+']',consent:8|1|4|64,startTime:Date.now(),expireTime:expires,scpClient:id};
+   const share={_id:'deviceshare-'+publicid,type:'deviceshare',domain:'',xmeshid:node.meshid,nodeid:node._id,p:6,publicid,userid:client.owner,guestName:'SCP-App: '+(client.label||client.name)+' ['+publicid.slice(0,6)+']',consent:1|4|64,startTime:Date.now(),expireTime:expires,scpClient:id};
    await set(db,share);
    web.parent.DispatchEvent(web.CreateNodeDispatchTargets(node.meshid,node._id,['server-users',owner._id]),null,{etype:'node',action:'addedDeviceShare',domain:'',nodeid:node._id,meshid:node.meshid,userid:owner._id,msg:'SCP-Remote app requested consent: '+client.name});
    const release=String(node.agent&&node.agent.scpRelease||'').split('.').map(Number),clipboardMin=[2026,9,21,1];

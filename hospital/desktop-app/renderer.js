@@ -305,13 +305,20 @@ window.addEventListener('click', (e) => {
 // Modals handling
 function showModal(id) {
   closeAllMenus();
+  ['modalSettingsBackdrop', 'modalGuideBackdrop', 'modalServerBackdrop', 'modalAboutBackdrop'].forEach(hideModal);
   const m = $(id);
-  if (m) m.hidden = false;
+  if (m) {
+    m.hidden = false;
+    m.style.display = 'flex';
+  }
 }
 
 function hideModal(id) {
   const m = $(id);
-  if (m) m.hidden = true;
+  if (m) {
+    m.hidden = true;
+    m.style.display = 'none';
+  }
 }
 
 [

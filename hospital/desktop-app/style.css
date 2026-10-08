@@ -548,6 +548,10 @@ body {
   z-index: 999999;
 }
 
+.scp-modal-backdrop[hidden] {
+  display: none !important;
+}
+
 .scp-modal-card {
   background: #ffffff;
   border-radius: 12px;

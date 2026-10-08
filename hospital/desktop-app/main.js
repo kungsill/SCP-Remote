@@ -50,13 +50,68 @@ app.whenReady().then(()=>{
   await current.webContents.executeJavaScript(`(() => {
    document.body.classList.remove('scp-inline-tools');
    var hide=document.createElement('style');
-   hide.textContent='#LeftSideToolBar,#deskarea1,#deskarea4,#scp-remote-dock,#scpConnection,.areaHead,.areaFoot{display:none!important;width:0!important;height:0!important;min-height:0!important;padding:0!important;margin:0!important;border:none!important} html,body{margin:0!important;padding:0!important;width:100vw!important;height:100vh!important;overflow:hidden!important;background:#000000!important} #p11{position:absolute!important;left:0!important;top:0!important;right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;display:block!important} #deskarea0{position:absolute!important;left:0!important;top:0!important;padding:0!important;margin:0!important;width:100vw!important;height:100vh!important;display:block!important} #deskarea3x{position:absolute!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:100vh!important;margin:0!important;padding:0!important} #DeskParent{width:100%!important;height:100%!important;display:flex!important;align-items:center!important;justify-content:center!important} #Desk{image-rendering:-webkit-optimize-contrast!important;image-rendering:crisp-edges!important} .vnc-float-toolbar{position:fixed;top:0;left:50%;transform:translateX(-50%);background:rgba(30,30,30,0.88);backdrop-filter:blur(6px);border-bottom-left-radius:8px;border-bottom-right-radius:8px;padding:4px 12px;display:flex;gap:10px;z-index:999999;box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0.35;transition:opacity 0.2s;} .vnc-float-toolbar:hover{opacity:1;} .vnc-tool-btn{background:transparent;border:none;color:#ffffff;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;display:flex;align-items:center;justify-content:center;} .vnc-tool-btn:hover{background:rgba(255,255,255,0.2);} .vnc-tool-btn.danger:hover{background:#dc2626;}';
+   hide.textContent='#LeftSideToolBar,#deskarea1,#deskarea4,#scp-remote-dock,#scpConnection,.areaHead,.areaFoot{display:none!important;width:0!important;height:0!important;min-height:0!important;padding:0!important;margin:0!important;border:none!important} html,body{margin:0!important;padding:0!important;width:100vw!important;height:100vh!important;overflow:hidden!important;background:#000000!important} #p11{position:absolute!important;left:0!important;top:0!important;right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;display:block!important} #deskarea0{position:absolute!important;left:0!important;top:0!important;padding:0!important;margin:0!important;width:100vw!important;height:100vh!important;display:block!important} #deskarea3x{position:absolute!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:100vh!important;margin:0!important;padding:0!important} #DeskParent{width:100%!important;height:100%!important;display:flex!important;align-items:center!important;justify-content:center!important} #Desk{image-rendering:-webkit-optimize-contrast!important;image-rendering:crisp-edges!important} .vnc-float-toolbar{position:fixed;top:0;left:50%;transform:translateX(-50%) translateY(-100%);background:rgba(24,24,27,0.94);backdrop-filter:blur(8px);border-bottom-left-radius:8px;border-bottom-right-radius:8px;border:1px solid rgba(255,255,255,0.12);border-top:none;padding:4px 10px;display:flex;align-items:center;gap:8px;z-index:999999;box-shadow:0 8px 24px rgba(0,0,0,0.45);opacity:0;pointer-events:none;transition:transform 0.25s cubic-bezier(0.16,1,0.3,1),opacity 0.2s ease;} .vnc-float-toolbar.visible{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto;} .vnc-toolbar-tab{position:fixed;top:0;left:50%;transform:translateX(-50%);background:rgba(24,24,27,0.7);color:rgba(255,255,255,0.75);border-bottom-left-radius:6px;border-bottom-right-radius:6px;padding:1px 18px 3px;font-size:10px;line-height:1;cursor:pointer;z-index:999998;transition:opacity 0.2s,background 0.2s;opacity:0.35;} .vnc-toolbar-tab:hover{opacity:1;background:rgba(24,24,27,0.95);} .vnc-toolbar-tab.hidden{opacity:0;pointer-events:none;} .vnc-tool-btn{background:transparent;border:none;color:#f4f4f5;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;display:flex;align-items:center;justify-content:center;} .vnc-tool-btn:hover{background:rgba(255,255,255,0.15);} .vnc-tool-btn.active{background:#1f40e6;color:#ffffff;} .vnc-tool-btn.danger:hover{background:#dc2626;} .vnc-tool-sep{width:1px;height:14px;background:rgba(255,255,255,0.15);margin:0 2px;}';
    document.head.appendChild(hide);
 
    var tb=document.createElement('div');
    tb.className='vnc-float-toolbar';
-   tb.innerHTML='<button class="vnc-tool-btn" id="vncFs" title="Fullscreen">⛶</button><button class="vnc-tool-btn" id="vncFit" title="1:1 Actual Size / Fit Window">1:1</button><button class="vnc-tool-btn" id="vncMaxQ" title="Maximum Quality (100% WebP)" style="color:#34d399;font-weight:600">HQ 100%</button><button class="vnc-tool-btn" id="vncCad" title="Send Ctrl+Alt+Del">CAD</button><button class="vnc-tool-btn danger" id="vncClose" title="End Session">✕</button>';
+   tb.id='vncToolbar';
+   tb.innerHTML='<button class="vnc-tool-btn" id="vncFs" title="เต็มหน้าจอ (Fullscreen)">⛶</button><button class="vnc-tool-btn" id="vncFit" title="ขนาดจริง / พอดีหน้าต่าง (1:1 / Fit)">1:1</button><button class="vnc-tool-btn" id="vncMaxQ" title="ความคมชัดสูงสุด (HQ 100% WebP)" style="color:#34d399;font-weight:600">HQ 100%</button><button class="vnc-tool-btn" id="vncCad" title="ส่งคำสั่ง Ctrl+Alt+Del">CAD</button><div class="vnc-tool-sep"></div><button class="vnc-tool-btn" id="vncPin" title="ตรึงแถบเครื่องมือ">📌</button><button class="vnc-tool-btn" id="vncHide" title="ซ่อนแถบเครื่องมือ">▲</button><button class="vnc-tool-btn danger" id="vncClose" title="ปิดหน้าต่างรีโมท">✕</button>';
    document.body.appendChild(tb);
+
+   var tab=document.createElement('div');
+   tab.className='vnc-toolbar-tab';
+   tab.id='vncTab';
+   tab.title='เลื่อนเมาส์มาที่นี่เพื่อแสดงแถบเครื่องมือ';
+   tab.textContent='▾';
+   document.body.appendChild(tab);
+
+   var pinned=false;
+   var hideTimeout=null;
+
+   function showBar(){
+     clearTimeout(hideTimeout);
+     tb.classList.add('visible');
+     tab.classList.add('hidden');
+   }
+
+   function hideBar(){
+     if(pinned)return;
+     clearTimeout(hideTimeout);
+     tb.classList.remove('visible');
+     tab.classList.remove('hidden');
+   }
+
+   function scheduleHide(){
+     if(pinned)return;
+     clearTimeout(hideTimeout);
+     hideTimeout=setTimeout(hideBar,600);
+   }
+
+   tab.onclick=showBar;
+   tab.onmouseenter=showBar;
+   tb.onmouseenter=function(){clearTimeout(hideTimeout);};
+   tb.onmouseleave=scheduleHide;
+
+   document.addEventListener('mousemove',function(e){
+     if(e.clientY<=10){
+       showBar();
+     }else if(e.clientY>60&&!tb.contains(e.target)&&!tab.contains(e.target)){
+       scheduleHide();
+     }
+   });
+
+   document.getElementById('vncHide').onclick=function(){
+     pinned=false;
+     document.getElementById('vncPin').classList.remove('active');
+     hideBar();
+   };
+
+   document.getElementById('vncPin').onclick=function(){
+     pinned=!pinned;
+     this.classList.toggle('active',pinned);
+     if(pinned){showBar();}else{scheduleHide();}
+   };
 
    document.getElementById('vncFs').onclick=function(){ if(!document.fullscreenElement){document.documentElement.requestFullscreen();}else{document.exitFullscreen();} };
    document.getElementById('vncFit').onclick=function(){ window.deskAspectRatio = (window.deskAspectRatio === 1 ? 0 : 1); this.textContent = (window.deskAspectRatio === 1 ? 'Fit' : '1:1'); if(window.deskAdjust) deskAdjust(); };

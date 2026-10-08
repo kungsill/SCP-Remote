@@ -45,7 +45,7 @@ function labels() {
     const node = $(id);
     if (node) node.textContent = t(th, en);
   });
-  if ($('footer')) $('footer').textContent = t('SCP-Remote · RealVNC Viewer UI · LAN / Wi-Fi', 'SCP-Remote · RealVNC Viewer UI · LAN / Wi-Fi');
+  if ($('footer')) $('footer').textContent = t('SCP-Remote · LAN / Wi-Fi', 'SCP-Remote · LAN / Wi-Fi');
   if ($('search')) $('search').placeholder = t('ค้นหา หรือ พิมพ์ IP แอดเดรส...', 'Search or enter an IP address...');
 }
 

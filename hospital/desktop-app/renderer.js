@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 let lang = localStorage.getItem('language') || 'th';
 let data = { rooms: [], nodes: [] };
-let room = '', query = '', map = false, busy = false, approved = false, connecting = false;
+let room = '', query = '', map = false, busy = false, approved = false, connecting = false, onlineOnly = false, compactView = false;
 
 const t = (th, en) => lang === 'th' ? th : en;
 
@@ -121,16 +121,16 @@ function render() {
 
   const nodes = data.nodes.slice()
     .sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name))
-    .filter(n => (!room || n.room === room) && (!query || (n.name + ' ' + n.ip).toLowerCase().includes(query)));
+    .filter(n => (!room || n.room === room) && (!onlineOnly || (n.online && !n.connectionUnknown)) && (!query || (n.name + ' ' + n.ip).toLowerCase().includes(query)));
 
   if ($('statusCount')) {
-    $('statusCount').textContent = `${nodes.length} device(s)`;
+    $('statusCount').textContent = `${nodes.length} device(s)` + (onlineOnly ? ` (${t('เฉพาะออนไลน์', 'Online only')})` : '');
   }
 
   const canvas = $('devices');
   if (!canvas) return;
   canvas.textContent = '';
-  canvas.className = map ? 'map' : 'vnc-device-grid grid';
+  canvas.className = map ? 'map' : ('vnc-device-grid grid' + (compactView ? ' compact' : ''));
 
   if ($('listView')) $('listView').setAttribute('aria-pressed', String(!map));
   if ($('mapView')) $('mapView').setAttribute('aria-pressed', String(map));
@@ -263,6 +263,191 @@ if ($('language')) {
     approved ? render() : init();
   };
 }
+
+// ==========================================
+// Menu Bar & Dropdown Logic
+// ==========================================
+const menuWrappers = [$('menuFileWrapper'), $('menuViewWrapper'), $('menuHelpWrapper')].filter(Boolean);
+
+function closeAllMenus() {
+  menuWrappers.forEach(w => w.classList.remove('open'));
+}
+
+function anyMenuOpen() {
+  return menuWrappers.some(w => w.classList.contains('open'));
+}
+
+menuWrappers.forEach(wrapper => {
+  const trigger = wrapper.querySelector('.vnc-menu-item');
+  if (!trigger) return;
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = wrapper.classList.contains('open');
+    closeAllMenus();
+    if (!isOpen) wrapper.classList.add('open');
+  });
+
+  wrapper.addEventListener('mouseenter', () => {
+    if (anyMenuOpen() && !wrapper.classList.contains('open')) {
+      closeAllMenus();
+      wrapper.classList.add('open');
+    }
+  });
+});
+
+window.addEventListener('click', (e) => {
+  if (!e.target.closest('.vnc-menu-wrapper')) {
+    closeAllMenus();
+  }
+});
+
+// Modals handling
+function showModal(id) {
+  closeAllMenus();
+  const m = $(id);
+  if (m) m.hidden = false;
+}
+
+function hideModal(id) {
+  const m = $(id);
+  if (m) m.hidden = true;
+}
+
+[
+  ['closeSettings', 'modalSettingsBackdrop'],
+  ['saveSettings', 'modalSettingsBackdrop'],
+  ['closeGuide', 'modalGuideBackdrop'],
+  ['closeGuideBtn', 'modalGuideBackdrop'],
+  ['closeServer', 'modalServerBackdrop'],
+  ['closeServerBtn', 'modalServerBackdrop'],
+  ['closeAbout', 'modalAboutBackdrop'],
+  ['closeAboutBtn', 'modalAboutBackdrop']
+].forEach(([btnId, modalId]) => {
+  const btn = $(btnId);
+  if (btn) btn.onclick = () => hideModal(modalId);
+});
+
+['modalSettingsBackdrop', 'modalGuideBackdrop', 'modalServerBackdrop', 'modalAboutBackdrop'].forEach(id => {
+  const backdrop = $(id);
+  if (backdrop) {
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) hideModal(id);
+    });
+  }
+});
+
+// Menu Actions: File
+if ($('menuActionSearch')) {
+  $('menuActionSearch').onclick = () => {
+    closeAllMenus();
+    if ($('search')) {
+      $('search').focus();
+      $('search').select();
+    }
+  };
+}
+if ($('menuActionRefresh')) {
+  $('menuActionRefresh').onclick = () => {
+    closeAllMenus();
+    refresh();
+  };
+}
+if ($('menuActionSettings')) {
+  $('menuActionSettings').onclick = () => showModal('modalSettingsBackdrop');
+}
+if ($('menuActionExit')) {
+  $('menuActionExit').onclick = () => window.close();
+}
+
+// Menu Actions: View
+if ($('menuActionViewAll')) {
+  $('menuActionViewAll').onclick = () => {
+    closeAllMenus();
+    room = '';
+    onlineOnly = false;
+    if ($('checkViewAll')) $('checkViewAll').textContent = '✓';
+    if ($('checkOnlineOnly')) $('checkOnlineOnly').textContent = '';
+    render();
+  };
+}
+
+if ($('menuActionOnlineOnly')) {
+  $('menuActionOnlineOnly').onclick = () => {
+    closeAllMenus();
+    onlineOnly = !onlineOnly;
+    if ($('checkOnlineOnly')) $('checkOnlineOnly').textContent = onlineOnly ? '✓' : '';
+    render();
+  };
+}
+
+if ($('menuActionGridLarge')) {
+  $('menuActionGridLarge').onclick = () => {
+    closeAllMenus();
+    compactView = false;
+    if ($('checkGridLarge')) $('checkGridLarge').textContent = '✓';
+    if ($('checkGridCompact')) $('checkGridCompact').textContent = '';
+    render();
+  };
+}
+
+if ($('menuActionGridCompact')) {
+  $('menuActionGridCompact').onclick = () => {
+    closeAllMenus();
+    compactView = true;
+    if ($('checkGridLarge')) $('checkGridLarge').textContent = '';
+    if ($('checkGridCompact')) $('checkGridCompact').textContent = '✓';
+    render();
+  };
+}
+
+if ($('menuActionFullscreen')) {
+  $('menuActionFullscreen').onclick = () => {
+    closeAllMenus();
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+}
+
+// Menu Actions: Help
+if ($('menuActionGuide')) {
+  $('menuActionGuide').onclick = () => showModal('modalGuideBackdrop');
+}
+if ($('sidebarHelpBtn')) {
+  $('sidebarHelpBtn').onclick = () => showModal('modalGuideBackdrop');
+}
+if ($('userProfileBtn')) {
+  $('userProfileBtn').onclick = () => showModal('modalAboutBackdrop');
+}
+if ($('menuActionServerInfo')) {
+  $('menuActionServerInfo').onclick = () => showModal('modalServerBackdrop');
+}
+if ($('menuActionAbout')) {
+  $('menuActionAbout').onclick = () => showModal('modalAboutBackdrop');
+}
+
+// Global Keyboard Shortcuts
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeAllMenus();
+    ['modalSettingsBackdrop', 'modalGuideBackdrop', 'modalServerBackdrop', 'modalAboutBackdrop'].forEach(hideModal);
+  } else if (e.key === 'F1') {
+    e.preventDefault();
+    showModal('modalGuideBackdrop');
+  } else if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
+    e.preventDefault();
+    refresh();
+  } else if (e.ctrlKey && e.key.toLowerCase() === 'f') {
+    e.preventDefault();
+    if ($('search')) {
+      $('search').focus();
+      $('search').select();
+    }
+  }
+});
 
 labels();
 init();

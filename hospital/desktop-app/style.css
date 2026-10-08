@@ -460,3 +460,247 @@ body {
 .scp-online-alt {
   color: #16836e;
 }
+
+/* Menu Bar & Dropdowns */
+.vnc-menu-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.vnc-menu-wrapper.open .vnc-menu-item {
+  background-color: #e5e5e5;
+  color: #111111;
+}
+
+.vnc-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: #ffffff;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  min-width: 250px;
+  z-index: 10000;
+  padding: 4px 0;
+  display: none;
+}
+
+.vnc-menu-wrapper.open .vnc-dropdown {
+  display: block;
+}
+
+.vnc-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 14px;
+  font-size: 12px;
+  color: #333333;
+  cursor: pointer;
+  user-select: none;
+}
+
+.vnc-dropdown-item:hover {
+  background-color: #1f40e6;
+  color: #ffffff;
+}
+
+.vnc-dropdown-item:hover .vnc-shortcut {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.vnc-shortcut {
+  font-size: 11px;
+  color: #999999;
+  margin-left: 18px;
+}
+
+.vnc-item-check {
+  display: inline-block;
+  width: 16px;
+  font-weight: bold;
+  color: #1f40e6;
+}
+
+.vnc-dropdown-item:hover .vnc-item-check {
+  color: #ffffff;
+}
+
+.vnc-dropdown-divider {
+  height: 1px;
+  background-color: #e5e5e5;
+  margin: 4px 0;
+}
+
+/* Modal Windows */
+.scp-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+}
+
+.scp-modal-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  width: 90%;
+  max-width: 520px;
+  overflow: hidden;
+  animation: scpModalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scpModalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.scp-modal-header {
+  padding: 14px 20px;
+  background: #f8f8f8;
+  border-bottom: 1px solid #e5e5e5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scp-modal-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f1f1f;
+}
+
+.scp-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #666666;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.scp-modal-close:hover {
+  background: #e5e5e5;
+  color: #111111;
+}
+
+.scp-modal-body {
+  padding: 18px 20px;
+  font-size: 13px;
+  color: #333333;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.scp-modal-footer {
+  padding: 12px 20px;
+  background: #f8f8f8;
+  border-top: 1px solid #e5e5e5;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.scp-setting-row {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scp-setting-row small {
+  color: #666666;
+  font-size: 11px;
+}
+
+.scp-badge-green {
+  display: inline-block;
+  align-self: flex-start;
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #bbf7d0;
+}
+
+.scp-select, .scp-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #cccccc;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+.scp-btn-primary {
+  background: #1f40e6;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scp-btn-primary:hover {
+  background: #1532c2;
+}
+
+.scp-guide-content h4 {
+  font-size: 14px;
+  color: #1f1f1f;
+  margin: 12px 0 8px;
+}
+
+.scp-guide-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.scp-key {
+  background: #f0f0f0;
+  border: 1px solid #cccccc;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111111;
+  min-width: 100px;
+  text-align: center;
+}
+
+.scp-diag-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Compact Grid View Option */
+.vnc-device-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.vnc-device-grid.compact .vnc-thumb-wrap {
+  height: 80px !important;
+}
+
+.vnc-device-grid.compact .vnc-card {
+  padding: 8px !important;
+}
+

@@ -50,28 +50,36 @@ app.whenReady().then(()=>{
   await current.webContents.executeJavaScript(`(() => {
    document.body.classList.remove('scp-inline-tools');
    var hide=document.createElement('style');
-   hide.textContent='#LeftSideToolBar,#deskarea1,#deskarea4,#scp-remote-dock,#scpConnection,.areaHead,.areaFoot{display:none!important;width:0!important;height:0!important;min-height:0!important;padding:0!important;margin:0!important;border:none!important} html,body{margin:0!important;padding:0!important;width:100vw!important;height:100vh!important;overflow:hidden!important;background:#000000!important} #p11{position:absolute!important;left:0!important;top:0!important;right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;display:block!important} #deskarea0{position:absolute!important;left:0!important;top:0!important;padding:0!important;margin:0!important;width:100vw!important;height:100vh!important;display:block!important} #deskarea3x{position:absolute!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:100vh!important;margin:0!important;padding:0!important} #DeskParent{width:100%!important;height:100%!important;display:flex!important;align-items:center!important;justify-content:center!important} .vnc-float-toolbar{position:fixed;top:0;left:50%;transform:translateX(-50%);background:rgba(30,30,30,0.88);backdrop-filter:blur(6px);border-bottom-left-radius:8px;border-bottom-right-radius:8px;padding:4px 12px;display:flex;gap:10px;z-index:999999;box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0.35;transition:opacity 0.2s;} .vnc-float-toolbar:hover{opacity:1;} .vnc-tool-btn{background:transparent;border:none;color:#ffffff;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;display:flex;align-items:center;justify-content:center;} .vnc-tool-btn:hover{background:rgba(255,255,255,0.2);} .vnc-tool-btn.danger:hover{background:#dc2626;}';
+   hide.textContent='#LeftSideToolBar,#deskarea1,#deskarea4,#scp-remote-dock,#scpConnection,.areaHead,.areaFoot{display:none!important;width:0!important;height:0!important;min-height:0!important;padding:0!important;margin:0!important;border:none!important} html,body{margin:0!important;padding:0!important;width:100vw!important;height:100vh!important;overflow:hidden!important;background:#000000!important} #p11{position:absolute!important;left:0!important;top:0!important;right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;display:block!important} #deskarea0{position:absolute!important;left:0!important;top:0!important;padding:0!important;margin:0!important;width:100vw!important;height:100vh!important;display:block!important} #deskarea3x{position:absolute!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:100vh!important;margin:0!important;padding:0!important} #DeskParent{width:100%!important;height:100%!important;display:flex!important;align-items:center!important;justify-content:center!important} #Desk{image-rendering:-webkit-optimize-contrast!important;image-rendering:crisp-edges!important} .vnc-float-toolbar{position:fixed;top:0;left:50%;transform:translateX(-50%);background:rgba(30,30,30,0.88);backdrop-filter:blur(6px);border-bottom-left-radius:8px;border-bottom-right-radius:8px;padding:4px 12px;display:flex;gap:10px;z-index:999999;box-shadow:0 4px 12px rgba(0,0,0,0.3);opacity:0.35;transition:opacity 0.2s;} .vnc-float-toolbar:hover{opacity:1;} .vnc-tool-btn{background:transparent;border:none;color:#ffffff;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;display:flex;align-items:center;justify-content:center;} .vnc-tool-btn:hover{background:rgba(255,255,255,0.2);} .vnc-tool-btn.danger:hover{background:#dc2626;}';
    document.head.appendChild(hide);
 
    var tb=document.createElement('div');
    tb.className='vnc-float-toolbar';
-   tb.innerHTML='<button class="vnc-tool-btn" id="vncFs" title="Fullscreen">⛶</button><button class="vnc-tool-btn" id="vncFit" title="Scale 100%">1:1</button><button class="vnc-tool-btn" id="vncCad" title="Send Ctrl+Alt+Del">CAD</button><button class="vnc-tool-btn danger" id="vncClose" title="End Session">✕</button>';
+   tb.innerHTML='<button class="vnc-tool-btn" id="vncFs" title="Fullscreen">⛶</button><button class="vnc-tool-btn" id="vncFit" title="1:1 Actual Size / Fit Window">1:1</button><button class="vnc-tool-btn" id="vncMaxQ" title="Maximum Quality (100% WebP)" style="color:#34d399;font-weight:600">HQ 100%</button><button class="vnc-tool-btn" id="vncCad" title="Send Ctrl+Alt+Del">CAD</button><button class="vnc-tool-btn danger" id="vncClose" title="End Session">✕</button>';
    document.body.appendChild(tb);
 
    document.getElementById('vncFs').onclick=function(){ if(!document.fullscreenElement){document.documentElement.requestFullscreen();}else{document.exitFullscreen();} };
-   document.getElementById('vncFit').onclick=function(){ if(window.desktopsettings){ desktopsettings.scaling = desktopsettings.scaling === 0 ? 1024 : 0; if(window.deskAdjust) deskAdjust(); } };
+   document.getElementById('vncFit').onclick=function(){ window.deskAspectRatio = (window.deskAspectRatio === 1 ? 0 : 1); this.textContent = (window.deskAspectRatio === 1 ? 'Fit' : '1:1'); if(window.deskAdjust) deskAdjust(); };
+   document.getElementById('vncMaxQ').onclick=function(){ if(window.desktop && window.desktop.m && window.desktop.m.SendCompressionLevel){ window.desktop.m.SendCompressionLevel(4, 100, 1024, 50); if(window.desktop.m.SendRefresh) window.desktop.m.SendRefresh(); } };
    document.getElementById('vncCad').onclick=function(){ if(window.sendCAD) sendCAD(); else if(window.meshserver) meshserver.send({action:'msg',type:'cad'}); };
    document.getElementById('vncClose').onclick=function(){ window.close(); };
 
    window.scpLanReady=${config.directLan!==false&&data.lan===true};
    desktopsettings.agentencoding=4;desktopsettings.quality=100;desktopsettings.scaling=1024;desktopsettings.framerate=50;
-   var original=CreateAgentRemoteDesktop;CreateAgentRemoteDesktop=function(){var m=original.apply(this,arguments);m.ImageType=4;return m;};
+   var original=CreateAgentRemoteDesktop;CreateAgentRemoteDesktop=function(){
+    var m=original.apply(this,arguments);
+    m.ImageType=4;m.CompressionLevel=100;m.ScalingLevel=1024;m.FrameRateTimer=50;
+    var origSendComp=m.SendCompressionLevel;
+    m.SendCompressionLevel=function(type,level,scaling,frametimer){return origSendComp.call(m,4,100,1024,50);};
+    return m;
+   };
    var tries=0,timer=setInterval(function(){var b=document.getElementById('connectbutton1');if(b&&!b.disabled){clearInterval(timer);connectDesktop(null,3);if(window.deskAdjust)setTimeout(deskAdjust,200);}else if(++tries>=60){clearInterval(timer);}},500);
    window.addEventListener('resize',function(){if(window.deskAdjust)deskAdjust();});
   })()`);
   try { await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'inject-filedrop.js'),'utf8')); } catch (e) { }
   await current.webContents.executeJavaScript('window.scpClipboardLanguage='+JSON.stringify(language==='en'?'en':'th')+';window.scpClipboardReady='+(data.clipboard===true)+';'+fs.readFileSync(path.join(__dirname,'clipboard-transfer.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'inject-clipboard.js'),'utf8'));
   await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'session-health.js'),'utf8'));
+  await current.webContents.executeJavaScript('try{var sel=document.querySelector("#scp-session-health select");if(sel){sel.value="0";}}catch(e){}');
   return {opened:true};
  });
  home.on('closed',()=>{if(remote&&!remote.isDestroyed())remote.close();home=null;});

@@ -304,7 +304,7 @@
         var agentPresent = true;
         var intelAmtPresent = false;
         var deskAspectRatio = 0;
-        var desktopsettings = { encoding: 2, showfocus: false, showmouse: true, showcad: true, quality: 40, scaling: 1024, framerate: 100, localkeymap: false, remotekeymap: false };
+        var desktopsettings = { encoding: 2, showfocus: false, showmouse: true, showcad: true, quality: 100, scaling: 1024, framerate: 50, localkeymap: false, swapmouse: false, remotekeymap: false, autoclipboard: false, autolock: false, agentencoding: 4 }; // SCP-Remote: WEBP at full quality stays sharp
         var serverPublicNamePort = '{{{serverDnsName}}}:{{{serverPublicPort}}}';
         var domain = '{{{domain}}}';
         var domainUrl = '{{{domainurl}}}';
@@ -649,7 +649,8 @@
                         }
                     }
                     desktop.onMetadataChange = function (metadata) { updateMetadata(desktop, 'deskmetadata'); }
-                    desktop.m.CompressionLevel = desktopsettings.quality; // Number from 1 to 100. 50 or less is best.
+                    desktop.m.ImageType = desktopsettings.agentencoding; // SCP-Remote: WEBP at full quality
+                    desktop.m.CompressionLevel = desktopsettings.quality;
                     desktop.m.ScalingLevel = desktopsettings.scaling;
                     if (desktopsettings.framerate) { desktop.m.FrameRateTimer = desktopsettings.framerate; }
                     desktop.m.onDisplayinfo = deskDisplayInfo;
@@ -813,7 +814,7 @@
                     desktop.m.SwapMouse = desktopsettings.swapmouse;
                     desktop.m.remoteKeyMap = desktopsettings.remotekeymap;
                     if (desktop.State != 0) {
-                        desktop.m.SendCompressionLevel(1, desktopsettings.quality, desktopsettings.scaling, desktopsettings.framerate);
+                        desktop.m.SendCompressionLevel(desktopsettings.agentencoding || 4, desktopsettings.quality, desktopsettings.scaling, desktopsettings.framerate); // SCP-Remote: WEBP at full quality
                     }
                 }
                 if (desktop.contype == 2) {

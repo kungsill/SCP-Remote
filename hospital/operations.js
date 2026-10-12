@@ -187,6 +187,27 @@ exports.handle = async function (ctx, cmd) {
   }
   return { saved };
  }
+ if (cmd.op === 'licenseSave') {
+  // Windows activation as each computer reported it (read-only query). No product key is
+  // ever stored: only the licence status, channel, KMS host and whether an OEM key exists.
+  if (!Array.isArray(cmd.items) || cmd.items.length > 1000) throw Error('INVALID_INPUT');
+  const str = v => typeof v === 'string' ? v.slice(0, 120) : '';
+  let saved = 0;
+  for (const it of cmd.items) {
+   if (!it || typeof it.nodeid !== 'string' || !await access(it.nodeid)) continue;
+   await save({ _id: 'scplicense/' + it.nodeid, type: 'scplicense', domain: domain.id, nodeid: it.nodeid, found: it.found === true,
+    status: Math.max(0, Math.min(9, Number(it.status) || 0)), channel: str(it.channel), desc: str(it.desc), name: str(it.name),
+    kms: str(it.kms), kmsFound: str(it.kmsFound), grace: Math.max(0, Math.min(1e6, Number(it.grace) || 0)), oemKey: it.oemKey === true,
+    updated: Date.now(), by: user._id });
+   saved++;
+  }
+  return { saved };
+ }
+ if (cmd.op === 'licenseList') {
+  const rows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scplicense', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const map = {}; for (const row of rows) if (row && row.nodeid && await access(row.nodeid)) map[row.nodeid] = row;
+  return map;
+ }
  if (cmd.op === 'chassisList') {
   const rows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scpchassis', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
   const map = {}; for (const row of rows) if (row && row.nodeid && await access(row.nodeid)) map[row.nodeid] = row;

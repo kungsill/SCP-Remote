@@ -364,6 +364,7 @@
         }
         faultsOf(node).forEach(function (fault) { found.push(fault); });
         virtualisationNotesOf(node).forEach(function (note) { found.push(note); });
+        licenseRisksOf(node).forEach(function (risk) { found.push(risk); });
         hardwareRisksOf(node).forEach(function (risk) { found.push(risk); });
         var scan = scanState[node._id];
         if (scan && scan.hits) { scan.hits.forEach(function (name) { found.push({ level: 'high', text: format(t('watched'), name) }); }); }
@@ -1065,7 +1066,7 @@
         var header = ['ชื่อเครื่อง', 'หน่วยงาน', 'เลขครุภัณฑ์', 'ปีงบประมาณ_พศ', 'ราคาจัดซื้อ_บาท', 'ชื่อเครื่องใน Windows', 'IP', 'รุ่นเครื่อง', 'ยี่ห้อเมนบอร์ด',
                       'CPU', 'การ์ดจอ', 'แรม (GB)', 'ดิสก์', 'ระบบปฏิบัติการ', 'Serial', 'วันที่ BIOS', 'หมายเหตุ',
                       'ปีที่CPUออกขาย_พศ', 'ปีที่ได้มา_พศ_ประมาณ', 'ที่มาของปี', 'ประเภทเครื่อง', 'ราคาตั้งต้น_บาท', 'ที่มาของราคา',
-                      'อายุการใช้งาน_ปี', 'ค่าเสื่อมราคาสะสม_บาท', 'มูลค่าคงเหลือตามบัญชี_บาท'];
+                      'อายุการใช้งาน_ปี', 'ค่าเสื่อมราคาสะสม_บาท', 'มูลค่าคงเหลือตามบัญชี_บาท', 'Windows แท้ / Activate'];
         var lines = [header.map(csvCell).join(',')];
         rows.forEach(function (node) {
             var hardware = hardwareOf(node), identifiers = hardware.identifiers || {}, windows = hardware.windows || {};
@@ -1090,13 +1091,13 @@
                 (node.osdesc || '').replace('Microsoft ', ''), serial, bios, nt
             ].concat((function () {
                 var b = (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice) ? window.ScpFleetAssess.assessDevice(node) : null;
-                if (!b) return ['', '', '', '', '', '', '', '', ''];
+                if (!b) return ['', '', '', '', '', '', '', '', '', licenseVerdictOf(node).text];
                 return [b.cpuYear ? b.cpuYear + 543 : '', b.acquiredYearBE || '',
                     { asset: 'ปีงบประมาณครุภัณฑ์', cpu: 'ประมาณจากรุ่น CPU', bios: 'ประมาณจากวันที่ BIOS' }[b.yearSource] || '',
                     (b.deviceClass === 'notebook' ? 'โน้ตบุ๊ก' : b.deviceClass === 'aio' ? 'All-in-One' : 'PC') + ' (' + typeSourceLabel(b.deviceTypeSource) + ')',
                     b.costBasis != null ? b.costBasis : '',
                     b.costSource === 'asset' ? 'ราคาจัดซื้อจริง' : ('ราคากลาง MDES' + (b.referencePriceYearBE ? ' ปี ' + b.referencePriceYearBE : '')),
-                    b.usefulLifeYears || '', b.depreciation != null ? b.depreciation : '', b.bookValue != null ? b.bookValue : ''];
+                    b.usefulLifeYears || '', b.depreciation != null ? b.depreciation : '', b.bookValue != null ? b.bookValue : '', licenseVerdictOf(node).text];
             })()).map(csvCell).join(','));
         });
         saveCsv('SCP-Remote_ครุภัณฑ์คอมพิวเตอร์_' + stamp() + '.csv', lines);
@@ -2678,6 +2679,8 @@
             var srcText = bookA.yearSource === 'asset' ? (thai ? 'ตามปีงบประมาณครุภัณฑ์' : 'from the asset record')
                 : bookA.yearSource === 'cpu' ? (thai ? 'ประมาณจากรุ่น CPU (ออกขายปี ' + (bookA.cpuYear + 543) + ')' : 'estimated from the CPU (released ' + bookA.cpuYear + ')')
                 : bookA.yearSource === 'bios' ? (thai ? 'ประมาณจากวันที่ BIOS' : 'estimated from the BIOS date') : '';
+            var licV = licenseVerdictOf(node);
+            assetGrid.appendChild(makeSpecItem(thai ? 'Windows แท้ / Activate' : 'Genuine Windows', licV.text, licV.level ? 'risk' : (licV.state === 'genuine' ? 'ok' : '')));
             assetGrid.appendChild(makeSpecItem(thai ? 'ประเภทเครื่อง' : 'Device type', typeLabel(bookA.deviceClass) + (bookA.modelName ? ' · ' + bookA.modelName : '') + ' · ' + typeSourceLabel(bookA.deviceTypeSource)));
             assetGrid.appendChild(makeSpecItem(thai ? 'ปีที่ได้มา (ประมาณ)' : 'Acquired (approx.)', bookA.acquiredYearBE ? ((thai ? 'พ.ศ. ' : 'BE ') + bookA.acquiredYearBE + ' · ' + srcText) : '-'));
             assetGrid.appendChild(makeSpecItem(thai ? 'ราคาตั้งต้น' : 'Cost basis', baht(bookA.costBasis) + ' · ' + (bookA.costSource === 'asset'
@@ -3177,6 +3180,7 @@
                 ['cpu', thai ? 'CPU เก่า' : 'Old CPU'],
                 ['age', thai ? 'เครื่องเก่า' : 'Old PC'],
                 ['os', 'Windows'],
+                ['license', thai ? 'Windows แท้' : 'Genuine'],
                 ['security', thai ? 'ความปลอดภัย/อื่นๆ' : 'Security/other']
             ];
             var riskBtn = element('button', 'scp-map-risk-btn');
@@ -3570,6 +3574,35 @@
     }
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
+    /* ---- Genuine Windows: what the activation record says ---- */
+    // LicenseStatus: 1 licensed; 0 unlicensed and 5 notification both show the watermark;
+    // 2/3/4/6 are grace periods. KMS activation is normal only where the hospital runs its
+    // own KMS server; a KMS host on the computer itself is the mark of an activation crack.
+    function licenseVerdictOf(node) {
+        var l = window.ScpCachedLicense && window.ScpCachedLicense[node._id];
+        if (!l) return { state: 'unknown', text: thai ? 'ยังไม่ได้ตรวจ' : 'not checked yet' };
+        if (!l.found) return { state: 'unlicensed', level: 'warn', text: thai ? 'ไม่พบสิทธิ์การใช้งาน Windows (มีลายน้ำ Activate Windows)' : 'No Windows licence found (watermark shows)' };
+        var channel = String(l.channel || ''), desc = String(l.desc || '');
+        var host = String(l.kms || l.kmsFound || '');
+        var isKms = /GVLK|KMSCLIENT/i.test(channel + ' ' + desc);
+        var localHost = /^(127\.|localhost|0\.0\.0\.0|::1)/i.test(host);
+        if (Number(l.status) === 1) {
+            if (isKms && localHost) return { state: 'suspect', level: 'high', text: thai ? 'Activate ด้วย KMS ในเครื่องตัวเอง — ลักษณะของโปรแกรมแคร็ก (ไม่แท้)' : 'Activated by a KMS on the computer itself — an activation crack' };
+            if (isKms) return { state: 'kms', level: 'warn', text: thai ? ('Activate แบบ KMS' + (host ? ' (' + host + ')' : '') + ' — ถ้า รพ. ไม่มีเซิร์ฟเวอร์ KMS เอง มักเป็นโปรแกรมแคร็ก') : ('KMS activation' + (host ? ' (' + host + ')' : '') + ' — a crack unless the hospital runs a KMS server') };
+            var how = /OEM/i.test(channel) ? (thai ? 'OEM มากับเครื่อง' : 'OEM, came with the PC') : /Retail/i.test(channel) ? 'Retail' : /MAK/i.test(channel) ? (thai ? 'MAK องค์กร' : 'MAK volume') : (channel || 'licensed');
+            return { state: 'genuine', text: (thai ? '✓ แท้ · Activate แล้ว (' : '✓ Genuine · activated (') + how + ')' };
+        }
+        if ([2, 3, 4, 6].indexOf(Number(l.status)) >= 0) {
+            var days = Math.round(Number(l.grace || 0) / 1440);
+            return { state: 'grace', level: 'warn', text: thai ? ('Windows อยู่ในช่วงผ่อนผัน ยังไม่ activate' + (days ? ' (เหลือ ' + days + ' วัน)' : '')) : ('In grace period, not activated' + (days ? ' (' + days + ' days left)' : '')) };
+        }
+        return { state: 'unlicensed', level: 'warn', text: thai ? 'Windows ยังไม่ได้ Activate — มีลายน้ำ "Activate Windows"' : 'Windows not activated — the watermark shows' };
+    }
+    function licenseRisksOf(node) {
+        var v = licenseVerdictOf(node);
+        return v.level ? [{ level: v.level, kind: 'license', text: v.text }] : [];
+    }
+
     /* ---- PC / All-in-One / notebook: ask the computers themselves (read only) ---- */
     // One statement per line: the agent feeds this to PowerShell line by line.
     var CHASSIS_SCRIPT = [
@@ -3577,7 +3610,13 @@
         "$e = Get-CimInstance Win32_SystemEnclosure; $p = Get-CimInstance Win32_ComputerSystemProduct; $c = Get-CimInstance Win32_ComputerSystem",
         "$int = @(Get-CimInstance -Namespace root\\wmi -ClassName WmiMonitorConnectionParams | Where-Object { $_.VideoOutputTechnology -eq 2147483648 }).Count",
         "$o = @{ chassis = @($e.ChassisTypes); model = [string]$p.Version; name = [string]$p.Name; system = [string]$c.Model; pcType = [int]$c.PCSystemType; internal = $int }",
-        "Write-Output ('SCP_CHASSIS:' + ($o | ConvertTo-Json -Compress))"
+        "Write-Output ('SCP_CHASSIS:' + ($o | ConvertTo-Json -Compress))",
+        // Windows activation, the same record that decides the "Activate Windows" watermark.
+        // The product key itself is never sent: only whether an OEM key is in the firmware.
+        '$lic = @(Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID=\'55c92734-d682-4d71-983e-d6ec3f16059f\' AND PartialProductKey IS NOT NULL") | Where-Object { $_.Description -like \'*Operating System*\' } | Select-Object -First 1',
+        '$svc = Get-CimInstance SoftwareLicensingService',
+        '$l = @{ status = [int]$lic.LicenseStatus; channel = [string]$lic.ProductKeyChannel; desc = [string]$lic.Description; name = [string]$lic.Name; kms = [string]$lic.KeyManagementServiceMachine; kmsFound = [string]$lic.DiscoveredKeyManagementServiceMachineName; grace = [int]$lic.GracePeriodRemaining; oemKey = [bool]$svc.OA3xOriginalProductKey; found = [bool]$lic }',
+        "Write-Output ('SCP_LICENSE:' + ($l | ConvertTo-Json -Compress))"
     ].join('\r\n');
     var chassisJob = null;
     function typeLabel(type) {
@@ -3591,6 +3630,7 @@
     function loadChassis() {
         if (!window.ScpOperations) return;
         window.ScpOperations.request('chassisList').then(function (map) { window.ScpCachedChassis = map || {}; }).catch(function () { });
+        window.ScpOperations.request('licenseList').then(function (map) { window.ScpCachedLicense = map || {}; if (mapRiskRefresh) mapRiskRefresh(); }).catch(function () { });
     }
     // Replies to our own request only; everything else goes on to the other handlers.
     function chassisReceive(message) {
@@ -3598,7 +3638,8 @@
         if (!job || !message || message.action !== 'msg' || message.type !== 'runcommands' || message.responseid !== job.ticket || message.progress === true) return false;
         if (!job.pending[message.nodeid]) return true;
         delete job.pending[message.nodeid];
-        var text = String(message.result || ''), m = text.match(/SCP_CHASSIS:(\{[^\r\n]*\})/);
+        var text = String(message.result || ''), m = text.match(/SCP_CHASSIS:(\{[^\r\n]*\})/), lm = text.match(/SCP_LICENSE:(\{[^\r\n]*\})/);
+        if (lm) { try { var lo = JSON.parse(lm[1]); lo.nodeid = message.nodeid; job.licenses.push(lo); } catch (e) { /* ignore */ } }
         if (/COMMAND_BUSY/.test(text)) job.busy++;
         else if (m) { try { var o = JSON.parse(m[1]); o.nodeid = message.nodeid; job.items.push(o); } catch (e) { job.failed++; } }
         else job.failed++;
@@ -3609,14 +3650,14 @@
     function probeChassis() {
         var online = allNodes().filter(isOnline);
         if (!online.length) { window.alert(thai ? 'ตอนนี้ไม่มีเครื่องที่ออนไลน์' : 'No computer is online right now'); return; }
-        if (!window.confirm(thai ? ('ตรวจชนิดเครื่อง (PC / All-in-One / โน้ตบุ๊ก) กับ ' + online.length + ' เครื่องที่ออนไลน์?\n\nเป็นการอ่านข้อมูลจาก Windows อย่างเดียว ไม่เปลี่ยนแปลงอะไรในเครื่อง ใช้เวลาไม่ถึงนาที')
+        if (!window.confirm(thai ? ('ตรวจชนิดเครื่อง (PC / All-in-One / โน้ตบุ๊ก) และ Windows แท้ / Activate กับ ' + online.length + ' เครื่องที่ออนไลน์?\n\nเป็นการอ่านข้อมูลจาก Windows อย่างเดียว ไม่เปลี่ยนแปลงอะไรในเครื่อง ใช้เวลาไม่ถึงนาที')
             : ('Check the type (PC / All-in-One / notebook) of ' + online.length + ' online computers?\n\nRead-only; nothing on the computers is changed.'))) return;
         var d = overlayDialog(thai ? '🔍 ตรวจชนิดเครื่อง' : '🔍 Checking computer types');
         var body = element('div', 'scp-extra-body');
         var status = element('p', '');
         body.appendChild(status);
         d.box.appendChild(body);
-        var job = chassisJob = { ticket: 'scpchassis' + Date.now(), pending: {}, items: [], busy: 0, failed: 0, total: online.length };
+        var job = chassisJob = { ticket: 'scpchassis' + Date.now(), pending: {}, items: [], licenses: [], busy: 0, failed: 0, total: online.length };
         online.forEach(function (n) { job.pending[n._id] = true; });
         job.paint = function () {
             var left = Object.keys(job.pending).length;
@@ -3629,7 +3670,11 @@
             if (chassisJob === job) chassisJob = null;
             window.clearTimeout(job.timer);
             if (!job.items.length) { status.textContent += thai ? ' — ไม่มีผลให้บันทึก' : ' — nothing to save'; return; }
-            window.ScpOperations.request('chassisSave', { items: job.items }).then(function () {
+            var licenseSaved = window.ScpOperations.request('licenseSave', { items: job.licenses }).then(function () {
+                window.ScpCachedLicense = window.ScpCachedLicense || {};
+                job.licenses.forEach(function (l) { window.ScpCachedLicense[l.nodeid] = l; });
+            }).catch(function () { });
+            window.ScpOperations.request('chassisSave', { items: job.items }).then(function () { return licenseSaved; }).then(function () {
                 window.ScpCachedChassis = window.ScpCachedChassis || {};
                 job.items.forEach(function (it) { window.ScpCachedChassis[it.nodeid] = it; });
                 var count = { desktop: 0, aio: 0, notebook: 0 };
@@ -3638,7 +3683,10 @@
                     var t = window.ScpFleetAssess.deviceTypeOf((n && n.cpu) || '', '', it).type;
                     count[t]++;
                 });
+                var lic = { genuine: 0, bad: 0 };
+                job.licenses.forEach(function (l) { var v = licenseVerdictOf({ _id: l.nodeid }); if (v.state === 'genuine') lic.genuine++; else lic.bad++; });
                 status.textContent = (thai ? '✓ บันทึกแล้ว ' : '✓ Saved ') + job.items.length + (thai ? ' เครื่อง: PC ' : ' computers: PC ') + count.desktop + ' · All-in-One ' + count.aio + (thai ? ' · โน้ตบุ๊ก ' : ' · notebook ') + count.notebook +
+                    (thai ? ' · Windows แท้ ' : ' · genuine Windows ') + lic.genuine + (lic.bad ? (thai ? ' · ไม่แท้/ยังไม่ activate ' : ' · not genuine/not activated ') + lic.bad : '') +
                     (thai ? ' (เครื่องที่ปิดอยู่ กดตรวจอีกครั้งตอนเปิดเครื่อง)' : ' (run again later for computers that are off)');
                 loadFleetAssessment(true);
             }).catch(function (e) { status.textContent = (thai ? 'บันทึกไม่สำเร็จ: ' : 'Could not save: ') + (e && e.message); });
@@ -3701,6 +3749,8 @@
         section(thai ? '⚪ ไม่ได้เปิดเกิน 1 วัน' : '⚪ Off for more than a day', longOff, function (n) { var a = daysAway(n); return a > 0 ? a + (thai ? ' วัน' : ' days') : (thai ? 'ไม่ทราบเวลาล่าสุด' : 'last seen unknown'); });
         section(thai ? '🛡️ ฐานข้อมูลไวรัสเก่า' : '🛡️ Old virus signatures', oldSig, function (n) { return signatureAge(n) + (thai ? ' วัน' : ' days'); });
         section(thai ? '💾 ดิสก์ใกล้เต็ม' : '💾 Disk almost full', diskLow, function (n) { return disksOf(n).filter(function (x) { return x.percent <= diskWarnPercent; }).map(function (x) { return x.letter + ': ' + x.percent + '%'; }).join(', '); });
+        var notGenuine = list.filter(function (n) { return licenseVerdictOf(n).level; });
+        section(thai ? '🪪 Windows ไม่แท้ / ยังไม่ Activate' : '🪪 Windows not genuine / not activated', notGenuine, function (n) { return licenseVerdictOf(n).text; });
         section(thai ? '🧠 RAM ต่ำ (≤ 4 GB)' : '🧠 Low RAM (≤ 4 GB)', lowRam, function (n) { var s = specSummaryOf(n); return s && s.ram; });
 
         var tickets = element('section', 'scp-extra-section');
@@ -4091,7 +4141,7 @@
         if (window.ScpReport) { actions.appendChild(button(thai ? 'รายงานและชาร์ต (พิมพ์)' : 'Reports & Print', 'scp-dash-refresh', function () { window.ScpReport.open(); })); }
         actions.appendChild(button(thai ? '📰 สรุปประจำวัน' : '📰 Daily summary', 'scp-dash-refresh', openMorningSummary));
         actions.appendChild(button(thai ? '🏷️ QR ติดเครื่อง' : '🏷️ QR stickers', 'scp-dash-refresh', openQrSheet));
-        actions.appendChild(button(thai ? '🔍 ตรวจชนิดเครื่อง (PC / All-in-One)' : '🔍 Check PC / All-in-One', 'scp-dash-refresh', probeChassis));
+        actions.appendChild(button(thai ? '🔍 ตรวจเครื่อง (ชนิด / Windows แท้)' : '🔍 Check type / genuine Windows', 'scp-dash-refresh', probeChassis));
         actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));
         var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);
         heading.appendChild(actions);

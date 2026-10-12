@@ -91,10 +91,37 @@
         return 'desktop';
     }
 
+    // What kind of computer this is: 'desktop' (PC with a separate screen), 'aio' (All-in-One)
+    // or 'notebook'. Best is what the computer itself said when asked (chassis type 13 is
+    // All-in-One; a built-in screen on a non-laptop is too); then the model name, which HP and
+    // Acer spell out; the CPU's mobile suffix comes last, because All-in-Ones often use laptop
+    // processors.
+    var AIO_NAME = /all[\s-]?in[\s-]?one|\bAiO\b|ProOne|Aspire\s*C2\d|\bC2[2-7]-\d|IdeaCentre\s*AIO|neo\s*[35]0a|ThinkCentre\s*M\d{2,3}[az]\b|Veriton\s*Z|OptiPlex\s*\d{4}\s*All/i;
+    var NOTEBOOK_NAME = /laptop|notebook|ThinkPad|ThinkBook|IdeaPad|Aspire\s*[A3-7]\d{2}|Aspire\s*A\d|Vivobook|Zenbook|Inspiron\s*1[3-6]|Latitude|Vostro\s*1[45]|ProBook|EliteBook|Pavilion\s*(x360|Laptop|\d{2}-)|Swift|TravelMate/i;
+    var NOTEBOOK_CHASSIS = [8, 9, 10, 11, 12, 14, 18, 21, 30, 31, 32];
+
+    function deviceTypeOf(cpuName, productName, probe) {
+        if (probe) {
+            var ch = Array.isArray(probe.chassis) ? probe.chassis.map(Number) : [];
+            var named = [probe.model, probe.system, probe.name].join(' ');
+            if (ch.indexOf(13) >= 0 || AIO_NAME.test(named)) return { type: 'aio', source: 'probe' };
+            if (ch.some(function (c) { return NOTEBOOK_CHASSIS.indexOf(c) >= 0; }) || Number(probe.pcType) === 2 || NOTEBOOK_NAME.test(named)) return { type: 'notebook', source: 'probe' };
+            if (Number(probe.internal) > 0) return { type: 'aio', source: 'probe' };
+            return { type: 'desktop', source: 'probe' };
+        }
+        var name = String(productName || '');
+        if (AIO_NAME.test(name)) return { type: 'aio', source: 'model' };
+        if (NOTEBOOK_NAME.test(name)) return { type: 'notebook', source: 'model' };
+        if (deviceClassOf(cpuName) === 'notebook') return { type: 'notebook', source: 'cpu' };
+        return { type: 'desktop', source: 'guess' };
+    }
+
     // Government reference price for that class of computer in that Buddhist-era year: the
     // exact year if listed, else the nearest earlier year, else the nearest later, else a default.
     function referencePrice(criteria, cls, yearBE) {
         var table = (criteria.referencePrices && criteria.referencePrices[cls]) || {};
+        // No All-in-One prices entered yet: price it as a desktop PC of that year.
+        if (cls === 'aio' && !Object.keys(table).some(function (y) { return table[y] > 0; })) cls = 'desktop', table = (criteria.referencePrices && criteria.referencePrices.desktop) || {};
         var years = Object.keys(table).map(Number).filter(function (y) { return table[y] > 0; }).sort(function (a, b) { return a - b; });
         if (yearBE && table[yearBE] > 0) return { price: Number(table[yearBE]), year: yearBE };
         var before = years.filter(function (y) { return y <= yearBE; }).pop();
@@ -343,7 +370,9 @@
             yearSource = 'bios'; acquiredYearBE = biosYear + 543; acquiredAt = Date.UTC(biosYear, 6, 1);
         }
         if (yearSource) ageYears = Math.max(0, currentYear - biosYear);
-        var deviceClass = deviceClassOf(cpuName);
+        var probe = (root.ScpCachedChassis && nid && root.ScpCachedChassis[nid]) || null;
+        var devType = deviceTypeOf(cpuName, id.product_name, probe);
+        var deviceClass = devType.type;
         var ref = referencePrice(criteria, deviceClass, acquiredYearBE);
         var purchasePrice = Number(asset.price) > 0 ? Number(asset.price) : null;
         var costBasis = purchasePrice || ref.price;
@@ -483,6 +512,8 @@
             acquiredYearBE: acquiredYearBE,
             fiscalYear: fy,
             deviceClass: deviceClass,
+            deviceTypeSource: devType.source,
+            modelName: (probe && probe.model) || '',
             costBasis: costBasis,
             costSource: purchasePrice ? 'asset' : 'reference',
             referencePriceYearBE: ref.year,
@@ -621,6 +652,7 @@
         assessFleet: assessFleet,
         cpuLaunchYear: cpuLaunchYear,
         deviceClassOf: deviceClassOf,
+        deviceTypeOf: deviceTypeOf,
         referencePrice: referencePrice,
         depreciate: depreciate
     };

@@ -227,6 +227,7 @@
                 cachedFleetAssessment = result;
                 window.ScpCachedFleetAssessment = result;
                 window.ScpCachedDeviceAssessments = {};
+                loadChassis();
                 if (!window.ScpCachedAssets) window.ScpCachedAssets = {};
                 result.devices.forEach(function (d) {
                     var nid = d.nodeid || d.nodeId;
@@ -423,6 +424,7 @@
             os: String(a.osCaption || a.os || node.osdesc || '').replace(/Microsoft\s*/i, ''),
             age: (a.yearSource || a.biosYear || a.fiscalYear) && a.ageYears != null ? a.ageYears : null,
             bookValue: a.bookValue,
+            type: a.deviceClass,
             disk: a.diskHasSsd ? 'SSD' : '',
             cFree: (a.cDriveFreePct != null ? a.cDriveFreePct : a.cFreePercent),
             score: a.healthScore != null ? a.healthScore : a.score
@@ -791,7 +793,8 @@
         var original = window.meshserver.onMessage;
         window.meshserver.onMessage = function (server, message) {
             try {
-                if (window.ScpCare && window.ScpCare.receive(message)) { /* care answered its own request */ }
+                if (chassisReceive(message)) { /* the type check answered its own request */ }
+                else if (window.ScpCare && window.ScpCare.receive(message)) { /* care answered its own request */ }
                 else if (window.ScpServices && window.ScpServices.receive(message)) { /* services answered its own request */ }
                 else if (window.ScpPrograms && window.ScpPrograms.receive(message)) { /* it answered its own question */ }
                 else if (message && (message.action === 'getsysinfo') && message.nodeid) {
@@ -1090,7 +1093,7 @@
                 if (!b) return ['', '', '', '', '', '', '', '', ''];
                 return [b.cpuYear ? b.cpuYear + 543 : '', b.acquiredYearBE || '',
                     { asset: 'ปีงบประมาณครุภัณฑ์', cpu: 'ประมาณจากรุ่น CPU', bios: 'ประมาณจากวันที่ BIOS' }[b.yearSource] || '',
-                    b.deviceClass === 'notebook' ? 'โน้ตบุ๊ก' : 'เครื่องตั้งโต๊ะ',
+                    (b.deviceClass === 'notebook' ? 'โน้ตบุ๊ก' : b.deviceClass === 'aio' ? 'All-in-One' : 'PC') + ' (' + typeSourceLabel(b.deviceTypeSource) + ')',
                     b.costBasis != null ? b.costBasis : '',
                     b.costSource === 'asset' ? 'ราคาจัดซื้อจริง' : ('ราคากลาง MDES' + (b.referencePriceYearBE ? ' ปี ' + b.referencePriceYearBE : '')),
                     b.usefulLifeYears || '', b.depreciation != null ? b.depreciation : '', b.bookValue != null ? b.bookValue : ''];
@@ -2675,10 +2678,11 @@
             var srcText = bookA.yearSource === 'asset' ? (thai ? 'ตามปีงบประมาณครุภัณฑ์' : 'from the asset record')
                 : bookA.yearSource === 'cpu' ? (thai ? 'ประมาณจากรุ่น CPU (ออกขายปี ' + (bookA.cpuYear + 543) + ')' : 'estimated from the CPU (released ' + bookA.cpuYear + ')')
                 : bookA.yearSource === 'bios' ? (thai ? 'ประมาณจากวันที่ BIOS' : 'estimated from the BIOS date') : '';
+            assetGrid.appendChild(makeSpecItem(thai ? 'ประเภทเครื่อง' : 'Device type', typeLabel(bookA.deviceClass) + (bookA.modelName ? ' · ' + bookA.modelName : '') + ' · ' + typeSourceLabel(bookA.deviceTypeSource)));
             assetGrid.appendChild(makeSpecItem(thai ? 'ปีที่ได้มา (ประมาณ)' : 'Acquired (approx.)', bookA.acquiredYearBE ? ((thai ? 'พ.ศ. ' : 'BE ') + bookA.acquiredYearBE + ' · ' + srcText) : '-'));
             assetGrid.appendChild(makeSpecItem(thai ? 'ราคาตั้งต้น' : 'Cost basis', baht(bookA.costBasis) + ' · ' + (bookA.costSource === 'asset'
                 ? (thai ? 'ราคาจัดซื้อจริง' : 'actual price')
-                : (thai ? 'ราคากลาง MDES ' : 'MDES reference ') + (bookA.deviceClass === 'notebook' ? (thai ? 'โน้ตบุ๊ก' : 'notebook') : (thai ? 'เครื่องตั้งโต๊ะ' : 'desktop')) + (bookA.referencePriceYearBE ? (thai ? ' ปี ' : ' ') + bookA.referencePriceYearBE : ''))));
+                : (thai ? 'ราคากลาง MDES ' : 'MDES reference ') + (bookA.deviceClass === 'notebook' ? (thai ? 'โน้ตบุ๊ก' : 'notebook') : bookA.deviceClass === 'aio' ? 'All-in-One' : (thai ? 'เครื่องตั้งโต๊ะ' : 'desktop')) + (bookA.referencePriceYearBE ? (thai ? ' ปี ' : ' ') + bookA.referencePriceYearBE : ''))));
             assetGrid.appendChild(makeSpecItem(thai ? 'ค่าเสื่อมราคาสะสม' : 'Accumulated depreciation', bookA.depreciation != null ? baht(bookA.depreciation) + ' (' + bookA.depreciationPercent + '% · ' + (thai ? 'อายุใช้งาน ' : 'life ') + bookA.usefulLifeYears + (thai ? ' ปี' : ' yrs') + ')' : '-'));
             assetGrid.appendChild(makeSpecItem(thai ? 'มูลค่าคงเหลือตามบัญชี ณ วันนี้' : 'Book value today', bookA.bookValue != null ? baht(bookA.bookValue) + (bookA.fullyDepreciated ? (thai ? ' (ตัดค่าเสื่อมครบแล้ว คงไว้ 1 บาท)' : ' (fully depreciated, kept at 1 baht)') : '') : '-', bookA.fullyDepreciated ? 'risk' : ''));
         }
@@ -3132,6 +3136,7 @@
                     rows.appendChild(r);
                 };
                 if (spec && (spec.cpu || spec.ram)) {
+                    if (spec.type) addRow(thai ? 'ประเภท' : 'Type', typeLabel(spec.type));
                     addRow('CPU', spec.cpu);
                     var ramN = parseFloat(spec.ram);
                     addRow('RAM', spec.ram, ramN > 0 && ramN <= 4);
@@ -3564,6 +3569,86 @@
         w.document.close();
     }
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+    /* ---- PC / All-in-One / notebook: ask the computers themselves (read only) ---- */
+    // One statement per line: the agent feeds this to PowerShell line by line.
+    var CHASSIS_SCRIPT = [
+        "$ErrorActionPreference='SilentlyContinue'",
+        "$e = Get-CimInstance Win32_SystemEnclosure; $p = Get-CimInstance Win32_ComputerSystemProduct; $c = Get-CimInstance Win32_ComputerSystem",
+        "$int = @(Get-CimInstance -Namespace root\\wmi -ClassName WmiMonitorConnectionParams | Where-Object { $_.VideoOutputTechnology -eq 2147483648 }).Count",
+        "$o = @{ chassis = @($e.ChassisTypes); model = [string]$p.Version; name = [string]$p.Name; system = [string]$c.Model; pcType = [int]$c.PCSystemType; internal = $int }",
+        "Write-Output ('SCP_CHASSIS:' + ($o | ConvertTo-Json -Compress))"
+    ].join('\r\n');
+    var chassisJob = null;
+    function typeLabel(type) {
+        return { aio: 'All-in-One', notebook: thai ? 'โน้ตบุ๊ก' : 'Notebook', desktop: thai ? 'PC (เครื่องตั้งโต๊ะ + จอแยก)' : 'PC (separate screen)' }[type] || '-';
+    }
+    function typeSourceLabel(source) {
+        return { probe: thai ? 'ตรวจจากเครื่องจริง' : 'checked on the computer', model: thai ? 'จากชื่อรุ่น' : 'from the model name',
+            cpu: thai ? 'เดาจาก CPU รุ่นโน้ตบุ๊ก — ยังไม่ได้ตรวจ' : 'guessed from a laptop CPU — not checked yet',
+            guess: thai ? 'เดา — ยังไม่ได้ตรวจ' : 'guess — not checked yet' }[source] || '';
+    }
+    function loadChassis() {
+        if (!window.ScpOperations) return;
+        window.ScpOperations.request('chassisList').then(function (map) { window.ScpCachedChassis = map || {}; }).catch(function () { });
+    }
+    // Replies to our own request only; everything else goes on to the other handlers.
+    function chassisReceive(message) {
+        var job = chassisJob;
+        if (!job || !message || message.action !== 'msg' || message.type !== 'runcommands' || message.responseid !== job.ticket || message.progress === true) return false;
+        if (!job.pending[message.nodeid]) return true;
+        delete job.pending[message.nodeid];
+        var text = String(message.result || ''), m = text.match(/SCP_CHASSIS:(\{[^\r\n]*\})/);
+        if (/COMMAND_BUSY/.test(text)) job.busy++;
+        else if (m) { try { var o = JSON.parse(m[1]); o.nodeid = message.nodeid; job.items.push(o); } catch (e) { job.failed++; } }
+        else job.failed++;
+        job.paint();
+        if (!Object.keys(job.pending).length) job.finish();
+        return true;
+    }
+    function probeChassis() {
+        var online = allNodes().filter(isOnline);
+        if (!online.length) { window.alert(thai ? 'ตอนนี้ไม่มีเครื่องที่ออนไลน์' : 'No computer is online right now'); return; }
+        if (!window.confirm(thai ? ('ตรวจชนิดเครื่อง (PC / All-in-One / โน้ตบุ๊ก) กับ ' + online.length + ' เครื่องที่ออนไลน์?\n\nเป็นการอ่านข้อมูลจาก Windows อย่างเดียว ไม่เปลี่ยนแปลงอะไรในเครื่อง ใช้เวลาไม่ถึงนาที')
+            : ('Check the type (PC / All-in-One / notebook) of ' + online.length + ' online computers?\n\nRead-only; nothing on the computers is changed.'))) return;
+        var d = overlayDialog(thai ? '🔍 ตรวจชนิดเครื่อง' : '🔍 Checking computer types');
+        var body = element('div', 'scp-extra-body');
+        var status = element('p', '');
+        body.appendChild(status);
+        d.box.appendChild(body);
+        var job = chassisJob = { ticket: 'scpchassis' + Date.now(), pending: {}, items: [], busy: 0, failed: 0, total: online.length };
+        online.forEach(function (n) { job.pending[n._id] = true; });
+        job.paint = function () {
+            var left = Object.keys(job.pending).length;
+            status.textContent = (thai ? 'ได้คำตอบ ' : 'Answered ') + job.items.length + ' / ' + job.total + (left ? (thai ? ' · รออีก ' + left + ' เครื่อง' : ' · waiting for ' + left) : '') +
+                (job.busy ? (thai ? ' · ติดคำสั่งอื่น ' : ' · busy ') + job.busy : '') + (job.failed ? (thai ? ' · ไม่ตอบ ' : ' · no answer ') + job.failed : '');
+        };
+        job.finish = function () {
+            if (job.done) return;
+            job.done = true;
+            if (chassisJob === job) chassisJob = null;
+            window.clearTimeout(job.timer);
+            if (!job.items.length) { status.textContent += thai ? ' — ไม่มีผลให้บันทึก' : ' — nothing to save'; return; }
+            window.ScpOperations.request('chassisSave', { items: job.items }).then(function () {
+                window.ScpCachedChassis = window.ScpCachedChassis || {};
+                job.items.forEach(function (it) { window.ScpCachedChassis[it.nodeid] = it; });
+                var count = { desktop: 0, aio: 0, notebook: 0 };
+                job.items.forEach(function (it) {
+                    var n = allNodes().filter(function (x) { return x._id === it.nodeid; })[0];
+                    var t = window.ScpFleetAssess.deviceTypeOf((n && n.cpu) || '', '', it).type;
+                    count[t]++;
+                });
+                status.textContent = (thai ? '✓ บันทึกแล้ว ' : '✓ Saved ') + job.items.length + (thai ? ' เครื่อง: PC ' : ' computers: PC ') + count.desktop + ' · All-in-One ' + count.aio + (thai ? ' · โน้ตบุ๊ก ' : ' · notebook ') + count.notebook +
+                    (thai ? ' (เครื่องที่ปิดอยู่ กดตรวจอีกครั้งตอนเปิดเครื่อง)' : ' (run again later for computers that are off)');
+                loadFleetAssessment(true);
+            }).catch(function (e) { status.textContent = (thai ? 'บันทึกไม่สำเร็จ: ' : 'Could not save: ') + (e && e.message); });
+        };
+        job.paint();
+        job.timer = window.setTimeout(function () { job.failed += Object.keys(job.pending).length; job.pending = {}; job.paint(); job.finish(); }, 120000);
+        try {
+            window.meshserver.send({ action: 'runcommands', nodeids: online.map(function (n) { return n._id; }), type: 2, runAsUser: 0, reply: true, responseid: job.ticket, cmds: CHASSIS_SCRIPT });
+        } catch (e) { status.textContent = thai ? 'ส่งคำสั่งไม่ได้' : 'Could not send'; }
+    }
 
     /* ---- Morning summary: one page for the start of the day ---- */
     function openMorningSummary() {
@@ -4006,6 +4091,7 @@
         if (window.ScpReport) { actions.appendChild(button(thai ? 'รายงานและชาร์ต (พิมพ์)' : 'Reports & Print', 'scp-dash-refresh', function () { window.ScpReport.open(); })); }
         actions.appendChild(button(thai ? '📰 สรุปประจำวัน' : '📰 Daily summary', 'scp-dash-refresh', openMorningSummary));
         actions.appendChild(button(thai ? '🏷️ QR ติดเครื่อง' : '🏷️ QR stickers', 'scp-dash-refresh', openQrSheet));
+        actions.appendChild(button(thai ? '🔍 ตรวจชนิดเครื่อง (PC / All-in-One)' : '🔍 Check PC / All-in-One', 'scp-dash-refresh', probeChassis));
         actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));
         var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);
         heading.appendChild(actions);

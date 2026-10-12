@@ -87,7 +87,10 @@ exports.handle = async function (ctx, cmd) {
   for (const a of (assetRows || [])) {
    if (a && a.nodeid) assetMap[a.nodeid] = a;
   }
-  return assessEngine.assessFleet(allowedNodes, sysinfos, criteria, meshMap, assetMap);
+  const chassisRows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scpchassis', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const chassisMap = {};
+  for (const c of chassisRows) { if (c && c.nodeid) chassisMap[c.nodeid] = c; }
+  return assessEngine.assessFleet(allowedNodes, sysinfos, criteria, meshMap, assetMap, chassisMap);
  }
  if (cmd.op === 'getCriteria') {
   const assessEngine = require('./fleet-assess');
@@ -102,8 +105,8 @@ exports.handle = async function (ctx, cmd) {
   // years), and reference prices kept to sane Buddhist-era years and baht amounts.
   const life = Number(newCriteria.usefulLifeYears);
   newCriteria.usefulLifeYears = (life >= 3 && life <= 5) ? Math.round(life) : assessEngine.DEFAULT_CRITERIA.usefulLifeYears;
-  const prices = { desktop: {}, notebook: {} };
-  for (const cls of ['desktop', 'notebook']) {
+  const prices = { desktop: {}, notebook: {}, aio: {} };
+  for (const cls of ['desktop', 'notebook', 'aio']) {
    const table = (newCriteria.referencePrices && newCriteria.referencePrices[cls]) || {};
    for (const year of Object.keys(table)) {
     const y = Number(year), v = Number(table[year]);
@@ -167,6 +170,27 @@ exports.handle = async function (ctx, cmd) {
   };
   await save(row);
   return row;
+ }
+ if (cmd.op === 'chassisSave') {
+  // What each computer said about its own case when asked (read-only query): chassis
+  // types, model name, whether it has a built-in screen. Used to tell PC / All-in-One /
+  // notebook apart.
+  if (!Array.isArray(cmd.items) || cmd.items.length > 1000) throw Error('INVALID_INPUT');
+  let saved = 0;
+  for (const it of cmd.items) {
+   if (!it || typeof it.nodeid !== 'string' || !await access(it.nodeid)) continue;
+   const chassis = Array.isArray(it.chassis) ? it.chassis.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n < 100).slice(0, 8) : [];
+   const str = v => typeof v === 'string' ? v.slice(0, 120) : '';
+   await save({ _id: 'scpchassis/' + it.nodeid, type: 'scpchassis', domain: domain.id, nodeid: it.nodeid, chassis, model: str(it.model), name: str(it.name), system: str(it.system),
+    pcType: Number(it.pcType) || 0, internal: Math.max(0, Math.min(9, Number(it.internal) || 0)), updated: Date.now(), by: user._id });
+   saved++;
+  }
+  return { saved };
+ }
+ if (cmd.op === 'chassisList') {
+  const rows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scpchassis', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const map = {}; for (const row of rows) if (row && row.nodeid && await access(row.nodeid)) map[row.nodeid] = row;
+  return map;
  }
  if (cmd.op === 'careStart') {
   // Safe auto-care was sent to these computers. Kept so the result survives a reload and

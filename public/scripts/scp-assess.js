@@ -4,7 +4,6 @@
     'use strict';
 
     var DEFAULT_CRITERIA = {
-        budgetYearBE: 2570,
         useReferencePricesForReplacement: true,
         replacementProfiles: root.ScpPriceReference.profiles,
         priceReferenceSource: root.ScpPriceReference.source,
@@ -351,6 +350,8 @@
         }
 
         var currentYear = new Date().getFullYear();
+        // Plan years are fiscal years (as A.D.), counted from the budget year, not the calendar year.
+        var planYear = criteria.budgetYearBE - 543;
         var ageYears = biosYear ? Math.max(0, currentYear - biosYear) : 4;
 
         var cpuName = (id.cpu_name) || (s && s.cpu && (s.cpu.model || s.cpu.name || s.cpu.brand)) || (node && node.cpu) || '';
@@ -481,7 +482,7 @@
 
         var survival = {};
         for (var i = 0; i <= 5; i++) {
-            var y = currentYear + i;
+            var y = planYear + i;
             var projectedAge = ageYears + i;
             var prob = 1.0;
             if (projectedAge > criteria.maxAgeYears + 2) prob = 0.15;
@@ -493,17 +494,17 @@
             survival[String(y)] = Math.max(0.1, Math.min(1.0, Math.round(prob * 100) / 100));
         }
 
-        var replacementYear = currentYear;
-        if (healthScore >= 75 && !win11Ineligible) replacementYear = currentYear + 4;
-        else if (healthScore >= 60 && !win11Ineligible) replacementYear = currentYear + 3;
-        else if (win11Upgradable) replacementYear = currentYear + 2;
-        else if (win11Ineligible && (ageYears >= 6 || isWin7)) replacementYear = currentYear;
-        else replacementYear = currentYear + 1;
+        var replacementYear = planYear;
+        if (healthScore >= 75 && !win11Ineligible) replacementYear = planYear + 4;
+        else if (healthScore >= 60 && !win11Ineligible) replacementYear = planYear + 3;
+        else if (win11Upgradable) replacementYear = planYear + 2;
+        else if (win11Ineligible && (ageYears >= 6 || isWin7)) replacementYear = planYear;
+        else replacementYear = planYear + 1;
 
         var rec = 'keep';
         if (win11Ineligible) {
             rec = 'replace';
-            replacementYear = criteria.budgetYearBE - 543;
+            replacementYear = planYear;
         } else if (win11Upgradable || upgradeActions.length > 0) {
             rec = 'upgrade';
         }

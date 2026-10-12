@@ -4,7 +4,6 @@ const priceReference = require('../public/scripts/scp-price-reference');
 // Evaluates Windows 11 readiness, lifespan health, yearly upgrade forecasts, and custom criteria.
 
 const DEFAULT_CRITERIA = {
-    budgetYearBE: 2570,
     useReferencePricesForReplacement: true,
     replacementProfiles: priceReference.profiles,
     priceReferenceSource: priceReference.source,
@@ -334,6 +333,8 @@ function depreciate(cost, acquiredAt, lifeYears, now) {
 function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
     const criteria = priceReference.resolveCriteria(DEFAULT_CRITERIA, customCriteria);
     const nowYear = new Date().getFullYear();
+    // Plan years are fiscal years (as A.D.), counted from the budget year, not the calendar year.
+    const planYear = criteria.budgetYearBE - 543;
 
     const hw = (sysinfo && sysinfo.hardware) || {};
     const win = hw.windows || {};
@@ -524,22 +525,22 @@ function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
 
     // Recommendation category: 'keep' | 'upgrade' | 'replace'
     let recommendation = 'keep';
-    let replaceByYear = nowYear + 3;
+    let replaceByYear = planYear + 3;
     let estimatedCost = 0;
 
     // Age still affects health and forecasts, but does not alone justify buying a new PC.
     // A supported processor can be kept or upgraded, including machines on older Windows.
     if (!cpuEval.supported) {
         recommendation = 'replace';
-        replaceByYear = criteria.budgetYearBE - 543;
+        replaceByYear = planYear;
         estimatedCost = replacementPrice.price;
     } else if (win11Status === 'upgradable' || (!hasSsd && criteria.requireSsd) || ramLow) {
         recommendation = 'upgrade';
-        replaceByYear = nowYear + 2;
+        replaceByYear = planYear + 2;
         estimatedCost = upgradeSuggestions.reduce((sum, s) => sum + (s.cost || 0), 0);
     } else {
         recommendation = 'keep';
-        replaceByYear = nowYear + Math.max(1, criteria.maxAgeYears - (ageYears || 3));
+        replaceByYear = planYear + Math.max(1, criteria.maxAgeYears - (ageYears || 3));
         estimatedCost = 0;
     }
 
@@ -591,11 +592,11 @@ function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
             year3: pYear3
         },
         survival: {
-            [String(nowYear)]: Math.round(pYearCurrent) / 100,
-            [String(nowYear + 1)]: Math.round(pYear1) / 100,
-            [String(nowYear + 2)]: Math.round(pYear2) / 100,
-            [String(nowYear + 3)]: Math.round(pYear3) / 100,
-            [String(nowYear + 4)]: Math.max(0.1, Math.round(pYear3 * 0.7)) / 100
+            [String(planYear)]: Math.round(pYearCurrent) / 100,
+            [String(planYear + 1)]: Math.round(pYear1) / 100,
+            [String(planYear + 2)]: Math.round(pYear2) / 100,
+            [String(planYear + 3)]: Math.round(pYear3) / 100,
+            [String(planYear + 4)]: Math.max(0.1, Math.round(pYear3 * 0.7)) / 100
         },
         recommendation: recommendation,
         replaceByYear: replaceByYear,

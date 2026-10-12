@@ -1840,7 +1840,7 @@
             thai ? 'ดิสก์' : 'Disk',
             thai ? 'สถานะ Win 11' : 'Win 11 Status',
             thai ? 'คะแนนสุขภาพ' : 'Health Score',
-            thai ? 'ปีที่ควรเปลี่ยน' : 'Replace Year',
+            thai ? 'ปีงบที่ควรเปลี่ยน' : 'Replace FY',
             thai ? 'ใบประเมิน' : 'Fact Sheet'
         ].forEach(function (h) { aHTr.appendChild(element('th', '', h)); });
         aHead.appendChild(aHTr);
@@ -1949,7 +1949,7 @@
 
         // --- Budget Tab ---
         var budgetSec = sections.budget;
-        var currentYear = fleetAssess.budgetYearBE ? fleetAssess.budgetYearBE - 543 : new Date().getFullYear();
+        var currentYear = fleetAssess.budgetYearBE ? fleetAssess.budgetYearBE - 543 : (window.ScpPriceReference ? window.ScpPriceReference.fiscalYearBE() - 543 : new Date().getFullYear());
         var bg = (fleetAssess && fleetAssess.budget) || {};
         var bgCur = bg.currentYear || {};
         var bgNext = bg.nextYear || {};
@@ -3415,7 +3415,7 @@
                     planBox.appendChild(element('span', 'scp-map-plan-key', thai ? 'สีห้อง/ตึก: 🟩 ปกติ 🟨 ควรระวัง 🟥 เสี่ยงสูง (เข้มตามสัดส่วนเครื่อง) · ⬜ ไม่มีคอม' : 'Room colour: green ok · amber caution · red serious · grey no computers'));
                 }
                 if (mode === 'plan') {
-                    var year = new Date().getFullYear(), byYear = {};
+                    var year = (window.ScpPriceReference ? window.ScpPriceReference.fiscalYearBE() - 543 : new Date().getFullYear()), byYear = {}; // fiscal year, as A.D.
                     allNodes().forEach(function (n) {
                         var y = planYearOf(n);
                         if (y === null) return;
@@ -3426,11 +3426,11 @@
                         byYear[y].count++;
                         byYear[y].cost += Number(a && a.estimatedCost) || 0;
                     });
-                    planBox.appendChild(element('span', 'scp-map-plan-key', thai ? 'ป้ายบนเครื่อง = ปี พ.ศ. ที่ควรเปลี่ยน · ห้องสีส้ม-แดง = ถึงกำหนดปีนี้/ปีหน้า' : 'Badge = year to replace · orange/red rooms = due this or next year'));
+                    planBox.appendChild(element('span', 'scp-map-plan-key', thai ? 'ป้ายบนเครื่อง = ปีงบประมาณ (พ.ศ.) ที่ควรเปลี่ยน · ห้องสีส้ม-แดง = ถึงกำหนดปีงบนี้/ปีงบหน้า' : 'Badge = year to replace · orange/red rooms = due this or next year'));
                     Object.keys(byYear).sort().forEach(function (y) {
                         var v = byYear[y];
                         planBox.appendChild(element('span', 'scp-map-plan-chip' + (Number(y) <= year ? ' now' : Number(y) === year + 1 ? ' next' : ''),
-                            (thai ? 'ปี ' : '') + (Number(y) + 543) + ': ' + v.count + (thai ? ' เครื่อง' : ' PCs') + (v.cost ? ' · ≈฿' + v.cost.toLocaleString() : '')));
+                            (thai ? 'ปีงบ ' : 'FY ') + (Number(y) + 543) + ': ' + v.count + (thai ? ' เครื่อง' : ' PCs') + (v.cost ? ' · ≈฿' + v.cost.toLocaleString() : '')));
                     });
                     if (!Object.keys(byYear).length) planBox.appendChild(element('span', 'scp-map-plan-key', thai ? '(กำลังโหลดผลประเมินเครื่อง…)' : '(loading assessment…)'));
                 }

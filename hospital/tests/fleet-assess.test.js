@@ -282,3 +282,29 @@ test('the read-only check drives SSD detection and spare-part advice with prices
     assert.equal(fleet.maintenance.ups, 1);
     assert.equal(fleet.maintenance.upsCost, 2500);
 });
+
+test('plans count in Thai fiscal years, which start on 1 October', () => {
+    const reference = require('../../public/scripts/scp-price-reference');
+    assert.equal(reference.fiscalYearBE(new Date(2026, 8, 30)), 2569);
+    assert.equal(reference.fiscalYearBE(new Date(2026, 9, 1)), 2570);
+    assert.equal(reference.fiscalYearBE(new Date(2027, 8, 30)), 2570);
+    const thisFY = reference.fiscalYearBE();
+    // A budget year saved in an earlier fiscal year is stale and moves on to the current one.
+    assert.equal(reference.resolveCriteria({}, { budgetYearBE: thisFY - 1 }).budgetYearBE, thisFY);
+    assert.equal(reference.resolveCriteria({}, { budgetYearBE: thisFY + 1 }).budgetYearBE, thisFY + 1);
+    assert.equal(reference.resolveCriteria({}, {}).budgetYearBE, thisFY);
+    // Supported CPU, 4 GB RAM: an upgrade paid from this fiscal year's budget, and the
+    // long-term replacement counted from the fiscal year, not the calendar year.
+    const nodes = [{ _id: 'up', name: 'Upgrade', hardware: assessmentHardware('12th Gen Intel Core i3-1215U', 4, 'Windows 10 Pro') }];
+    const fleet = assess.assessFleet(nodes, [], {});
+    assert.equal(fleet.budgetYearBE, thisFY);
+    assert.equal(fleet.devices[0].recommendation, 'upgrade');
+    assert.equal(fleet.devices[0].replaceByYear, thisFY - 543 + 2);
+    assert.ok(fleet.budget.currentYear.upgrade > 0, 'the upgrade is budgeted in the current fiscal year');
+    const browser = {};
+    for (const file of ['scp-price-reference.js', 'scp-assess.js']) vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../public/scripts', file), 'utf8'), { window: browser });
+    const local = browser.ScpFleetAssess.assessFleet(nodes, {});
+    assert.equal(local.budgetYearBE, thisFY);
+    assert.ok(local.devices[0].replacementYear >= thisFY - 543, 'no plan year falls before the current fiscal year');
+    assert.ok(Object.keys(local.devices[0].survival).includes(String(thisFY - 543)));
+});

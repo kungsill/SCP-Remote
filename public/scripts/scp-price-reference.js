@@ -25,6 +25,11 @@
     };
     var historySources = {"desktop:2553":"ict-2553 p.3 #7","notebook:2553":"ict-2553 p.5 #11","desktop:2555":"ict-2555 p.3 #7","notebook:2555":"ict-2555 p.5 #11","desktop:2556":"mdes-1590 p.3 #7","notebook:2556":"mdes-1590 p.4 #10","desktop:2557":"mdes-1592 p.3 #7","notebook:2557":"mdes-1592 p.4 #10","desktop:2558":"mdes-1593 p.3 #7","notebook:2558":"mdes-1593 p.5 #10","desktop:2559":"mdes-1595 p.4 #7","notebook:2559":"mdes-1595 p.5 #10","desktop:2560":"mdes-1596 p.4 #7","notebook:2560":"mdes-1596 p.6 #10","desktop:2561":"mdes-1597 p.3 #7","aio:2561":"mdes-1597 p.5 #10","notebook:2561":"mdes-1597 p.6 #12","desktop:2562":"mdes-1598 p.3 #7","aio:2562":"mdes-1598 p.5 #10","notebook:2562":"mdes-1598 p.6 #12","desktop:2563":"mdes-2564 p.3 #6","aio:2563":"mdes-2564 p.4 #9","notebook:2563":"mdes-2564 p.5 #11","desktop:2564":"mdes-5121 p.4 #6","aio:2564":"mdes-5121 p.6 #9","notebook:2564":"mdes-5121 p.8 #11","desktop:2566":"mdes-6650 p.4 #6","aio:2566":"mdes-6650 p.5 #9","notebook:2566":"mdes-6650 p.6 #11","desktop:2568":"mdes-10282 p.4 #4","aio:2568":"mdes-10282 p.6 #7","notebook:2568":"mdes-10282 p.7 #9","desktop:2569":"mdes-10933 p.4 #4","aio:2569":"mdes-10933 p.6 #7","notebook:2569":"mdes-10933 p.7 #9"};
     var profiles = { desktop: 'desktop-office', aio: 'aio-office', notebook: 'notebook-office' };
+    // Thai government fiscal year (B.E.): it starts on 1 October, so October 2026 is FY 2570.
+    function fiscalYearBE(date) {
+        var d = date || new Date();
+        return d.getFullYear() + (d.getMonth() >= 9 ? 1 : 0) + 543;
+    }
     function resolveCriteria(defaults, custom) {
         custom = custom || {};
         var c = Object.assign({}, defaults, custom);
@@ -32,8 +37,11 @@
         Object.keys(parts).forEach(function (k) { partPrices[k] = parts[k].price; });
         c.costs = Object.assign(partPrices, defaults.costs, custom.costs);
         c.weights = Object.assign({}, defaults.weights, custom.weights);
-        c.budgetYearBE = Number(custom.budgetYearBE || defaults.budgetYearBE || 2570);
-        if (!Number.isInteger(c.budgetYearBE) || c.budgetYearBE < 2540 || c.budgetYearBE > 2700) c.budgetYearBE = 2570;
+        // Plans count from the budget year: one the administrator saved, else the current fiscal
+        // year. A saved year that has already passed is stale (saved last year), so it moves on.
+        var thisFY = fiscalYearBE();
+        c.budgetYearBE = Number(custom.budgetYearBE || thisFY);
+        if (!Number.isInteger(c.budgetYearBE) || c.budgetYearBE < thisFY || c.budgetYearBE > 2700) c.budgetYearBE = thisFY;
         c.useReferencePricesForReplacement = custom.useReferencePricesForReplacement !== false;
         c.replacementProfiles = Object.assign({}, profiles, custom.replacementProfiles);
         c.referencePrices = {};
@@ -97,7 +105,7 @@
         return out;
     }
 
-    var api = { catalog: catalog, source: source, profiles: profiles, history: history, historySources: historySources, parts: parts,
+    var api = { catalog: catalog, fiscalYearBE: fiscalYearBE, source: source, profiles: profiles, history: history, historySources: historySources, parts: parts,
         systemDiskOf: systemDiskOf, maintenanceFor: maintenanceFor, resolveCriteria: resolveCriteria, replacementPrice: replacementPrice };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.ScpPriceReference = api;

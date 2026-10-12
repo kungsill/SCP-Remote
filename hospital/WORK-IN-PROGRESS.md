@@ -308,3 +308,10 @@ node scripts/allow-subnet.js add 192.168.x.0/24     เพิ่มวงเค�
 **ไฟล์ใน `public/scripts/` ไม่ต้องรีสตาร์ตเซิร์ฟเวอร์** เบราว์เซอร์ดึงใหม่เอง แต่กด **Ctrl+Shift+R** เพื่อล้างแคช
 
 **เมื่อออกรุ่นโมดูลเอเจนต์ใหม่** ต้องแก้เลขรุ่นให้ตรงกันทั้ง `hospital/release.json` และ `meshCoreObj.scpRelease` ใน `agents/meshcore.js` (มีเทสต์ตรวจ)
+
+## Fiscal-year plans (Claude, 2026-10-12)
+
+- Plan years are Thai fiscal years (1 Oct – 30 Sep). `ScpPriceReference.fiscalYearBE(date)` is the one helper; `resolveCriteria` defaults `budgetYearBE` to the current fiscal year, and a saved year that has already passed is treated as stale and moves on to the current one.
+- Both assessors count replacement years and survival keys from `budgetYearBE − 543` (not the calendar year); age still uses the calendar year. Upgrades are budgeted in the current fiscal year; the printout now says so ("อัปเกรดเครื่องเดิมในปีงบประมาณ 2570 … คาดว่าจะต้องเปลี่ยนเครื่องใหม่ราวปีงบประมาณ 2572").
+- Previously an upgrade plan printed calendar 2026 + 2 → "2571" next to the budget, which read as the wrong budget year; machines to keep could land in "2570" from calendar arithmetic.
+- The FY 2570 draft-price tests assume the current fiscal year is 2570; update them with the FY 2571 price edition.

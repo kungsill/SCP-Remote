@@ -8,6 +8,13 @@
     'use strict';
     var thai = (typeof document !== 'undefined') && document.documentElement.lang === 'th';
     function t(en, th) { return thai ? th : en; }
+    // The fiscal year (B.E.) the assessment planned for; Thai fiscal years start on 1 October.
+    function budgetYearBEOf(assess) {
+        if (assess && assess.budgetYearBE) return Number(assess.budgetYearBE);
+        if (window.ScpPriceReference && window.ScpPriceReference.fiscalYearBE) return window.ScpPriceReference.fiscalYearBE();
+        var d = new Date();
+        return d.getFullYear() + (d.getMonth() >= 9 ? 1 : 0) + 543;
+    }
     function el(tag, text, className) {
         var n = document.createElement(tag);
         if (text != null) { n.textContent = text; }
@@ -240,7 +247,7 @@
         var c2 = el('div', null, 'scp-report-chart-box');
         c2.appendChild(el('h4', t('Lifespan & Replacement Timeline', 'ระยะเวลาคงเหลือ / แผนปลดระวาง')));
         c2.appendChild(createBarChart([
-            { label: t('Budget FY ' + (assess.budgetYearBE || 2570), 'งบ ' + (assess.budgetYearBE || 2570)), value: assess.forecast.currentYear || 0, color: '#ef4444' },
+            { label: t('Budget FY ' + budgetYearBEOf(assess), 'งบ ' + budgetYearBEOf(assess)), value: assess.forecast.currentYear || 0, color: '#ef4444' },
             { label: t('Next fiscal year', 'ปีงบถัดไป'), value: assess.forecast.nextYear || 0, color: '#f59e0b' },
             { label: t('2-3 Yrs', '2-3 ปี'), value: assess.forecast.year2to3 || 0, color: '#3b82f6' },
             { label: t('4-5 Yrs', '4-5 ปี+'), value: assess.forecast.year4to5 || 0, color: '#10b981' }
@@ -529,11 +536,12 @@
 
         var planYear = cur.replacementYear || cur.replaceByYear;
         var planYearText = planYear ? String(thai ? Number(planYear) + 543 : planYear) : '-';
+        var budgetYearText = String(thai ? budgetYearBEOf(assess) : budgetYearBEOf(assess) - 543);
         var recMsg = cur.recommendation === 'replace'
-            ? t('Recommended: Plan replacement in ', 'ข้อเสนอแนะ: วางแผนจัดซื้อเครื่องใหม่ในปี ') + planYearText + ' (ประมาณการงบ ~' + (cur.estimatedCost || 18000).toLocaleString() + ' บาท)'
+            ? t('Recommended: Plan replacement in FY ', 'ข้อเสนอแนะ: วางแผนจัดซื้อเครื่องใหม่ในปีงบประมาณ ') + planYearText + ' (ประมาณการงบ ~' + (cur.estimatedCost || 18000).toLocaleString() + ' บาท)'
             : (cur.recommendation === 'upgrade'
-                ? t('Recommended: Upgrade hardware for ~', 'ข้อเสนอแนะ: อัปเกรดเครื่องเดิม งบประมาณ ~') + (cur.upgradeCost || cur.estimatedCost || 0).toLocaleString() + ' บาท · ปีแผนระยะยาว ' + planYearText
-                : t('Recommended: Maintain this device. Planning year ', 'ข้อเสนอแนะ: ใช้งานและดูแลเครื่องเดิม ปีแผนระยะยาว ') + planYearText);
+                ? t('Recommended: Upgrade hardware in FY ' + budgetYearText + ' for ~', 'ข้อเสนอแนะ: อัปเกรดเครื่องเดิมในปีงบประมาณ ' + budgetYearText + ' งบประมาณ ~') + (cur.upgradeCost || cur.estimatedCost || 0).toLocaleString() + t(' THB · expected replacement around FY ', ' บาท · คาดว่าจะต้องเปลี่ยนเครื่องใหม่ราวปีงบประมาณ ') + planYearText
+                : t('Recommended: Maintain this device. Expected replacement around FY ', 'ข้อเสนอแนะ: ใช้งานและดูแลเครื่องเดิม คาดว่าจะต้องเปลี่ยนเครื่องใหม่ราวปีงบประมาณ ') + planYearText);
 
         evalBox.appendChild(el('div', recMsg, 'scp-device-rec-callout scp-rec-' + cur.recommendation));
         sheet.appendChild(evalBox);
@@ -545,7 +553,7 @@
     function renderBudgetForecast(data, body) {
         var assess = data.assess || { budget: {}, forecast: {}, criteria: {} };
         var b = assess.budget || {};
-        var currentYear = assess.budgetYearBE ? assess.budgetYearBE - 543 : new Date().getFullYear();
+        var currentYear = budgetYearBEOf(assess) - 543;
 
         body.appendChild(el('h3', t('Multi-Year IT Hardware Budget & Upgrade Forecast', 'แผนงบประมาณและประมาณการค่าใช้จ่ายครุภัณฑ์คอมพิวเตอร์ 1-5 ปี')));
         if (assess.criteria && assess.criteria.useReferencePricesForReplacement && assess.budgetYearBE === 2570) body.appendChild(el('p', t('FY 2570 planning prices are from the supplied draft, whose publication date is blank. Replacement costs follow the selected device type / workload category.', 'ราคางบ 2570 อ้างอิงฉบับร่างที่แนบ ซึ่งยังเว้นวันที่ประกาศไว้ ราคาซื้อทดแทนใช้ชนิดเครื่องและประเภทงานที่เลือกในเกณฑ์ประเมิน')));

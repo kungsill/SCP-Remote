@@ -114,6 +114,12 @@
 
     /* Building heights in map units, so the campus reads as a real place: grounds lie
        flat, houses are low, the flats stand tall, clinical buildings sit in between. */
+    // The current Thai fiscal year as A.D. (it starts on 1 October), which plan years count in.
+    function fiscalYearAD() {
+        if (window.ScpPriceReference && window.ScpPriceReference.fiscalYearBE) return window.ScpPriceReference.fiscalYearBE() - 543;
+        var d = new Date();
+        return d.getFullYear() + (d.getMonth() >= 9 ? 1 : 0);
+    }
     function heightOf(r) {
         if (r.kind !== 'building') return 0;
         var id = String(r.id || '');
@@ -1406,7 +1412,7 @@
 
         // Risk badges on top of everything: red ! for a serious problem (low RAM, very old
         // CPU or machine, unprotected), amber for a lesser one (only when zoomed in).
-        var thisYear = new Date().getFullYear();
+        var thisYear = fiscalYearAD();
         spots.forEach(function (it) {
             if (self.viewMode === 'plan') {
                 // replacement plan: the Buddhist-era year this computer should be replaced
@@ -1799,7 +1805,7 @@
     // Due means this year or next: the ones a budget request has to cover now.
     IsoMap.prototype._isDue = function (node) {
         var y = this._planYear(node);
-        return y !== null && y <= new Date().getFullYear() + 1;
+        return y !== null && y <= fiscalYearAD() + 1;
     };
 
     IsoMap.prototype.setViewMode = function (mode) {

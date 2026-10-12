@@ -2027,3 +2027,15 @@ body.scp-map-full-open {
     .scp-extra-kpis { grid-template-columns: repeat(2, 1fr); }
     .scp-map-view-bar, .scp-map-plan-box { right: 16px; }
 }
+
+/* cartoon style: a pastel sky round the floating island, and a deep violet one at night */
+.scp-map-wrapper.scp-map-anime {
+    background:
+        radial-gradient(ellipse at 20% 10%, rgba(255, 255, 255, 0.85), transparent 45%),
+        linear-gradient(180deg, #cfdcff 0%, #e9e2ff 55%, #ffe1ee 100%);
+}
+.scp-map-wrapper.scp-map-anime.scp-map-night {
+    background:
+        radial-gradient(ellipse at 80% 8%, rgba(255, 248, 214, 0.35), transparent 22%),
+        linear-gradient(180deg, #161238 0%, #2a1f5c 70%, #3b2470 100%);
+}

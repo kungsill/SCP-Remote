@@ -3068,7 +3068,7 @@
             rotL.title = thai ? 'หมุนซ้าย (Rotate Left)' : 'Rotate Left';
             var rotR = button('↻', 'scp-map-ctrl-btn', function () { if (currentIsoMap) currentIsoMap.rotate(-Math.PI / 4); });
             rotR.title = thai ? 'หมุนขวา (Rotate Right)' : 'Rotate Right';
-            var homeBtn = button('⌂', 'scp-map-ctrl-btn', function () { if (currentIsoMap) currentIsoMap.fit(); });
+            var homeBtn = button('⌂', 'scp-map-ctrl-btn', function () { if (currentIsoMap) currentIsoMap.fit(true); });
             homeBtn.title = thai ? 'มุมมองเริ่มต้น (Reset View)' : 'Reset View';
 
             controls.appendChild(zIn);
@@ -3456,6 +3456,19 @@
             controls.appendChild(nightBtn);
             mapWrapper.classList.toggle('scp-map-night', nightOn());
 
+            // Cartoon style: pastel buildings, trees, clouds and faces on the screens (on by default).
+            var animeOn = function () { return pref('scpMapStyle', 'anime') === 'anime'; };
+            var animeBtn = button('✨', 'scp-map-ctrl-btn' + (animeOn() ? ' on' : ''), function () {
+                var next = !animeOn();
+                setPref('scpMapStyle', next ? 'anime' : 'classic');
+                animeBtn.classList.toggle('on', next);
+                mapWrapper.classList.toggle('scp-map-anime', next);
+                if (currentIsoMap) currentIsoMap.setAnime(next);
+            });
+            animeBtn.title = thai ? 'สไตล์การ์ตูน (ต้นไม้ เมฆ หน้าจอยิ้มได้) · กดอีกครั้งเพื่อกลับแบบเรียบ' : 'Cartoon style (trees, clouds, smiling screens) · press again for the plain style';
+            controls.appendChild(animeBtn);
+            mapWrapper.classList.toggle('scp-map-anime', animeOn());
+
             var soundBtn = button(mapSoundOn() ? '🔔' : '🔕', 'scp-map-ctrl-btn', function () {
                 var next = !mapSoundOn();
                 setPref('scpMapSound', next ? '1' : '0');
@@ -3561,6 +3574,7 @@
                         currentIsoMap.opts.planYear = planYearOf;
                         if (currentIsoMap.viewMode !== pref('scpMapView', 'status')) currentIsoMap.setViewMode(pref('scpMapView', 'status'));
                         if (currentIsoMap.night !== nightOn()) currentIsoMap.setNight(nightOn());
+                        if (currentIsoMap.anime !== animeOn() && currentIsoMap.setAnime) currentIsoMap.setAnime(animeOn());
                         if (currentIsoMap.traffic !== mapTrafficOn()) currentIsoMap.setTraffic(mapTrafficOn());
                         if (currentIsoMap.editMode !== (mapEditMode && !!window.ScpOperations)) currentIsoMap.setEditMode(mapEditMode && !!window.ScpOperations);
                         syncFloorSelect(currentIsoMap.floorId);

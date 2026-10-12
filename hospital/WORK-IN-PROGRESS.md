@@ -315,3 +315,10 @@ node scripts/allow-subnet.js add 192.168.x.0/24     เพิ่มวงเค�
 - Both assessors count replacement years and survival keys from `budgetYearBE − 543` (not the calendar year); age still uses the calendar year. Upgrades are budgeted in the current fiscal year; the printout now says so ("อัปเกรดเครื่องเดิมในปีงบประมาณ 2570 … คาดว่าจะต้องเปลี่ยนเครื่องใหม่ราวปีงบประมาณ 2572").
 - Previously an upgrade plan printed calendar 2026 + 2 → "2571" next to the budget, which read as the wrong budget year; machines to keep could land in "2570" from calendar arithmetic.
 - The FY 2570 draft-price tests assume the current fiscal year is 2570; update them with the FY 2571 price edition.
+
+## Cartoon map style (Claude, 2026-10-12)
+
+- `public/scripts/scp-map-anime.js` adds a 2.5D anime look to the map; `scp-map.js` calls it only while `map.anime` is on (✨ button, pref `scpMapStyle`, default `anime`; `classic` = the old look).
+- Static layer: pastel cel-shaded buildings with violet outlines, glass windows by day, grass island with flowers, pastel indoor walls, warm tint morning/late afternoon.
+- Per frame: trees that sway (green, pink ชมพูพันธุ์ทิพย์, yellow ราชพฤกษ์; depth-sorted with people and cars, hidden behind buildings), clouds and their shadows (fade out as you zoom in), petals, birds; stars and fireflies at night; sunbeams and strolling patients in floor-plan waiting areas; faces on screens (happy/blinking = on, glancing + typing bubble = in use, asleep with z's = off, sweat drop = serious risk). Desks grow with zoom in this style.
+- Engine: smooth wheel/button zoom, flick-to-glide panning, eased building lift on hover, floor fade-in, `fit(true)` glides home. Frames run at display rate while each costs < 7 ms, else ~30 fps. Reduced motion: nothing moves, zoom is instant.

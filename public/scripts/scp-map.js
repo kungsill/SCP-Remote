@@ -15,6 +15,8 @@
     var PULSE_INTERVAL = 66; // ~15 fps is plenty for a slow LED pulse
     var FULL_DETAIL_SCALE = 5; // below this, computers are drawn as dots
     var TRAFFIC_INTERVAL = 33; // ~30 fps while people and cars are moving
+    var SMOOTH_COST_MS = 7; // a frame cheaper than this runs at the display's full rate
+    var ENTER_MS = 420; // a floor plan fades and settles in over this long
     // Someone who asked their system for less motion gets the roads without anything moving on them.
     var REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     var thai = document.documentElement.lang === 'th';
@@ -263,6 +265,15 @@
         this.editMode = false;
         this._drag = null;
         this._floorBuilding = {};
+        // Cartoon style (scp-map-anime.js): pastel cel shading, trees, clouds, faces on screens.
+        this.anime = false;
+        this._t = 0; // seconds of animation, for everything that sways, blinks or drifts
+        this._zoomTo = null; // where a smooth zoom is heading
+        this._glide = null; // pan velocity (px/s) after a flick, slowing down
+        this._vel = null;
+        this._hoverT = 1; // 0..1 ease of the hovered building lifting
+        this._enterAt = 0; // when the current floor appeared, for its fade-in
+        this._frameCost = 4; // smoothed render time (ms), to choose full or 30 fps
         this._layer = document.createElement('canvas');
         this._layerCtx = this._layer.getContext('2d');
         // Name labels live on their own layer above the pulsing status LEDs.
@@ -389,6 +400,7 @@
             this.floorId = (doc.floors && doc.floors[0]) ? doc.floors[0].id : 'flr_campus';
         }
         this._buildPaths(doc);
+        if (this.anime && this._buildDecor) this._buildDecor();
         this.setFloor(this.floorId);
     };
 
@@ -416,6 +428,9 @@
         });
         this.hoverRoom = null;
         this.hoverNode = null;
+        this._zoomTo = null;
+        this._glide = null;
+        if (changed && !REDUCED_MOTION) this._enterAt = performance.now();
         this.fit();
         this._updateNodePositions();
         this.invalidate();
@@ -425,7 +440,7 @@
     };
 
     // Fit the whole floor slab into the canvas at the current rotation.
-    IsoMap.prototype.fit = function () {
+    IsoMap.prototype.fit = function (smooth) {
         var f = this.floors ? this.floors[this.floorId] : null;
         if (!f) return;
         if (!this.w || !this.h) { this._needFit = true; return; }
@@ -463,8 +478,17 @@
         }
         var sx = (this.w * 0.9) / Math.max(1, maxX - minX);
         var sy = (this.h * 0.82) / Math.max(1, maxY - minY);
-        this.scale = Math.max(0.5, Math.min(40, Math.min(sx, sy)));
-        this.pan = [-(minX + maxX) / 2 * this.scale, -(minY + maxY) / 2 * this.scale];
+        var scale = Math.max(0.5, Math.min(40, Math.min(sx, sy)));
+        this._fitScale = scale;
+        var pan = [-(minX + maxX) / 2 * scale, -(minY + maxY) / 2 * scale];
+        this._zoomTo = null;
+        this._glide = null;
+        if (smooth === true && !REDUCED_MOTION) {
+            this._fly = { from: { scale: this.scale, pan: this.pan.slice() }, to: { scale: scale, pan: pan }, t0: performance.now(), ms: 650 };
+        } else {
+            this.scale = scale;
+            this.pan = pan;
+        }
         this.invalidate();
     };
 
@@ -661,16 +685,61 @@
         return dx * (this._c + this._s) + dy * (this._c - this._s);
     };
 
+    // Zoom about a screen point, gliding there over a few frames (instantly for reduced motion).
     IsoMap.prototype.zoomBy = function (factor, cx, cy) {
+        if (cx === undefined || cy === undefined) { cx = this.w / 2; cy = this.h / 2; }
+        if (REDUCED_MOTION) { this._zoomAt(factor, cx, cy); this.invalidate(); return; }
+        var from = this._zoomTo ? this._zoomTo.scale : this.scale;
+        this._zoomTo = { scale: Math.max(0.4, Math.min(60, from * factor)), cx: cx, cy: cy };
+        this._glide = null;
+        this._fly = null;
+        this.invalidate();
+    };
+
+    IsoMap.prototype._zoomAt = function (factor, cx, cy) {
         var oldScale = this.scale;
         this.scale = Math.max(0.4, Math.min(60, this.scale * factor));
-        if (cx === undefined || cy === undefined) { cx = this.w / 2; cy = this.h / 2; }
         var ratio = this.scale / oldScale;
         var dx = cx - (this.w / 2 + this.pan[0]);
         var dy = cy - (this.h / 2 + this.pan[1]);
         this.pan[0] -= dx * (ratio - 1);
         this.pan[1] -= dy * (ratio - 1);
-        this.invalidate();
+        this._staticDirty = true;
+    };
+
+    // One frame of a smooth zoom; true while still on the way.
+    IsoMap.prototype._stepZoom = function (dt) {
+        var z = this._zoomTo;
+        if (!z) return false;
+        var left = Math.log(z.scale / this.scale);
+        if (Math.abs(left) < 0.003) {
+            this._zoomAt(z.scale / this.scale, z.cx, z.cy);
+            this._zoomTo = null;
+            return false;
+        }
+        this._zoomAt(Math.exp(left * (1 - Math.exp(-dt * 14))), z.cx, z.cy);
+        return true;
+    };
+
+    // A flicked map keeps sliding and slows down, like paper pushed across a table.
+    IsoMap.prototype._stepGlide = function (dt) {
+        var g = this._glide;
+        if (!g) return false;
+        this.pan[0] += g[0] * dt;
+        this.pan[1] += g[1] * dt;
+        var k = Math.exp(-dt * 4.5);
+        g[0] *= k; g[1] *= k;
+        this._staticDirty = true;
+        if (Math.hypot(g[0], g[1]) < 18) { this._glide = null; return false; }
+        return true;
+    };
+
+    // The hovered building rises with a little bounce instead of jumping.
+    IsoMap.prototype._stepHover = function (dt) {
+        if (this._hoverT >= 1) return false;
+        this._hoverT = REDUCED_MOTION ? 1 : Math.min(1, this._hoverT + dt * 4);
+        this._staticDirty = true;
+        return this._hoverT < 1;
     };
 
     IsoMap.prototype.rotate = function (deltaAngle) {
@@ -691,6 +760,9 @@
             try { c.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
             self._pointers.set(e.pointerId, [e.offsetX, e.offsetY]);
             downAt = [e.offsetX, e.offsetY];
+            self._glide = null;
+            self._zoomTo = null;
+            self._vel = null;
             if (typeof self.opts.onHoverNode === 'function') self.opts.onHoverNode(null);
             moved = 0;
             // Edit mode: pressing on a computer picks it up instead of panning the map.
@@ -745,14 +817,26 @@
             if (self._pointers.size === 2 && pinch) {
                 var pts = Array.from(self._pointers.values());
                 var currentDist = dist(pts[0], pts[1]);
-                self.zoomBy((pinch.s * (currentDist / pinch.d)) / self.scale, (pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2);
+                self._zoomAt((pinch.s * (currentDist / pinch.d)) / self.scale, (pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2);
+                self.invalidate();
                 moved += 10;
+                self._vel = null;
                 return;
             }
 
             self.pan[0] += cur[0] - prev[0];
             self.pan[1] += cur[1] - prev[1];
             moved += Math.abs(cur[0] - prev[0]) + Math.abs(cur[1] - prev[1]);
+            // How fast the map is being dragged, smoothed, for the slide after letting go.
+            var nowMs = performance.now(), v = self._vel;
+            if (v && nowMs - v.at < 100) {
+                var span = Math.max(4, nowMs - v.at) / 1000;
+                v.x = v.x * 0.4 + ((cur[0] - prev[0]) / span) * 0.6;
+                v.y = v.y * 0.4 + ((cur[1] - prev[1]) / span) * 0.6;
+                v.at = nowMs;
+            } else {
+                self._vel = { x: 0, y: 0, at: nowMs };
+            }
             self.invalidate();
         });
 
@@ -773,7 +857,15 @@
             }
             if (wasDown && e.type === 'pointerup' && downAt && moved < 8 && self._pointers.size === 0) {
                 self._onClick(e.offsetX, e.offsetY);
+            } else if (wasDown && e.type === 'pointerup' && self._pointers.size === 0 && self._vel && !REDUCED_MOTION) {
+                var fv = self._vel, speed = Math.hypot(fv.x, fv.y);
+                if (performance.now() - fv.at < 80 && speed > 160) {
+                    var cap = Math.min(1, 2600 / speed);
+                    self._glide = [fv.x * cap, fv.y * cap];
+                    self.invalidate(false);
+                }
             }
+            if (self._pointers.size === 0) self._vel = null;
             if (self._pointers.size === 0) downAt = null;
         }
 
@@ -854,7 +946,9 @@
     IsoMap.prototype._roofOf = function (r) {
         var g = this._geom.get(r);
         if (!g || r.kind !== 'building') return 0;
-        return g.h + (this.hoverRoom === r && r.link_floor ? 0.6 : 0);
+        if (this.hoverRoom !== r || !r.link_floor) return g.h;
+        var t = this._hoverT - 1, back = 1 + 2.2 * t * t * t + 1.2 * t * t; // ease out with a slight overshoot
+        return g.h + 0.6 * back;
     };
 
     /* Where a dragged computer would land. On the campus, dropping on a building that has
@@ -974,6 +1068,7 @@
         this.hoverNode = this._hitNode(sx, sy);
         if (this.hoverNode !== prevNode) this._emitHover();
         this.hoverRoom = (!this.hoverNode && this.doc) ? this._hitRoom(sx, sy) : null;
+        if (this.hoverRoom !== prevRoom && this.hoverRoom && this.hoverRoom.link_floor) this._hoverT = 0;
         if (this.hoverNode !== prevNode || this.hoverRoom !== prevRoom) {
             var clickable = this.hoverNode || (this.hoverRoom && this.hoverRoom.link_floor);
             this.canvas.style.cursor = (this.editMode && this.hoverNode) ? 'grab' : clickable ? 'pointer' : '';
@@ -1015,24 +1110,35 @@
         this._c = Math.cos(this.angle);
         this._s = Math.sin(this.angle);
         if (this._stepFly()) rotating = true;
+        if (this._stepZoom(dt)) rotating = true;
+        if (this._stepGlide(dt)) rotating = true;
+        if (this._stepHover(dt)) rotating = true;
+        if (this._enterAt && performance.now() - this._enterAt < ENTER_MS) rotating = true;
 
+        this._t += dt;
         this._pulsePhase = (this._pulsePhase + dt * 3.5) % (Math.PI * 2);
         var traffic = this._trafficOn();
         if (traffic) this._stepAgents(dt);
+        var ambient = this._ambientOn();
+        if (ambient) this._stepAmbient(dt);
 
+        var started = performance.now();
         this.render();
+        this._frameCost = this._frameCost * 0.9 + (performance.now() - started) * 0.1;
         this.dirty = false;
 
         var self = this;
-        if (rotating) {
+        // Cheap frames run at the display's rate so movement is smooth; a slow computer
+        // drops to ~30 fps instead of stuttering.
+        if (rotating || ((traffic || ambient) && this._frameCost < SMOOTH_COST_MS)) {
             this._kick();
-        } else if (traffic || this._hasOnline || this._focus || this._hasPings()) {
+        } else if (traffic || ambient || this._hasOnline || this._focus || this._hasPings()) {
             // Moving people and cars at ~30 fps, otherwise just a gentle LED pulse; any
             // interaction kicks a real frame sooner.
             this._pulseTimer = setTimeout(function () {
                 self._pulseTimer = 0;
                 self._kick();
-            }, traffic ? TRAFFIC_INTERVAL : PULSE_INTERVAL);
+            }, (traffic || ambient) ? TRAFFIC_INTERVAL : PULSE_INTERVAL);
         } else {
             this._lastTime = 0;
         }
@@ -1048,12 +1154,23 @@
             this._renderStatic();
             this._staticDirty = false;
         }
+        // A floor that just opened fades in and settles from slightly below.
+        var enter = this._enterAt ? Math.min(1, (performance.now() - this._enterAt) / ENTER_MS) : 1;
+        if (enter >= 1) this._enterAt = 0;
+        var ease = 1 - Math.pow(1 - enter, 3), drop = (1 - ease) * 18 * this.dpr;
+        ctx.globalAlpha = ease;
+        ctx.setTransform(1, 0, 0, 1, 0, drop);
         ctx.drawImage(this._layer, 0, 0);
-        ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, drop);
+        var anime = this.anime && typeof this._drawAmbientUnder === 'function';
+        if (anime) this._drawAmbientUnder(ctx);
         this._drawLeds(ctx);
+        if (anime) this._drawFaces(ctx);
         this._drawAgents(ctx);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        if (anime) this._drawAmbientOver(ctx);
+        ctx.setTransform(1, 0, 0, 1, 0, drop);
         ctx.drawImage(this._labels, 0, 0);
+        ctx.globalAlpha = 1;
         if (this._drag) {
             ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
             this._drawDrag(ctx);
@@ -1083,13 +1200,18 @@
         });
         this._drawOrder = order;
 
+        var anime = this.anime && typeof this._drawGround === 'function';
         this._drawSlab(ctx, f);
+        if (anime) this._drawGround(ctx, f);
         if (this.floorId === 'flr_campus') this._drawPaths(ctx);
         this._drawShadows(ctx, order);
         this._drawRooms(ctx, order);
+        if (anime && !this.night) this._drawDayWindows(ctx, order);
         if (this.night) this._drawNight(ctx, order);
+        else if (anime) this._drawSunTint(ctx);
         this._drawLabels(ctx, lctx, order);
         this._drawWorkstations(ctx, lctx);
+        if (anime) this._placeDecor();
     };
 
     // The floor sits on a thick base, like an architectural model.
@@ -1098,9 +1220,11 @@
         var campus = f.style === 'campus';
         var poly = [[0, 0], [W, 0], [W, H], [0, H]];
         var depth = campus ? 4 : 1.2;
-        this._drawPrism(ctx, poly, 1, -depth, 0, campus ? '#8fb08a' : '#cbd5e1', {
-            top: campus ? '#d3e8cf' : '#f1f5f9',
-            edge: campus ? 'rgba(74, 110, 70, 0.35)' : 'rgba(100, 116, 139, 0.35)'
+        var anime = this.anime && typeof this._slabStyle === 'function';
+        var look = anime ? this._slabStyle(campus) : null;
+        this._drawPrism(ctx, poly, 1, -depth, 0, look ? look.side : (campus ? '#8fb08a' : '#cbd5e1'), {
+            top: look ? look.top : (campus ? '#d3e8cf' : '#f1f5f9'),
+            edge: look ? look.edge : (campus ? 'rgba(74, 110, 70, 0.35)' : 'rgba(100, 116, 139, 0.35)')
         });
         if (!campus) {
             // A faint tile grid helps the eye judge distance across the floor.
@@ -1128,7 +1252,7 @@
         sc.setTransform(1, 0, 0, 1, 0, 0);
         sc.clearRect(0, 0, this._shadow.width, this._shadow.height);
         sc.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-        sc.fillStyle = '#0f172a';
+        sc.fillStyle = this.anime ? '#3b2a66' : '#0f172a'; // cartoon shadows are a soft violet, not grey
         var any = false;
         for (var i = 0; i < rooms.length; i++) {
             var r = rooms[i];
@@ -1159,7 +1283,7 @@
         if (!any) return;
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalAlpha = 0.14;
+        ctx.globalAlpha = this.anime ? 0.17 : 0.14;
         ctx.drawImage(this._shadow, 0, 0);
         ctx.restore();
     };
@@ -1173,6 +1297,7 @@
                 var base = /^#[0-9a-f]{6}$/i.test(r.color || '') ? r.color : '#e2e8f0';
                 var tint = this._tintFor(r);
                 if (tint && g.h >= 0.5) base = tint;
+                else if (this.anime && this._pastel) base = this._pastel(base);
                 var top = this._roofOf(r);
                 if (g.h < 0.5) {
                     // Grounds: just a coloured patch with a border.
@@ -1187,8 +1312,9 @@
                 } else {
                     this._drawPrism(ctx, r.polygon, g.sign, 0, top, base, {
                         top: shade(base, isHover ? 1.28 : 1.12),
-                        edge: 'rgba(15, 23, 42, 0.22)',
-                        levels: g.levels || 1
+                        edge: this.anime ? 'rgba(67, 45, 110, 0.55)' : 'rgba(15, 23, 42, 0.22)',
+                        levels: g.levels || 1,
+                        roof: this.anime
                     });
                 }
                 if (isHover) {
@@ -1246,9 +1372,10 @@
             ctx.lineTo(p3[0], p3[1]); ctx.lineTo(p4[0], p4[1]);
             ctx.closePath();
             // Back walls are seen from inside, so they take the opposite light.
-            ctx.fillStyle = shade('#f8fafc', facing ? 0.8 + 0.08 * light : 0.9 - 0.06 * light);
+            if (this.anime && this._toon) ctx.fillStyle = this._toon(this._pastel(color.charAt(0) === '#' ? color : '#eef2f6'), facing ? -1 : 0.6 - 0.4 * light);
+            else ctx.fillStyle = shade('#f8fafc', facing ? 0.8 + 0.08 * light : 0.9 - 0.06 * light);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(100, 116, 139, 0.35)';
+            ctx.strokeStyle = this.anime ? 'rgba(67, 45, 110, 0.45)' : 'rgba(100, 116, 139, 0.35)';
             ctx.lineWidth = 0.8;
             ctx.stroke();
             ctx.beginPath();
@@ -1285,7 +1412,7 @@
             ctx.lineTo(p3[0], p3[1]);
             ctx.lineTo(p4[0], p4[1]);
             ctx.closePath();
-            ctx.fillStyle = shade(color, 0.8 + 0.13 * light);
+            ctx.fillStyle = this.anime && this._toon ? this._toon(color, light) : shade(color, 0.8 + 0.13 * light);
             ctx.fill();
             ctx.stroke();
             if (style.levels > 1) {
@@ -1310,6 +1437,7 @@
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
         ctx.lineWidth = 1;
         ctx.stroke();
+        if (style.roof && this._drawRoofTrim) this._drawRoofTrim(ctx, poly, hi, color);
     };
 
     IsoMap.prototype._measure = function (ctx, text) {
@@ -1368,11 +1496,18 @@
                 ctx.setLineDash([]);
             }
             if (full) {
-                var monY = self._drawDesk(ctx, sx, sy, online, busy, isHover);
-                led = { x: sx + 7, y: monY - 2, r: 4 };
-                hits.push({ spot: item.spot, sx: sx, sy: sy - 12 });
+                // In the cartoon style the desks grow as you zoom in, up to about twice their size.
+                var k = self.anime ? Math.max(1, Math.min(2.2, self.scale / 14)) : 1;
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.scale(k, k);
+                var monY = sy + self._drawDesk(ctx, 0, 0, online, busy, isHover) * k;
+                ctx.restore();
+                led = { x: sx + 7 * k, y: monY - 2 * k, r: 4 };
+                hits.push({ spot: item.spot, sx: sx, sy: sy - 12 * k });
                 if (isHover) hovered = item;
                 item.top = monY - 5;
+                item.k = k;
             } else {
                 // Zoomed out: a small upright pin, so the status still reads at a glance.
                 ctx.strokeStyle = 'rgba(15, 23, 42, 0.45)';
@@ -1389,6 +1524,7 @@
             led.color = statusColor;
             led.online = online;
             item.led = led;
+            if (full) item.face = { x: sx, y: item.top + 5 + 6.5 * item.k, k: item.k, online: online, busy: busy, risk: item.spot.risk, seed: stableIndex(String(node._id || node.name)) };
         });
 
         // Names go on the label layer, nearest first, skipping any that would cover one
@@ -1451,6 +1587,7 @@
         });
 
         this._leds = spots.map(function (s) { return s.led; });
+        this._faces = spots.map(function (s) { return s.face; }).filter(Boolean);
         this._screenHits = hits;
         this._hasOnline = hasOnline;
     };
@@ -1503,7 +1640,8 @@
         ctx.strokeStyle = isHover ? PALETTE.accentRing : PALETTE.slate600;
         ctx.lineWidth = isHover ? 2 : 1;
         ctx.stroke();
-        ctx.fillStyle = online ? (busy ? 'rgba(59, 130, 246, 0.6)' : 'rgba(34, 197, 94, 0.45)') : 'rgba(51, 65, 85, 0.85)';
+        if (this.anime) ctx.fillStyle = online ? (busy ? '#dbe7ff' : '#dcf5e6') : '#3a3358';
+        else ctx.fillStyle = online ? (busy ? 'rgba(59, 130, 246, 0.6)' : 'rgba(34, 197, 94, 0.45)') : 'rgba(51, 65, 85, 0.85)';
         ctx.fillRect(sx - monW / 2 + 2, monY + 2, monW - 4, monH - 4);
         if (online) {
             // screen glare
@@ -1818,6 +1956,18 @@
         this.invalidate();
     };
 
+    // Cartoon style on or off; drawn by scp-map-anime.js when that file is loaded.
+    IsoMap.prototype.setAnime = function (on) {
+        this.anime = !!on && typeof this._drawAmbientUnder === 'function';
+        if (this.anime && this._buildDecor) this._buildDecor();
+        this.invalidate();
+    };
+
+    // Trees swaying, clouds, petals and blinking screens keep the map moving.
+    IsoMap.prototype._ambientOn = function () {
+        return this.anime && !REDUCED_MOTION && typeof this._stepAmbient === 'function';
+    };
+
     // The colour a room or building takes in the risk or replacement view; null = keep its own.
     IsoMap.prototype._tintFor = function (r) {
         if (this.viewMode === 'status') return null;
@@ -1845,6 +1995,8 @@
 
     // Glide the camera so map point (x, y, z) ends up centred at the given scale.
     IsoMap.prototype.flyTo = function (x, y, z, scale, ms) {
+        this._zoomTo = null;
+        this._glide = null;
         var keepScale = this.scale, keepPan = this.pan;
         this.scale = Math.max(0.4, Math.min(60, scale || this.scale));
         this.pan = [0, 0];
@@ -1890,7 +2042,7 @@
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.globalCompositeOperation = 'source-atop';
-        ctx.fillStyle = 'rgba(6, 12, 32, 0.66)';
+        ctx.fillStyle = this.anime ? 'rgba(24, 16, 64, 0.6)' : 'rgba(6, 12, 32, 0.66)';
         ctx.fillRect(0, 0, this._layer.width, this._layer.height);
         ctx.restore();
         var self = this, stats = this._roomStats || new Map();
@@ -2251,9 +2403,11 @@
 
     // Per frame: the people and cars, in depth order, hidden where a building is in the way.
     IsoMap.prototype._drawAgents = function (ctx) {
-        if (!this._trafficOn()) return;
+        var trees = this.anime && this._treeVis ? this._treeVis : null;
+        if (!this._trafficOn() && !trees) return;
         var self = this, list = [];
-        this._agents.forEach(function (ag) {
+        if (trees) trees.forEach(function (tr) { list.push({ tree: tr, depth: tr.depth }); });
+        if (this._trafficOn()) this._agents.forEach(function (ag) {
             if (ag.hidden) return;
             var pos = self._agentPos(ag);
             if (self._occluded(pos.x, pos.y, ag.type === 'walker' ? 0.4 : 0.6)) return;
@@ -2261,12 +2415,14 @@
         });
         list.sort(function (a, b) { return a.depth - b.depth; });
         list.forEach(function (it) {
-            if (it.ag.type === 'walker') self._drawWalker(ctx, it.ag, it.pos);
+            if (it.tree) self._drawTree(ctx, it.tree);
+            else if (it.ag.type === 'walker') self._drawWalker(ctx, it.ag, it.pos);
             else self._drawCar(ctx, it.ag, it.pos);
         });
     };
 
     IsoMap.prototype._drawWalker = function (ctx, ag, pos) {
+        if (this.anime && this._drawChibi) { this._drawChibi(ctx, ag, pos); return; }
         var p = this.project(pos.x, pos.y, 0);
         var H = Math.max(6, Math.min(18, this.scale * 2.2));
         var moving = !!ag.path;
@@ -2316,7 +2472,8 @@
         ctx.fill();
         var body = box(pos.x, pos.y, L, W);
         var sign = signedArea(body) >= 0 ? 1 : -1;
-        this._drawPrism(ctx, body, sign, 0.25, 1.15, ag.color, { top: shade(ag.color, 1.12), edge: 'rgba(15, 23, 42, 0.3)' });
+        var paint = this.anime && this._pastel ? this._pastel(ag.color) : ag.color;
+        this._drawPrism(ctx, body, sign, 0.25, 1.15, paint, { top: shade(paint, 1.12), edge: this.anime ? 'rgba(67, 45, 110, 0.55)' : 'rgba(15, 23, 42, 0.3)' });
         var cab = box(pos.x - dx * 0.35, pos.y - dy * 0.35, L * 0.5, W * 0.86);
         this._drawPrism(ctx, cab, sign, 1.15, 1.85, ag.type === 'ambulance' ? '#f8fafc' : '#cbd5e1', { top: ag.type === 'ambulance' ? '#ffffff' : shade(ag.color, 1.2), edge: 'rgba(15, 23, 42, 0.3)' });
         if (ag.type === 'ambulance') {
@@ -2343,6 +2500,8 @@
     var pendingLoad = null;
     window.ScpHosMap = {
         IsoMap: IsoMap,
+        util: { shade: shade, mix: mix, pointInPoly: pointInPoly, roundRectPath: roundRectPath, stableIndex: stableIndex,
+            ROAD_W: ROAD_W, PATH_W: PATH_W, REDUCED_MOTION: REDUCED_MOTION, PALETTE: PALETTE },
         loadMapData: function (callback) {
             if (window.__scpHosMapData) {
                 callback(null, window.__scpHosMapData);

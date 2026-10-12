@@ -964,3 +964,31 @@ body.scp-signin { background: var(--scp-bg) !important; overflow-y: auto !import
     border-radius: 50%;
 }
 
+
+/* Phones: the left menu folds away behind a ☰ button and opens as a drawer over the page. */
+#scp-nav-toggle, #scp-nav-scrim { display: none; }
+@media (max-width: 760px) {
+    .scp-workspace.fullscreen:not(.menu_stack):not(.fulldesk):not(.arg_hide) #container { grid-template-columns: 0 minmax(0, 1fr); }
+    .scp-workspace.fullscreen:not(.menu_stack):not(.fulldesk):not(.arg_hide) #page_leftbar {
+        position: fixed; top: 66px; bottom: 0; left: 0; width: 232px; z-index: 2000;
+        padding-top: 10px; transform: translateX(-105%); transition: transform .22s ease;
+        background: var(--scp-surface); box-shadow: none;
+    }
+    .scp-workspace.scp-nav-open #page_leftbar { transform: none !important; box-shadow: 8px 0 30px rgba(15, 23, 42, 0.25); }
+    /* in the drawer the items are rows again: icon, then the label beside it */
+    .scp-workspace #page_leftbar .scp-nav-label { font-size: 14px; line-height: 20px; padding: 14px 8px 14px 47px; text-align: left; }
+    .scp-workspace #page_leftbar .scp-nav-icon { left: 15px; top: 14px; }
+    .scp-workspace:not(.menu_stack):not(.fulldesk):not(.arg_hide) #scp-nav-toggle {
+        display: inline-flex; flex-direction: column; justify-content: center; gap: 4px;
+        float: left; width: 42px; height: 42px; margin: 12px 4px 0 10px; padding: 0 10px; box-sizing: border-box;
+        border: 1px solid var(--scp-line); border-radius: 12px; background: var(--scp-surface); cursor: pointer;
+    }
+    #scp-nav-toggle span { display: block; height: 2px; border-radius: 2px; background: var(--scp-accent); transition: transform .2s, opacity .2s; }
+    .scp-nav-open #scp-nav-toggle span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+    .scp-nav-open #scp-nav-toggle span:nth-child(2) { opacity: 0; }
+    .scp-nav-open #scp-nav-toggle span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+    .scp-workspace.scp-nav-open #scp-nav-scrim { display: block; position: fixed; inset: 66px 0 0 0; z-index: 1999; background: rgba(15, 23, 42, 0.35); }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+    .scp-workspace #page_leftbar, #scp-nav-toggle span { transition: none; }
+}

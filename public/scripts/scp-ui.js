@@ -225,6 +225,34 @@
             var home = document.getElementById('masthead') || document.getElementById('page_leftbar');
             if (home) { home.appendChild(back); }
         }
+        // On a phone the left menu folds away behind a ☰ button in the masthead, so the page
+        // gets the whole width. It opens as a drawer over the page; choosing an item, tapping
+        // outside it or the button again folds it back. Only shown on narrow screens (CSS).
+        var leftbar = document.getElementById('page_leftbar'), mast = document.getElementById('masthead');
+        if (leftbar && mast && !document.getElementById('scp-nav-toggle')) {
+            var toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.id = 'scp-nav-toggle';
+            toggle.setAttribute('aria-controls', 'page_leftbar');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.setAttribute('aria-label', text('Menu', 'เมนู'));
+            toggle.title = text('Menu', 'เมนู');
+            toggle.innerHTML = '<span></span><span></span><span></span>';
+            var scrim = document.createElement('div');
+            scrim.id = 'scp-nav-scrim';
+            var setOpen = function (open) {
+                document.body.classList.toggle('scp-nav-open', open);
+                toggle.setAttribute('aria-expanded', String(open));
+            };
+            toggle.onclick = function () { setOpen(!document.body.classList.contains('scp-nav-open')); };
+            scrim.onclick = function () { setOpen(false); };
+            leftbar.addEventListener('click', function (e) {
+                if (e.target.closest && e.target.closest('.lbbutton')) setOpen(false);
+            });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
+            mast.insertBefore(toggle, mast.firstChild);
+            document.body.appendChild(scrim);
+        }
         // Upstream uses fixed toolbar offsets. Measure the visible shell so the
         // new heading and wrapped buttons cannot hide the bottom of a file/device list.
         if (document.getElementById('column_l')) {

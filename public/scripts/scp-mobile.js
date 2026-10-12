@@ -63,7 +63,9 @@
             settings.setAttribute('aria-label', label);
             // Same reason open() works this way: this page is served at <root>m, so a bare
             // "?m=0" reloads it with the query ignored instead of leaving for the full site.
-            settings.href = siteRoot() + '?m=0';
+            // mobile=0 because a phone would otherwise get MeshCentral's old, unstyled mobile
+            // page; the full site is the one with the hospital's look and the map.
+            settings.href = siteRoot() + '?m=0&mobile=0';
         }
         $('search').placeholder = t('ค้นหาชื่อเครื่อง หรือ IP', 'Search device name or IP');
         $('footer').textContent = t('SCP-Remote · Hospital IT', 'SCP-Remote · Hospital IT');

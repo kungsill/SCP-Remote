@@ -70,10 +70,14 @@ exports.root = function (web, req, res, next, url) {
     // gone from the page. Device groups, moving a computer between wards and adding an account
     // all live there, so this has to keep working:  https://remote.kpsnana.com/?m=0
     // The choice is remembered, so the full site survives a reload and normal navigation.
-    if (q.m === '0') { if (req.session) { req.session.scpView = 'full'; } next(); return; }
+    // On a phone MeshCentral would serve its own old mobile page for the full site, which has
+    // none of the hospital's styling; mobile=0 is its override for that, read in getRenderPage.
+    // Set here, so a reload or a plain link back to the root keeps the full site too.
+    const fullSite = function () { if (q.mobile == null) { try { req.query.mobile = '0'; } catch (e) { } } next(); };
+    if (q.m === '0') { if (req.session) { req.session.scpView = 'full'; } fullSite(); return; }
 
     if (!signedIn) { next(); return; } // Before that the login page is the same either way.
-    if (req.session && (req.session.scpView === 'full')) { next(); return; }
+    if (req.session && (req.session.scpView === 'full')) { fullSite(); return; }
 
     // A query that names something goes through untouched - above all a link to a computer,
     // which /m opens as /?node=..&viewmode=11. Redirecting those sent the technician straight

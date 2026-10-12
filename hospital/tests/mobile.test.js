@@ -570,7 +570,7 @@ test('there is one door to the full site, and it is a link', () => {
     const page = fs.readFileSync(mobile.pageFile, 'utf8');
     const gear = /<a id="settings"[^>]*>/.exec(page);
     assert.ok(gear, 'the settings link is gone, and nothing else reaches the full site');
-    assert.ok(/href="\?m=0"/.test(gear[0]), 'm=0 is what the server reads as "the full site"');
+    assert.ok(/href="\?m=0&amp;mobile=0"/.test(gear[0]), 'm=0 is what the server reads as "the full site", mobile=0 keeps a phone off the old mobile page');
     assert.ok(/aria-label=/.test(gear[0]), 'an icon on its own has no accessible name');
 });
 
@@ -578,7 +578,7 @@ test('the gear is aimed at the site root, not at this page', () => {
     // /m is served at <root>m, so a bare "?m=0" reloads this page with the query ignored -
     // the same trap the device buttons fell into. The script rewrites it.
     const client = fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-mobile.js'), 'utf8');
-    assert.ok(/settings\.href = siteRoot\(\) \+ '\?m=0'/.test(client));
+    assert.ok(/settings\.href = siteRoot\(\) \+ '\?m=0&mobile=0'/.test(client));
 });
 
 // Built rather than grepped. The first version of this test read the script for the right
@@ -685,4 +685,23 @@ test('connected is green here too', () => {
     const live = /#scp-app-state\.is-live\{[^}]*\}/.exec(css);
     assert.ok(live, 'the connected state needs its own colour');
     assert.ok(/#0b8f6f/.test(live[0]), 'and it should be the green /m and the app already use');
+});
+
+test('the way to the full site gives a phone the styled site, not MeshCentral\'s old mobile page', () => {
+    const r = { redirect() { throw new Error('should pass on'); } };
+    const req = { query: { m: '0' }, session: {} };
+    let passedOn = false;
+    mobile.root(web({}), req, r, () => { passedOn = true; }, '/');
+    assert.ok(passedOn);
+    assert.equal(req.query.mobile, '0');
+    assert.equal(req.session.scpView, 'full');
+    // and it is remembered: a plain reload of the root stays on the full site
+    const again = { query: {}, session: { userid: 'user//admin', scpView: 'full' } };
+    mobile.root(web({ users: { 'user//admin': { _id: 'user//admin' } } }), again, r, () => { }, '/');
+    assert.equal(again.query.mobile, '0');
+    // someone asking for the mobile page outright still gets it
+    const asked = { query: { m: '0', mobile: '1' }, session: {} };
+    mobile.root(web({}), asked, r, () => { }, '/');
+    assert.equal(asked.query.mobile, '1');
+    assert.match(fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-mobile.js'), 'utf8'), /\?m=0&mobile=0/);
 });

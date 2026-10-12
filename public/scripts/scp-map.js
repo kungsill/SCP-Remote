@@ -45,8 +45,6 @@
         // Particular computers, by their own name, whose group does not say where they are
         // (e.g. still in the test group). The group name is checked first, so a computer
         // in a real department group still follows that group.
-        [/พี่ปราง/, 'c_genprac'],
-        [/^10999$/, 'c_b_c'],
         [/จ่ายกลาง|\bCSSD\b/i, 'c_b_a'],
         // Offices in the OPD building; listed first so "พยาบาล" never reads as a ward.
         [/กลุ่มการพยาบาล|ฝ่ายการพยาบาล|การพยาบาล|nursing/i, 'c_opd'],
@@ -101,7 +99,7 @@
         d2_av: /โสต/i,
         d2_driver: /พขร|ขับรถ|ยานพาหนะ|driver/i,
         pm_comm: /ชุมชน|เวชกรรมสังคม|community/i,
-        pm_ward: /ตึกเวช|เวชปฏิบัติ|พี่ปราง/i
+        pm_ward: /ตึกเวช|เวชปฏิบัติ/i
     };
     var PC_ROOM_KINDS = { service: 1, counter: 1, window: 1 };
 

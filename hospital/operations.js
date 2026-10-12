@@ -204,6 +204,14 @@ exports.handle = async function (ctx, cmd) {
      k = (k && typeof k === 'object') ? k : {};
      return { tasks: list(k.tasks), services: list(k.services), files: list(k.files), hook: k.hook === true, threats: list(k.threats), exclusions: list(k.exclusions) };
     })(it.crack),
+    // the last five characters of the key only (what Windows Settings shows), to spot generic keys
+    partial: (typeof it.partial === 'string' && /^[A-Z0-9]{5}$/i.test(it.partial)) ? it.partial.toUpperCase() : '',
+    office: (function (o) {
+     o = (o && typeof o === 'object') ? o : {};
+     const prods = (Array.isArray(o.products) ? o.products : []).filter(p => p && typeof p === 'object').slice(0, 10).map(p => ({
+      name: str(p.name), desc: str(p.desc), status: Math.max(0, Math.min(9, Number(p.status) || 0)), kms: str(p.kms), grace: Math.max(0, Math.min(1e8, Number(p.grace) || 0)) }));
+     return { products: prods, ohook: o.ohook === true, c2r: typeof o.c2r === 'string' ? o.c2r.slice(0, 200) : '' };
+    })(it.office),
     updated: Date.now(), by: user._id });
    saved++;
   }

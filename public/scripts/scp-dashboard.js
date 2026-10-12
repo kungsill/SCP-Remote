@@ -1066,7 +1066,7 @@
         var header = ['ชื่อเครื่อง', 'หน่วยงาน', 'เลขครุภัณฑ์', 'ปีงบประมาณ_พศ', 'ราคาจัดซื้อ_บาท', 'ชื่อเครื่องใน Windows', 'IP', 'รุ่นเครื่อง', 'ยี่ห้อเมนบอร์ด',
                       'CPU', 'การ์ดจอ', 'แรม (GB)', 'ดิสก์', 'ระบบปฏิบัติการ', 'Serial', 'วันที่ BIOS', 'หมายเหตุ',
                       'ปีที่CPUออกขาย_พศ', 'ปีที่ได้มา_พศ_ประมาณ', 'ที่มาของปี', 'ประเภทเครื่อง', 'ราคาตั้งต้น_บาท', 'ที่มาของราคา',
-                      'อายุการใช้งาน_ปี', 'ค่าเสื่อมราคาสะสม_บาท', 'มูลค่าคงเหลือตามบัญชี_บาท', 'Windows แท้ / Activate'];
+                      'อายุการใช้งาน_ปี', 'ค่าเสื่อมราคาสะสม_บาท', 'มูลค่าคงเหลือตามบัญชี_บาท', 'Windows แท้ / Activate', 'Microsoft Office'];
         var lines = [header.map(csvCell).join(',')];
         rows.forEach(function (node) {
             var hardware = hardwareOf(node), identifiers = hardware.identifiers || {}, windows = hardware.windows || {};
@@ -1091,13 +1091,13 @@
                 (node.osdesc || '').replace('Microsoft ', ''), serial, bios, nt
             ].concat((function () {
                 var b = (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice) ? window.ScpFleetAssess.assessDevice(node) : null;
-                if (!b) return ['', '', '', '', '', '', '', '', '', licenseVerdictOf(node).text];
+                if (!b) return ['', '', '', '', '', '', '', '', '', licenseVerdictOf(node).text, officeVerdictOf(node).text];
                 return [b.cpuYear ? b.cpuYear + 543 : '', b.acquiredYearBE || '',
                     { asset: 'ปีงบประมาณครุภัณฑ์', cpu: 'ประมาณจากรุ่น CPU', bios: 'ประมาณจากวันที่ BIOS' }[b.yearSource] || '',
                     (b.deviceClass === 'notebook' ? 'โน้ตบุ๊ก' : b.deviceClass === 'aio' ? 'All-in-One' : 'PC') + ' (' + typeSourceLabel(b.deviceTypeSource) + ')',
                     b.costBasis != null ? b.costBasis : '',
                     b.costSource === 'asset' ? 'ราคาจัดซื้อจริง' : ('ราคากลาง MDES' + (b.referencePriceYearBE ? ' ปี ' + b.referencePriceYearBE : '')),
-                    b.usefulLifeYears || '', b.depreciation != null ? b.depreciation : '', b.bookValue != null ? b.bookValue : '', licenseVerdictOf(node).text];
+                    b.usefulLifeYears || '', b.depreciation != null ? b.depreciation : '', b.bookValue != null ? b.bookValue : '', licenseVerdictOf(node).text, officeVerdictOf(node).text];
             })()).map(csvCell).join(','));
         });
         saveCsv('SCP-Remote_ครุภัณฑ์คอมพิวเตอร์_' + stamp() + '.csv', lines);
@@ -2681,6 +2681,8 @@
                 : bookA.yearSource === 'bios' ? (thai ? 'ประมาณจากวันที่ BIOS' : 'estimated from the BIOS date') : '';
             var licV = licenseVerdictOf(node);
             assetGrid.appendChild(makeSpecItem(thai ? 'Windows แท้ / Activate' : 'Genuine Windows', licV.text, licV.level ? 'risk' : (licV.state === 'genuine' ? 'ok' : '')));
+            var offV = officeVerdictOf(node);
+            if (offV.state !== 'unknown') assetGrid.appendChild(makeSpecItem('Microsoft Office', offV.text, offV.level ? 'risk' : (offV.state === 'genuine' ? 'ok' : '')));
             assetGrid.appendChild(makeSpecItem(thai ? 'ประเภทเครื่อง' : 'Device type', typeLabel(bookA.deviceClass) + (bookA.modelName ? ' · ' + bookA.modelName : '') + ' · ' + typeSourceLabel(bookA.deviceTypeSource)));
             assetGrid.appendChild(makeSpecItem(thai ? 'ปีที่ได้มา (ประมาณ)' : 'Acquired (approx.)', bookA.acquiredYearBE ? ((thai ? 'พ.ศ. ' : 'BE ') + bookA.acquiredYearBE + ' · ' + srcText) : '-'));
             assetGrid.appendChild(makeSpecItem(thai ? 'ราคาตั้งต้น' : 'Cost basis', baht(bookA.costBasis) + ' · ' + (bookA.costSource === 'asset'
@@ -3607,6 +3609,13 @@
             if (isKms && localHost) return { state: 'suspect', level: 'high', text: thai ? 'Activate ด้วย KMS ในเครื่องตัวเอง — ลักษณะของโปรแกรมแคร็ก (ไม่แท้)' : 'Activated by a KMS on the computer itself — an activation crack' };
             if (isKms) return { state: 'kms', level: 'warn', text: thai ? ('Activate แบบ KMS' + (host ? ' (' + host + ')' : '') + ' — ถ้า รพ. ไม่มีเซิร์ฟเวอร์ KMS เอง มักเป็นโปรแกรมแคร็ก') : ('KMS activation' + (host ? ' (' + host + ')' : '') + ' — a crack unless the hospital runs a KMS server') };
             var how = /OEM/i.test(channel) ? (thai ? 'OEM มากับเครื่อง' : 'OEM, came with the PC') : /Retail/i.test(channel) ? 'Retail' : /MAK/i.test(channel) ? (thai ? 'MAK องค์กร' : 'MAK volume') : (channel || 'licensed');
+            // A digital licence runs on a public generic key. So does the HWID crack, and so
+            // does a free upgrade from Windows 7/8 -- the paperwork decides, not the computer.
+            if (GENERIC_KEYS[String(l.partial || '').toUpperCase()] && !l.oemKey) {
+                return { state: 'digital', review: true, text: thai
+                    ? '✓ Activate แล้ว (Digital License ด้วยคีย์ทั่วไป · ไม่มีคีย์ OEM ในเครื่อง) — ถ้าไม่มีเอกสารซื้อ/สิทธิ์อัปเกรด อาจเป็นแคร็กแบบ HWID ควรตรวจเอกสาร'
+                    : '✓ Activated (digital licence on a generic key, no OEM key) — without a purchase or upgrade record this can be an HWID crack' };
+            }
             return { state: 'genuine', text: (thai ? '✓ แท้ · Activate แล้ว (' : '✓ Genuine · activated (') + how + ')' };
         }
         if ([2, 3, 4, 6].indexOf(Number(l.status)) >= 0) {
@@ -3615,9 +3624,38 @@
         }
         return { state: 'unlicensed', level: 'warn', text: thai ? 'Windows ยังไม่ได้ Activate — มีลายน้ำ "Activate Windows"' : 'Windows not activated — the watermark shows' };
     }
+    // Public generic keys (last five characters) that Windows 10/11 digital licences use.
+    var GENERIC_KEYS = { '3V66T': 'Pro', '8HVX7': 'Home', '6F4BT': 'Home Single Language', 'PKCKT': 'Pro N', '7CFBY': 'Education', '2YV77': 'Pro for Workstations', 'WXCHW': 'Home N' };
+
+    // Microsoft Office: Ohook or a crack KMS is pirated; Microsoft 365 is a subscription
+    // checked against the user's account, which the computer's licence store cannot show.
+    function officeVerdictOf(node) {
+        var l = window.ScpCachedLicense && window.ScpCachedLicense[node._id];
+        var o = l && l.office;
+        if (!o) return { state: 'unknown', text: thai ? 'ยังไม่ได้ตรวจ' : 'not checked yet' };
+        var prods = o.products || [];
+        if (!prods.length && !o.c2r) return { state: 'none', text: thai ? 'ไม่ได้ติดตั้ง Office (หรือไม่พบสิทธิ์)' : 'No Office found' };
+        if (o.ohook) return { state: 'cracked', level: 'high', text: thai ? '🏴‍☠️ Office ถูกแคร็กด้วย Ohook (มีไฟล์ sppc.dll ปลอมในโฟลเดอร์ Office) — ไม่แท้' : '🏴‍☠️ Office cracked with Ohook (fake sppc.dll) — not genuine' };
+        var licensed = prods.filter(function (p) { return Number(p.status) === 1; });
+        for (var i = 0; i < licensed.length; i++) {
+            var p = licensed[i], kms = /KMSCLIENT|GVLK/i.test(p.desc + ' ' + p.name), host = String(p.kms || '');
+            if (kms && (/^(127\.|localhost|0\.0\.0\.0|::1)/i.test(host) || Number(p.grace) > 259200 ||
+                /digiboy|msguides|03k\.org|loli\.|crsoo|chinancce|lotro\.cc|cangshui|library\.hk|kms\.cx|ddz\.red|kms\.lol|kms\.srv/i.test(host))) {
+                return { state: 'cracked', level: 'high', text: thai ? ('🏴‍☠️ Office activate ด้วย KMS แคร็ก' + (host ? ' (' + host + ')' : '') + ' — ไม่แท้') : ('🏴‍☠️ Office activated by a crack KMS' + (host ? ' (' + host + ')' : '')) };
+            }
+            if (kms) return { state: 'kms', level: 'warn', text: thai ? ('Office activate แบบ KMS' + (host ? ' (' + host + ')' : '') + ' — ถ้า รพ. ไม่มีเซิร์ฟเวอร์ KMS เอง มักเป็นแคร็ก') : ('Office KMS activation' + (host ? ' (' + host + ')' : '')) };
+        }
+        if (licensed.length) return { state: 'genuine', text: (thai ? '✓ Office แท้ · Activate แล้ว (' : '✓ Office genuine (') + String(licensed[0].name).replace(/^Office \d+,\s*/, '').replace(/ edition$/, '') + ')' };
+        if (/O365|M365|Microsoft365|SubPrem|_Grace/i.test(o.c2r + ' ' + prods.map(function (x) { return x.name; }).join(' '))) {
+            return { state: 'subscription', text: thai ? 'Microsoft 365 แบบสมาชิก — ยืนยันสิทธิ์ผ่านบัญชีผู้ใช้ (ตรวจจากเครื่องไม่ได้)' : 'Microsoft 365 subscription — licensed through the user account' };
+        }
+        return { state: 'unlicensed', level: 'warn', text: thai ? 'Office ยังไม่ Activate (มีแถบแดงเตือนในโปรแกรม)' : 'Office not activated' };
+    }
     function licenseRisksOf(node) {
-        var v = licenseVerdictOf(node);
-        return v.level ? [{ level: v.level, kind: 'license', text: v.text }] : [];
+        var out = [], v = licenseVerdictOf(node), o = officeVerdictOf(node);
+        if (v.level) out.push({ level: v.level, kind: 'license', text: v.text });
+        if (o.level) out.push({ level: o.level, kind: 'license', text: o.text });
+        return out;
     }
 
     /* ---- PC / All-in-One / notebook: ask the computers themselves (read only) ---- */
@@ -3642,8 +3680,17 @@
         "$kThreats = @(Get-MpThreat -ErrorAction SilentlyContinue | Where-Object { $_.ThreatName -match 'KMS|Pico|Activat|HackTool:Win32/AutoKMS' } | ForEach-Object { $_.ThreatName } | Select-Object -Unique)",
         "$kEx = @((Get-MpPreference -ErrorAction SilentlyContinue).ExclusionPath | Where-Object { $_ -match 'KMS|Pico|Activat|SECOH' })",
         "$k = @{ tasks = @($kTasks); services = @($kSvcs); files = @($kFiles); hook = [bool]($kIfeo -and ($kIfeo.Debugger -or $kIfeo.VerifierDlls)); threats = @($kThreats); exclusions = @($kEx) }",
-        '$l = @{ status = [int]$lic.LicenseStatus; channel = [string]$lic.ProductKeyChannel; desc = [string]$lic.Description; name = [string]$lic.Name; kms = [string]$lic.KeyManagementServiceMachine; kmsFound = [string]$lic.DiscoveredKeyManagementServiceMachineName; grace = [int]$lic.GracePeriodRemaining; oemKey = [bool]$svc.OA3xOriginalProductKey; found = [bool]$lic; crack = $k }',
-        "Write-Output ('SCP_LICENSE:' + ($l | ConvertTo-Json -Compress -Depth 4))"
+        // Microsoft Office: its licences (Office 2013+ in SPP, Office 2010 in OSPP), the Ohook
+        // crack (a fake sppc.dll inside Office's own folder) and the Click-to-Run products.
+        '$oProd = @(Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID=\'0ff1ce15-a989-479d-af46-f275c6370663\' AND PartialProductKey IS NOT NULL" | ForEach-Object { @{ name = [string]$_.Name; desc = [string]$_.Description; status = [int]$_.LicenseStatus; kms = [string]($_.KeyManagementServiceMachine + $_.DiscoveredKeyManagementServiceMachineName); grace = [int]$_.GracePeriodRemaining } })',
+        "$oOld = @(Get-CimInstance OfficeSoftwareProtectionProduct -ErrorAction SilentlyContinue | Where-Object { $_.PartialProductKey } | ForEach-Object { @{ name = [string]$_.Name; desc = [string]$_.Description; status = [int]$_.LicenseStatus; kms = [string]$_.KeyManagementServiceMachine; grace = [int]$_.GracePeriodRemaining } })",
+        "$oHook = @('C:\\Program Files\\Microsoft Office\\root\\vfs\\System\\sppc.dll','C:\\Program Files\\Microsoft Office\\root\\vfs\\SystemX86\\sppc.dll','C:\\Program Files (x86)\\Microsoft Office\\root\\vfs\\System\\sppc.dll','C:\\Program Files (x86)\\Microsoft Office\\root\\vfs\\SystemX86\\sppc.dll') | Where-Object { Test-Path $_ }",
+        "$oC2r = [string](Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Office\\ClickToRun\\Configuration' -ErrorAction SilentlyContinue).ProductReleaseIds",
+        "$off = @{ products = @($oProd + $oOld); ohook = (@($oHook).Count -gt 0); c2r = $oC2r }",
+        // Only the last five characters of the Windows key -- what Settings shows anyway -- to
+        // recognise the generic keys a digital licence (or an HWID crack) runs on.
+        '$l = @{ status = [int]$lic.LicenseStatus; channel = [string]$lic.ProductKeyChannel; desc = [string]$lic.Description; name = [string]$lic.Name; kms = [string]$lic.KeyManagementServiceMachine; kmsFound = [string]$lic.DiscoveredKeyManagementServiceMachineName; grace = [int]$lic.GracePeriodRemaining; oemKey = [bool]$svc.OA3xOriginalProductKey; found = [bool]$lic; partial = [string]$lic.PartialProductKey; crack = $k; office = $off }',
+        "Write-Output ('SCP_LICENSE:' + ($l | ConvertTo-Json -Compress -Depth 5))"
     ].join('\r\n');
     var chassisJob = null;
     function typeLabel(type) {
@@ -3711,9 +3758,12 @@
                     count[t]++;
                 });
                 var lic = { genuine: 0, bad: 0 };
-                job.licenses.forEach(function (l) { var v = licenseVerdictOf({ _id: l.nodeid }); if (v.state === 'genuine') lic.genuine++; else lic.bad++; });
+                job.licenses.forEach(function (l) {
+                    var v = licenseVerdictOf({ _id: l.nodeid }), o = officeVerdictOf({ _id: l.nodeid });
+                    if (v.level || o.level) lic.bad++; else if (v.review) lic.review = (lic.review || 0) + 1; else lic.genuine++;
+                });
                 status.textContent = (thai ? '✓ บันทึกแล้ว ' : '✓ Saved ') + job.items.length + (thai ? ' เครื่อง: PC ' : ' computers: PC ') + count.desktop + ' · All-in-One ' + count.aio + (thai ? ' · โน้ตบุ๊ก ' : ' · notebook ') + count.notebook +
-                    (thai ? ' · Windows แท้ ' : ' · genuine Windows ') + lic.genuine + (lic.bad ? (thai ? ' · ไม่แท้/ยังไม่ activate ' : ' · not genuine/not activated ') + lic.bad : '') +
+                    (thai ? ' · Windows แท้ ' : ' · genuine Windows ') + lic.genuine + (lic.bad ? (thai ? ' · ไม่แท้/ยังไม่ activate (Windows หรือ Office) ' : ' · not genuine/not activated (Windows or Office) ') + lic.bad : '') + (lic.review ? (thai ? ' · ควรตรวจเอกสาร ' : ' · check paperwork ') + lic.review : '') +
                     (thai ? ' (เครื่องที่ปิดอยู่ กดตรวจอีกครั้งตอนเปิดเครื่อง)' : ' (run again later for computers that are off)');
                 loadFleetAssessment(true);
             }).catch(function (e) { status.textContent = (thai ? 'บันทึกไม่สำเร็จ: ' : 'Could not save: ') + (e && e.message); });
@@ -3778,6 +3828,8 @@
         section(thai ? '💾 ดิสก์ใกล้เต็ม' : '💾 Disk almost full', diskLow, function (n) { return disksOf(n).filter(function (x) { return x.percent <= diskWarnPercent; }).map(function (x) { return x.letter + ': ' + x.percent + '%'; }).join(', '); });
         var notGenuine = list.filter(function (n) { return licenseVerdictOf(n).level; });
         section(thai ? '🪪 Windows ไม่แท้ / ยังไม่ Activate' : '🪪 Windows not genuine / not activated', notGenuine, function (n) { return licenseVerdictOf(n).text; });
+        section(thai ? '📄 Office ไม่แท้ / ยังไม่ Activate' : '📄 Office not genuine / not activated', list.filter(function (n) { return officeVerdictOf(n).level; }), function (n) { return officeVerdictOf(n).text; });
+        section(thai ? '🔎 ควรตรวจเอกสารสิทธิ์ (Digital License ด้วยคีย์ทั่วไป)' : '🔎 Check the licence paperwork (digital licence, generic key)', list.filter(function (n) { return licenseVerdictOf(n).review; }), function () { return thai ? 'ยืนยันด้วยใบสั่งซื้อหรือสิทธิ์อัปเกรด' : 'confirm with a purchase or upgrade record'; });
         section(thai ? '🧠 RAM ต่ำ (≤ 4 GB)' : '🧠 Low RAM (≤ 4 GB)', lowRam, function (n) { var s = specSummaryOf(n); return s && s.ram; });
 
         var tickets = element('section', 'scp-extra-section');

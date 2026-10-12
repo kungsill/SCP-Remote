@@ -197,7 +197,13 @@ exports.handle = async function (ctx, cmd) {
    if (!it || typeof it.nodeid !== 'string' || !await access(it.nodeid)) continue;
    await save({ _id: 'scplicense/' + it.nodeid, type: 'scplicense', domain: domain.id, nodeid: it.nodeid, found: it.found === true,
     status: Math.max(0, Math.min(9, Number(it.status) || 0)), channel: str(it.channel), desc: str(it.desc), name: str(it.name),
-    kms: str(it.kms), kmsFound: str(it.kmsFound), grace: Math.max(0, Math.min(1e6, Number(it.grace) || 0)), oemKey: it.oemKey === true,
+    kms: str(it.kms), kmsFound: str(it.kmsFound), grace: Math.max(0, Math.min(1e8, Number(it.grace) || 0)), oemKey: it.oemKey === true,
+    crack: (function (k) {
+     // traces of activation cracks found on the computer: short lists of names only
+     const list = v => (Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : [])).filter(x => typeof x === 'string').slice(0, 10).map(x => x.slice(0, 160));
+     k = (k && typeof k === 'object') ? k : {};
+     return { tasks: list(k.tasks), services: list(k.services), files: list(k.files), hook: k.hook === true, threats: list(k.threats), exclusions: list(k.exclusions) };
+    })(it.crack),
     updated: Date.now(), by: user._id });
    saved++;
   }

@@ -3586,7 +3586,24 @@
         var host = String(l.kms || l.kmsFound || '');
         var isKms = /GVLK|KMSCLIENT/i.test(channel + ' ' + desc);
         var localHost = /^(127\.|localhost|0\.0\.0\.0|::1)/i.test(host);
+        // Traces a crack left on the computer outweigh everything else: they are there even
+        // when the licence itself looks fine.
+        var k = l.crack || {}, traces = [];
+        if (k.hook) traces.push(thai ? 'ตัวดักระบบ activate (SppExtComObj hook)' : 'activation hook (SppExtComObj)');
+        (k.tasks || []).forEach(function (x) { traces.push('Task ' + x); });
+        (k.services || []).forEach(function (x) { traces.push('Service ' + x); });
+        (k.files || []).forEach(function (x) { traces.push(String(x).split('\\').pop()); });
+        (k.threats || []).forEach(function (x) { traces.push((thai ? 'Defender เคยจับ ' : 'Defender caught ') + x); });
+        (k.exclusions || []).forEach(function (x) { traces.push((thai ? 'ยกเว้นใน Defender: ' : 'Defender exclusion: ') + x); });
+        if (traces.length) {
+            return { state: 'cracked', level: 'high', text: (thai ? '🏴‍☠️ พบร่องรอยโปรแกรมแคร็ก Windows: ' : '🏴‍☠️ Activation crack traces: ') + traces.slice(0, 4).join(', ') + (traces.length > 4 ? ' …' : '') };
+        }
+        // Real KMS activation lasts at most 180 days; KMS38 (a crack) runs to 2038.
+        var kms38 = isKms && Number(l.grace) > 259200;
+        var crackKms = /digiboy|msguides|03k\.org|loli\.|crsoo|chinancce|lotro\.cc|cangshui|library\.hk|kms\.cx|zhang\.|ddz\.red|kms\.lol|xspace|cy2617|moeclub|kms\.srv/i.test(host);
         if (Number(l.status) === 1) {
+            if (kms38) return { state: 'cracked', level: 'high', text: thai ? '🏴‍☠️ Activate แบบ KMS38 (ใช้ได้ถึงปี 2038) — เป็นวิธีแคร็ก ไม่แท้' : '🏴‍☠️ KMS38 activation (valid to 2038) — a crack' };
+            if (isKms && crackKms) return { state: 'cracked', level: 'high', text: thai ? ('🏴‍☠️ Activate กับเซิร์ฟเวอร์ KMS สาธารณะที่ใช้แคร็ก (' + host + ') — ไม่แท้') : ('🏴‍☠️ Activated against a public crack KMS (' + host + ')') };
             if (isKms && localHost) return { state: 'suspect', level: 'high', text: thai ? 'Activate ด้วย KMS ในเครื่องตัวเอง — ลักษณะของโปรแกรมแคร็ก (ไม่แท้)' : 'Activated by a KMS on the computer itself — an activation crack' };
             if (isKms) return { state: 'kms', level: 'warn', text: thai ? ('Activate แบบ KMS' + (host ? ' (' + host + ')' : '') + ' — ถ้า รพ. ไม่มีเซิร์ฟเวอร์ KMS เอง มักเป็นโปรแกรมแคร็ก') : ('KMS activation' + (host ? ' (' + host + ')' : '') + ' — a crack unless the hospital runs a KMS server') };
             var how = /OEM/i.test(channel) ? (thai ? 'OEM มากับเครื่อง' : 'OEM, came with the PC') : /Retail/i.test(channel) ? 'Retail' : /MAK/i.test(channel) ? (thai ? 'MAK องค์กร' : 'MAK volume') : (channel || 'licensed');
@@ -3615,8 +3632,18 @@
         // The product key itself is never sent: only whether an OEM key is in the firmware.
         '$lic = @(Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID=\'55c92734-d682-4d71-983e-d6ec3f16059f\' AND PartialProductKey IS NOT NULL") | Where-Object { $_.Description -like \'*Operating System*\' } | Select-Object -First 1',
         '$svc = Get-CimInstance SoftwareLicensingService',
-        '$l = @{ status = [int]$lic.LicenseStatus; channel = [string]$lic.ProductKeyChannel; desc = [string]$lic.Description; name = [string]$lic.Name; kms = [string]$lic.KeyManagementServiceMachine; kmsFound = [string]$lic.DiscoveredKeyManagementServiceMachineName; grace = [int]$lic.GracePeriodRemaining; oemKey = [bool]$svc.OA3xOriginalProductKey; found = [bool]$lic }',
-        "Write-Output ('SCP_LICENSE:' + ($l | ConvertTo-Json -Compress))"
+        // Traces the well-known activation cracks leave behind (KMSpico, KMSAuto, KMS_VL_ALL,
+        // AutoKMS): their scheduled tasks, services, files, the hook on Windows' own activation
+        // service, what Defender has caught, and Defender exclusions made for them. Read only.
+        "$kTasks = @(Get-ScheduledTask | Where-Object { $_.TaskName -match 'AutoKMS|AutoPico|KMSAuto|KMS_VL|SppExtComObjHook|KMSpico' } | ForEach-Object { $_.TaskName })",
+        "$kSvcs = @(Get-Service | Where-Object { $_.Name -match 'KMSELDI|KMSpico|AutoKMS|KMSAuto|SppExtComObjHook' } | ForEach-Object { $_.Name })",
+        "$kFiles = @('C:\\Windows\\SECOH-QAD.exe','C:\\Windows\\SECOH-QAD.dll','C:\\Windows\\System32\\SppExtComObjHook.dll','C:\\Windows\\System32\\SppExtComObjPatcher.exe','C:\\Program Files\\KMSpico','C:\\ProgramData\\KMSAutoS','C:\\ProgramData\\KMSAuto','C:\\Windows\\KMSAutoS','C:\\Windows\\AutoKMS','C:\\Windows\\SysWOW64\\SppExtComObjHook.dll') | Where-Object { Test-Path $_ }",
+        "$kIfeo = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\SppExtComObj.exe' -ErrorAction SilentlyContinue",
+        "$kThreats = @(Get-MpThreat -ErrorAction SilentlyContinue | Where-Object { $_.ThreatName -match 'KMS|Pico|Activat|HackTool:Win32/AutoKMS' } | ForEach-Object { $_.ThreatName } | Select-Object -Unique)",
+        "$kEx = @((Get-MpPreference -ErrorAction SilentlyContinue).ExclusionPath | Where-Object { $_ -match 'KMS|Pico|Activat|SECOH' })",
+        "$k = @{ tasks = @($kTasks); services = @($kSvcs); files = @($kFiles); hook = [bool]($kIfeo -and ($kIfeo.Debugger -or $kIfeo.VerifierDlls)); threats = @($kThreats); exclusions = @($kEx) }",
+        '$l = @{ status = [int]$lic.LicenseStatus; channel = [string]$lic.ProductKeyChannel; desc = [string]$lic.Description; name = [string]$lic.Name; kms = [string]$lic.KeyManagementServiceMachine; kmsFound = [string]$lic.DiscoveredKeyManagementServiceMachineName; grace = [int]$lic.GracePeriodRemaining; oemKey = [bool]$svc.OA3xOriginalProductKey; found = [bool]$lic; crack = $k }',
+        "Write-Output ('SCP_LICENSE:' + ($l | ConvertTo-Json -Compress -Depth 4))"
     ].join('\r\n');
     var chassisJob = null;
     function typeLabel(type) {

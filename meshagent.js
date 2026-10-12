@@ -1235,6 +1235,18 @@ module.exports.CreateMeshAgent = function (parent, db, ws, req, args, domain) {
                         if(command.type==='runcommands'&&typeof command.responseid==='string'&&/^scpclean-[0-9]+-[0-9]+$/.test(command.responseid)){
                             db.Set({_id:'scpcleanup/'+obj.dbNodeKey,type:'scpcleanup',domain:obj.domain.id,nodeid:obj.dbNodeKey,ticket:command.responseid,progress:command.progress===true,result:String(command.result||'').slice(-4000),updated:Date.now()});
                         }
+                        // Safe auto-care: keep the answer (and who started it) so a reload does not lose it.
+                        if (command.type === 'runcommands' && command.progress !== true && typeof command.responseid === 'string' && /^scpcare[0-9]+_[0-9]+$/.test(command.responseid)) {
+                            (function (nodeKey, domainId, ticket, text) {
+                                var careText = String(text || ''), careMatch = careText.match(/SCP_CARE:(\{[^\r\n]*\})/), careResult = null;
+                                if (careMatch) { try { careResult = JSON.parse(careMatch[1]); } catch (e) { careResult = null; } }
+                                var careState = /COMMAND_BUSY/.test(careText) ? 'busy' : (careResult ? 'done' : 'unknown');
+                                db.Get('scpcare/' + nodeKey, function (err, docs) {
+                                    var before = (docs && docs[0]) || {};
+                                    db.Set({ _id: 'scpcare/' + nodeKey, type: 'scpcare', domain: domainId, nodeid: nodeKey, ticket: ticket, state: careState, started: before.started || null, by: before.by || null, result: careResult, updated: Date.now() });
+                                });
+                            })(obj.dbNodeKey, obj.domain.id, command.responseid, command.result);
+                        }
                         // Route a message
                         parent.routeAgentCommand(command, obj.domain.id, obj.dbNodeKey, obj.dbMeshKey);
                         break;

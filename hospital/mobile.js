@@ -23,8 +23,9 @@ const pageFile = path.join(__dirname, 'mobile.html');
 // meant for the full site. Anything else on the root - hide=, mobile=, viewmode= with no
 // device beside it - is what MeshCentral leaves behind when a view closes, and must not be
 // mistaken for someone asking to go somewhere.
+// scpnode: a QR sticker on a computer, which opens that computer's card on the dashboard.
 const AIMED_AT_SOMETHING = ['node', 'gotonode', 'gotodevicename', 'gotodevicername',
-    'gotodeviceip', 'gotomesh', 'gotouser', 'gotougrp', 'key'];
+    'gotodeviceip', 'gotomesh', 'gotouser', 'gotougrp', 'key', 'scpnode'];
 
 function signedInUser(web, req) {
     if ((req.session == null) || (typeof req.session.userid != 'string')) { return null; }

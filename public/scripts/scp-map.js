@@ -193,6 +193,18 @@
         return Math.abs(h);
     }
 
+    function newStat() { return { total: 0, online: 0, busy: 0, risky: 0, warn: 0, due: 0 }; }
+
+    // Mix two #rrggbb colours; t = 0 gives a, t = 1 gives b.
+    function mix(a, b, t) {
+        var pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+        var ch = [16, 8, 0].map(function (sh) {
+            var x = (pa >> sh) & 255, y = (pb >> sh) & 255;
+            return Math.round(x + (y - x) * t).toString(16).padStart(2, '0');
+        });
+        return '#' + ch.join('');
+    }
+
     function dist(p1, p2) {
         return Math.hypot(p1[0] - p2[0], p1[1] - p2[1]);
     }
@@ -239,6 +251,11 @@
         this.placements = {};
         this.traffic = true;
         this._agents = [];
+        this.viewMode = 'status'; // 'status' | 'heat' (risk) | 'plan' (replacement year)
+        this.night = false;
+        this._pings = {};
+        this._fly = null;
+        this._busyByStop = {};
         this.editMode = false;
         this._drag = null;
         this._floorBuilding = {};
@@ -450,6 +467,7 @@
     IsoMap.prototype.setNodes = function (nodes) {
         this.nodes = Array.isArray(nodes) ? nodes : [];
         this._updateNodePositions();
+        this._updateActivity();
         if (this.hoverNode && this.nodes.indexOf(this.hoverNode) < 0) this.hoverNode = null;
         this.invalidate();
     };
@@ -564,13 +582,15 @@
         var spots = [];
         var stats = new Map();
         exact.forEach(function (e) {
+            if (!e.room && !onCampus) e.room = self._roomAt(e.x, e.y);
             var g = e.room ? self._geom.get(e.room) : null;
             var risk = self._riskOf(e.node);
             spots.push({ node: e.node, room: e.room, x: e.x, y: e.y, z: g ? g.h + 0.2 : (onCampus ? 0.2 : 0.05), exact: true, risk: risk });
             if (e.room) {
-                var st = stats.get(e.room) || { total: 0, online: 0, busy: 0, risky: 0 };
+                var st = stats.get(e.room) || newStat();
                 st.total++;
-                if (risk === 'high') st.risky++;
+                if (risk === 'high') st.risky++; else if (risk === 'warn') st.warn++;
+                if (self._isDue(e.node)) st.due++;
                 if (self._isOnline(e.node)) { st.online++; if (self._isBusy(e.node)) st.busy++; }
                 stats.set(e.room, st);
             }
@@ -578,14 +598,15 @@
         groups.forEach(function (list, room) {
             var g = self._geom.get(room);
             if (!g) return;
-            var st = stats.get(room) || { total: 0, online: 0, busy: 0, risky: 0 };
+            var st = stats.get(room) || newStat();
             st.total += list.length;
             var risks = new Map();
             list.forEach(function (node) {
                 if (self._isOnline(node)) { st.online++; if (self._isBusy(node)) st.busy++; }
                 var rk = self._riskOf(node);
                 risks.set(node, rk);
-                if (rk === 'high') st.risky++;
+                if (rk === 'high') st.risky++; else if (rk === 'warn') st.warn++;
+                if (self._isDue(node)) st.due++;
             });
             stats.set(room, st);
             list.sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || '')); });
@@ -937,13 +958,9 @@
         var spot = find();
         if (!spot && this.floorId !== 'flr_campus') { this.setFloor('flr_campus'); spot = find(); }
         if (!spot) return false;
-        if (this.scale < 6) this.scale = 6;
         var z = spot.room && spot.room.kind === 'building' ? this._roofOf(spot.room) + 0.2 : spot.z;
-        this.pan = [0, 0];
-        var p = this.project(spot.x, spot.y, z);
-        this.pan = [this.w / 2 - p[0], this.h / 2 - p[1] + 20];
-        this._focus = { id: id, until: performance.now() + 4000 };
-        this.invalidate();
+        this.flyTo(spot.x, spot.y, z, Math.max(this.scale, 6), 800);
+        this._focus = { id: id, until: performance.now() + 5000 };
         return true;
     };
 
@@ -993,6 +1010,7 @@
         }
         this._c = Math.cos(this.angle);
         this._s = Math.sin(this.angle);
+        if (this._stepFly()) rotating = true;
 
         this._pulsePhase = (this._pulsePhase + dt * 3.5) % (Math.PI * 2);
         var traffic = this._trafficOn();
@@ -1004,7 +1022,7 @@
         var self = this;
         if (rotating) {
             this._kick();
-        } else if (traffic || this._hasOnline || this._focus) {
+        } else if (traffic || this._hasOnline || this._focus || this._hasPings()) {
             // Moving people and cars at ~30 fps, otherwise just a gentle LED pulse; any
             // interaction kicks a real frame sooner.
             this._pulseTimer = setTimeout(function () {
@@ -1065,6 +1083,7 @@
         if (this.floorId === 'flr_campus') this._drawPaths(ctx);
         this._drawShadows(ctx, order);
         this._drawRooms(ctx, order);
+        if (this.night) this._drawNight(ctx, order);
         this._drawLabels(ctx, lctx, order);
         this._drawWorkstations(ctx, lctx);
     };
@@ -1148,6 +1167,8 @@
             var isHover = this.hoverRoom === r;
             if (r.kind === 'building') {
                 var base = /^#[0-9a-f]{6}$/i.test(r.color || '') ? r.color : '#e2e8f0';
+                var tint = this._tintFor(r);
+                if (tint && g.h >= 0.5) base = tint;
                 var top = this._roofOf(r);
                 if (g.h < 0.5) {
                     // Grounds: just a coloured patch with a border.
@@ -1175,7 +1196,7 @@
                 continue;
             }
 
-            var color = ROOM_COLOR[r.kind] || ROOM_COLOR_OTHER;
+            var color = this._tintFor(r) || ROOM_COLOR[r.kind] || ROOM_COLOR_OTHER;
             this._polyPath(ctx, r.polygon, 0);
             ctx.fillStyle = isHover ? shade(color, 0.94) : color;
             ctx.fill();
@@ -1387,7 +1408,23 @@
 
         // Risk badges on top of everything: red ! for a serious problem (low RAM, very old
         // CPU or machine, unprotected), amber for a lesser one (only when zoomed in).
+        var thisYear = new Date().getFullYear();
         spots.forEach(function (it) {
+            if (self.viewMode === 'plan') {
+                // replacement plan: the Buddhist-era year this computer should be replaced
+                var py = self._planYear(it.spot.node);
+                if (py === null || (!full && py > thisYear + 1)) return;
+                var label = String(py + 543), bw = full ? 30 : 24, bh = full ? 14 : 11;
+                var cx = full ? it.sx - 12 : it.sx - 6, cy = full ? it.top + 5 : it.sy - 11;
+                roundRectPath(ctx, cx - bw / 2, cy - bh / 2, bw, bh, bh / 2);
+                ctx.fillStyle = py <= thisYear ? '#b91c1c' : py === thisYear + 1 ? '#ea580c' : '#16a34a';
+                ctx.fill();
+                ctx.strokeStyle = PALETTE.white; ctx.lineWidth = 1.2; ctx.stroke();
+                ctx.fillStyle = PALETTE.white;
+                ctx.font = '700 ' + (full ? 9.5 : 8) + 'px sans-serif';
+                ctx.fillText(label, cx, cy + 0.5);
+                return;
+            }
             var rk = it.spot.risk;
             if (!rk || (rk === 'warn' && !full)) return;
             var bx = full ? it.sx - 10 : it.sx - 6, by = full ? it.top + 5 : it.sy - 11;
@@ -1516,6 +1553,22 @@
     // The only per-frame drawing: status LEDs over the cached layer.
     IsoMap.prototype._drawLeds = function (ctx) {
         var leds = this._leds || [];
+        // alert pings: red rings on computers that just went offline
+        if (this._hasPings()) {
+            var nowP = performance.now();
+            for (var hp = 0; hp < this._screenHits.length; hp++) {
+                var hh = this._screenHits[hp];
+                if (!this._pings[hh.spot.node._id]) continue;
+                for (var pr = 0; pr < 2; pr++) {
+                    var phs = ((nowP / 700) + pr * 0.5) % 1;
+                    ctx.beginPath();
+                    ctx.arc(hh.sx, hh.sy, 8 + phs * 28, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(220, 38, 38, ' + (0.9 * (1 - phs)).toFixed(3) + ')';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                }
+            }
+        }
         var f = this._focus;
         if (f) {
             var left = f.until - performance.now();
@@ -1725,6 +1778,216 @@
         ctx.closePath();
     };
 
+    /* ---------- view modes, night, pings, flying the camera ---------- */
+
+    // The floor room a free-standing spot lies in (PC rooms before waiting areas).
+    IsoMap.prototype._roomAt = function (x, y) {
+        var hit = null;
+        for (var i = 0; i < this._floorRooms.length; i++) {
+            var r = this._floorRooms[i];
+            if (r.kind === 'building' || !pointInPoly(x, y, r.polygon)) continue;
+            if (PC_ROOM_KINDS[r.kind]) return r;
+            if (!hit) hit = r;
+        }
+        return hit;
+    };
+
+    // The calendar year this computer should be replaced, if the assessment knows it.
+    IsoMap.prototype._planYear = function (node) {
+        var fn = this.opts.planYear;
+        var y = fn ? Number(fn(node)) : NaN;
+        return y > 2000 && y < 2200 ? y : null;
+    };
+    // Due means this year or next: the ones a budget request has to cover now.
+    IsoMap.prototype._isDue = function (node) {
+        var y = this._planYear(node);
+        return y !== null && y <= new Date().getFullYear() + 1;
+    };
+
+    IsoMap.prototype.setViewMode = function (mode) {
+        this.viewMode = (mode === 'heat' || mode === 'plan') ? mode : 'status';
+        this.invalidate();
+    };
+
+    IsoMap.prototype.setNight = function (on) {
+        this.night = !!on;
+        this.invalidate();
+    };
+
+    // The colour a room or building takes in the risk or replacement view; null = keep its own.
+    IsoMap.prototype._tintFor = function (r) {
+        if (this.viewMode === 'status') return null;
+        var st = this._roomStats && this._roomStats.get(r);
+        if (!st || !st.total) return r.kind === 'building' ? '#cbd5e1' : null;
+        if (this.viewMode === 'heat') {
+            if (st.risky) return mix('#fca5a5', '#b91c1c', Math.min(1, st.risky / st.total * 1.5));
+            if (st.warn) return mix('#fde68a', '#d97706', Math.min(1, st.warn / st.total));
+            return '#4ade80';
+        }
+        if (st.due) return mix('#fdba74', '#c2410c', Math.min(1, st.due / st.total * 1.5));
+        return '#86efac';
+    };
+
+    // Draw attention to one computer for a while without moving the camera.
+    IsoMap.prototype.pingNode = function (id, ms) {
+        this._pings[id] = performance.now() + (ms || 8000);
+        this.invalidate(false);
+    };
+    IsoMap.prototype._hasPings = function () {
+        var now = performance.now(), any = false;
+        for (var id in this._pings) { if (this._pings[id] > now) any = true; else delete this._pings[id]; }
+        return any;
+    };
+
+    // Glide the camera so map point (x, y, z) ends up centred at the given scale.
+    IsoMap.prototype.flyTo = function (x, y, z, scale, ms) {
+        var keepScale = this.scale, keepPan = this.pan;
+        this.scale = Math.max(0.4, Math.min(60, scale || this.scale));
+        this.pan = [0, 0];
+        var p = this.project(x, y, z || 0);
+        var target = { scale: this.scale, pan: [this.w / 2 - p[0], this.h / 2 - p[1] + 20] };
+        this.scale = keepScale; this.pan = keepPan;
+        if (REDUCED_MOTION || !ms) {
+            this.scale = target.scale; this.pan = target.pan; this._fly = null;
+        } else {
+            this._fly = { from: { scale: this.scale, pan: this.pan.slice() }, to: target, t0: performance.now(), ms: ms };
+        }
+        this.invalidate();
+    };
+
+    IsoMap.prototype._stepFly = function () {
+        var f = this._fly;
+        if (!f) return false;
+        var t = Math.min(1, (performance.now() - f.t0) / f.ms);
+        var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; // ease in-out
+        // zoom in logarithmic space so it feels even
+        this.scale = Math.exp(Math.log(f.from.scale) + (Math.log(f.to.scale) - Math.log(f.from.scale)) * e);
+        this.pan = [f.from.pan[0] + (f.to.pan[0] - f.from.pan[0]) * e, f.from.pan[1] + (f.to.pan[1] - f.from.pan[1]) * e];
+        this._staticDirty = true;
+        if (t >= 1) this._fly = null;
+        return true;
+    };
+
+    // Fly to a room or building by id, switching floor first if it is on another one.
+    IsoMap.prototype.focusRoom = function (id, ms) {
+        var r = this.rooms && this.rooms[id];
+        if (!r || !this._geom.get(r)) return false;
+        if (r.floor_id !== this.floorId) this.setFloor(r.floor_id);
+        var g = this._geom.get(r);
+        var size = Math.max(g.b.x2 - g.b.x1, g.b.y2 - g.b.y1, 6);
+        var scale = Math.max(3, Math.min(22, Math.min(this.w, this.h) * 0.45 / size));
+        this.flyTo(g.c[0], g.c[1], r.kind === 'building' ? g.h : 0, scale, ms === undefined ? 900 : ms);
+        return true;
+    };
+
+    // Night: everything darkened on the cached layer, then windows, room glows and street
+    // lamps lit -- brighter where more computers are switched on.
+    IsoMap.prototype._drawNight = function (ctx, rooms) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = 'rgba(6, 12, 32, 0.66)';
+        ctx.fillRect(0, 0, this._layer.width, this._layer.height);
+        ctx.restore();
+        var self = this, stats = this._roomStats || new Map();
+        var c = this._c, s = this._s;
+        var hash = function (str) { var h = 7; for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h) % 100; };
+        ctx.save();
+        rooms.forEach(function (r) {
+            var g = self._geom.get(r), st = stats.get(r);
+            if (r.kind !== 'building') {
+                // floor plan: a warm glow in rooms where computers are on
+                if (!st || !st.online) return;
+                var p = self.project(g.c[0], g.c[1], 0.1);
+                var rad = Math.max(12, Math.min(140, Math.max(g.b.x2 - g.b.x1, g.b.y2 - g.b.y1) * self.scale * 0.6));
+                var grad = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], rad);
+                grad.addColorStop(0, 'rgba(253, 230, 138, ' + (0.25 + 0.35 * st.online / st.total).toFixed(2) + ')');
+                grad.addColorStop(1, 'rgba(253, 230, 138, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath(); ctx.arc(p[0], p[1], rad, 0, Math.PI * 2); ctx.fill();
+                return;
+            }
+            if (g.h < 0.5) return;
+            var lit = st && st.total ? 10 + Math.round(85 * st.online / st.total) : 22;
+            var levels = g.levels || Math.max(1, Math.round(g.h / 2.6));
+            var poly = r.polygon, n = poly.length, h = self._roofOf(r);
+            for (var i = 0; i < n; i++) {
+                var a = poly[i], b = poly[(i + 1) % n];
+                var nx = (b[1] - a[1]) * g.sign, ny = -(b[0] - a[0]) * g.sign;
+                if ((nx * c - ny * s) + (nx * s + ny * c) <= 0.0001) continue;
+                var len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+                var cols = Math.max(1, Math.floor(len / 3));
+                for (var lv = 0; lv < levels; lv++) {
+                    var z0 = h * (lv + 0.3) / levels, z1 = h * (lv + 0.7) / levels;
+                    for (var k = 0; k < cols; k++) {
+                        var u0 = (k + 0.25) / cols, u1 = (k + 0.75) / cols;
+                        var q0 = [a[0] + (b[0] - a[0]) * u0, a[1] + (b[1] - a[1]) * u0];
+                        var q1 = [a[0] + (b[0] - a[0]) * u1, a[1] + (b[1] - a[1]) * u1];
+                        var on = hash(r.id + ':' + i + ':' + lv + ':' + k) < lit;
+                        var p1 = self.project(q0[0], q0[1], z0), p2 = self.project(q1[0], q1[1], z0);
+                        var p3 = self.project(q1[0], q1[1], z1), p4 = self.project(q0[0], q0[1], z1);
+                        ctx.beginPath();
+                        ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]); ctx.lineTo(p4[0], p4[1]);
+                        ctx.closePath();
+                        ctx.fillStyle = on ? '#fde68a' : 'rgba(30, 41, 59, 0.9)';
+                        ctx.fill();
+                    }
+                }
+            }
+        });
+        // street lamps along the roads
+        var P = this._paths;
+        if (P && this.floorId === 'flr_campus') {
+            P.edges.forEach(function (e) {
+                if (e.kind !== 'road') return;
+                var steps = Math.max(1, Math.floor(e.len / 22));
+                for (var k = 0; k <= steps; k++) {
+                    var t = k / steps, x = e.a.x + (e.b.x - e.a.x) * t, y = e.a.y + (e.b.y - e.a.y) * t;
+                    var p = self.project(x, y, 0.1), rad = Math.max(8, self.scale * 5);
+                    var grad = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], rad);
+                    grad.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
+                    grad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath(); ctx.arc(p[0], p[1], rad, 0, Math.PI * 2); ctx.fill();
+                }
+            });
+        }
+        ctx.restore();
+    };
+
+    // How many people walk, and where to, follows how many computers are in use.
+    IsoMap.prototype._updateActivity = function () {
+        var P = this._paths;
+        if (!P || !P.stops.length) return;
+        var self = this, busyTotal = 0, byBuilding = new Map();
+        this.nodes.forEach(function (node) {
+            if (!self._isBusy(node)) return;
+            busyTotal++;
+            var pl = self.placements[node._id];
+            var b = pl ? (pl.floor === 'flr_campus' ? self._buildingAt(pl.x, pl.y) : self._floorBuilding[pl.floor]) : (self._buildingFor(node) || {}).building;
+            if (b) byBuilding.set(b, (byBuilding.get(b) || 0) + 1);
+        });
+        // each building front draws walkers in proportion to the people working inside
+        var weights = {};
+        P.stops.forEach(function (id) {
+            var n = P.nodes[id], best = null, bestD = 30;
+            byBuilding.forEach(function (count, b) {
+                var g = self._geom.get(b), d = Math.hypot(g.c[0] - n.x, g.c[1] - n.y);
+                if (d < bestD) { bestD = d; best = b; }
+            });
+            weights[id] = 1 + (best ? byBuilding.get(best) * 2 : 0);
+        });
+        this._busyByStop = weights;
+        var target = Math.max(6, Math.min(32, 6 + busyTotal));
+        var walkers = this._agents.filter(function (a) { return a.type === 'walker' && !a.leaving; });
+        var pick = function (list) { return list[Math.floor(Math.random() * list.length)]; };
+        for (var i = walkers.length; i < target; i++) {
+            this._agents.push({ type: 'walker', at: pick(P.stops), wait: Math.random() * 4, speed: 1.8 + Math.random() * 1.2,
+                color: pick(WALKER_COLORS), side: (Math.random() - 0.5) * 1.2, phase: Math.random() * 6 });
+        }
+        for (var j = target; j < walkers.length; j++) walkers[j].leaving = true;
+    };
+
     /* ---------- roads, paths and the people and cars moving on them (campus only) ---------- */
 
     var ROAD_W = 7, PATH_W = 2.4;
@@ -1813,7 +2076,11 @@
         var pick = function (list) { return list[Math.floor(Math.random() * list.length)]; };
         var dest, kinds;
         if (ag.type === 'walker') {
-            dest = pick(P.stops);
+            var w = this._busyByStop || {}, total = 0;
+            P.stops.forEach(function (id) { total += w[id] || 1; });
+            var roll = Math.random() * total;
+            dest = P.stops[0];
+            for (var k = 0; k < P.stops.length; k++) { roll -= w[P.stops[k]] || 1; if (roll <= 0) { dest = P.stops[k]; break; } }
             kinds = ['walk', 'path'];
         } else if (ag.type === 'car') {
             dest = pick(P.roadEnds);
@@ -1851,7 +2118,10 @@
                     // arrived: people go inside for a while, cars leave the map, the ambulance waits at ER
                     ag.at = ag.path[ag.path.length - 1];
                     ag.path = null;
-                    if (ag.type === 'walker') { ag.wait = 2 + Math.random() * 7; ag.hidden = true; }
+                    if (ag.type === 'walker') {
+                        ag.wait = 2 + Math.random() * 7; ag.hidden = true;
+                        if (ag.leaving) { this._agents.splice(n, 1); n--; break; }
+                    }
                     else if (ag.type === 'car') { ag.wait = 1 + Math.random() * 6; ag.hidden = true; }
                     else { ag.wait = ag.toEr ? 6 : 4 + Math.random() * 8; ag.hidden = !ag.toEr; ag.toEr = !ag.toEr; }
                 }

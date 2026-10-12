@@ -94,11 +94,53 @@
             online.forEach(function (n) { jobs[n._id] = { ticket: ticket, state: 'failed' }; });
             draw(); return;
         }
+        // Recorded on the server too, so the answer is still there after a reload.
+        if (root.ScpOperations) {
+            root.ScpOperations.request('careStart', { nodeids: online.map(function (n) { return n._id; }), ticket: ticket }).catch(function () { });
+        }
+        poll();
         root.setTimeout(function () {
             var changed = false;
             online.forEach(function (n) { var j = jobs[n._id]; if (j && j.ticket === ticket && j.state === 'working') { j.state = 'unknown'; changed = true; } });
             if (changed) { draw(); }
         }, 300000);
+    }
+
+    // Read the recorded results: fills in answers that went to another tab or arrived
+    // while this page was reloading, and shows the last run when nothing is running.
+    var pollTimer = null;
+    function nodeName(id) {
+        var list = root.nodes || [];
+        for (var i = 0; i < list.length; i++) { if (list[i]._id === id) { return list[i].name || id; } }
+        return id;
+    }
+    function loadRecorded(done) {
+        if (!root.ScpOperations) { if (done) { done(); } return; }
+        root.ScpOperations.request('careStatus').then(function (rows) {
+            (rows || []).forEach(function (row) {
+                var job = jobs[row.nodeid];
+                if (job && job.ticket === row.ticket && job.state !== 'working') { return; }
+                if (job && job.ticket !== row.ticket && job.state === 'working') { return; }
+                var state = row.state;
+                if (state === 'working' && row.started && Date.now() - row.started > 300000) { state = 'unknown'; }
+                jobs[row.nodeid] = { ticket: row.ticket, state: state, result: row.result || null, at: row.updated, by: row.by };
+                if (!names[row.nodeid]) { names[row.nodeid] = nodeName(row.nodeid); }
+            });
+            draw();
+            if (done) { done(); }
+        }).catch(function () { if (done) { done(); } });
+    }
+    function poll() {
+        if (pollTimer) { return; }
+        pollTimer = root.setInterval(function () {
+            var working = Object.keys(jobs).some(function (id) { return jobs[id].state === 'working'; });
+            if (!working || !dialog || !dialog.open) { root.clearInterval(pollTimer); pollTimer = null; return; }
+            loadRecorded();
+        }, 10000);
+    }
+    function history() {
+        open();
+        loadRecorded(function () { poll(); });
     }
 
     function draw() {
@@ -119,11 +161,13 @@
             if (job.state === 'working') { waiting++; }
             if (job.state === 'done') { done++; }
             row.appendChild(el('span', states[job.state] || job.state, 'scp-care-state'));
+            if (job.at) { row.appendChild(el('small', '· ' + new Date(job.at).toLocaleString(th ? 'th-TH' : undefined, { dateStyle: 'short', timeStyle: 'short' }))); }
             if (job.result) {
                 Object.keys(job.result).forEach(function (key) { row.appendChild(el('small', '· ' + labelFor(key, job.result[key]))); });
             }
             listBox.appendChild(row);
         });
+        if (!ids.length) { notice.textContent = t('No safe auto-care has been run yet.', 'ยังไม่เคยสั่งดูแลอัตโนมัติ'); return; }
         notice.textContent = waiting
             ? format(t('Working on {0}, done {1} of {2}', 'กำลังทำ {0} — เสร็จแล้ว {1} จาก {2}'), waiting, done, ids.length)
             : format(t('Finished. {0} of {1} computers done.', 'เสร็จแล้ว {0} จาก {1} เครื่อง'), done, ids.length);
@@ -147,5 +191,5 @@
         draw();
     }
 
-    root.ScpCare = { run: run, receive: receive, _script: script };
+    root.ScpCare = { run: run, receive: receive, history: history, _script: script };
 }(typeof window === 'undefined' ? globalThis : window));

@@ -1230,8 +1230,8 @@
    "id": "c_er",
    "floor_id": "flr_campus",
    "code": "ER",
-   "name": "ER · ห้องคลอด · ผ่าตัดเล็ก",
-   "short_name": "ER · ห้องคลอด",
+   "name": "ห้องคลอด · ห้องผ่าตัด",
+   "short_name": "ห้องคลอด · ผ่าตัด",
    "kind": "building",
    "polygon": [
     [

@@ -361,6 +361,7 @@
             found.push({ level: 'warn', text: updating ? t('rebootPending') : t('rebootPendingFiles') });
         }
         faultsOf(node).forEach(function (fault) { found.push(fault); });
+        virtualisationNotesOf(node).forEach(function (note) { found.push(note); });
         hardwareRisksOf(node).forEach(function (risk) { found.push(risk); });
         var scan = scanState[node._id];
         if (scan && scan.hits) { scan.hits.forEach(function (name) { found.push({ level: 'high', text: format(t('watched'), name) }); }); }
@@ -610,6 +611,7 @@
         if (window.ScpCare) {
             var careable = flagged.map(function (entry) { return entry.node; }).filter(isOnline);
             if (careable.length) { head.appendChild(button(t('Safe auto-care', 'ดูแลอัตโนมัติ (ปลอดภัย)'), 'scp-dash-fix-all', function () { window.ScpCare.run(careable); })); }
+            if (window.ScpCare && window.ScpCare.history) { head.appendChild(button(thai ? 'ผลดูแลล่าสุด' : 'Last care results', 'scp-dash-fix-all', function () { window.ScpCare.history(); })); }
         }
         panelEl.appendChild(head);
         if (!flagged.length) { panelEl.className += ' scp-dash-attention-clear'; return panelEl; }
@@ -977,11 +979,25 @@
     // and left in they crowd out the device fault that actually stops something. So they are
     // not attention: a computer whose only faults are these has nothing here to report.
     var HOUSEKEEPING = /^(SM ?Bus Controller|PCI Simple Communications Controller|PCI Memory Controller|PCI Data Acquisition and Signal Processing Controller|PCI Device|Base System Device|PCI Serial Port|PCI Encryption\/Decryption Controller|Performance Counters|PCI standard RAM Controller|Communications controller|Unknown device)$/i;
+    /* Hyper-V's own devices report code 37 on a real PC when Windows has Hyper-V or memory
+       integrity switched on but the processor's virtualisation (VT-x / AMD SVM) is off in the
+       BIOS. No driver fixes that, so it is not offered as a driver install; it is explained. */
+    function isVirtualisationNote(fault) {
+        return /Hyper-V/i.test(String(fault && fault.name || '')) && Number(fault.code) === 37;
+    }
+    function virtualisationNotesOf(node) {
+        var record = specs[node._id];
+        var faults = (record && Array.isArray(record.deviceFaults)) ? record.deviceFaults : [];
+        if (!faults.some(isVirtualisationNote)) return [];
+        return [{ level: 'warn', kind: 'virt', text: thai
+            ? 'Hyper-V (รหัส 37) ไม่ใช่ปัญหาไดรเวอร์ — เปิด SVM/VT-x ใน BIOS หรือปิดฟีเจอร์ Hyper-V ถ้าไม่ได้ใช้ (ไม่กระทบการใช้งานทั่วไป)'
+            : 'Hyper-V (code 37) is not a driver problem — turn on SVM/VT-x in the BIOS, or turn Hyper-V off if unused' }];
+    }
     function faultsOf(node) {
         var record = specs[node._id];
         var faults = record && record.deviceFaults;
         if (!Array.isArray(faults) || !faults.length) return [];
-        var real = faults.filter(function (fault) { return !HOUSEKEEPING.test(String(fault.name || '').trim()); });
+        var real = faults.filter(function (fault) { return !HOUSEKEEPING.test(String(fault.name || '').trim()) && !isVirtualisationNote(fault); });
         if (!real.length) return [];
         var found = real.slice(0, 3).map(function (fault) {
             var key = 'fault' + fault.code;
@@ -2059,6 +2075,8 @@
         }
         mapPanel.hidden = false;
         listen();
+        mapLastOnline = null;
+        checkOfflineTransitions();
         renderMapPage();
         fitHeight();
         // Keep the computer status on the map live without rebuilding the page.
@@ -2068,6 +2086,7 @@
                 currentIsoMap.setNodes(allNodes().filter(matchesSearch));
                 loadMapPlacements();
                 if (mapRiskRefresh) mapRiskRefresh();
+                checkOfflineTransitions();
             }
         }, 10000);
     }
@@ -2625,6 +2644,7 @@
         assetBtnRow.appendChild(editAssetBtn);
         secAsset.appendChild(assetBtnRow);
         cmBody.appendChild(secAsset);
+        cmBody.appendChild(historySection(node));
         box.appendChild(cmBody);
 
         // Footer Actions - STRICTLY NO REMOTE CONTROL BUTTON!
@@ -2871,7 +2891,7 @@
                 document.body.classList.toggle('scp-map-full-open', on);
                 fullBtn.textContent = on ? '✕' : '⛶';
                 fullBtn.title = on ? (thai ? 'ออกจากเต็มจอ (Esc)' : 'Exit full screen (Esc)') : (thai ? 'เต็มจอ (Esc เพื่อออก)' : 'Full screen (Esc to exit)');
-                if (!on) fitHeight();
+                if (!on) { fitHeight(); mapWrapper.dispatchEvent(new Event('scp-map-exit-full')); }
                 if (currentIsoMap) window.requestAnimationFrame(function () { currentIsoMap.resize(); currentIsoMap.fit(); });
             };
             if (mapFullKey) document.removeEventListener('keydown', mapFullKey);
@@ -3120,7 +3140,7 @@
                 items.sort(function (a, b) { return (b.high - a.high) || (b.risks.length - a.risks.length) || String(a.node.name).localeCompare(String(b.node.name)); });
                 return items;
             };
-            var kindOf = function (r) { return r.kind || 'security'; };
+            var kindOf = function (r) { return (r.kind && r.kind !== 'virt') ? r.kind : 'security'; };
 
             var paintRisk = function () {
                 var items = collectRisks();
@@ -3181,6 +3201,128 @@
             mapRiskRefresh = paintRisk;
             paintRisk();
 
+            /* ---- View mode: status / risk heatmap / replacement plan ---- */
+            var modeBar = element('div', 'scp-map-view-bar');
+            var planBox = element('div', 'scp-map-plan-box');
+            var paintModes = function () {
+                modeBar.textContent = '';
+                var mode = pref('scpMapView', 'status');
+                [['status', thai ? '🖥 สถานะ' : '🖥 Status'], ['heat', thai ? '🌡 ความเสี่ยง' : '🌡 Risk'], ['plan', thai ? '📅 แผนเปลี่ยนเครื่อง' : '📅 Replacement']].forEach(function (m) {
+                    modeBar.appendChild(button(m[1], 'scp-map-view-btn' + (mode === m[0] ? ' on' : ''), function () {
+                        setPref('scpMapView', m[0]);
+                        if (currentIsoMap) currentIsoMap.setViewMode(m[0]);
+                        paintModes();
+                    }));
+                });
+                planBox.textContent = '';
+                planBox.hidden = mode === 'status';
+                if (mode === 'heat') {
+                    planBox.appendChild(element('span', 'scp-map-plan-key', thai ? 'สีห้อง/ตึก: 🟩 ปกติ 🟨 ควรระวัง 🟥 เสี่ยงสูง (เข้มตามสัดส่วนเครื่อง) · ⬜ ไม่มีคอม' : 'Room colour: green ok · amber caution · red serious · grey no computers'));
+                }
+                if (mode === 'plan') {
+                    var year = new Date().getFullYear(), byYear = {};
+                    allNodes().forEach(function (n) {
+                        var y = planYearOf(n);
+                        if (y === null) return;
+                        y = Math.max(y, year);
+                        if (y > year + 3) return;
+                        var a = window.ScpFleetAssess.assessDevice(n);
+                        byYear[y] = byYear[y] || { count: 0, cost: 0 };
+                        byYear[y].count++;
+                        byYear[y].cost += Number(a && a.estimatedCost) || 0;
+                    });
+                    planBox.appendChild(element('span', 'scp-map-plan-key', thai ? 'ป้ายบนเครื่อง = ปี พ.ศ. ที่ควรเปลี่ยน · ห้องสีส้ม-แดง = ถึงกำหนดปีนี้/ปีหน้า' : 'Badge = year to replace · orange/red rooms = due this or next year'));
+                    Object.keys(byYear).sort().forEach(function (y) {
+                        var v = byYear[y];
+                        planBox.appendChild(element('span', 'scp-map-plan-chip' + (Number(y) <= year ? ' now' : Number(y) === year + 1 ? ' next' : ''),
+                            (thai ? 'ปี ' : '') + (Number(y) + 543) + ': ' + v.count + (thai ? ' เครื่อง' : ' PCs') + (v.cost ? ' · ≈฿' + v.cost.toLocaleString() : '')));
+                    });
+                    if (!Object.keys(byYear).length) planBox.appendChild(element('span', 'scp-map-plan-key', thai ? '(กำลังโหลดผลประเมินเครื่อง…)' : '(loading assessment…)'));
+                }
+            };
+            paintModes();
+            mapWrapper.appendChild(modeBar);
+            mapWrapper.appendChild(planBox);
+
+            /* ---- Night, sound and kiosk buttons ---- */
+            var nightOn = function () {
+                var p = pref('scpMapNight', 'auto');
+                if (p === 'auto') { var h = new Date().getHours(); return h >= 18 || h < 6; }
+                return p === '1';
+            };
+            var nightBtn = button('🌙', 'scp-map-ctrl-btn' + (nightOn() ? ' on' : ''), function () {
+                var next = !nightOn();
+                setPref('scpMapNight', next ? '1' : '0');
+                nightBtn.classList.toggle('on', next);
+                mapWrapper.classList.toggle('scp-map-night', next);
+                if (currentIsoMap) currentIsoMap.setNight(next);
+            });
+            nightBtn.title = thai ? 'โหมดกลางคืน (ไฟตามเครื่องที่เปิดอยู่)' : 'Night mode';
+            controls.appendChild(nightBtn);
+            mapWrapper.classList.toggle('scp-map-night', nightOn());
+
+            var soundBtn = button(mapSoundOn() ? '🔔' : '🔕', 'scp-map-ctrl-btn', function () {
+                var next = !mapSoundOn();
+                setPref('scpMapSound', next ? '1' : '0');
+                soundBtn.textContent = next ? '🔔' : '🔕';
+                if (next) beep();
+            });
+            soundBtn.title = thai ? 'เสียงเตือนเมื่อเครื่องหลุดออฟไลน์' : 'Sound when a computer goes offline';
+            controls.appendChild(soundBtn);
+
+            mapAlertFeed = element('div', 'scp-map-alert-feed');
+            mapWrapper.appendChild(mapAlertFeed);
+            paintAlertFeed();
+
+            // Kiosk: full screen, the camera tours the buildings that hold computers.
+            var kioskCard = element('div', 'scp-map-kiosk-card');
+            kioskCard.hidden = true;
+            mapWrapper.appendChild(kioskCard);
+            var kioskTimer = null, kioskIndex = 0;
+            var stopKiosk = function () {
+                if (kioskTimer) window.clearInterval(kioskTimer);
+                kioskTimer = null;
+                kioskCard.hidden = true;
+                mapWrapper.classList.remove('scp-map-kiosk');
+            };
+            var kioskStep = function () {
+                if (!currentIsoMap || !mapWrapper.isConnected) { stopKiosk(); return; }
+                if (currentIsoMap.floorId !== 'flr_campus') currentIsoMap.setFloor('flr_campus');
+                var stats = currentIsoMap._roomStats || new Map();
+                var tour = (currentIsoMap._campusBuildings || []).filter(function (b) { return stats.get(b) && stats.get(b).total; })
+                    .sort(function (a, b) { return stats.get(b).total - stats.get(a).total; });
+                var now = new Date();
+                kioskCard.textContent = '';
+                kioskCard.appendChild(element('div', 'scp-kiosk-clock', now.toLocaleTimeString(thai ? 'th-TH' : undefined, { timeStyle: 'short' }) + ' · ' + now.toLocaleDateString(thai ? 'th-TH' : undefined, { dateStyle: 'medium' })));
+                var list = allNodes(), on = list.filter(isOnline).length;
+                var risky = list.filter(function (n) { return risksOf(n).some(function (r) { return r.level === 'high'; }); }).length;
+                if (!tour.length || kioskIndex % (tour.length + 1) === tour.length) {
+                    currentIsoMap.fit();
+                    kioskCard.appendChild(element('h2', '', thai ? 'โรงพยาบาลสีชมพู' : 'Sichomphu Hospital'));
+                    kioskCard.appendChild(element('p', '', (thai ? 'เครื่องเปิดอยู่ ' : 'Online ') + on + ' / ' + list.length + (risky ? (thai ? ' · เสี่ยงสูง ' : ' · serious ') + risky : '')));
+                } else {
+                    var b = tour[kioskIndex % (tour.length + 1)], st = stats.get(b);
+                    currentIsoMap.focusRoom(b.id, 2600);
+                    kioskCard.appendChild(element('h2', '', b.name));
+                    kioskCard.appendChild(element('p', '', '🖥 ' + st.online + ' / ' + st.total + (thai ? ' เครื่องเปิดอยู่' : ' online') + (st.busy ? (thai ? ' · ใช้งาน ' : ' · in use ') + st.busy : '') + (st.risky ? ' · ⚠ ' + st.risky : '')));
+                }
+                kioskCard.hidden = false;
+                kioskIndex++;
+            };
+            var kioskBtn = button('📺', 'scp-map-ctrl-btn', function () {
+                if (kioskTimer) { stopKiosk(); setMapFull(false); return; }
+                setMapFull(true);
+                mapWrapper.classList.add('scp-map-kiosk');
+                kioskIndex = 0;
+                window.setTimeout(kioskStep, 400);
+                kioskTimer = window.setInterval(kioskStep, 10000);
+            });
+            kioskBtn.title = thai ? 'โหมดจอแสดงผล (ทัวร์รอบ รพ. อัตโนมัติ · Esc เพื่อออก)' : 'Kiosk mode (auto tour · Esc to exit)';
+            controls.appendChild(kioskBtn);
+            kioskCard.addEventListener('click', function () { stopKiosk(); setMapFull(false); });
+            mapWrapper.addEventListener('scp-map-exit-full', stopKiosk);
+            mapRiskRefresh = function () { paintRisk(); paintModes(); };
+
             container.appendChild(mapWrapper);
 
             if (window.ScpHosMap) {
@@ -3207,6 +3349,7 @@
                                 isBusy: isBusy,
                                 signedInUser: signedInUser,
                                 roomOf: roomOf,
+                                planYear: planYearOf,
                                 riskLevel: function (node) {
                                     var risks = risksOf(node);
                                     if (!risks.length) return null;
@@ -3220,6 +3363,9 @@
                         currentIsoMap.opts.onFloorChange = syncFloorSelect;
                         currentIsoMap.opts.onPlace = window.ScpOperations ? savePlacement : null;
                         currentIsoMap.opts.onHoverNode = showCard;
+                        currentIsoMap.opts.planYear = planYearOf;
+                        if (currentIsoMap.viewMode !== pref('scpMapView', 'status')) currentIsoMap.setViewMode(pref('scpMapView', 'status'));
+                        if (currentIsoMap.night !== nightOn()) currentIsoMap.setNight(nightOn());
                         if (currentIsoMap.traffic !== mapTrafficOn()) currentIsoMap.setTraffic(mapTrafficOn());
                         if (currentIsoMap.editMode !== (mapEditMode && !!window.ScpOperations)) currentIsoMap.setEditMode(mapEditMode && !!window.ScpOperations);
                         syncFloorSelect(currentIsoMap.floorId);
@@ -3315,6 +3461,370 @@
         }
     }
 
+    /* ================= Map & dashboard extras ================= */
+
+    function pref(key, fallback) {
+        try { var v = window.localStorage.getItem(key); return v == null ? fallback : v; } catch (e) { return fallback; }
+    }
+    function setPref(key, value) {
+        try { window.localStorage.setItem(key, value); } catch (e) { /* private window */ }
+    }
+    function fmtTime(ms) {
+        return new Date(ms).toLocaleString(thai ? 'th-TH' : undefined, { dateStyle: 'short', timeStyle: 'short' });
+    }
+    // The year the assessment says a computer should be replaced, if it knows.
+    function planYearOf(node) {
+        var a = (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice) ? window.ScpFleetAssess.assessDevice(node) : null;
+        if (!a) return null;
+        var y = Number(a.replacementYear || a.replaceByYear);
+        return y > 2000 ? y : null;
+    }
+    function nodeByShortId(shortId) {
+        var list = allNodes();
+        for (var i = 0; i < list.length; i++) { if (String(list[i]._id).split('/').pop() === shortId) return list[i]; }
+        return null;
+    }
+    function overlayDialog(title) {
+        var overlay = element('div', 'scp-asset-dialog-overlay scp-extra-overlay');
+        var box = element('div', 'scp-asset-dialog-box scp-extra-box');
+        var head = element('div', 'scp-extra-head');
+        head.appendChild(element('h3', '', title));
+        var close = function () { overlay.remove(); document.removeEventListener('keydown', onKey); };
+        var onKey = function (e) { if (e.key === 'Escape') close(); };
+        document.addEventListener('keydown', onKey);
+        head.appendChild(button('✕', 'scp-dialog-close-btn', close));
+        box.appendChild(head);
+        overlay.appendChild(box);
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+        document.body.appendChild(overlay);
+        return { overlay: overlay, box: box, close: close };
+    }
+    function printHtml(title, bodyHtml) {
+        var w = window.open('', '_blank');
+        if (!w) { window.alert(thai ? 'เบราว์เซอร์บล็อกหน้าต่างพิมพ์ กรุณาอนุญาตป๊อปอัป' : 'The print window was blocked; allow pop-ups.'); return; }
+        w.document.write('<!doctype html><html lang="' + (thai ? 'th' : 'en') + '"><head><meta charset="utf-8"><title>' + title +
+            '</title><style>body{font-family:"IBM Plex Sans Thai",sans-serif;margin:16px;color:#111}h1{font-size:18px;margin:0 0 4px}h2{font-size:14px;margin:16px 0 6px}' +
+            'table{border-collapse:collapse;width:100%;font-size:12px}td,th{border:1px solid #ccc;padding:4px 6px;text-align:left}' +
+            '.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.card{border:1px dashed #999;border-radius:8px;padding:8px;text-align:center;page-break-inside:avoid;font-size:11px}' +
+            '.card img{width:110px;height:110px}.card b{display:block;font-size:12px;margin-top:4px}@media print{button{display:none}}</style></head><body>' +
+            bodyHtml + '<script>setTimeout(function(){window.print();},300);<\/script></body></html>');
+        w.document.close();
+    }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+    /* ---- Morning summary: one page for the start of the day ---- */
+    function openMorningSummary() {
+        var list = allNodes();
+        var online = list.filter(isOnline);
+        var offline = list.filter(function (n) { return !isOnline(n); });
+        var dayAgo = Date.now() - 86400000;
+        var wentDown = offline.filter(function (n) { var at = lastSeen && lastSeen[n._id]; return at && at >= dayAgo; });
+        // never seen since the server started counting falls here too, rather than nowhere
+        var longOff = offline.filter(function (n) { var at = lastSeen && lastSeen[n._id]; return !at || at < dayAgo; });
+        var oldSig = list.filter(function (n) { var a = signatureAge(n); return a != null && a > staleSignatureDays; });
+        var diskLow = list.filter(function (n) { return disksOf(n).some(function (d) { return d.percent <= diskWarnPercent; }); });
+        var lowRam = list.filter(function (n) { return hardwareRisksOf(n).some(function (r) { return r.kind === 'ram' && r.level === 'high'; }); });
+        var serious = list.filter(function (n) { return risksOf(n).some(function (r) { return r.level === 'high'; }); });
+
+        var d = overlayDialog((thai ? '📰 สรุปประจำวัน · ' : '📰 Daily summary · ') + new Date().toLocaleDateString(thai ? 'th-TH' : undefined, { dateStyle: 'full' }));
+        var body = element('div', 'scp-extra-body');
+        d.box.appendChild(body);
+        var kpis = element('div', 'scp-extra-kpis');
+        [[thai ? 'เครื่องทั้งหมด' : 'Computers', list.length, ''], [thai ? 'เปิดอยู่' : 'Online', online.length, 'ok'],
+         [thai ? 'ปิด/ออฟไลน์' : 'Offline', offline.length, 'off'], [thai ? 'เสี่ยงสูง' : 'Serious risk', serious.length, 'risk']].forEach(function (k) {
+            var c = element('div', 'scp-extra-kpi ' + k[2]);
+            c.appendChild(element('strong', '', String(k[1])));
+            c.appendChild(element('span', '', k[0]));
+            kpis.appendChild(c);
+        });
+        body.appendChild(kpis);
+
+        var sections = [];
+        var section = function (title, nodes, detail) {
+            var s = element('section', 'scp-extra-section');
+            s.appendChild(element('h4', '', title + ' (' + nodes.length + ')'));
+            if (!nodes.length) { s.appendChild(element('p', 'scp-extra-muted', thai ? 'ไม่มี 👍' : 'None 👍')); }
+            var ul = element('ul', 'scp-extra-list');
+            nodes.slice(0, 12).forEach(function (n) {
+                var li = element('li');
+                var a = element('button', 'scp-extra-link', (n.name || '-') + ' · ' + roomOf(n));
+                a.type = 'button';
+                a.addEventListener('click', function () { d.close(); showComputerDetailModal(n); });
+                li.appendChild(a);
+                if (detail) li.appendChild(element('small', '', ' — ' + detail(n)));
+                ul.appendChild(li);
+            });
+            if (nodes.length > 12) ul.appendChild(element('li', 'scp-extra-muted', (thai ? 'และอีก ' : 'and ') + (nodes.length - 12) + (thai ? ' เครื่อง' : ' more')));
+            s.appendChild(ul);
+            body.appendChild(s);
+            sections.push({ title: title, nodes: nodes, detail: detail });
+        };
+        section(thai ? '🔴 ดับ/หลุดภายใน 24 ชม.' : '🔴 Went offline in the last 24 h', wentDown, function (n) { return (thai ? 'เห็นล่าสุด ' : 'last seen ') + fmtTime(lastSeen[n._id]); });
+        section(thai ? '⚪ ไม่ได้เปิดเกิน 1 วัน' : '⚪ Off for more than a day', longOff, function (n) { var a = daysAway(n); return a > 0 ? a + (thai ? ' วัน' : ' days') : (thai ? 'ไม่ทราบเวลาล่าสุด' : 'last seen unknown'); });
+        section(thai ? '🛡️ ฐานข้อมูลไวรัสเก่า' : '🛡️ Old virus signatures', oldSig, function (n) { return signatureAge(n) + (thai ? ' วัน' : ' days'); });
+        section(thai ? '💾 ดิสก์ใกล้เต็ม' : '💾 Disk almost full', diskLow, function (n) { return disksOf(n).filter(function (x) { return x.percent <= diskWarnPercent; }).map(function (x) { return x.letter + ': ' + x.percent + '%'; }).join(', '); });
+        section(thai ? '🧠 RAM ต่ำ (≤ 4 GB)' : '🧠 Low RAM (≤ 4 GB)', lowRam, function (n) { var s = specSummaryOf(n); return s && s.ram; });
+
+        var tickets = element('section', 'scp-extra-section');
+        tickets.appendChild(element('h4', '', thai ? '🛠️ งานซ่อมค้าง' : '🛠️ Open repairs'));
+        var tlist = element('ul', 'scp-extra-list');
+        tlist.appendChild(element('li', 'scp-extra-muted', thai ? 'กำลังโหลด…' : 'Loading…'));
+        tickets.appendChild(tlist);
+        body.appendChild(tickets);
+        var openTickets = [];
+        if (window.ScpOperations) {
+            window.ScpOperations.request('tickets').then(function (rows) {
+                openTickets = (rows || []).filter(function (r) { return r.status !== 'closed'; });
+                tlist.textContent = '';
+                tickets.firstChild.textContent = (thai ? '🛠️ งานซ่อมค้าง (' : '🛠️ Open repairs (') + openTickets.length + ')';
+                if (!openTickets.length) tlist.appendChild(element('li', 'scp-extra-muted', thai ? 'ไม่มี 👍' : 'None 👍'));
+                var names = {}; list.forEach(function (n) { names[n._id] = n.name; });
+                openTickets.slice(0, 12).forEach(function (r) {
+                    tlist.appendChild(element('li', '', (names[r.nodeid] || '-') + ' · ' + r.title + ' (' + r.status + ')'));
+                });
+            }).catch(function () { tlist.textContent = ''; tlist.appendChild(element('li', 'scp-extra-muted', '-')); });
+        }
+
+        // Plain text for pasting into a chat, and a printable page.
+        var asText = function () {
+            var lines = [(thai ? 'สรุปประจำวัน SCP-Remote ' : 'SCP-Remote daily summary ') + new Date().toLocaleDateString(thai ? 'th-TH' : undefined),
+                (thai ? 'ทั้งหมด ' : 'Total ') + list.length + (thai ? ' · เปิด ' : ' · online ') + online.length + (thai ? ' · ปิด ' : ' · offline ') + offline.length + (thai ? ' · เสี่ยงสูง ' : ' · serious ') + serious.length];
+            sections.forEach(function (s) {
+                lines.push('');
+                lines.push(s.title + ' (' + s.nodes.length + ')');
+                s.nodes.slice(0, 10).forEach(function (n) { lines.push('- ' + n.name + ' · ' + roomOf(n) + (s.detail ? ' — ' + (s.detail(n) || '') : '')); });
+                if (s.nodes.length > 10) lines.push((thai ? '…และอีก ' : '…and ') + (s.nodes.length - 10));
+            });
+            lines.push('');
+            lines.push((thai ? 'งานซ่อมค้าง ' : 'Open repairs ') + openTickets.length);
+            return lines.join('\n');
+        };
+        var actionsRow = element('div', 'scp-extra-actions');
+        actionsRow.appendChild(button(thai ? '📋 คัดลอกข้อความ (วางในไลน์ได้)' : '📋 Copy as text', 'scp-dash-refresh', function (e) {
+            var txt = asText(), btn = e.target;
+            var done = function () { btn.textContent = thai ? '✓ คัดลอกแล้ว' : '✓ Copied'; };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () { window.prompt('', txt); });
+            else window.prompt('', txt);
+        }));
+        actionsRow.appendChild(button(thai ? '🖨️ พิมพ์' : '🖨️ Print', 'scp-dash-refresh', function () {
+            printHtml(thai ? 'สรุปประจำวัน' : 'Daily summary', '<pre style="font-family:inherit;font-size:13px;white-space:pre-wrap">' + esc(asText()) + '</pre>');
+        }));
+        d.box.appendChild(actionsRow);
+    }
+
+    /* ---- QR stickers: scan with a phone to open that computer's card ---- */
+    function qrLink(node) {
+        return window.location.origin + window.location.pathname + '?scpnode=' + encodeURIComponent(String(node._id).split('/').pop());
+    }
+    function openQrSheet() {
+        var d = overlayDialog(thai ? '🏷️ พิมพ์สติกเกอร์ QR ติดเครื่อง' : '🏷️ Print QR stickers');
+        var body = element('div', 'scp-extra-body');
+        d.box.appendChild(body);
+        body.appendChild(element('p', 'scp-extra-muted', thai
+            ? 'สแกนด้วยมือถือ (ล็อกอินแล้ว) เพื่อเปิดสเปก ประวัติ และแจ้งซ่อมของเครื่องนั้นทันที'
+            : 'Scan with a signed-in phone to open that computer\'s specs, history and repairs.'));
+        var pick = document.createElement('select');
+        pick.className = 'scp-map-floor-select';
+        var rooms = {};
+        allNodes().forEach(function (n) { rooms[roomOf(n)] = true; });
+        [['', thai ? 'ทุกแผนก' : 'All departments']].concat(Object.keys(rooms).sort().map(function (r) { return [r, r]; })).forEach(function (o) {
+            var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; pick.appendChild(op);
+        });
+        body.appendChild(pick);
+        var grid = element('div', 'scp-qr-grid');
+        body.appendChild(grid);
+        var paint = function () {
+            grid.textContent = '';
+            var list = allNodes().filter(function (n) { return !pick.value || roomOf(n) === pick.value; })
+                .sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+            list.slice(0, 120).forEach(function (n) {
+                var card = element('div', 'scp-qr-card');
+                var q = element('div', 'scp-qr-code');
+                card.appendChild(q);
+                card.appendChild(element('b', '', n.name || '-'));
+                var asset = (window.ScpCachedAssets && window.ScpCachedAssets[n._id]) || {};
+                card.appendChild(element('small', '', roomOf(n) + (asset.assetNumber ? ' · ' + asset.assetNumber : '')));
+                grid.appendChild(card);
+                if (window.QRCode) { try { new window.QRCode(q, { text: qrLink(n), width: 110, height: 110, correctLevel: window.QRCode.CorrectLevel.M }); } catch (e) { q.textContent = 'QR'; } }
+                card.dataset.name = n.name || '-';
+                card.dataset.sub = roomOf(n) + (asset.assetNumber ? ' · ' + asset.assetNumber : '');
+            });
+            if (list.length > 120) grid.appendChild(element('p', 'scp-extra-muted', thai ? 'แสดง 120 เครื่องแรก เลือกแผนกเพื่อพิมพ์ทีละแผนก' : 'First 120 shown; pick a department.'));
+        };
+        pick.addEventListener('change', paint);
+        paint();
+        var actionsRow = element('div', 'scp-extra-actions');
+        actionsRow.appendChild(button(thai ? '🖨️ พิมพ์สติกเกอร์' : '🖨️ Print stickers', 'scp-dash-refresh', function () {
+            var html = '<h1>' + esc(thai ? 'สติกเกอร์ QR ติดเครื่อง' : 'Computer QR stickers') + '</h1><div class="grid">';
+            Array.prototype.forEach.call(grid.querySelectorAll('.scp-qr-card'), function (c) {
+                var cv = c.querySelector('canvas'), img = c.querySelector('img');
+                var src = cv ? cv.toDataURL('image/png') : (img ? img.src : '');
+                html += '<div class="card"><img src="' + src + '" alt=""><b>' + esc(c.dataset.name) + '</b>' + esc(c.dataset.sub) + '</div>';
+            });
+            printHtml(thai ? 'สติกเกอร์ QR' : 'QR stickers', html + '</div>');
+        }));
+        d.box.appendChild(actionsRow);
+    }
+
+    /* ---- One computer's history, for its detail card ---- */
+    function historySection(node) {
+        var sec = element('section', 'scp-cm-section');
+        sec.appendChild(element('h4', 'scp-cm-section-title', thai ? '🕘 ประวัติเครื่อง' : '🕘 History'));
+        var list = element('ul', 'scp-history-list');
+        list.appendChild(element('li', 'scp-extra-muted', thai ? 'กำลังโหลด…' : 'Loading…'));
+        sec.appendChild(list);
+        if (!window.ScpOperations) { list.textContent = ''; return sec; }
+        var floorName = function (id) {
+            var doc = window.__scpHosMapData, f = doc && (doc.floors || []).find(function (x) { return x.id === id; });
+            var b = f && (doc.buildings || []).find(function (x) { return x.id === f.building_id; });
+            return b ? b.name + (f.level > 1 ? ' ชั้น ' + f.level : '') : (id === 'flr_campus' ? (thai ? 'ภาพรวม รพ.' : 'campus') : id);
+        };
+        window.ScpOperations.request('deviceHistory', { nodeid: node._id }).then(function (rows) {
+            list.textContent = '';
+            if (!rows || !rows.length) { list.appendChild(element('li', 'scp-extra-muted', thai ? 'ยังไม่มีประวัติ' : 'No history yet')); return; }
+            rows.forEach(function (e) {
+                var icon = { ticket: '🛠️', driver: '🧩', cleanup: '🧹', care: '🛡️', moved: '📍', asset: '🏷️' }[e.kind] || '•';
+                var text = '';
+                if (e.kind === 'ticket') text = (thai ? 'งานซ่อม: ' : 'Repair: ') + e.title + ' — ' + e.status + (e.note && e.note !== 'Created' ? ' (' + e.note + ')' : '');
+                else if (e.kind === 'driver') text = (thai ? 'ติดตั้งไดรเวอร์: ' : 'Drivers: ') + (e.progress ? (thai ? 'กำลังทำ' : 'running') : (e.note || '-'));
+                else if (e.kind === 'cleanup') text = (thai ? 'ล้างไฟล์ขยะ: ' : 'Clean-up: ') + (e.progress ? (thai ? 'กำลังทำ' : 'running') : (e.note || '-'));
+                else if (e.kind === 'care') text = (thai ? 'ดูแลอัตโนมัติ: ' : 'Safe auto-care: ') + (e.state || '') + (e.result ? ' · ' + Object.keys(e.result).map(function (k) { return k + ' ' + e.result[k]; }).join(', ') : '');
+                else if (e.kind === 'moved') text = (thai ? 'ย้ายตำแหน่งบนแผนที่ → ' : 'Moved on the map → ') + floorName(e.floor);
+                else if (e.kind === 'asset') text = (thai ? 'แก้ข้อมูลครุภัณฑ์ ' : 'Asset record ') + (e.note || '');
+                var li = element('li');
+                li.appendChild(element('span', 'scp-history-icon', icon));
+                var body = element('div');
+                body.appendChild(element('b', '', text));
+                body.appendChild(element('small', '', fmtTime(e.at) + (e.by ? ' · ' + e.by : '')));
+                li.appendChild(body);
+                list.appendChild(li);
+            });
+        }).catch(function () { list.textContent = ''; list.appendChild(element('li', 'scp-extra-muted', thai ? 'โหลดประวัติไม่ได้ (เซิร์ฟเวอร์อาจต้องรีสตาร์ท)' : 'Could not load history')); });
+        return sec;
+    }
+
+    /* ---- Live offline alerts on the map ---- */
+    var mapLastOnline = null, mapAlerts = [], mapAlertFeed = null, mapAudio = null;
+    function mapSoundOn() { return pref('scpMapSound', '1') !== '0'; }
+    function beep() {
+        try {
+            var Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            mapAudio = mapAudio || new Ctx();
+            [0, 0.22].forEach(function (offset) {
+                var o = mapAudio.createOscillator(), g = mapAudio.createGain();
+                o.type = 'sine'; o.frequency.value = 880;
+                g.gain.setValueAtTime(0.0001, mapAudio.currentTime + offset);
+                g.gain.exponentialRampToValueAtTime(0.18, mapAudio.currentTime + offset + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, mapAudio.currentTime + offset + 0.18);
+                o.connect(g); g.connect(mapAudio.destination);
+                o.start(mapAudio.currentTime + offset); o.stop(mapAudio.currentTime + offset + 0.2);
+            });
+        } catch (e) { /* no sound */ }
+    }
+    function paintAlertFeed() {
+        var feed = mapAlertFeed;
+        if (!feed || !feed.isConnected) return;
+        feed.textContent = '';
+        feed.hidden = !mapAlerts.length;
+        mapAlerts.slice(0, 4).forEach(function (a) {
+            var row = element('div', 'scp-map-alert-item');
+            row.appendChild(element('span', '', '🔴 ' + a.name + (thai ? ' หลุดออฟไลน์ · ' : ' went offline · ') + a.room + ' · ' + new Date(a.at).toLocaleTimeString(thai ? 'th-TH' : undefined, { timeStyle: 'short' })));
+            row.appendChild(button(thai ? 'ดูตำแหน่ง' : 'Show', 'scp-map-alert-go', function () { if (currentIsoMap) currentIsoMap.focusNode(a.id); }));
+            row.appendChild(button('✕', 'scp-map-alert-close', function () { mapAlerts = mapAlerts.filter(function (x) { return x !== a; }); paintAlertFeed(); }));
+            feed.appendChild(row);
+        });
+    }
+    // Called every refresh while the map is open; the first call only takes a baseline.
+    function checkOfflineTransitions() {
+        var list = allNodes(), first = mapLastOnline === null, gone = [];
+        if (first) mapLastOnline = {};
+        list.forEach(function (n) {
+            var now = isOnline(n);
+            if (!first && mapLastOnline[n._id] === true && !now) gone.push(n);
+            mapLastOnline[n._id] = now;
+        });
+        if (!gone.length) return;
+        var hour = new Date().getHours(), workHours = hour >= 7 && hour < 18, sound = false;
+        gone.forEach(function (n) {
+            mapAlerts.unshift({ id: n._id, name: n.name || '-', room: roomOf(n), at: Date.now() });
+            if (currentIsoMap) currentIsoMap.pingNode(n._id, 120000);
+            if (watched[n._id] === true || workHours) sound = true;
+        });
+        mapAlerts = mapAlerts.slice(0, 20);
+        paintAlertFeed();
+        if (sound && mapSoundOn()) beep();
+    }
+
+    /* ---- Search that flies the map to a computer or a room ---- */
+    function buildMapSearch() {
+        var wrap = element('div', 'scp-map-search');
+        var input = document.createElement('input');
+        input.type = 'search';
+        input.placeholder = thai ? '🔎 ค้นหาเครื่อง ชื่อคน IP หรือห้อง แล้วบินไปหา' : '🔎 Find a computer, person, IP or room';
+        var results = element('div', 'scp-map-search-results');
+        results.hidden = true;
+        wrap.appendChild(input);
+        wrap.appendChild(results);
+        var go = function (item) {
+            results.hidden = true;
+            input.value = item.label;
+            if (campusViewMode !== 'map' || selectedCampusDept) { campusViewMode = 'map'; selectedCampusDept = null; renderMapPage(); }
+            var fly = function () {
+                if (!currentIsoMap || !currentIsoMap.doc) { window.setTimeout(fly, 200); return; }
+                if (item.node) { if (!currentIsoMap.focusNode(item.node._id)) showComputerDetailModal(item.node); }
+                else currentIsoMap.focusRoom(item.roomId);
+            };
+            fly();
+        };
+        var current = [];
+        var search = function () {
+            var q = input.value.trim().toLowerCase();
+            results.textContent = '';
+            current = [];
+            if (q.length < 1) { results.hidden = true; return; }
+            allNodes().forEach(function (n) {
+                var hay = [n.name, n.rname, n.host, n.ip, signedInUser(n), roomOf(n)].join(' ').toLowerCase();
+                if (hay.indexOf(q) >= 0) current.push({ node: n, label: n.name || '-', sub: roomOf(n) + (signedInUser(n) ? ' · 👤 ' + signedInUser(n) : '') });
+            });
+            var doc = window.__scpHosMapData;
+            (doc && doc.rooms || []).forEach(function (r) {
+                if (r.name && r.kind !== 'corridor' && String(r.name).toLowerCase().indexOf(q) >= 0) current.push({ roomId: r.id, label: r.name, sub: thai ? 'ห้อง / อาคาร' : 'Room / building' });
+            });
+            current.slice(0, 8).forEach(function (item, i) {
+                var b = element('button', 'scp-map-search-item' + (i === 0 ? ' first' : ''));
+                b.type = 'button';
+                b.appendChild(element('b', '', (item.node ? '🖥 ' : '📍 ') + item.label));
+                b.appendChild(element('small', '', item.sub));
+                b.addEventListener('mousedown', function (e) { e.preventDefault(); go(item); });
+                results.appendChild(b);
+            });
+            if (!current.length) results.appendChild(element('div', 'scp-extra-muted', thai ? 'ไม่พบ' : 'No match'));
+            results.hidden = false;
+        };
+        input.addEventListener('input', search);
+        input.addEventListener('focus', search);
+        input.addEventListener('blur', function () { window.setTimeout(function () { results.hidden = true; }, 150); });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && current.length) { e.preventDefault(); go(current[0]); }
+            if (e.key === 'Escape') { results.hidden = true; input.blur(); }
+        });
+        return wrap;
+    }
+
+    // ?scpnode=<id> (from a QR sticker) opens that computer's card once the list has loaded.
+    function openDeepLink() {
+        var m = /[?&]scpnode=([^&#]+)/.exec(window.location.search);
+        if (!m) return;
+        var id = decodeURIComponent(m[1]), tries = 0;
+        var attempt = function () {
+            var node = nodeByShortId(id);
+            if (node) { showDashboard(); showComputerDetailModal(node); return; }
+            if (++tries < 60) window.setTimeout(attempt, 500);
+        };
+        attempt();
+    }
+
     // Fetch the shared computer positions for the map. Skipped while someone is arranging,
     // so a slow reply can never jump a computer back from where it was just dropped.
     function loadMapPlacements() {
@@ -3349,6 +3859,8 @@
         topBar.appendChild(breadcrumb);
 
         var topActions = element('div', 'scp-map-standalone-actions');
+        topBar.appendChild(buildMapSearch());
+        topActions.appendChild(button(thai ? '📰 สรุปประจำวัน' : '📰 Daily summary', 'scp-dash-refresh', openMorningSummary));
         topActions.appendChild(button(thai ? '🔄 รีเฟรชสถานะ' : '🔄 Refresh', 'scp-dash-refresh', function () {
             loadFleetAssessment(true);
             renderMapPage();
@@ -3439,6 +3951,8 @@
         actions.appendChild(button(t('exportUsage'), 'scp-dash-refresh', exportUsage));
         actions.appendChild(button(t('refresh'), 'scp-dash-refresh', render));
         if (window.ScpReport) { actions.appendChild(button(thai ? 'รายงานและชาร์ต (พิมพ์)' : 'Reports & Print', 'scp-dash-refresh', function () { window.ScpReport.open(); })); }
+        actions.appendChild(button(thai ? '📰 สรุปประจำวัน' : '📰 Daily summary', 'scp-dash-refresh', openMorningSummary));
+        actions.appendChild(button(thai ? '🏷️ QR ติดเครื่อง' : '🏷️ QR stickers', 'scp-dash-refresh', openQrSheet));
         actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));
         var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);
         heading.appendChild(actions);
@@ -3496,7 +4010,9 @@
             hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway,
             hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf,
             fixDrivers: fixDrivers, driverScript: driverScript, snapshot: snapshot,
-            reloadAssessment: function () { loadFleetAssessment(true); render(); } };
+            reloadAssessment: function () { loadFleetAssessment(true); render(); },
+            openMorningSummary: openMorningSummary, openQrSheet: openQrSheet };
+        openDeepLink();
         setTimeout(show, 50);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

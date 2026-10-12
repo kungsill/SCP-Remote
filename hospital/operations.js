@@ -155,6 +155,49 @@ exports.handle = async function (ctx, cmd) {
   await save(row);
   return row;
  }
+ if (cmd.op === 'careStart') {
+  // Safe auto-care was sent to these computers. Kept so the result survives a reload and
+  // shows who started it; the agent's reply (meshagent.js) fills in the result.
+  if (!Array.isArray(cmd.nodeids) || cmd.nodeids.length > 1000) throw Error('INVALID_INPUT');
+  if (typeof cmd.ticket !== 'string' || !/^scpcare[0-9]+_[0-9]+$/.test(cmd.ticket)) throw Error('INVALID_INPUT');
+  let saved = 0;
+  for (const nodeid of cmd.nodeids) {
+   if (typeof nodeid !== 'string' || !await access(nodeid)) continue;
+   await save({ _id: 'scpcare/' + nodeid, type: 'scpcare', domain: domain.id, nodeid, ticket: cmd.ticket, state: 'working', started: Date.now(), by: user._id, result: null, updated: Date.now() });
+   saved++;
+  }
+  return { saved };
+ }
+ if (cmd.op === 'careStatus') {
+  const rows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scpcare', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const out = []; for (const row of rows) if (row && row.nodeid && await access(row.nodeid)) out.push(row);
+  return out;
+ }
+ if (cmd.op === 'deviceHistory') {
+  // One computer's story from the records SCP-Remote keeps: repairs, driver and clean-up
+  // jobs, safe auto-care, where it was moved on the map, and its asset record.
+  if (typeof cmd.nodeid !== 'string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
+  const id = cmd.nodeid;
+  const who = uid => { const u = uid && parent.users && parent.users[uid]; return u ? (u.realname || u.name || uid) : (uid ? String(uid).split('/').pop() : ''); };
+  const one = key => get(key).catch(() => null);
+  const out = [];
+  const tickets = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scpticket', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  for (const t of tickets) {
+   if (!t || t.nodeid !== id) continue;
+   for (const h of (t.history || [])) out.push({ at: h.at, kind: 'ticket', title: t.title, status: h.status, note: h.note || '', by: who(h.by) });
+  }
+  const driver = await one('scpdriver/' + id);
+  if (driver && driver.updated) out.push({ at: driver.updated, kind: 'driver', note: String(driver.result || '').replace(/SCP_DRIVER_[A-Z]+:\S*/g, '').trim().slice(-200), progress: driver.progress === true });
+  const cleanup = await one('scpcleanup/' + id);
+  if (cleanup && cleanup.updated) out.push({ at: cleanup.updated, kind: 'cleanup', note: String(cleanup.result || '').replace(/SCP_CLEANUP_PROGRESS:\{[^\r\n]*\}/g, '').trim().slice(-200), progress: cleanup.progress === true });
+  const care = await one('scpcare/' + id);
+  if (care && care.updated) out.push({ at: care.updated, kind: 'care', state: care.state, result: care.result, by: who(care.by) });
+  const place = await one('scpmappos/' + domain.id + '/' + id);
+  if (place && place.updated) out.push({ at: place.updated, kind: 'moved', floor: place.floor, by: who(place.updatedBy) });
+  const asset = await one('scpasset/' + domain.id + '/' + id);
+  if (asset && asset.updated) out.push({ at: asset.updated, kind: 'asset', note: [asset.assetNumber, asset.fiscalYear].filter(Boolean).join(' · '), by: who(asset.updatedBy) });
+  return out.filter(e => typeof e.at === 'number').sort((a, b) => b.at - a.at).slice(0, 200);
+ }
  if (cmd.op === 'mapPlacements') {
   // Where each computer was dragged to on the hospital map. Shared by everyone, so the map
   // looks the same on every screen; only computers this user may see are returned.

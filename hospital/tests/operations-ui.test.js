@@ -1,5 +1,17 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{JSDOM}=require('jsdom');
+test('criteria editor offers every draft category and saves the selected profiles under the server criteria payload',async t=>{
+ const dom=new JSDOM('<html lang="th"><body></body></html>',{runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.nodes=[];w.userinfo={siteadmin:4294967295};const sent=[];w.meshserver={send:c=>sent.push(c)};
+ for(const file of ['scp-price-reference.js','scp-assess.js','scp-operations.js'])w.eval(fs.readFileSync(path.join(__dirname,'../../public/scripts',file),'utf8'));
+ w.ScpOperations.openCriteria();w.ScpOperations.receive({tag:sent[0].tag,result:{maxAgeYears:7,costs:{newDevice:18000},referencePrices:{desktop:{2566:17000}}}});await Promise.resolve();await Promise.resolve();
+ assert.match(w.document.body.textContent,/ฉบับร่าง/);assert.equal(w.document.querySelectorAll('[data-replacement-type] option').length,8);
+ w.document.querySelector('[data-replacement-type="desktop"]').value='desktop-processing-2';w.document.querySelector('[data-replacement-type="notebook"]').value='notebook-ai';
+ assert.equal(w.document.querySelector('[data-cls="aio"][data-year="2570"]').value,'25000');
+ [...w.document.querySelectorAll('button')].find(b=>b.textContent==='บันทึกเกณฑ์และคำนวณใหม่').click();const save=sent.find(c=>c.op==='saveCriteria');
+ assert.equal(save.criteria.budgetYearBE,2570);assert.equal(save.criteria.replacementProfiles.desktop,'desktop-processing-2');assert.equal(save.criteria.replacementProfiles.notebook,'notebook-ai');assert.equal(save.criteria.referencePrices.desktop[2566],17000);
+ w.ScpOperations.receive({tag:save.tag,result:save.criteria});await Promise.resolve();await Promise.resolve();
+});
 test('file retry preserves the original device and destination; completion needs an explicit event',t=>{
  const dom=new JSDOM('<html lang="th"><body><div id="p13filetable"></div></body></html>',{runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;w.currentNode={_id:'node//test',name:'test'};w.files={State:3};w.p13filetreelocation=['C:','test'];w.uploadFile={xpath:'C:/test',xptr:12,xfilePtr:0};let retries=0;w.p13doUploadFiles=()=>retries++;
  w.eval(fs.readFileSync(path.join(__dirname,'../../public/scripts/scp-transfer.js'),'utf8'));

@@ -4,6 +4,10 @@
     'use strict';
 
     var DEFAULT_CRITERIA = {
+        budgetYearBE: 2570,
+        useReferencePricesForReplacement: true,
+        replacementProfiles: root.ScpPriceReference.profiles,
+        priceReferenceSource: root.ScpPriceReference.source,
         maxAgeYears: 7,
         minRamGb: 4,
         recommendedRamGb: 8,
@@ -18,16 +22,14 @@
             os: 15
         },
         costs: {
-            newDevice: 18000,
+            newDevice: 26000,
             ramUpgrade: 1200,
             ssdUpgrade: 1500
         },
         // Same book-value rules as the server (hospital/fleet-assess.js).
         usefulLifeYears: 5,
-        referencePrices: {
-            desktop: { 2565: 17000, 2566: 17000 },
-            notebook: { 2565: 16000, 2566: 16000 }
-        },
+        // official MDES prices by year (+ the 2570 draft), shared with the browser
+        referencePrices: root.ScpPriceReference.history,
         defaultPrice: { desktop: 17000, notebook: 16000 }
     };
 
@@ -121,7 +123,7 @@
     function referencePrice(criteria, cls, yearBE) {
         var table = (criteria.referencePrices && criteria.referencePrices[cls]) || {};
         // No All-in-One prices entered yet: price it as a desktop PC of that year.
-        if (cls === 'aio' && !Object.keys(table).some(function (y) { return table[y] > 0; })) cls = 'desktop', table = (criteria.referencePrices && criteria.referencePrices.desktop) || {};
+        if (cls === 'aio' && !Object.keys(table).some(function (y) { return table[y] > 0 && Number(y) <= yearBE; })) return referencePrice(criteria, 'desktop', yearBE);
         var years = Object.keys(table).map(Number).filter(function (y) { return table[y] > 0; }).sort(function (a, b) { return a - b; });
         if (yearBE && table[yearBE] > 0) return { price: Number(table[yearBE]), year: yearBE };
         var before = years.filter(function (y) { return y <= yearBE; }).pop();
@@ -331,7 +333,7 @@
         if (root.ScpCachedDeviceAssessments && nid && root.ScpCachedDeviceAssessments[nid]) {
             return root.ScpCachedDeviceAssessments[nid];
         }
-        var criteria = Object.assign({}, DEFAULT_CRITERIA, customCriteria || {});
+        var criteria = root.ScpPriceReference.resolveCriteria(DEFAULT_CRITERIA, customCriteria);
         var s = (node && node.sysinfo) ? node.sysinfo : {};
         var hw = (node && node.hardware) || (s && s.hardware) || (root.__scpSpecs && root.__scpSpecs[nid] && root.__scpSpecs[nid].hardware) || null;
         var win = (hw && hw.windows) || {};
@@ -373,6 +375,7 @@
         var probe = (root.ScpCachedChassis && nid && root.ScpCachedChassis[nid]) || null;
         var devType = deviceTypeOf(cpuName, id.product_name, probe);
         var deviceClass = devType.type;
+        var replacementPrice = root.ScpPriceReference.replacementPrice(criteria, deviceClass);
         var ref = referencePrice(criteria, deviceClass, acquiredYearBE);
         var purchasePrice = Number(asset.price) > 0 ? Number(asset.price) : null;
         var costBasis = purchasePrice || ref.price;
@@ -419,34 +422,31 @@
         var upgradeActions = [];
         var upgradeCost = 0;
 
-        if (isWin11) {
-            win11Eligible = true;
-        } else {
-            if (!cpuEval.supported) {
-                win11Blockers.push(cpuEval.reason);
+        var ramLow = ramGb > 0 && !hasRecRam;
+        if (!cpuEval.supported) {
+            win11Blockers.push((isWin11 ? 'ติดตั้ง Windows 11 แบบข้ามข้อกำหนด — CPU ไม่รองรับ: ' : 'CPU ไม่รองรับ: ') + cpuEval.reason);
+        }
+        if (ramLow) {
+            win11Blockers.push('RAM น้อย: มี ' + ramGb + ' GB (แนะนำ ' + criteria.recommendedRamGb + ' GB)');
+            upgradeActions.push('เพิ่ม RAM เป็น ' + criteria.recommendedRamGb + ' GB (~' + criteria.costs.ramUpgrade + ' บาท)');
+            upgradeCost += criteria.costs.ramUpgrade;
+        }
+        if (!isWin11) {
+            if (/Legacy/i.test(biosMode)) {
+                win11Blockers.push('BIOS โหมด Legacy (ต้องแปลงเป็น UEFI/GPT)');
+                upgradeActions.push('เปิดใช้งาน UEFI และ Secure Boot ใน BIOS');
             }
-            if (ageYears > criteria.maxAgeYears) {
-                win11Blockers.push('อายุเครื่อง ' + ageYears + ' ปี เกินเกณฑ์สูงสุด (' + criteria.maxAgeYears + ' ปี)');
+            if (!hasTpm2) {
+                win11Blockers.push('ไม่พบ TPM 2.0 (อาจต้องเปิด fTPM/PTT ใน BIOS)');
+                upgradeActions.push('เปิดใช้งาน TPM 2.0 / fTPM ใน BIOS');
             }
-            if (criteria.requireSsd && !diskHasSsd) {
-                upgradeActions.push('เพิ่ม/เปลี่ยน SSD ความเร็วสูง (~' + criteria.costs.ssdUpgrade + ' บาท)');
-                upgradeCost += criteria.costs.ssdUpgrade;
-            }
-            if (!hasMinRam || !hasRecRam) {
-                var neededGb = (criteria.recommendedRamGb || 8) - ramGb;
-                upgradeActions.push('เพิ่ม RAM อย่างน้อย ' + Math.max(4, neededGb) + ' GB (~' + criteria.costs.ramUpgrade + ' บาท)');
-                upgradeCost += criteria.costs.ramUpgrade;
-            }
-
-            if (cpuEval.supported && ageYears <= criteria.maxAgeYears) {
-                if (upgradeActions.length > 0) {
-                    win11Upgradable = true;
-                } else {
-                    win11Eligible = true;
-                }
-            } else {
-                win11Ineligible = true;
-            }
+        }
+        win11Ineligible = !cpuEval.supported;
+        win11Upgradable = cpuEval.supported && win11Blockers.length > 0;
+        win11Eligible = cpuEval.supported && !win11Upgradable;
+        if (criteria.requireSsd && !diskHasSsd) {
+            upgradeActions.push('เพิ่ม/เปลี่ยน SSD ความเร็วสูง (~' + criteria.costs.ssdUpgrade + ' บาท)');
+            upgradeCost += criteria.costs.ssdUpgrade;
         }
 
         var healthScore = 100;
@@ -494,8 +494,9 @@
         else replacementYear = currentYear + 1;
 
         var rec = 'keep';
-        if (win11Ineligible || healthScore < 45 || ageYears >= criteria.maxAgeYears) {
+        if (win11Ineligible) {
             rec = 'replace';
+            replacementYear = criteria.budgetYearBE - 543;
         } else if (win11Upgradable || upgradeActions.length > 0) {
             rec = 'upgrade';
         }
@@ -533,7 +534,7 @@
             isWin11: isWin11,
             isWin10: isWin10,
             isWin7: isWin7,
-            win11Status: isWin11 ? 'already_win11' : (win11Eligible ? 'eligible' : (win11Upgradable ? 'upgradable' : 'ineligible')),
+            win11Status: win11Eligible ? (isWin11 ? 'already_win11' : 'eligible') : (win11Upgradable ? 'upgradable' : 'ineligible'),
             win11Blockers: win11Blockers,
             upgradeActions: upgradeActions,
             upgradeCost: upgradeCost,
@@ -542,7 +543,10 @@
             survival: survival,
             replacementYear: replacementYear,
             recommendation: rec,
-            estimatedCost: rec === 'replace' ? criteria.costs.newDevice : (rec === 'upgrade' ? upgradeCost : 0),
+            estimatedCost: rec === 'replace' ? replacementPrice.price : (rec === 'upgrade' ? upgradeCost : 0),
+            replacementCost: replacementPrice.price,
+            replacementPrice: replacementPrice,
+            replacementBudgetYearBE: criteria.budgetYearBE,
             insight: getDeviceInsight({
                 cpu: cpuName,
                 cpuName: cpuName,
@@ -558,18 +562,19 @@
     }
 
     function assessFleet(nodes, customCriteria) {
-        var criteria = Object.assign({}, DEFAULT_CRITERIA, customCriteria || {});
+        var criteria = root.ScpPriceReference.resolveCriteria(DEFAULT_CRITERIA, customCriteria);
         if (root.ScpCachedFleetAssessment && !customCriteria) {
             if (!Array.isArray(nodes) || !nodes.length || nodes.length === (root.ScpCachedFleetAssessment.devices || []).length) {
                 return root.ScpCachedFleetAssessment;
             }
         }
         var list = Array.isArray(nodes) ? nodes : (nodes ? Object.values(nodes) : []);
-        var currentYear = new Date().getFullYear();
+        var currentYear = criteria.budgetYearBE - 543;
 
         var summary = {
             total: list.length,
-            win11: { eligible: 0, upgradable: 0, ineligible: 0, already_win11: 0 },
+            budgetYearBE: criteria.budgetYearBE,
+            win11: { eligible: 0, upgradable: 0, ineligible: 0, already_win11: 0, critical: 0, upgradeCost: 0, replaceCostIfNew: 0 },
             health: { good: 0, fair: 0, poor: 0, critical: 0, averageScore: 0 },
             forecast: {
                 currentYear: 0,
@@ -595,26 +600,29 @@
             var a = assessDevice(node, criteria);
             summary.devices.push(a);
 
-            if (summary.win11[a.win11Status] !== undefined) {
-                summary.win11[a.win11Status]++;
-            } else {
-                summary.win11[a.win11Status] = 1;
+            if (a.win11Status === 'already_win11') summary.win11.already_win11++;
+            if (a.win11Status === 'eligible' || a.win11Status === 'already_win11') summary.win11.eligible++;
+            else summary.win11[a.win11Status]++;
+            if (a.healthStatus === 'critical' || a.recommendation === 'replace') summary.win11.critical++;
+            if (a.win11Status === 'upgradable') {
+                summary.win11.upgradeCost += a.upgradeCost;
+                summary.win11.replaceCostIfNew += a.replacementCost;
             }
             summary.health[a.healthStatus]++;
             totalScore += a.healthScore;
 
-            if (a.replacementYear <= currentYear) {
+            if (a.recommendation === 'replace' && a.replacementYear <= currentYear) {
                 summary.forecast.currentYear++;
-                summary.budget.currentYear.replace += criteria.costs.newDevice;
-            } else if (a.replacementYear === currentYear + 1) {
+                summary.budget.currentYear.replace += a.replacementCost;
+            } else if (a.recommendation === 'replace' && a.replacementYear === currentYear + 1) {
                 summary.forecast.nextYear++;
-                summary.budget.nextYear.replace += criteria.costs.newDevice;
-            } else if (a.replacementYear <= currentYear + 3) {
+                summary.budget.nextYear.replace += a.replacementCost;
+            } else if (a.recommendation === 'replace' && a.replacementYear <= currentYear + 3) {
                 summary.forecast.year2to3++;
-                summary.budget.year2to3.replace += criteria.costs.newDevice;
-            } else {
+                summary.budget.year2to3.replace += a.replacementCost;
+            } else if (a.recommendation === 'replace') {
                 summary.forecast.year4to5++;
-                summary.budget.year4to5.replace += criteria.costs.newDevice;
+                summary.budget.year4to5.replace += a.replacementCost;
             }
 
             if (a.recommendation === 'upgrade') {
@@ -626,7 +634,7 @@
                 summary.byRoom[r] = { name: r, total: 0, eligible: 0, upgradable: 0, ineligible: 0, replaceNow: 0, cost: 0, devices: [] };
             }
             summary.byRoom[r].total++;
-            summary.byRoom[r][a.win11Status]++;
+            summary.byRoom[r][a.win11Status === 'already_win11' ? 'eligible' : a.win11Status]++;
             if (a.replacementYear <= currentYear) summary.byRoom[r].replaceNow++;
             summary.byRoom[r].cost += a.estimatedCost;
             summary.byRoom[r].devices.push(a);

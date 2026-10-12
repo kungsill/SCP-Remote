@@ -695,11 +695,19 @@
         catch (error) { return date.toDateString(); }
     }
 
-    function stat(label, value, tone) {
-        var card = element('div', 'scp-dash-stat' + (tone ? ' scp-dash-' + tone : ''));
-        card.appendChild(element('div', 'scp-dash-stat-value', String(value)));
-        card.appendChild(element('div', 'scp-dash-stat-label', label));
+    function stat(label, value, tone, onClick) {
+        var cls = 'scp-dash-stat' + (tone ? ' scp-dash-' + tone : '');
+        var card = onClick ? button('', cls + ' scp-assess-stat', onClick) : element('div', cls);
+        card.appendChild(element(onClick ? 'span' : 'div', 'scp-dash-stat-value', String(value)));
+        card.appendChild(element(onClick ? 'span' : 'div', 'scp-dash-stat-label', label));
         return card;
+    }
+
+    function matchesAssessStatus(d, filter) {
+        if (filter === 'eligible') return d.win11Status === 'eligible' || d.win11Status === 'already_win11';
+        if (filter === 'upgradable' || filter === 'ineligible') return d.win11Status === filter;
+        if (filter === 'critical') return d.healthStatus === 'critical' || d.recommendation === 'replace';
+        return true;
     }
 
     function actionCell(node) {
@@ -1545,7 +1553,7 @@
                 });
                 tagWrap.appendChild(ntTag);
             }
-            var wTag = element('span', 'scp-badge-' + devAss.win11Status, devAss.win11Status === 'eligible' ? (thai ? 'พร้อม Win 11' : 'Win 11 Ready') : (devAss.win11Status === 'upgradable' ? (thai ? 'อัปเกรดได้' : 'Win 11 Upgradable') : (thai ? 'ไม่รองรับ' : 'Win 11 Unsupported')));
+            var wTag = element('span', 'scp-badge-' + devAss.win11Status, (devAss.win11Status === 'eligible' || devAss.win11Status === 'already_win11') ? (thai ? 'พร้อม Win 11' : 'Win 11 Ready') : (devAss.win11Status === 'upgradable' ? (thai ? 'อัปเกรดได้' : 'Win 11 Upgradable') : (thai ? 'ไม่รองรับ' : 'Win 11 Unsupported')));
             var hTag = element('span', 'scp-health-' + devAss.healthStatus, 'Health: ' + devAss.healthScore);
             tagWrap.appendChild(wTag);
             tagWrap.appendChild(hTag);
@@ -1594,8 +1602,32 @@
         return row;
     }
 
+    var assessmentExpanded = true, panelAnchor = null;
+    function fitAssessmentView() {
+        if (!panel) return;
+        var expanded = !panel.hidden && activeView === 'assess' && assessmentExpanded;
+        panel.classList.toggle('scp-dash-expanded', expanded);
+        document.body.classList.toggle('scp-assessment-expanded', expanded);
+        // Escape the workspace's clipped scroll container when occupying the viewport.
+        if (expanded && panel.parentElement !== document.body) document.body.appendChild(panel);
+        else if (!expanded && panelAnchor && panelAnchor.parentNode && panel.parentNode !== panelAnchor.parentNode) {
+            panelAnchor.parentNode.insertBefore(panel, panelAnchor.nextSibling);
+        }
+    }
+
+    function assessmentForPrint(d) {
+        var node = allNodes().find(function (n) { return (n._id || n.id) === (d.nodeid || d.nodeId); }) || {};
+        return Object.assign({}, d, { reportDetails: {
+            ip: node.ip || node.agentip || '', host: node.host || node.rname || '',
+            online: isOnline(node), user: signedInUser(node),
+            windowsLicense: licenseVerdictOf(node).text, officeLicense: officeVerdictOf(node).text,
+            risks: risksOf(node).map(function (r) { return r.text; })
+        } });
+    }
+
     function render() {
         if (!body || panel.hidden) return;
+        fitAssessmentView();
         loadFleetAssessment();
         // This redraws every ten seconds. Without keeping the scroll position, anyone
         // reading a room further down the page is thrown back to the top each time.
@@ -1721,29 +1753,63 @@
         // --- Assess Tab ---
         var assessSec = sections.assess;
         assessSec.appendChild(element('h3', '', thai ? 'การประเมินสภาพเครื่องและความพร้อมอัปเกรด Windows 11' : 'Hardware Lifespan & Windows 11 Assessment'));
-        var fWin11 = (fleetAssess && fleetAssess.win11) || {};
-        var fHealth = (fleetAssess && fleetAssess.health) || {};
-        var aStats = element('div', 'scp-dash-stats');
-        aStats.appendChild(stat(thai ? 'พร้อมใช้ Win 11' : 'Win 11 Ready', fWin11.eligible || 0, 'ok'));
-        aStats.appendChild(stat(thai ? 'อัปเกรดเพื่อรองรับ' : 'Win 11 Upgradable', fWin11.upgradable || 0, 'idle'));
-        aStats.appendChild(stat(thai ? 'ไม่รองรับ / ปลดระวาง' : 'Ineligible', fWin11.ineligible || 0, 'risk'));
-        aStats.appendChild(stat(thai ? 'คะแนนสุขภาพเฉลี่ย' : 'Avg Health', (fHealth.averageScore || 0) + ' / 100', 'busy'));
-        assessSec.appendChild(aStats);
-
-        var aFilterWrap = element('div', 'scp-dash-assess-filters');
-        aFilterWrap.appendChild(element('span', 'scp-dash-rooms-label', thai ? 'กรองตามสถานะ:' : 'Filter:'));
+        var assessToolbar = element('div', 'scp-assess-toolbar');
+        assessToolbar.appendChild(button(assessmentExpanded ? (thai ? 'กลับหน้าปกติ' : 'Normal view') : (thai ? 'ขยายเต็มจอ' : 'Expand view'), 'scp-dash-refresh', function () {
+            assessmentExpanded = !assessmentExpanded;
+            render(); fitHeight();
+        }));
+        assessSec.appendChild(assessToolbar);
+        // Scope both counts and rows to the same devices, including room/search filters.
+        var shownIds = new Set(list.map(function (n) { return n._id || n.id; }));
+        var assessedDevices = (fleetAssess.devices || []).filter(function (d) {
+            return shownIds.has(d.nodeid || d.nodeId);
+        });
         var currentAssessFilter = window.__assessFilter || 'all';
-        [
-            ['all', thai ? 'ทุกเครื่อง' : 'All'],
-            ['eligible', thai ? 'พร้อมใช้งาน' : 'Eligible'],
-            ['upgradable', thai ? 'อัปเกรดได้' : 'Upgradable'],
-            ['ineligible', thai ? 'ไม่รองรับ' : 'Ineligible'],
-            ['critical', thai ? 'วิกฤต/ต้องเปลี่ยน' : 'Critical/Replace']
-        ].forEach(function (f) {
-            var chip = button(f[1], 'scp-assess-pill' + (currentAssessFilter === f[0] ? ' on' : ''), function () {
+        var assessFilters = [
+            ['all', thai ? 'ทุกเครื่อง' : 'All', 'busy'],
+            ['eligible', thai ? 'พร้อมใช้งาน' : 'Ready', 'ok'],
+            ['upgradable', thai ? 'อัปเกรดได้' : 'Upgradable', 'idle'],
+            ['ineligible', thai ? 'ไม่รองรับ' : 'Unsupported', 'risk'],
+            ['critical', thai ? 'วิกฤต/ต้องเปลี่ยน' : 'Critical/Replace', 'risk']
+        ];
+        var assessCounts = {};
+        assessFilters.forEach(function (f) {
+            assessCounts[f[0]] = assessedDevices.filter(function (d) { return matchesAssessStatus(d, f[0]); }).length;
+        });
+        var aStats = element('div', 'scp-dash-stats scp-assess-stats');
+        assessFilters.slice(1).forEach(function (f) {
+            var card = stat(f[1], assessCounts[f[0]], f[2], function () {
                 window.__assessFilter = f[0];
                 render();
             });
+            card.dataset.assessFilter = f[0];
+            card.setAttribute('aria-pressed', String(currentAssessFilter === f[0]));
+            card.title = thai ? 'กดดูรายชื่อและรายละเอียดเครื่อง' : 'Show devices and details';
+            aStats.appendChild(card);
+        });
+        assessSec.appendChild(aStats);
+        assessSec.appendChild(element('p', 'scp-dash-note', thai ?
+            'กดตัวเลขเพื่อดูรายชื่อ · พร้อมใช้งานรวมเครื่องที่ลง Windows 11 แล้วและไม่ต้องเพิ่ม RAM · วิกฤต/ต้องเปลี่ยนเป็นธงสุขภาพ อาจซ้ำกับกลุ่มความพร้อม' :
+            'Select a count to see devices. Ready includes Windows 11 devices with sufficient RAM. Critical/Replace is a health flag and may overlap readiness groups.'));
+
+        var upgradeableDevices = assessedDevices.filter(function (d) { return d.win11Status === 'upgradable'; });
+        if (upgradeableDevices.length) {
+            var upgradeCost = upgradeableDevices.reduce(function (sum, d) { return sum + (d.upgradeCost || 0); }, 0);
+            var replacementCost = upgradeableDevices.reduce(function (sum, d) { return sum + (d.replacementCost || (fleetAssess.criteria && fleetAssess.criteria.costs && fleetAssess.criteria.costs.newDevice) || 18000); }, 0);
+            assessSec.appendChild(element('p', 'scp-assess-savings', thai ?
+                'อัปเกรด ' + upgradeableDevices.length + ' เครื่อง: ประมาณ ' + upgradeCost.toLocaleString() + ' บาท เทียบซื้อใหม่ ' + replacementCost.toLocaleString() + ' บาท · ประหยัดประมาณ ' + Math.max(0, replacementCost - upgradeCost).toLocaleString() + ' บาท (ตามเกณฑ์ราคาที่ตั้งไว้)' :
+                'Upgrade ' + upgradeableDevices.length + ' devices: estimated ฿' + upgradeCost.toLocaleString() + ' vs ฿' + replacementCost.toLocaleString() + ' new · estimated savings ฿' + Math.max(0, replacementCost - upgradeCost).toLocaleString() + ' (configured prices)'));
+        }
+
+        var aFilterWrap = element('div', 'scp-dash-assess-filters');
+        aFilterWrap.appendChild(element('span', 'scp-dash-rooms-label', thai ? 'กรองตามสถานะ:' : 'Filter:'));
+        assessFilters.forEach(function (f) {
+            var chip = button(f[1] + ' (' + assessCounts[f[0]] + ')', 'scp-assess-pill' + (currentAssessFilter === f[0] ? ' on' : ''), function () {
+                window.__assessFilter = f[0];
+                render();
+            });
+            chip.dataset.assessFilter = f[0];
+            chip.setAttribute('aria-pressed', String(currentAssessFilter === f[0]));
             aFilterWrap.appendChild(chip);
         });
         assessSec.appendChild(aFilterWrap);
@@ -1765,18 +1831,25 @@
         aTable.appendChild(aHead);
 
         var aBody = element('tbody');
-        var filteredAssessed = (fleetAssess.devices || []).filter(function (d) {
-            if (shownRooms.length && shownRooms.indexOf(d.room) === -1) return false;
-            if (searchText) {
-                var hay = [d.name, d.room, d.cpu, d.cpuName, d.os].join(' ').toLowerCase();
-                if (hay.indexOf(searchText) === -1) return false;
-            }
-            if (currentAssessFilter === 'eligible') return d.win11Status === 'eligible';
-            if (currentAssessFilter === 'upgradable') return d.win11Status === 'upgradable';
-            if (currentAssessFilter === 'ineligible') return d.win11Status === 'ineligible';
-            if (currentAssessFilter === 'critical') return d.healthStatus === 'critical' || d.recommendation === 'replace';
-            return true;
+        var filteredAssessed = assessedDevices.filter(function (d) {
+            return matchesAssessStatus(d, currentAssessFilter);
         });
+        if (window.ScpReport && window.ScpReport.printAssessment) {
+            var printSelected = button((thai ? 'พิมพ์รายละเอียดกลุ่มที่เลือก (' : 'Print selected group (') + filteredAssessed.length + ')', 'scp-dash-refresh scp-assess-print', function () {
+                window.ScpReport.printAssessment(filteredAssessed.map(assessmentForPrint), { criteria: fleetAssess.criteria, scope: assessFilters.find(function (f) { return f[0] === currentAssessFilter; })[1] });
+            });
+            printSelected.disabled = !filteredAssessed.length;
+            assessToolbar.appendChild(printSelected);
+            var allAssessments = (fleetAssess.devices || []).filter(function (d) {
+                return allNodes().some(function (n) { return (n._id || n.id) === (d.nodeid || d.nodeId); });
+            });
+            var printAll = button((thai ? 'พิมพ์ทุกเครื่อง (' : 'Print all devices (') + allAssessments.length + ')', 'scp-dash-refresh scp-assess-print-all', function () {
+                window.ScpReport.printAssessment(allAssessments.map(assessmentForPrint), { criteria: fleetAssess.criteria, scope: thai ? 'ทุกเครื่อง' : 'All devices' });
+            });
+            printAll.disabled = !allAssessments.length;
+            assessToolbar.appendChild(printAll);
+        }
+        assessSec.appendChild(element('p', 'scp-dash-note', (thai ? 'แสดง ' : 'Showing ') + filteredAssessed.length + ' / ' + assessedDevices.length + (thai ? ' เครื่อง' : ' devices')));
 
         if (!filteredAssessed.length) {
             var emptyRow = element('tr');
@@ -1817,23 +1890,33 @@
                 tr.appendChild(element('td', '', (d.diskHasSsd || d.hasSsd) ? 'SSD' : 'HDD'));
 
                 var tdWin = element('td');
-                var isWin11Already = d.isWin11 || d.win11Status === 'already_win11' || /Windows\s*11/i.test(d.os || d.osCaption || '');
+                var isWin11Already = d.win11Status === 'already_win11';
                 var badgeCls = isWin11Already ? 'scp-badge-eligible' : ('scp-badge-' + d.win11Status);
                 var badgeTxt = isWin11Already ? (thai ? 'ลง Win 11 แล้ว' : 'Already Win 11') :
                     (d.win11Status === 'eligible' ? (thai ? 'พร้อมใช้' : 'Eligible') :
                     (d.win11Status === 'upgradable' ? (thai ? 'อัปเกรดได้' : 'Upgradable') : (thai ? 'ไม่รองรับ' : 'Ineligible')));
                 tdWin.appendChild(element('span', badgeCls, badgeTxt));
+                if (d.isWin11 && !isWin11Already) tdWin.appendChild(element('small', 'scp-dash-note', thai ? 'ลง Win 11 แล้ว' : 'Windows 11 installed'));
+                (d.win11Blockers || []).forEach(function (reason) { tdWin.appendChild(element('small', 'scp-dash-note', reason)); });
+                (d.upgradeActions || d.upgradeSuggestions || []).forEach(function (action) {
+                    tdWin.appendChild(element('small', 'scp-dash-note', typeof action === 'string' ? action : action.note));
+                });
+                if (d.recommendation === 'upgrade') tdWin.appendChild(element('small', 'scp-dash-note', (thai ? 'งบอัปเกรดประมาณ ' : 'Estimated upgrade ฿') + (d.upgradeCost || 0).toLocaleString() + (thai ? ' บาท' : '')));
                 tr.appendChild(tdWin);
 
                 var tdHealth = element('td');
                 tdHealth.appendChild(element('span', 'scp-health-' + (d.healthStatus || 'fair'), (d.healthScore || d.score || 0) + ' / 100'));
                 tr.appendChild(tdHealth);
 
-                tr.appendChild(element('td', '', String(d.replacementYear || d.replaceByYear || '-')));
+                var replacementYear = d.replacementYear || d.replaceByYear;
+                tr.appendChild(element('td', '', replacementYear ? String(Number(replacementYear) + (thai ? 543 : 0)) : '-'));
 
                 var tdAct = element('td');
                 tdAct.appendChild(button(thai ? 'ใบประเมิน' : 'Fact sheet', 'scp-dash-refresh', function () {
                     if (window.ScpReport) window.ScpReport.open('device', d.nodeid || d.nodeId);
+                }));
+                if (window.ScpReport && window.ScpReport.printAssessment) tdAct.appendChild(button(thai ? 'พิมพ์เครื่องนี้' : 'Print this device', 'scp-dash-refresh scp-assess-print-device', function () {
+                    window.ScpReport.printAssessment([assessmentForPrint(d)], { criteria: fleetAssess.criteria, scope: d.name });
                 }));
                 tr.appendChild(tdAct);
 
@@ -1841,16 +1924,23 @@
             });
         }
         aTable.appendChild(aBody);
-        assessSec.appendChild(aTable);
+        var aTableWrap = element('div', 'scp-assess-table-wrap');
+        aTableWrap.appendChild(aTable);
+        assessSec.appendChild(aTableWrap);
 
         // --- Budget Tab ---
         var budgetSec = sections.budget;
-        var currentYear = new Date().getFullYear();
+        var currentYear = fleetAssess.budgetYearBE ? fleetAssess.budgetYearBE - 543 : new Date().getFullYear();
         var bg = (fleetAssess && fleetAssess.budget) || {};
         var bgCur = bg.currentYear || {};
         var bgNext = bg.nextYear || {};
         var bgY23 = bg.year2to3 || {};
         budgetSec.appendChild(element('h3', '', thai ? 'ประมาณการงบประมาณจัดซื้อและอัปเกรด 1-5 ปี' : '5-Year Hardware Budget Forecast'));
+        if (fleetAssess.criteria && fleetAssess.criteria.useReferencePricesForReplacement && fleetAssess.criteria.budgetYearBE === 2570) {
+            var referenceNote = thai ? 'งบประมาณ 2570 ใช้เกณฑ์ราคากลางฉบับร่างที่แนบ ราคาซื้อทดแทนแยกตามชนิดและประเภทงานที่เลือกในเกณฑ์ประเมิน' : 'FY 2570 uses the supplied draft prices and the selected procurement category for each device type.';
+            budgetSec.appendChild(element('p', 'scp-assess-savings', referenceNote));
+            assessSec.insertBefore(element('p', 'scp-dash-note', referenceNote), aStats);
+        }
 
         var bStats = element('div', 'scp-dash-stats');
         bStats.appendChild(stat(thai ? 'ปีนี้ (' + (currentYear + 543) + ')' : 'This Year', (bgCur.total || 0).toLocaleString() + ' ฿', 'risk'));
@@ -1989,6 +2079,7 @@
         liveNote.hidden = (liveSkipped === 0);
         liveNote.textContent = liveSkipped ? format(t('liveFull'), liveLimit) : '';
 
+        fitHeight();
         if (scrollTop > 0) { panel.scrollTop = scrollTop; }
     }
 
@@ -1998,8 +2089,15 @@
     function fitHeight() {
         if (panel && !panel.hidden) {
             var top = panel.getBoundingClientRect().top;
-            var available = window.innerHeight - top - 8;
-            panel.style.maxHeight = Math.max(240, available) + 'px';
+            var panelBottom = window.innerHeight;
+            var dashboardFooter = document.getElementById('footer');
+            if (!panel.classList.contains('scp-dash-expanded') && dashboardFooter && dashboardFooter.offsetHeight) {
+                var footerTop = dashboardFooter.getBoundingClientRect().top;
+                if (footerTop > top && footerTop < panelBottom) panelBottom = footerTop;
+            }
+            var available = panelBottom - top - (panel.classList.contains('scp-dash-expanded') ? 0 : 8);
+            panel.style.maxHeight = Math.max(0, available) + 'px';
+            panel.style.boxSizing = 'border-box';
         }
         if (mapPanel && !mapPanel.hidden) {
             var mTop = mapPanel.getBoundingClientRect().top;
@@ -2076,6 +2174,7 @@
     }
     function showMap() {
         if (panel) panel.hidden = true;
+        fitAssessmentView();
         stripUnwantedNav();
         if (!mapPanel) return;
         document.querySelectorAll('#page_leftbar .lbbutton').forEach(function (item) { item.classList.remove('lbbuttonsel'); });
@@ -2114,6 +2213,7 @@
         if (mapPanel) mapPanel.hidden = true;
         if (!panel || panel.hidden) return;
         panel.hidden = true;
+        fitAssessmentView();
         stopAllTiles();
         if (window.ScpReport && typeof window.ScpReport.close === 'function') window.ScpReport.close();
         var rDialog = document.getElementById('scpReport');
@@ -2314,7 +2414,9 @@
         var isInstalledWin11 = d.isWin11 || d.win11Status === 'already_win11' || /Windows\s*11/i.test(d.os || d.osCaption || '');
         var isCpuSupp = d.cpuSupported || (d.cpuEval && d.cpuEval.supported);
         var statusDesc = '';
-        if (isInstalledWin11) {
+        if (d.win11Status === 'upgradable') {
+            statusDesc = thai ? 'อัปเกรดฮาร์ดแวร์ก่อนได้' : 'Upgradable';
+        } else if (isInstalledWin11) {
             statusDesc = isCpuSupp ?
                 (thai ? 'ติดตั้ง Windows 11 แล้ว (สเปกผ่านเกณฑ์ทางการ 100%)' : 'Windows 11 Installed (Supported)') :
                 (thai ? 'ติดตั้ง Windows 11 แล้ว (ใช้งานได้ แต่สเปก CPU อยู่นอกลิสต์ทางการของ Microsoft)' : 'Windows 11 Installed (Unsupported CPU)');
@@ -2608,16 +2710,16 @@
             var evalCard = element('div', 'scp-cm-eval-box');
             var w11Title = element('div', 'scp-cm-eval-line');
             w11Title.appendChild(element('strong', '', 'Windows 11 Readiness: '));
-            var w11StatusBadge = element('span', 'scp-ws-w11-badge ' + (devAss.win11Status === 'eligible' ? 'ok' : (devAss.win11Status === 'upgradable' ? 'idle' : 'risk')),
-                devAss.win11Status === 'eligible' ? (thai ? 'พร้อมใช้งาน 100%' : 'Eligible') :
+            var w11StatusBadge = element('span', 'scp-ws-w11-badge ' + ((devAss.win11Status === 'eligible' || devAss.win11Status === 'already_win11') ? 'ok' : (devAss.win11Status === 'upgradable' ? 'idle' : 'risk')),
+                (devAss.win11Status === 'eligible' || devAss.win11Status === 'already_win11') ? (thai ? 'พร้อมใช้งาน 100%' : 'Eligible') :
                 (devAss.win11Status === 'upgradable' ? (thai ? 'อัปเกรดฮาร์ดแวร์ก่อนได้' : 'Upgradable') : (thai ? 'ไม่ผ่านเกณฑ์ขั้นต่ำ' : 'Ineligible'))
             );
             w11Title.appendChild(w11StatusBadge);
             evalCard.appendChild(w11Title);
 
-            if (devAss.win11Reasons && devAss.win11Reasons.length) {
+            if (devAss.win11Blockers && devAss.win11Blockers.length) {
                 var reasonList = element('ul', 'scp-cm-reason-list');
-                devAss.win11Reasons.forEach(function (r) {
+                devAss.win11Blockers.forEach(function (r) {
                     reasonList.appendChild(element('li', '', r));
                 });
                 evalCard.appendChild(reasonList);
@@ -2626,11 +2728,15 @@
             var recLine = element('div', 'scp-cm-eval-line');
             recLine.appendChild(element('strong', '', thai ? 'คำแนะนำการใช้งาน: ' : 'Recommendation: '));
             var recText = devAss.recommendation === 'keep' ? (thai ? 'สภาพดี ใช้งานต่อได้ยาวนาน' : 'Good condition') :
+                (devAss.recommendation === 'upgrade' ? (thai ? 'อัปเกรดเครื่องเดิมเพื่อประหยัดงบประมาณ' : 'Upgrade this device to save costs') :
                 (devAss.recommendation === 'upgrade_ram' ? (thai ? 'แนะนำเพิ่ม RAM เป็นอย่างน้อย 8-16 GB' : 'Upgrade RAM') :
                 (devAss.recommendation === 'upgrade_ssd' ? (thai ? 'แนะนำเปลี่ยนฮาร์ดดิสก์เป็น SSD เพื่อเพิ่มความเร็ว' : 'Upgrade to SSD') :
-                (thai ? 'ควรจัดสรรงบประมาณเพื่อจัดซื้อเครื่องทดแทน (ปลดระวาง)' : 'Recommend replacement')));
+                (thai ? 'ควรจัดสรรงบประมาณเพื่อจัดซื้อเครื่องทดแทน (ปลดระวาง)' : 'Recommend replacement'))));
             recLine.appendChild(element('span', 'scp-cm-rec-text', recText));
             evalCard.appendChild(recLine);
+            (devAss.upgradeActions || devAss.upgradeSuggestions || []).forEach(function (action) {
+                evalCard.appendChild(element('p', 'scp-dash-note', typeof action === 'string' ? action : action.note));
+            });
             secDiag.appendChild(evalCard);
         }
 
@@ -2804,8 +2910,8 @@
                 var scoreRow = element('div', 'scp-ws-score-row');
                 var scClass = ass.healthStatus === 'good' ? 'ok' : (ass.healthStatus === 'fair' ? 'busy' : 'risk');
                 scoreRow.appendChild(element('span', 'scp-ws-score-badge ' + scClass, '❤️ ' + (ass.healthScore || 0) + '/100'));
-                var w11Class = ass.win11Status === 'eligible' ? 'ok' : (ass.win11Status === 'upgradable' ? 'idle' : 'risk');
-                var w11Text = ass.win11Status === 'eligible' ? 'Win 11 Ready' : (ass.win11Status === 'upgradable' ? 'Win 11 Upgradable' : 'Win 11 Ineligible');
+                var w11Class = (ass.win11Status === 'eligible' || ass.win11Status === 'already_win11') ? 'ok' : (ass.win11Status === 'upgradable' ? 'idle' : 'risk');
+                var w11Text = (ass.win11Status === 'eligible' || ass.win11Status === 'already_win11') ? 'Win 11 Ready' : (ass.win11Status === 'upgradable' ? 'Win 11 Upgradable' : 'Win 11 Ineligible');
                 scoreRow.appendChild(element('span', 'scp-ws-w11-badge ' + w11Class, w11Text));
                 card.appendChild(scoreRow);
             }
@@ -4240,6 +4346,8 @@
         body = element('div', 'scp-dash-body');
         panel.appendChild(body);
         devices.parentElement.insertBefore(panel, devices);
+        panelAnchor = document.createComment('SCP dashboard location');
+        panel.parentNode.insertBefore(panelAnchor, panel);
 
         mapPanel = element('div', 'scp-map-page');
         mapPanel.id = 'scpHosMapPage';

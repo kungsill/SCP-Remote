@@ -373,9 +373,23 @@
 .scp-assess-pill { border: 1px solid var(--scp-line); background: var(--scp-surface); color: var(--scp-muted); border-radius: 20px; padding: 6px 14px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .scp-assess-pill:hover { background: var(--scp-soft); color: var(--scp-ink); }
 .scp-assess-pill.on { border-color: var(--scp-accent); background: var(--scp-accent); color: #fff; }
+.scp-assess-stat { font: inherit; text-align: left; cursor: pointer; color: var(--scp-ink); }
+.scp-assess-stat > span { display: block; }
+.scp-assess-stat[aria-pressed="true"], .scp-assess-stat:focus-visible { outline: 2px solid var(--scp-accent); outline-offset: 2px; }
+.scp-assess-savings { padding: 12px 16px; border-radius: 12px; background: var(--scp-soft); color: var(--scp-ink); font-size: 13px; }
+.scp-assess-table-wrap { overflow-x: auto; }
+.scp-assess-toolbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0; background: var(--scp-bg, #faf6f9); }
+.scp-assess-table-wrap td:last-child button { display: block; margin: 5px 0; white-space: nowrap; }
+body.scp-assessment-expanded { overflow: hidden !important; }
+#scpDashboard.scp-dash-expanded { position: fixed !important; inset: 0 !important; width: 100% !important; height: 100dvh !important; max-height: 100dvh !important; box-sizing: border-box; z-index: 10000; background: var(--scp-bg, #faf6f9); overflow-y: auto; padding-bottom: 48px; }
+.scp-dash-expanded .scp-dash-heading { padding-top: 16px; padding-bottom: 12px; }
+.scp-dash-expanded .scp-dash-heading > :not(.scp-dash-search), .scp-dash-expanded .scp-dash-body > .scp-dash-stats { display: none !important; }
+.scp-dash-expanded .scp-dash-search { margin: 0; }
+.scp-assess-table-wrap td .scp-dash-note { display: block; margin-top: 4px; }
+@media(max-width:760px) { .scp-dash-stats.scp-assess-stats { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 
-.scp-badge-eligible, .scp-badge-upgradable, .scp-badge-ineligible { display: inline-block; padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 600; line-height: 1.5; white-space: nowrap; }
-.scp-badge-eligible { background: #10b98118; color: #047857; border: 1px solid #10b98144; }
+.scp-badge-eligible, .scp-badge-already_win11, .scp-badge-upgradable, .scp-badge-ineligible { display: inline-block; padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 600; line-height: 1.5; white-space: nowrap; }
+.scp-badge-eligible, .scp-badge-already_win11 { background: #10b98118; color: #047857; border: 1px solid #10b98144; }
 .scp-badge-upgradable { background: #f59e0b18; color: #b45309; border: 1px solid #f59e0b44; }
 .scp-badge-ineligible { background: #ef444418; color: #b91c1c; border: 1px solid #ef444444; }
 
@@ -479,7 +493,11 @@
 }
 
 /* Print view optimization */
+.scp-print-root { display: none; }
 @media print {
+    html.scp-printing, html.scp-printing body { position: static !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
+    html.scp-printing body > :not(.scp-print-root) { display: none !important; }
+    html.scp-printing .scp-print-root { position: static !important; display: block !important; overflow: visible !important; height: auto !important; color: #111; background: #fff; font-size: 10pt; }
     body { background: #fff !important; color: #111 !important; font-size: 12pt; }
     #scpReport, .scp-print-root { display: block !important; border: none !important; box-shadow: none !important; width: 100% !important; max-width: 100% !important; padding: 0 !important; }
     .scp-dash-heading-actions, #scpReport header button, .scp-report-nav, .scp-report-device-picker,
@@ -488,6 +506,24 @@
     .scp-report-table th, .scp-report-table td { border-bottom: 1px solid #eee !important; color: #000 !important; }
     .scp-report-chart-box, .scp-device-sheet, .scp-device-spec-item { border-color: #ccc !important; page-break-inside: avoid; }
     .scp-svg-chart { filter: none !important; }
+    .scp-assessment-report .scp-device-sheet { break-before: page; break-inside: auto; page-break-inside: auto; padding: 0; border: 0; border-radius: 0; background: #fff; }
+    .scp-assessment-report .scp-device-sheet:first-child { break-before: auto; margin-top: 0; }
+    html.scp-printing .scp-assessment-report { font-size: 9pt; line-height: 1.35; }
+    .scp-assessment-report .scp-device-spec-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 6px; }
+    .scp-assessment-report .scp-device-spec-item { padding: 6px; overflow-wrap: anywhere; break-inside: avoid; background: #fff; }
+    .scp-assessment-report .scp-device-spec-item p { margin: 2px 0; font-size: 11px; }
+    .scp-assessment-report .scp-device-spec-item strong, .scp-assessment-report .scp-device-spec-item small { font-size: 10px; }
+    .scp-assessment-report .scp-device-eval-box { padding: 8px; background: #fff; }
+    .scp-assessment-report .scp-device-eval-box > *, .scp-assessment-report .scp-device-sheet-head { break-inside: avoid; }
+    .scp-assessment-report .scp-device-eval-box h4 { margin: 6px 0; }
+    .scp-assessment-report .scp-device-eval-box h5 { margin: 8px 0 4px; break-after: avoid; }
+    .scp-assessment-report .scp-device-eval-box p { margin: 6px 0; }
+    .scp-assessment-report .scp-sparkline-wrap { width: 360px; max-width: 100%; }
+    .scp-assessment-report .scp-sparkline-wrap svg { display: block; width: 100%; height: 80px; }
+    .scp-assessment-report .scp-device-rec-callout { margin-top: 8px; padding: 8px; font-size: 11px; }
+    .scp-assessment-report .scp-bulb-banner { font-size: 10px; }
+    .scp-assessment-report .scp-report-reasons { margin: 4px 0; padding-left: 18px; }
+    .scp-assessment-report .scp-report-stats { grid-template-columns: repeat(4,minmax(0,1fr)); }
 }
 
 /* Hospital Campus Overview & Department Cards */

@@ -2,6 +2,94 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const assess = require('../fleet-assess');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+function assessmentHardware(cpu, ram, os) {
+    return {
+        identifiers: { cpu_name: cpu, bios_mode: 'UEFI', storage_devices: [{ Model: 'NVMe SSD' }] },
+        windows: { memory: [{ Capacity: ram * 1024 ** 3 }], osinfo: { Caption: os } },
+        tpm: { SpecVersion: '2.0' }
+    };
+}
+
+test('FY 2570 draft categories price replacements by type while keeping old book values and saved custom criteria', () => {
+    const reference = require('../../public/scripts/scp-price-reference');
+    assert.deepEqual(reference.catalog.map(p => p.price), [26000, 30000, 37000, 25000, 27000, 23000, 26000, 38000]);
+    const nodes = [
+        { _id: 'pc', name: 'PC', hardware: assessmentHardware('Intel Core i5-4590', 8, 'Windows 10 Pro') },
+        { _id: 'aio', name: 'AiO', hardware: assessmentHardware('Intel Core i5-4590', 8, 'Windows 10 Pro') },
+        { _id: 'nb', name: 'Notebook', hardware: assessmentHardware('Intel Core i5-6200U', 8, 'Windows 10 Pro') }
+    ];
+    const chassis = { aio: { chassis: [13] } };
+    const oldSettings = { costs: { newDevice: 18000, ramUpgrade: 1400 }, referencePrices: { desktop: { 2566: 17500 }, notebook: { 2566: 16500 } } };
+    const office = assess.assessFleet(nodes, [], oldSettings, null, null, chassis);
+    assert.equal(office.budgetYearBE, 2570);
+    assert.deepEqual(office.devices.map(d => d.replacementCost), [26000, 25000, 23000]);
+    assert.equal(office.budget.currentYear.replace, 74000);
+    assert.equal(office.budgetForecast[2027].cost, 74000);
+    assert.equal(office.criteria.costs.ramUpgrade, 1400);
+    assert.equal(office.criteria.referencePrices.desktop[2566], 17500);
+    // i5-4590 dates the machine to 2556; that year's official edition (mdes-1590) has no
+    // All-in-One item, so its office PC price applies -- never the 2570 draft AIO price.
+    assert.equal(office.devices[1].costBasis, 14000, 'new AIO prices must not be applied retrospectively to old assets');
+    const custom = { ...oldSettings, replacementProfiles: { desktop: 'desktop-processing-2', aio: 'aio-processing', notebook: 'notebook-ai' } };
+    const selected = assess.assessFleet(nodes, [], custom, null, null, chassis);
+    assert.deepEqual(selected.devices.map(d => d.replacementCost), [37000, 27000, 38000]);
+    assert.equal(selected.budget.currentYear.replace, 102000);
+    assert.ok(selected.devices.every(d => d.replacementPrice.draft && d.replaceByYear === 2027));
+    const browser = { ScpCachedChassis: chassis };
+    for (const file of ['scp-price-reference.js', 'scp-assess.js']) vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../public/scripts', file), 'utf8'), { window: browser });
+    const local = browser.ScpFleetAssess.assessFleet(nodes, custom);
+    assert.equal(local.budget.currentYear.replace, 102000);
+    assert.deepEqual(Array.from(local.devices, d => d.replacementCost), [37000, 27000, 38000]);
+    const manual = assess.assessFleet(nodes, [], { ...custom, useReferencePricesForReplacement: false, costs: { newDevice: 22000 } }, null, null, chassis);
+    assert.equal(manual.budget.currentYear.replace, 66000);
+    const asset = assess.assessDevice(nodes[0], nodes[0], custom, { fiscalYear: 2566, price: 12345 });
+    assert.equal(asset.costBasis, 12345, 'actual purchase price is preserved');
+    assert.equal(asset.replacementCost, 37000);
+});
+
+test('RAM upgrades on Windows 10 and 11 are counted with costs, while installed unsupported Windows 11 is not ready', () => {
+    const browser = { ScpCachedAssets: { old: { fiscalYear: new Date().getFullYear() - 12 + 543 } } };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-price-reference.js'), 'utf8'), { window: browser });
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-assess.js'), 'utf8'), { window: browser });
+    const fixtures = [
+        ['ready11', 'Intel Core i3-10100', 8, 'Windows 11 Pro', 'already_win11', 'keep'],
+        ['low11', 'Intel Core i3-10100', 4, 'Windows 11 Pro', 'upgradable', 'upgrade'],
+        ['low10', 'Intel Core i3-10100', 2, 'Windows 10 Pro', 'upgradable', 'upgrade'],
+        ['ready10', 'Intel Core i3-10100', 8, 'Windows 10 Pro', 'eligible', 'keep'],
+        ['bypass', 'Intel Core i5-4590', 4, 'Windows 11 Pro', 'ineligible', 'replace'],
+        ['old', 'Intel Core i3-10100', 4, 'Windows 11 Pro', 'upgradable', 'upgrade']
+    ];
+    const nodes = fixtures.map(([id, cpu, ram, os]) => ({ _id: id, name: id, hardware: assessmentHardware(cpu, ram, os) }));
+    nodes.forEach((node, i) => {
+        const asset = browser.ScpCachedAssets[node._id];
+        const server = assess.assessDevice(node, node, null, asset);
+        const local = browser.ScpFleetAssess.assessDevice(node);
+        for (const result of [server, local]) {
+            assert.equal(result.win11Status, fixtures[i][4], node.name);
+            assert.equal(result.recommendation, fixtures[i][5], node.name);
+            if (result.win11Status === 'upgradable') {
+                assert.equal(result.upgradeCost, 1200, node.name);
+                assert.match(JSON.stringify(result.upgradeActions), /RAM/);
+            }
+        }
+    });
+    const server = assess.assessFleet(nodes, [], null, null, browser.ScpCachedAssets);
+    const local = browser.ScpFleetAssess.assessFleet(nodes);
+    for (const summary of [server, local]) {
+        assert.equal(summary.win11.eligible, 2);
+        assert.equal(summary.win11.upgradable, 3);
+        assert.equal(summary.win11.ineligible, 1);
+        assert.equal(summary.win11.critical, summary.devices.filter(d => d.healthStatus === 'critical' || d.recommendation === 'replace').length);
+        assert.equal(summary.win11.eligible + summary.win11.upgradable + summary.win11.ineligible, summary.total);
+        assert.equal(summary.win11.upgradeCost, 3600);
+        assert.equal(summary.win11.replaceCostIfNew, 78000);
+    }
+    assert.equal(server.win11Already, 1, 'only ready installed Windows 11 devices enter the ready subtotal');
+});
 
 test('evaluateCpu detects officially supported and unsupported CPUs correctly', () => {
     // Unsupported CPUs (older than 8th gen, or Ryzen 1st gen)
@@ -156,4 +244,19 @@ test('acquisition year comes from the asset record, else the CPU launch year, an
     assert.equal(byAsset.acquiredYearBE, 2567);
     assert.equal(byAsset.costBasis, 21000);
     assert.equal(byAsset.costSource, 'asset');
+});
+
+test('book value uses the official MDES office price of the year a computer was acquired', () => {
+    const fa = require('../fleet-assess');
+    const ref = require('../../public/scripts/scp-price-reference');
+    const c = fa.DEFAULT_CRITERIA;
+    // figures read from the archived editions (catalog.json)
+    assert.equal(ref.history.desktop[2564], 17000);
+    assert.equal(ref.history.desktop[2566], 20000);
+    assert.equal(ref.history.notebook[2566], 19000);
+    assert.equal(ref.history.aio[2569], 22000);
+    assert.equal(fa.referencePrice(c, 'desktop', 2565).price, 17000, '2565 has no edition of its own: December 2564 applies');
+    assert.equal(fa.referencePrice(c, 'desktop', 2567).price, 20000, '2567 falls back to March 2566');
+    assert.equal(fa.referencePrice(c, 'aio', 2558).price, 16000, 'no All-in-One item before 2561: office PC price of that year');
+    assert.ok(ref.historySources['desktop:2566'].startsWith('mdes-6650'));
 });

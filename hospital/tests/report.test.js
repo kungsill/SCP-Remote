@@ -42,6 +42,49 @@ function load(t, opts) {
     return w;
 }
 
+test('device fact sheets show installed Windows 11 as ready and render RAM upgrade notes from the server', (t) => {
+    const w = load(t);
+    const base = { nodeid: 'ready', name: 'Ready PC', room: 'OPD', os: 'Windows 11 Pro', ramGb: 8,
+        healthScore: 90, healthStatus: 'good', cpu: 'Intel Core i3-10100', win11Status: 'already_win11',
+        win11Blockers: [], upgradeActions: [], survival: {}, replacementYear: 2030 };
+    w.ScpCachedFleetAssessment = { devices: [base] };
+    w.ScpReport.open('device', 'ready');
+    assert.match(w.document.querySelector('.scp-device-sheet').textContent, /พร้อมใช้งาน \(Eligible\)/);
+    w.ScpCachedFleetAssessment = { devices: [{ ...base, nodeid: 'ram', name: 'RAM PC', ramGb: 4,
+        win11Status: 'upgradable', win11Blockers: ['RAM น้อย'], upgradeActions: [{ note: 'เพิ่ม RAM เป็น 8 GB', cost: 1200 }] }] };
+    w.ScpReport.open('device', 'ram');
+    const text = w.document.querySelector('.scp-device-sheet').textContent;
+    assert.match(text, /สามารถอัปเกรดได้/);
+    assert.match(text, /เพิ่ม RAM เป็น 8 GB/);
+    assert.doesNotMatch(text, /\[object Object\]/);
+});
+
+test('direct assessment printing includes every supplied computer and its available details without opening a dialog', (t) => {
+    const w = load(t);
+    const device = {
+        nodeid: 'ram', name: 'RAM PC', room: 'OPD', os: 'Windows 11 Pro', cpu: 'Intel Core i3-10100',
+        ramGb: 4, win11Status: 'upgradable', healthScore: 68, healthStatus: 'fair', recommendation: 'upgrade',
+        upgradeCost: 1200, replaceByYear: 2028, cTotalGb: 240, cFreeGb: 100, cFreePercent: 42,
+        assetNumber: 'ASSET-001', acquiredYearBE: 2563, yearSource: 'cpu', costBasis: 17000,
+        bookValue: 1, depreciation: 16999, depreciationPercent: 100, usefulLifeYears: 5,
+        win11Blockers: ['RAM น้อย'], upgradeActions: [{ note: 'เพิ่ม RAM เป็น 8 GB', cost: 1200 }],
+        driveModels: ['TEST-SSD'], reportDetails: { ip: '192.168.2.123', host: 'TEST-PC', windowsLicense: 'ตรวจเอกสารสิทธิ์', officeLicense: 'ยังไม่ได้ตรวจ', risks: ['พื้นที่ดิสก์เหลือน้อย'] }
+    };
+    w.ScpReport.printAssessment([device, { ...device, nodeid: 'last', name: 'Last PC' }], { scope: 'อัปเกรดได้' });
+    assert.equal(w.__printed, 1);
+    assert.equal(w.document.querySelector('#scpReport'), null);
+    const report = w.document.querySelector('.scp-assessment-report');
+    assert.equal(report.querySelectorAll('.scp-device-sheet').length, 2);
+    assert.equal(report.firstElementChild.className, 'scp-device-sheet', 'printing starts directly with the first device');
+    assert.equal(report.querySelector('.scp-report-stats'), null, 'there is no separate summary cover');
+    assert.match(report.textContent, /RAM PC/);
+    assert.match(report.textContent, /Last PC/);
+    for (const value of ['ASSET-001', '192.168.2.123', 'TEST-PC', 'TEST-SSD', '240 GB / 100 GB', 'ตรวจเอกสารสิทธิ์', 'ค่าเสื่อมสะสม', 'พื้นที่ดิสก์เหลือน้อย', 'เพิ่ม RAM เป็น 8 GB', '2571']) assert.ok(report.textContent.includes(value), value);
+    assert.doesNotMatch(report.textContent, /\[object Object\]|undefined|NaN/);
+    w.dispatchEvent(new w.Event('afterprint'));
+    assert.equal(w.document.querySelector('.scp-print-root'), null);
+});
+
 test('summarize counts the fleet and keeps the same online/offline totals as the snapshot', (t) => {
     const w = load(t);
     const d = w.ScpReport.summarize(fleet(), null);

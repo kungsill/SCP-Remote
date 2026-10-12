@@ -1,8 +1,13 @@
 'use strict';
+const priceReference = require('../public/scripts/scp-price-reference');
 // SCP-Remote: Hardware assessment and upgrade planning engine.
 // Evaluates Windows 11 readiness, lifespan health, yearly upgrade forecasts, and custom criteria.
 
 const DEFAULT_CRITERIA = {
+    budgetYearBE: 2570,
+    useReferencePricesForReplacement: true,
+    replacementProfiles: priceReference.profiles,
+    priceReferenceSource: priceReference.source,
     maxAgeYears: 7,
     minRamGb: 4,
     recommendedRamGb: 8,
@@ -17,7 +22,7 @@ const DEFAULT_CRITERIA = {
         os: 15
     },
     costs: {
-        newDevice: 18000,
+        newDevice: 26000,
         ramUpgrade: 1200,
         ssdUpgrade: 1500
     },
@@ -26,10 +31,8 @@ const DEFAULT_CRITERIA = {
     usefulLifeYears: 5,
     // MDES reference prices (ราคากลาง) by Buddhist-era year. Only the years confirmed from
     // the published criteria are filled in; the rest are entered on the criteria screen.
-    referencePrices: {
-        desktop: { 2565: 17000, 2566: 17000 },
-        notebook: { 2565: 16000, 2566: 16000 }
-    },
+    // official MDES prices by year (+ the 2570 draft), shared with the browser
+    referencePrices: priceReference.history,
     defaultPrice: { desktop: 17000, notebook: 16000 }
 };
 
@@ -307,7 +310,7 @@ function deviceTypeOf(cpuName, productName, probe) {
 function referencePrice(criteria, cls, yearBE) {
     var table = (criteria.referencePrices && criteria.referencePrices[cls]) || {};
     // No All-in-One prices entered yet: price it as a desktop PC of that year.
-    if (cls === 'aio' && !Object.keys(table).some(function (y) { return table[y] > 0; })) cls = 'desktop', table = (criteria.referencePrices && criteria.referencePrices.desktop) || {};
+    if (cls === 'aio' && !Object.keys(table).some(function (y) { return table[y] > 0 && Number(y) <= yearBE; })) return referencePrice(criteria, 'desktop', yearBE);
     var years = Object.keys(table).map(Number).filter(function (y) { return table[y] > 0; }).sort(function (a, b) { return a - b; });
     if (yearBE && table[yearBE] > 0) return { price: Number(table[yearBE]), year: yearBE };
     var before = years.filter(function (y) { return y <= yearBE; }).pop();
@@ -329,7 +332,7 @@ function depreciate(cost, acquiredAt, lifeYears, now) {
 }
 
 function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
-    const criteria = Object.assign({}, DEFAULT_CRITERIA, customCriteria);
+    const criteria = priceReference.resolveCriteria(DEFAULT_CRITERIA, customCriteria);
     const nowYear = new Date().getFullYear();
 
     const hw = (sysinfo && sysinfo.hardware) || {};
@@ -373,6 +376,7 @@ function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
     const ageYears = biosYear ? Math.max(0, nowYear - biosYear) : null;
     const devType = deviceTypeOf(cpuName, id.product_name, probe);
     const deviceClass = devType.type;
+    const replacementPrice = priceReference.replacementPrice(criteria, deviceClass);
     const ref = referencePrice(criteria, deviceClass, acquiredYearBE);
     const costBasis = purchasePrice > 0 ? purchasePrice : ref.price;
     const book = depreciate(costBasis, acquiredAt, criteria.usefulLifeYears, Date.now());
@@ -414,16 +418,32 @@ function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
     const win11Blockers = [];
     const upgradeSuggestions = [];
 
+    // A processor that runs Windows 11 with too little memory is an upgrade, not a
+    // replacement: adding RAM costs a fraction of a new computer.
+    const ramLow = ramGb > 0 && ramGb < criteria.recommendedRamGb;
+    const ramSuggestion = { type: 'ram', cost: criteria.costs.ramUpgrade, note: 'เพิ่ม RAM เป็น ' + criteria.recommendedRamGb + ' GB' };
     if (isWin11) {
-        win11Status = 'already_win11';
+        if (!cpuEval.supported) {
+            // Windows 11 forced onto a processor it does not support: no security updates guaranteed.
+            win11Status = 'ineligible';
+            win11Blockers.push('ติดตั้ง Windows 11 แบบข้ามข้อกำหนด — CPU ไม่รองรับ: ' + cpuEval.reason);
+        } else if (ramLow) {
+            win11Status = 'upgradable';
+            win11Blockers.push('RAM น้อย: มี ' + ramGb + ' GB (แนะนำ ' + criteria.recommendedRamGb + ' GB) — เพิ่ม RAM ก็ใช้งานต่อได้');
+            upgradeSuggestions.push(ramSuggestion);
+        } else {
+            win11Status = 'already_win11';
+        }
     } else {
         if (!cpuEval.supported) {
             win11Blockers.push('CPU ไม่รองรับ: ' + cpuEval.reason);
         }
-        if (ramGb < criteria.minRamGb) {
+        if (ramGb > 0 && ramGb < criteria.minRamGb) {
             win11Blockers.push('RAM ไม่พอ: มี ' + ramGb + ' GB (ต้องการอย่างน้อย ' + criteria.minRamGb + ' GB)');
-            upgradeSuggestions.push({ type: 'ram', cost: criteria.costs.ramUpgrade, note: 'เพิ่ม RAM เป็น ' + criteria.recommendedRamGb + ' GB' });
+        } else if (ramLow) {
+            win11Blockers.push('RAM น้อย: มี ' + ramGb + ' GB (แนะนำ ' + criteria.recommendedRamGb + ' GB)');
         }
+        if (ramLow) upgradeSuggestions.push(ramSuggestion);
         if (biosMode.toLowerCase() === 'legacy') {
             win11Blockers.push('BIOS โหมด Legacy (ต้องแปลงเป็น UEFI/GPT)');
             upgradeSuggestions.push({ type: 'bios', cost: 0, note: 'เปิดใช้งาน UEFI และ Secure Boot ใน BIOS' });
@@ -500,11 +520,13 @@ function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
     let replaceByYear = nowYear + 3;
     let estimatedCost = 0;
 
-    if (ageYears !== null && ageYears >= criteria.maxAgeYears || !cpuEval.supported || isWin7) {
+    // Age still affects health and forecasts, but does not alone justify buying a new PC.
+    // A supported processor can be kept or upgraded, including machines on older Windows.
+    if (!cpuEval.supported) {
         recommendation = 'replace';
-        replaceByYear = nowYear; // Replace this year or next
-        estimatedCost = criteria.costs.newDevice;
-    } else if (win11Status === 'upgradable' || (!hasSsd && criteria.requireSsd) || (ramGb < criteria.recommendedRamGb)) {
+        replaceByYear = criteria.budgetYearBE - 543;
+        estimatedCost = replacementPrice.price;
+    } else if (win11Status === 'upgradable' || (!hasSsd && criteria.requireSsd) || ramLow) {
         recommendation = 'upgrade';
         replaceByYear = nowYear + 2;
         estimatedCost = upgradeSuggestions.reduce((sum, s) => sum + (s.cost || 0), 0);
@@ -569,6 +591,9 @@ function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
         replaceByYear: replaceByYear,
         replacementYear: replaceByYear,
         estimatedCost: estimatedCost,
+        replacementCost: replacementPrice.price,
+        replacementPrice: replacementPrice,
+        replacementBudgetYearBE: criteria.budgetYearBE,
         assetNumber: assetNumber,
         fiscalYear: fiscalYear,
         purchasePrice: purchasePrice,
@@ -605,7 +630,7 @@ function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
 
 // Fleet assessment summarizer
 function assessFleet(nodes, sysinfos, customCriteria, meshMap, assetMap, probeMap) {
-    const criteria = Object.assign({}, DEFAULT_CRITERIA, customCriteria);
+    const criteria = priceReference.resolveCriteria(DEFAULT_CRITERIA, customCriteria);
     const sysMap = new Map();
     if (Array.isArray(sysinfos)) {
         for (const si of sysinfos) {
@@ -625,6 +650,7 @@ function assessFleet(nodes, sysinfos, customCriteria, meshMap, assetMap, probeMa
 
     const summary = {
         total: list.length,
+        budgetYearBE: criteria.budgetYearBE,
         win11Ready: 0,
         win11Already: 0,
         win11Upgradable: 0,
@@ -640,13 +666,13 @@ function assessFleet(nodes, sysinfos, customCriteria, meshMap, assetMap, probeMa
         criteria: criteria
     };
 
-    const currentYear = new Date().getFullYear();
+    const currentYear = criteria.budgetYearBE - 543;
     for (let y = currentYear; y <= currentYear + 5; y++) {
-        summary.budgetForecast[y] = { count: 0, cost: 0, replaceCount: 0, upgradeCount: 0 };
+        summary.budgetForecast[y] = { count: 0, cost: 0, replaceCount: 0, upgradeCount: 0, replaceCost: 0, upgradeCost: 0 };
     }
 
     for (const item of list) {
-        if (item.isWin11) summary.win11Already++;
+        if (item.win11Status === 'already_win11') summary.win11Already++;
         if (item.win11Status === 'eligible') summary.win11Ready++;
         if (item.win11Status === 'upgradable') summary.win11Upgradable++;
         if (item.win11Status === 'ineligible') summary.win11Ineligible++;
@@ -658,12 +684,12 @@ function assessFleet(nodes, sysinfos, customCriteria, meshMap, assetMap, probeMa
         if (item.recommendation === 'replace') summary.recommendReplace++;
 
         // Budget year assignment
-        const targetYear = item.replaceByYear;
+        const targetYear = item.recommendation === 'upgrade' ? currentYear : item.replaceByYear;
         if (summary.budgetForecast[targetYear]) {
             summary.budgetForecast[targetYear].count++;
             summary.budgetForecast[targetYear].cost += item.estimatedCost;
-            if (item.recommendation === 'replace') summary.budgetForecast[targetYear].replaceCount++;
-            if (item.recommendation === 'upgrade') summary.budgetForecast[targetYear].upgradeCount++;
+            if (item.recommendation === 'replace') { summary.budgetForecast[targetYear].replaceCount++; summary.budgetForecast[targetYear].replaceCost += item.estimatedCost; }
+            if (item.recommendation === 'upgrade') { summary.budgetForecast[targetYear].upgradeCount++; summary.budgetForecast[targetYear].upgradeCost += item.estimatedCost; }
         }
 
         // Room grouping
@@ -682,10 +708,18 @@ function assessFleet(nodes, sysinfos, customCriteria, meshMap, assetMap, probeMa
         summary.byRoom[r].devices.push(item);
     }
 
+    // Readiness has three exclusive groups. Critical/replace is a separate health flag
+    // and can overlap them; it must use the same predicate as the dashboard filter.
+    const upgradableList = list.filter(d => d.win11Status === 'upgradable');
     summary.win11 = {
-        eligible: summary.win11Ready + summary.win11Already,
-        upgradable: summary.win11Upgradable,
-        ineligible: summary.win11Ineligible
+        eligible: list.filter(d => d.win11Status === 'eligible' || d.win11Status === 'already_win11').length,
+        upgradable: upgradableList.length,
+        ineligible: list.filter(d => d.win11Status === 'ineligible').length,
+        already_win11: summary.win11Already,
+        critical: list.filter(d => d.healthStatus === 'critical' || d.recommendation === 'replace').length,
+        // what upgrading the upgradable ones costs, against buying them new
+        upgradeCost: upgradableList.reduce((sum, d) => sum + (d.upgradeCost || 0), 0),
+        replaceCostIfNew: upgradableList.reduce((sum, d) => sum + d.replacementCost, 0)
     };
     summary.health = {
         good: summary.devices.filter(d => d.healthStatus === 'good').length,
@@ -700,28 +734,19 @@ function assessFleet(nodes, sysinfos, customCriteria, meshMap, assetMap, probeMa
         year2to3: ((summary.budgetForecast[currentYear + 2] ? summary.budgetForecast[currentYear + 2].replaceCount : 0) + (summary.budgetForecast[currentYear + 3] ? summary.budgetForecast[currentYear + 3].replaceCount : 0)),
         year4to5: ((summary.budgetForecast[currentYear + 4] ? summary.budgetForecast[currentYear + 4].replaceCount : 0) + (summary.budgetForecast[currentYear + 5] ? summary.budgetForecast[currentYear + 5].replaceCount : 0))
     };
+    const sumBudget = (years) => years.reduce((total, year) => {
+        const row = summary.budgetForecast[year] || {};
+        total.replace += row.replaceCost || 0;
+        total.upgrade += row.upgradeCost || 0;
+        total.total += row.cost || 0;
+        return total;
+    }, { replace: 0, upgrade: 0, total: 0 });
     summary.budget = {
-        currentYear: {
-            replace: summary.budgetForecast[currentYear] ? (summary.budgetForecast[currentYear].replaceCount * criteria.costs.newDevice) : 0,
-            upgrade: summary.budgetForecast[currentYear] ? Math.max(0, summary.budgetForecast[currentYear].cost - summary.budgetForecast[currentYear].replaceCount * criteria.costs.newDevice) : 0,
-            total: summary.budgetForecast[currentYear] ? summary.budgetForecast[currentYear].cost : 0
-        },
-        nextYear: {
-            replace: summary.budgetForecast[currentYear + 1] ? (summary.budgetForecast[currentYear + 1].replaceCount * criteria.costs.newDevice) : 0,
-            upgrade: 0,
-            total: summary.budgetForecast[currentYear + 1] ? summary.budgetForecast[currentYear + 1].cost : 0
-        },
-        year2to3: {
-            replace: ((summary.budgetForecast[currentYear + 2] ? summary.budgetForecast[currentYear + 2].replaceCount : 0) + (summary.budgetForecast[currentYear + 3] ? summary.budgetForecast[currentYear + 3].replaceCount : 0)) * criteria.costs.newDevice,
-            upgrade: ((summary.budgetForecast[currentYear + 2] ? summary.budgetForecast[currentYear + 2].upgradeCount : 0) + (summary.budgetForecast[currentYear + 3] ? summary.budgetForecast[currentYear + 3].upgradeCount : 0)) * criteria.costs.ramUpgrade,
-            total: (summary.budgetForecast[currentYear + 2] ? summary.budgetForecast[currentYear + 2].cost : 0) + (summary.budgetForecast[currentYear + 3] ? summary.budgetForecast[currentYear + 3].cost : 0)
-        },
-        year4to5: {
-            replace: ((summary.budgetForecast[currentYear + 4] ? summary.budgetForecast[currentYear + 4].replaceCount : 0) + (summary.budgetForecast[currentYear + 5] ? summary.budgetForecast[currentYear + 5].replaceCount : 0)) * criteria.costs.newDevice,
-            upgrade: 0,
-            total: (summary.budgetForecast[currentYear + 4] ? summary.budgetForecast[currentYear + 4].cost : 0) + (summary.budgetForecast[currentYear + 5] ? summary.budgetForecast[currentYear + 5].cost : 0)
-        },
-        fiveYearTotal: Object.values(summary.budgetForecast).reduce((sum, b) => sum + (b.cost || 0), 0)
+        currentYear: sumBudget([currentYear]),
+        nextYear: sumBudget([currentYear + 1]),
+        year2to3: sumBudget([currentYear + 2, currentYear + 3]),
+        year4to5: sumBudget([currentYear + 4, currentYear + 5]),
+        fiveYearTotal: Object.values(summary.budgetForecast).reduce((sum, row) => sum + row.cost, 0)
     };
 
     return summary;

@@ -65,6 +65,12 @@ function setup(t, options = {}) {
     w.clearInterval = (id) => { const i = timers.findIndex(timer => timer.id === id); if (i >= 0) { timers.splice(i, 1); } };
     const tick = (times = 1) => { for (let i = 0; i < times; i++) { timers.slice().forEach(timer => timer.fn()); } };
 
+    if (options.assessment) {
+        w.ScpFleetAssess = {
+            assessFleet: () => options.assessment,
+            assessDevice: node => options.assessment.devices.find(d => d.nodeid === node._id) || null
+        };
+    }
     w.eval(fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-dashboard.js'), 'utf8'));
     w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
     t.after(() => { try { w.ScpDashboard.hide(); } catch (error) { /* already closed */ } w.close(); });
@@ -76,6 +82,91 @@ function setup(t, options = {}) {
 function liveButton(w) {
     return w.document.querySelector('.scp-dash-live');
 }
+
+test('assessment counts open matching device lists and follow room and search filters', (t) => {
+    const devices = [
+        { nodeid: 'ready', name: 'Ready PC', room: 'ทดสอบ', win11Status: 'already_win11', isWin11: true, healthStatus: 'good', recommendation: 'keep' },
+        { nodeid: 'ram', name: 'RAM PC', room: 'ทดสอบ', win11Status: 'upgradable', isWin11: true, healthStatus: 'fair', recommendation: 'upgrade', upgradeCost: 1200, win11Blockers: ['RAM น้อย'], upgradeActions: [{ note: 'เพิ่ม RAM เป็น 8 GB', cost: 1200 }] },
+        { nodeid: 'old', name: 'Old PC', room: 'ทดสอบ', win11Status: 'ineligible', healthStatus: 'critical', recommendation: 'replace' },
+        { nodeid: 'other', name: 'Other PC', room: 'ห้องยา', win11Status: 'eligible', healthStatus: 'good', recommendation: 'keep' },
+        { nodeid: 'hidden', name: 'Hidden PC', room: 'ทดสอบ', win11Status: 'eligible', healthStatus: 'good', recommendation: 'keep' }
+    ];
+    const { w, api } = setup(t, {
+        meshes: { 'mesh//a': { name: 'ทดสอบ' }, 'mesh//b': { name: 'ห้องยา' } },
+        nodes: devices.slice(0, 4).map(d => ({ _id: d.nodeid, name: d.name, meshid: d.room === 'ห้องยา' ? 'mesh//b' : 'mesh//a', conn: 1 })),
+        assessment: { devices, criteria: { costs: { newDevice: 18000 } } }
+    });
+    const printCalls = [];
+    w.ScpReport = { printAssessment: (devices, options) => printCalls.push({ devices, options }) };
+    api.show();
+    const section = () => w.document.getElementById('scp-dash-view-assess');
+    const count = filter => Number(section().querySelector('.scp-assess-stat[data-assess-filter="' + filter + '"] .scp-dash-stat-value').textContent);
+    for (const [filter, expected] of [['eligible', 2], ['upgradable', 1], ['ineligible', 1], ['critical', 1]]) {
+        assert.equal(count(filter), expected);
+        section().querySelector('.scp-assess-stat[data-assess-filter="' + filter + '"]').click();
+        assert.equal(section().querySelectorAll('tbody tr').length, expected);
+        assert.equal(section().querySelector('.scp-assess-stat[data-assess-filter="' + filter + '"]').getAttribute('aria-pressed'), 'true');
+    }
+    section().querySelector('.scp-assess-stat[data-assess-filter="upgradable"]').click();
+    assert.match(section().querySelector('tbody').textContent, /อัปเกรดได้.*ลง Win 11 แล้ว.*เพิ่ม RAM เป็น 8 GB/);
+    assert.match(section().querySelector('.scp-assess-savings').textContent, /1,200.*18,000.*16,800/);
+    section().querySelector('.scp-assess-print').click();
+    assert.deepEqual(Array.from(printCalls[0].devices, d => d.nodeid), ['ram']);
+    assert.ok(printCalls[0].devices[0].reportDetails.windowsLicense, 'available licence details are attached to printing');
+    section().querySelector('.scp-assess-print-all').click();
+    assert.deepEqual(Array.from(printCalls[1].devices, d => d.nodeid), ['ready', 'ram', 'old', 'other']);
+    section().querySelector('.scp-assess-print-device').click();
+    assert.deepEqual(Array.from(printCalls[2].devices, d => d.nodeid), ['ram']);
+    assert.doesNotMatch(section().textContent, /Hidden PC|\[object Object\]/);
+    const roomButton = [...w.document.querySelectorAll('.scp-dash-rooms .scp-dash-chip')].find(b => b.textContent.includes('ห้องยา'));
+    assert.ok(roomButton);
+    roomButton.click();
+    assert.equal(count('eligible'), 1);
+    assert.equal(count('upgradable'), 0);
+    const search = w.document.querySelector('.scp-dash-search');
+    search.value = 'no-match';
+    search.dispatchEvent(new w.Event('input'));
+    assert.equal(count('eligible'), 0);
+    assert.match(section().querySelector('tbody').textContent, /ไม่พบเครื่อง/);
+    assert.equal(section().querySelector('.scp-assess-print').disabled, true);
+});
+
+test('assessment fills the viewport outside a clipped workspace, and restores its location on exit', (t) => {
+    const { w, api, panel } = setup(t);
+    const anchor = panel.previousSibling;
+    const workspace = w.document.createElement('div');
+    panel.parentNode.insertBefore(workspace, panel);
+    // Keep the location anchor with the panel as the production workspace does.
+    workspace.appendChild(anchor);
+    workspace.appendChild(panel);
+    api.show();
+    const tab = label => [...w.document.querySelectorAll('.scp-dash-tab')].find(b => b.textContent === label);
+    tab('การประเมินสภาพเครื่อง').click();
+    assert.equal(panel.parentNode, w.document.body);
+    assert.equal(panel.classList.contains('scp-dash-expanded'), true);
+    const normal = [...w.document.querySelectorAll('.scp-assess-toolbar button')].find(b => b.textContent === 'กลับหน้าปกติ');
+    normal.click();
+    assert.equal(panel.parentNode, workspace);
+    assert.equal(panel.classList.contains('scp-dash-expanded'), false);
+    [...w.document.querySelectorAll('.scp-assess-toolbar button')].find(b => b.textContent === 'ขยายเต็มจอ').click();
+    api.hide();
+    assert.equal(panel.parentNode, workspace);
+    assert.equal(w.document.body.classList.contains('scp-assessment-expanded'), false);
+});
+
+test('normal dashboard scrolling stops above the fixed footer and includes padding inside its height', (t) => {
+    const { w, api, panel } = setup(t);
+    const footer = w.document.createElement('div');
+    footer.id = 'footer';
+    Object.defineProperty(footer, 'offsetHeight', { value: 50 });
+    footer.getBoundingClientRect = () => ({ top: 750 });
+    panel.getBoundingClientRect = () => ({ top: 80 });
+    w.document.body.appendChild(footer);
+    Object.defineProperty(w, 'innerHeight', { value: 800 });
+    api.show();
+    assert.equal(panel.style.maxHeight, '662px');
+    assert.equal(panel.style.boxSizing, 'border-box');
+});
 
 test('fleet snapshot returns counts without starting thumbnail capture', (t) => {
     const { api, connections } = setup(t);

@@ -240,8 +240,8 @@
         var c2 = el('div', null, 'scp-report-chart-box');
         c2.appendChild(el('h4', t('Lifespan & Replacement Timeline', 'ระยะเวลาคงเหลือ / แผนปลดระวาง')));
         c2.appendChild(createBarChart([
-            { label: t('This year (2026)', 'ปีนี้ (2569)'), value: assess.forecast.currentYear || 0, color: '#ef4444' },
-            { label: t('Next year (2027)', 'ปีหน้า (2570)'), value: assess.forecast.nextYear || 0, color: '#f59e0b' },
+            { label: t('Budget FY ' + (assess.budgetYearBE || 2570), 'งบ ' + (assess.budgetYearBE || 2570)), value: assess.forecast.currentYear || 0, color: '#ef4444' },
+            { label: t('Next fiscal year', 'ปีงบถัดไป'), value: assess.forecast.nextYear || 0, color: '#f59e0b' },
             { label: t('2-3 Yrs', '2-3 ปี'), value: assess.forecast.year2to3 || 0, color: '#3b82f6' },
             { label: t('4-5 Yrs', '4-5 ปี+'), value: assess.forecast.year4to5 || 0, color: '#10b981' }
         ], 380, 160, t('pcs', 'เครื่อง')));
@@ -380,7 +380,7 @@
                 row.appendChild(el('td', dev.diskHasSsd ? 'SSD' : 'HDD'));
 
                 var wTd = el('td');
-                var wBadge = el('span', dev.win11Status === 'eligible' ? t('Eligible', 'พร้อมใช้งาน') : (dev.win11Status === 'upgradable' ? t('Upgradable', 'อัปเกรดได้') : t('Ineligible', 'ไม่รองรับ')),
+                var wBadge = el('span', (dev.win11Status === 'eligible' || dev.win11Status === 'already_win11') ? t('Eligible', 'พร้อมใช้งาน') : (dev.win11Status === 'upgradable' ? t('Upgradable', 'อัปเกรดได้') : t('Ineligible', 'ไม่รองรับ')),
                     'scp-badge-' + dev.win11Status);
                 wTd.appendChild(wBadge);
                 row.appendChild(wTd);
@@ -399,7 +399,7 @@
     }
 
     // --- Report View 3: Individual Device Fact Sheet ---
-    function renderDeviceFactSheet(data, body) {
+    function renderDeviceFactSheet(data, body, device) {
         var assess = data.assess || { devices: [] };
         var devicesList = assess.devices || [];
 
@@ -419,15 +419,16 @@
             draw();
         };
         picker.appendChild(sel);
-        body.appendChild(picker);
+        if (!device) body.appendChild(picker);
 
-        var cur = devicesList.find(function (d) { return d.nodeid === selectedDeviceId; }) || devicesList[0];
+        var cur = device || devicesList.find(function (d) { return d.nodeid === selectedDeviceId; }) || devicesList[0];
         if (!cur) {
             body.appendChild(el('p', t('No device selected.', 'ยังไม่ได้เลือกเครื่อง'), 'scp-report-clear'));
             return;
         }
 
         var asset = (window.ScpCachedAssets && window.ScpCachedAssets[cur.nodeid]) || {};
+        var details = cur.reportDetails || {};
         var assetNo = asset.assetNumber || cur.assetNumber || '';
         var fy = asset.fiscalYear || cur.fiscalYear;
         var pr = asset.price != null ? asset.price : cur.purchasePrice;
@@ -453,11 +454,26 @@
 
         addSpec(t('Asset Tag & Procurement', 'เลขครุภัณฑ์และปีงบจัดซื้อ'), assetNo || t('Not specified', 'ยังไม่ระบุเลขครุภัณฑ์'), (fy ? (t('B.E. ', 'พ.ศ. ') + fy) : '') + (pr ? (' · ' + Number(pr).toLocaleString('th-TH') + ' ' + t('THB', 'บาท')) : ''));
         addSpec(t('Processor (CPU)', 'หน่วยประมวลผล (CPU)'), cur.cpu, cur.cpuEval ? cur.cpuEval.reason : '');
-        addSpec(t('System Memory (RAM)', 'หน่วยความจำ (RAM)'), (cur.ramGb || 0) + ' GB', cur.ramGb >= 8 ? t('Meets recommended 8 GB', 'ผ่านเกณฑ์แนะนำ 8 GB') : t('Below 8 GB', 'ต่ำกว่าเกณฑ์แนะนำ'));
-        addSpec(t('Storage Drive', 'ฮาร์ดดิสก์ / พื้นที่จัดเก็บ'), (cur.diskHasSsd ? 'SSD ความเร็วสูง' : 'HDD จานหมุน (ควรเปลี่ยน)'), 'พื้นที่ C: เหลือ ' + cur.cDriveFreePct + '%');
-        addSpec(t('Motherboard & BIOS', 'ระบบไบออส / เฟิร์มแวร์'), cur.biosMode || 'Legacy / UEFI', 'ปีที่จัดซื้อ/ผลิต: ' + (fy ? ('พ.ศ. ' + fy) : (cur.biosYear ? ('พ.ศ. ' + (cur.biosYear + 543)) : 'ไม่ระบุ')) + ' (อายุ ' + cur.ageYears + ' ปี)');
+        var recommendedRam = (assess.criteria && assess.criteria.recommendedRamGb) || 8;
+        addSpec(t('System Memory (RAM)', 'หน่วยความจำ (RAM)'), cur.ramGb ? cur.ramGb + ' GB' : t('Unknown', 'ไม่ทราบ'), t('Recommended ', 'แนะนำ ') + recommendedRam + ' GB');
+        var freePct = cur.cFreePercent == null ? cur.cDriveFreePct : cur.cFreePercent;
+        addSpec(t('Storage Drive', 'ฮาร์ดดิสก์ / พื้นที่จัดเก็บ'), ((cur.diskHasSsd || cur.hasSsd) ? 'SSD ความเร็วสูง' : 'HDD จานหมุน (ควรเปลี่ยน)'), freePct == null ? '' : 'พื้นที่ C: เหลือ ' + freePct + '%');
+        addSpec(t('Motherboard & BIOS', 'ระบบไบออส / เฟิร์มแวร์'), cur.biosMode || t('Unknown', 'ไม่ทราบ'), 'ปีที่จัดซื้อ/ผลิต: ' + (fy ? ('พ.ศ. ' + fy) : (cur.biosYear ? ('พ.ศ. ' + (cur.biosYear + 543)) : 'ไม่ระบุ')) + (cur.ageYears == null ? '' : ' (อายุ ' + cur.ageYears + ' ปี)'));
         addSpec(t('TPM Security Module', 'ระบบความปลอดภัย TPM'), cur.hasTpm2 ? 'TPM 2.0 พร้อมใช้งาน' : 'ไม่พบ TPM 2.0');
-        addSpec(t('Windows 11 Compatibility', 'ความพร้อม Windows 11'), cur.win11Status === 'eligible' ? 'พร้อมใช้งาน (Eligible)' : (cur.win11Status === 'upgradable' ? 'สามารถอัปเกรดได้' : 'ไม่ผ่านเกณฑ์ (Ineligible)'));
+        addSpec(t('Windows 11 Compatibility', 'ความพร้อม Windows 11'), (cur.win11Status === 'eligible' || cur.win11Status === 'already_win11') ? 'พร้อมใช้งาน (Eligible)' : (cur.win11Status === 'upgradable' ? 'สามารถอัปเกรดได้' : 'ไม่ผ่านเกณฑ์ (Ineligible)'));
+        if (cur.replacementPrice) addSpec(t('Replacement budget / category', 'ราคาซื้อทดแทน / ประเภทงาน'), cur.replacementPrice.price.toLocaleString() + ' บาท', (cur.replacementPrice.label || '') + ' · งบ ' + cur.replacementBudgetYearBE + (cur.replacementPrice.draft ? ' · ฉบับร่าง หน้า ' + cur.replacementPrice.page : ''));
+        addSpec(t('Operating system', 'ระบบปฏิบัติการ'), cur.os || cur.osCaption);
+        addSpec(t('Device type / model', 'ชนิดเครื่อง / รุ่น'), ({ desktop: 'PC', aio: 'All-in-One', notebook: 'Notebook' })[cur.deviceClass] || '-', cur.modelName || '');
+        if (details.ip || details.host) addSpec(t('IP / hostname', 'IP / ชื่อโฮสต์'), details.ip || '-', details.host);
+        if (details.online !== undefined) addSpec(t('Connection / user', 'การเชื่อมต่อ / ผู้ใช้งาน'), details.online ? t('Online', 'ออนไลน์') : t('Offline', 'ออฟไลน์'), details.user || t('No user reported', 'ไม่มีข้อมูลผู้ใช้งาน'));
+        if (cur.driveModels && cur.driveModels.length) addSpec(t('Drive models', 'รุ่นดิสก์'), cur.driveModels.join(' / '));
+        if (cur.cTotalGb) addSpec(t('C: capacity / free', 'ความจุ / พื้นที่ว่างไดรฟ์ C:'), cur.cTotalGb + ' GB / ' + (cur.cFreeGb || 0) + ' GB', (cur.cFreePercent == null ? cur.cDriveFreePct : cur.cFreePercent) + '% ' + t('free', 'ว่าง'));
+        if (details.windowsLicense) addSpec(t('Windows activation', 'สิทธิ์ Windows / Activate'), details.windowsLicense);
+        if (details.officeLicense) addSpec(t('Microsoft Office licence', 'สิทธิ์ Microsoft Office'), details.officeLicense);
+        if (cur.acquiredYearBE) addSpec(t('Acquisition year / source', 'ปีจัดซื้อหรือปีประมาณ / ที่มา'), 'พ.ศ. ' + cur.acquiredYearBE, ({ asset: t('Asset record', 'ทะเบียนครุภัณฑ์'), cpu: t('Estimated from CPU', 'ประมาณจากรุ่น CPU'), bios: t('Estimated from BIOS', 'ประมาณจาก BIOS') })[cur.yearSource] || '');
+        if (cur.costBasis != null) addSpec(t('Cost basis', 'มูลค่าตั้งต้น'), Number(cur.costBasis).toLocaleString() + ' บาท', cur.costSource === 'asset' ? t('Purchase price', 'ราคาจัดซื้อ') : t('Configured reference price', 'ราคากลางที่ตั้งไว้'));
+        if (cur.bookValue != null) addSpec(t('Book value / depreciation', 'มูลค่าคงเหลือ / ค่าเสื่อมสะสม'), Number(cur.bookValue).toLocaleString() + ' / ' + Number(cur.depreciation || 0).toLocaleString() + ' บาท', (cur.depreciationPercent || 0) + '% · ' + t('Useful life ', 'อายุค่าเสื่อม ') + (cur.usefulLifeYears || '-') + t(' years', ' ปี'));
+        if (cur.assetNote || asset.note) addSpec(t('Asset note', 'หมายเหตุครุภัณฑ์'), asset.note || cur.assetNote);
 
         sheet.appendChild(specGrid);
 
@@ -474,7 +490,7 @@
 
         var repIns = cur.insight || (window.ScpFleetAssess && window.ScpFleetAssess.getDeviceInsight && window.ScpFleetAssess.getDeviceInsight(cur));
         if (repIns && (repIns.what || repIns.why)) {
-            var bannerCls = 'scp-bulb-banner' + (cur.win11Status === 'eligible' ? ' scp-bulb-banner-good' : (cur.win11Status === 'upgradable' ? ' scp-bulb-banner-warn' : ' scp-bulb-banner-danger'));
+            var bannerCls = 'scp-bulb-banner' + ((cur.win11Status === 'eligible' || cur.win11Status === 'already_win11') ? ' scp-bulb-banner-good' : (cur.win11Status === 'upgradable' ? ' scp-bulb-banner-warn' : ' scp-bulb-banner-danger'));
             var bulbBanner = el('div', null, bannerCls);
             var bIcon = el('span', '💡', null);
             bIcon.style.fontSize = '18px';
@@ -497,19 +513,27 @@
         if (cur.upgradeActions && cur.upgradeActions.length) {
             evalBox.appendChild(el('h5', t('Upgrade Advice:', 'คำแนะนำในการปรับปรุง:')));
             var aUl = el('ul', null, 'scp-report-reasons');
-            cur.upgradeActions.forEach(function (aTxt) { aUl.appendChild(el('li', aTxt, 'scp-report-r-warn')); });
+            cur.upgradeActions.forEach(function (action) { aUl.appendChild(el('li', typeof action === 'string' ? action : action.note, 'scp-report-r-warn')); });
             evalBox.appendChild(aUl);
+        }
+        if (details.risks && details.risks.length) {
+            evalBox.appendChild(el('h5', t('Other issues reported:', 'ประเด็นที่ระบบตรวจพบเพิ่มเติม:')));
+            var risks = el('ul', null, 'scp-report-reasons');
+            details.risks.forEach(function (risk) { risks.appendChild(el('li', risk)); });
+            evalBox.appendChild(risks);
         }
 
         // Survival curve sparkline
         evalBox.appendChild(el('h5', t('1-5 Year Survival Probability Forecast:', 'โอกาสใช้งานได้ต่อเนื่อง 1–5 ปี ข้างหน้า:')));
         evalBox.appendChild(createSparkline(cur.survival, 360, 80));
 
+        var planYear = cur.replacementYear || cur.replaceByYear;
+        var planYearText = planYear ? String(thai ? Number(planYear) + 543 : planYear) : '-';
         var recMsg = cur.recommendation === 'replace'
-            ? t('Recommended: Plan replacement in ', 'ข้อเสนอแนะ: วางแผนจัดซื้อเครื่องใหม่ในปี ') + cur.replacementYear + ' (ประมาณการงบ ~' + (cur.estimatedCost || 18000).toLocaleString() + ' บาท)'
+            ? t('Recommended: Plan replacement in ', 'ข้อเสนอแนะ: วางแผนจัดซื้อเครื่องใหม่ในปี ') + planYearText + ' (ประมาณการงบ ~' + (cur.estimatedCost || 18000).toLocaleString() + ' บาท)'
             : (cur.recommendation === 'upgrade'
-                ? t('Recommended: Upgrade SSD/RAM for ~', 'ข้อเสนอแนะ: อัปเกรด RAM/SSD งบประมาณ ~') + (cur.estimatedCost || 0).toLocaleString() + ' บาท ยืดอายุได้ถึง ' + cur.replacementYear
-                : t('Recommended: Good condition. Maintain and use through ', 'ข้อเสนอแนะ: สภาพดี ใช้งานต่อเนื่องได้ถึง ') + cur.replacementYear);
+                ? t('Recommended: Upgrade hardware for ~', 'ข้อเสนอแนะ: อัปเกรดเครื่องเดิม งบประมาณ ~') + (cur.upgradeCost || cur.estimatedCost || 0).toLocaleString() + ' บาท · ปีแผนระยะยาว ' + planYearText
+                : t('Recommended: Maintain this device. Planning year ', 'ข้อเสนอแนะ: ใช้งานและดูแลเครื่องเดิม ปีแผนระยะยาว ') + planYearText);
 
         evalBox.appendChild(el('div', recMsg, 'scp-device-rec-callout scp-rec-' + cur.recommendation));
         sheet.appendChild(evalBox);
@@ -521,9 +545,10 @@
     function renderBudgetForecast(data, body) {
         var assess = data.assess || { budget: {}, forecast: {}, criteria: {} };
         var b = assess.budget || {};
-        var currentYear = new Date().getFullYear();
+        var currentYear = assess.budgetYearBE ? assess.budgetYearBE - 543 : new Date().getFullYear();
 
         body.appendChild(el('h3', t('Multi-Year IT Hardware Budget & Upgrade Forecast', 'แผนงบประมาณและประมาณการค่าใช้จ่ายครุภัณฑ์คอมพิวเตอร์ 1-5 ปี')));
+        if (assess.criteria && assess.criteria.useReferencePricesForReplacement && assess.budgetYearBE === 2570) body.appendChild(el('p', t('FY 2570 planning prices are from the supplied draft, whose publication date is blank. Replacement costs follow the selected device type / workload category.', 'ราคางบ 2570 อ้างอิงฉบับร่างที่แนบ ซึ่งยังเว้นวันที่ประกาศไว้ ราคาซื้อทดแทนใช้ชนิดเครื่องและประเภทงานที่เลือกในเกณฑ์ประเมิน')));
         body.appendChild(el('p', t('Projections based on device age, Windows 11 end-of-life compatibility, and hardware degradation modeling.', 'คำนวณจากอายุเครื่อง สภาพฮาร์ดแวร์ การสิ้นสุดระยะสนับสนุน Windows 10 และเกณฑ์มาตรฐานของโรงพยาบาล')));
 
         // Budget summary cards
@@ -648,6 +673,10 @@
         var title = el('h1', titles[currentReportMode] || titles.overview, 'scp-report-title');
         printRoot.appendChild(title);
         printRoot.appendChild(buildBody(lastData));
+        printContent(printRoot);
+    }
+
+    function printContent(printRoot) {
         document.body.appendChild(printRoot);
         document.documentElement.classList.add('scp-printing');
         var cleaned = false;
@@ -660,6 +689,15 @@
         root.addEventListener('afterprint', clean);
         root.setTimeout(clean, 60000);
         try { root.print(); } catch (error) { clean(); }
+    }
+
+    function printAssessment(devices, options) {
+        if (!Array.isArray(devices) || !devices.length) return;
+        options = options || {};
+        var printRoot = el('div', null, 'scp-print-root scp-assessment-report');
+        var data = { assess: { devices: devices, criteria: options.criteria || {} } };
+        devices.forEach(function (device) { renderDeviceFactSheet(data, printRoot, device); });
+        printContent(printRoot);
     }
 
     function refresh() {
@@ -712,6 +750,7 @@
     root.ScpReport = {
         open: open,
         close: close,
+        printAssessment: printAssessment,
         summarize: summarize,
         _buildBody: buildBody,
         createBarChart: createBarChart,

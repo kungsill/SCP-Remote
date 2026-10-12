@@ -2067,3 +2067,25 @@ body.scp-map-full-open {
     .scp-map-edit-bar, .scp-map-edit-bar.on { display: none; }
     .scp-map-card { width: min(290px, calc(100% - 16px)); }
 }
+
+/* Computer details on a phone: the header, the four quick cards and the footer were all pinned,
+   leaving only a sliver in the middle to scroll, so the details seemed to slide under the cards.
+   Here the whole box scrolls as one page: the name bar stays at the top, the quick cards go two
+   to a row, and the buttons stay reachable at the bottom. */
+@media (max-width: 700px) {
+    .scp-computer-modal-box { max-height: 92svh; overflow-y: auto !important; display: block; border-radius: 18px !important; overscroll-behavior: contain; }
+    .scp-cm-header { position: sticky; top: 0; z-index: 3; padding: 12px 14px; gap: 8px; align-items: flex-start; background: var(--scp-surface, #fff); }
+    .scp-cm-title-wrap { gap: 10px; min-width: 0; }
+    .scp-cm-icon { width: 40px; height: 40px; font-size: 24px; }
+    .scp-cm-name { font-size: 17px; overflow-wrap: anywhere; }
+    .scp-cm-header-right { gap: 4px; flex-shrink: 0; }
+    .scp-cm-header-right > :not(.scp-dialog-close-btn) { font-size: 11px; padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+    .scp-cm-quick-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px 14px; }
+    .scp-cm-quick-card { padding: 8px 10px; }
+    .scp-cm-quick-val { font-size: 13px; overflow-wrap: anywhere; }
+    .scp-cm-body { overflow: visible; padding: 14px; gap: 16px; }
+    .scp-cm-footer { position: sticky; bottom: 0; z-index: 3; padding: 10px 14px; flex-wrap: wrap; gap: 8px; background: var(--scp-surface, #fff); }
+    .scp-cm-footer-left { flex: 1 1 100%; }
+    .scp-cm-footer-left > * { flex: 1 1 auto; }
+    .scp-cm-btn-close { flex: 1 1 100%; }
+}

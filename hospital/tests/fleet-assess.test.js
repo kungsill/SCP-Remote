@@ -129,3 +129,31 @@ test('assessFleet builds comprehensive hospital fleet summaries and budget forec
     assert.ok(fleet.byRoom['OPD']);
     assert.ok(Object.keys(fleet.budgetForecast).length >= 5);
 });
+
+test('acquisition year comes from the asset record, else the CPU launch year, and book value follows government straight-line to 1 baht', () => {
+    const fa = require('../fleet-assess');
+    assert.equal(fa.cpuLaunchYear('13th Gen Intel(R) Core(TM) i5-13420H'), 2023);
+    assert.equal(fa.cpuLaunchYear('Intel(R) Core(TM) i3-4160 CPU @ 3.60GHz'), 2013);
+    assert.equal(fa.cpuLaunchYear('Intel(R) Core(TM) i5-1135G7 @ 2.40GHz'), 2021);
+    assert.equal(fa.cpuLaunchYear('AMD Ryzen 5 2400G with Radeon Vega Graphics'), 2018);
+    assert.equal(fa.cpuLaunchYear('Intel(R) Core(TM)2 Duo CPU E7500'), 2008);
+    assert.equal(fa.cpuLaunchYear('Something unknown'), null);
+    assert.equal(fa.deviceClassOf('13th Gen Intel(R) Core(TM) i5-13420H'), 'notebook');
+    assert.equal(fa.deviceClassOf('Intel(R) Core(TM) i5-10400 CPU'), 'desktop');
+    const full = fa.depreciate(17000, Date.UTC(2015, 6, 1), 5, Date.UTC(2026, 0, 1));
+    assert.equal(full.bookValue, 1);
+    assert.equal(full.fullyDepreciated, true);
+    const half = fa.depreciate(17001, Date.UTC(2020, 0, 1), 5, Date.UTC(2020, 0, 1) + 2.5 * 365.25 * 86400000);
+    assert.equal(half.bookValue, 8501);
+    const node = { _id: 'node//x', name: 'PC' };
+    const si = { hardware: { identifiers: { cpu_name: 'Intel(R) Core(TM) i5-10400 CPU', bios_date: '20250101' }, windows: { memory: [{ Capacity: 8 * 1024 ** 3 }], osinfo: { Caption: 'Microsoft Windows 11 Pro' } } } };
+    const byCpu = fa.assessDevice(node, si, null, null);
+    assert.equal(byCpu.yearSource, 'cpu');
+    assert.equal(byCpu.acquiredYearBE, 2563);
+    assert.equal(byCpu.costSource, 'reference');
+    const byAsset = fa.assessDevice(node, si, null, { fiscalYear: 2567, price: 21000 });
+    assert.equal(byAsset.yearSource, 'asset');
+    assert.equal(byAsset.acquiredYearBE, 2567);
+    assert.equal(byAsset.costBasis, 21000);
+    assert.equal(byAsset.costSource, 'asset');
+});

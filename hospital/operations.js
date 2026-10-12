@@ -98,6 +98,19 @@ exports.handle = async function (ctx, cmd) {
   if (!admin && !(user.siteadmin & 2)) throw Error('ACCESS_DENIED');
   const assessEngine = require('./fleet-assess');
   const newCriteria = Object.assign({}, assessEngine.DEFAULT_CRITERIA, cmd.criteria);
+  // Book-value settings: a useful life the Comptroller General allows for computers (3-5
+  // years), and reference prices kept to sane Buddhist-era years and baht amounts.
+  const life = Number(newCriteria.usefulLifeYears);
+  newCriteria.usefulLifeYears = (life >= 3 && life <= 5) ? Math.round(life) : assessEngine.DEFAULT_CRITERIA.usefulLifeYears;
+  const prices = { desktop: {}, notebook: {} };
+  for (const cls of ['desktop', 'notebook']) {
+   const table = (newCriteria.referencePrices && newCriteria.referencePrices[cls]) || {};
+   for (const year of Object.keys(table)) {
+    const y = Number(year), v = Number(table[year]);
+    if (Number.isInteger(y) && y >= 2540 && y <= 2700 && v > 0 && v <= 1000000) prices[cls][y] = Math.round(v);
+   }
+  }
+  newCriteria.referencePrices = prices;
   const row = {
    _id: 'scpcriteria/' + domain.id,
    type: 'scpcriteria',

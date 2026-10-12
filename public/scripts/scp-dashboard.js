@@ -396,11 +396,12 @@
             }
         }
         // Only a real date counts: the BIOS year, or the fiscal year typed into the asset record.
-        var age = (a.biosYear || a.fiscalYear) ? Number(a.ageYears) : NaN;
+        var age = (a.yearSource || a.biosYear || a.fiscalYear) ? Number(a.ageYears) : NaN;
+        var ageFrom = a.yearSource === 'cpu' ? (thai ? ' (ประมาณจากรุ่น CPU)' : ' (from the CPU model)') : a.yearSource === 'asset' ? (thai ? ' (ตามปีงบครุภัณฑ์)' : ' (asset record)') : '';
         if (age >= 10) {
-            found.push({ level: 'high', kind: 'age', text: thai ? ('เครื่องเก่ามาก อายุประมาณ ' + age + ' ปี — เสี่ยงเสียกลางคัน ควรเปลี่ยน') : ('Very old machine, about ' + age + ' years — likely to fail, replace') });
+            found.push({ level: 'high', kind: 'age', text: thai ? ('เครื่องเก่ามาก อายุประมาณ ' + age + ' ปี' + ageFrom + ' — เสี่ยงเสียกลางคัน ควรเปลี่ยน') : ('Very old machine, about ' + age + ' years' + ageFrom + ' — likely to fail, replace') });
         } else if (age >= 7) {
-            found.push({ level: 'warn', kind: 'age', text: thai ? ('เครื่องอายุประมาณ ' + age + ' ปี ครบเกณฑ์พิจารณาเปลี่ยน') : ('About ' + age + ' years old, due for replacement') });
+            found.push({ level: 'warn', kind: 'age', text: thai ? ('เครื่องอายุประมาณ ' + age + ' ปี' + ageFrom + ' ครบเกณฑ์พิจารณาเปลี่ยน') : ('About ' + age + ' years old' + ageFrom + ', due for replacement') });
         }
         var os = String(a.osCaption || a.os || node.osdesc || '');
         if (a.isWin7 || /Windows\s*(XP|Vista|7|8)\b/i.test(os)) {
@@ -420,7 +421,8 @@
             cpu: cpu && cpu !== '-' ? cpu : '',
             ram: Number(a.ramGb) > 0 ? a.ramGb + ' GB' : '',
             os: String(a.osCaption || a.os || node.osdesc || '').replace(/Microsoft\s*/i, ''),
-            age: (a.biosYear || a.fiscalYear) && a.ageYears != null ? a.ageYears : null,
+            age: (a.yearSource || a.biosYear || a.fiscalYear) && a.ageYears != null ? a.ageYears : null,
+            bookValue: a.bookValue,
             disk: a.diskHasSsd ? 'SSD' : '',
             cFree: (a.cDriveFreePct != null ? a.cDriveFreePct : a.cFreePercent),
             score: a.healthScore != null ? a.healthScore : a.score
@@ -1058,7 +1060,9 @@
         var rows = allNodes().filter(function (node) { return hardwareOf(node); });
         if (!rows.length) { window.alert(t('exportNone')); return; }
         var header = ['ชื่อเครื่อง', 'หน่วยงาน', 'เลขครุภัณฑ์', 'ปีงบประมาณ_พศ', 'ราคาจัดซื้อ_บาท', 'ชื่อเครื่องใน Windows', 'IP', 'รุ่นเครื่อง', 'ยี่ห้อเมนบอร์ด',
-                      'CPU', 'การ์ดจอ', 'แรม (GB)', 'ดิสก์', 'ระบบปฏิบัติการ', 'Serial', 'วันที่ BIOS', 'หมายเหตุ'];
+                      'CPU', 'การ์ดจอ', 'แรม (GB)', 'ดิสก์', 'ระบบปฏิบัติการ', 'Serial', 'วันที่ BIOS', 'หมายเหตุ',
+                      'ปีที่CPUออกขาย_พศ', 'ปีที่ได้มา_พศ_ประมาณ', 'ที่มาของปี', 'ประเภทเครื่อง', 'ราคาตั้งต้น_บาท', 'ที่มาของราคา',
+                      'อายุการใช้งาน_ปี', 'ค่าเสื่อมราคาสะสม_บาท', 'มูลค่าคงเหลือตามบัญชี_บาท'];
         var lines = [header.map(csvCell).join(',')];
         rows.forEach(function (node) {
             var hardware = hardwareOf(node), identifiers = hardware.identifiers || {}, windows = hardware.windows || {};
@@ -1081,7 +1085,16 @@
                 ram > 0 ? gigabytes(ram) : '',
                 disksOf(node).map(function (d) { return d.letter + ':' + d.free + 'GB'; }).join(' '),
                 (node.osdesc || '').replace('Microsoft ', ''), serial, bios, nt
-            ].map(csvCell).join(','));
+            ].concat((function () {
+                var b = (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice) ? window.ScpFleetAssess.assessDevice(node) : null;
+                if (!b) return ['', '', '', '', '', '', '', '', ''];
+                return [b.cpuYear ? b.cpuYear + 543 : '', b.acquiredYearBE || '',
+                    { asset: 'ปีงบประมาณครุภัณฑ์', cpu: 'ประมาณจากรุ่น CPU', bios: 'ประมาณจากวันที่ BIOS' }[b.yearSource] || '',
+                    b.deviceClass === 'notebook' ? 'โน้ตบุ๊ก' : 'เครื่องตั้งโต๊ะ',
+                    b.costBasis != null ? b.costBasis : '',
+                    b.costSource === 'asset' ? 'ราคาจัดซื้อจริง' : ('ราคากลาง MDES' + (b.referencePriceYearBE ? ' ปี ' + b.referencePriceYearBE : '')),
+                    b.usefulLifeYears || '', b.depreciation != null ? b.depreciation : '', b.bookValue != null ? b.bookValue : ''];
+            })()).map(csvCell).join(','));
         });
         saveCsv('SCP-Remote_ครุภัณฑ์คอมพิวเตอร์_' + stamp() + '.csv', lines);
         window.alert(format(t('exportDone'), rows.length));
@@ -2654,6 +2667,21 @@
         assetGrid.appendChild(makeSpecItem(thai ? 'ปีงบประมาณ' : 'Fiscal Year', assetData.fiscalYear ? ((thai ? 'พ.ศ. ' : 'FY ') + assetData.fiscalYear) : '-'));
         assetGrid.appendChild(makeSpecItem(thai ? 'ราคาจัดซื้อ' : 'Purchase Price', assetData.price ? (Number(assetData.price).toLocaleString() + (thai ? ' บาท' : ' THB')) : '-'));
         assetGrid.appendChild(makeSpecItem(thai ? 'งบจัดซื้อ / หมายเหตุ' : 'Budget / Note', assetData.note || '-'));
+        // Book value the government way: straight line to 1 baht, from the acquisition year
+        // (asset record, else the CPU's launch year) and the purchase or reference price.
+        var bookA = (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice) ? window.ScpFleetAssess.assessDevice(node) : null;
+        if (bookA && bookA.costBasis) {
+            var baht = function (v) { return Number(v).toLocaleString(thai ? 'th-TH' : undefined, { maximumFractionDigits: 2 }) + (thai ? ' บาท' : ' THB'); };
+            var srcText = bookA.yearSource === 'asset' ? (thai ? 'ตามปีงบประมาณครุภัณฑ์' : 'from the asset record')
+                : bookA.yearSource === 'cpu' ? (thai ? 'ประมาณจากรุ่น CPU (ออกขายปี ' + (bookA.cpuYear + 543) + ')' : 'estimated from the CPU (released ' + bookA.cpuYear + ')')
+                : bookA.yearSource === 'bios' ? (thai ? 'ประมาณจากวันที่ BIOS' : 'estimated from the BIOS date') : '';
+            assetGrid.appendChild(makeSpecItem(thai ? 'ปีที่ได้มา (ประมาณ)' : 'Acquired (approx.)', bookA.acquiredYearBE ? ((thai ? 'พ.ศ. ' : 'BE ') + bookA.acquiredYearBE + ' · ' + srcText) : '-'));
+            assetGrid.appendChild(makeSpecItem(thai ? 'ราคาตั้งต้น' : 'Cost basis', baht(bookA.costBasis) + ' · ' + (bookA.costSource === 'asset'
+                ? (thai ? 'ราคาจัดซื้อจริง' : 'actual price')
+                : (thai ? 'ราคากลาง MDES ' : 'MDES reference ') + (bookA.deviceClass === 'notebook' ? (thai ? 'โน้ตบุ๊ก' : 'notebook') : (thai ? 'เครื่องตั้งโต๊ะ' : 'desktop')) + (bookA.referencePriceYearBE ? (thai ? ' ปี ' : ' ') + bookA.referencePriceYearBE : ''))));
+            assetGrid.appendChild(makeSpecItem(thai ? 'ค่าเสื่อมราคาสะสม' : 'Accumulated depreciation', bookA.depreciation != null ? baht(bookA.depreciation) + ' (' + bookA.depreciationPercent + '% · ' + (thai ? 'อายุใช้งาน ' : 'life ') + bookA.usefulLifeYears + (thai ? ' ปี' : ' yrs') + ')' : '-'));
+            assetGrid.appendChild(makeSpecItem(thai ? 'มูลค่าคงเหลือตามบัญชี ณ วันนี้' : 'Book value today', bookA.bookValue != null ? baht(bookA.bookValue) + (bookA.fullyDepreciated ? (thai ? ' (ตัดค่าเสื่อมครบแล้ว คงไว้ 1 บาท)' : ' (fully depreciated, kept at 1 baht)') : '') : '-', bookA.fullyDepreciated ? 'risk' : ''));
+        }
         secAsset.appendChild(assetGrid);
 
         var assetBtnRow = element('div', 'scp-cm-asset-actions');

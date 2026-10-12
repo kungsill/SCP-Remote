@@ -21,8 +21,100 @@
             newDevice: 18000,
             ramUpgrade: 1200,
             ssdUpgrade: 1500
-        }
+        },
+        // Same book-value rules as the server (hospital/fleet-assess.js).
+        usefulLifeYears: 5,
+        referencePrices: {
+            desktop: { 2565: 17000, 2566: 17000 },
+            notebook: { 2565: 16000, 2566: 16000 }
+        },
+        defaultPrice: { desktop: 17000, notebook: 16000 }
     };
+
+    // The year a processor went on sale, from its model name. A computer cannot be older than
+    // its processor, and unlike the BIOS date (which moves forward with every BIOS update) the
+    // model never changes, so this is the better guess of when a machine was bought.
+    function cpuLaunchYear(cpuName) {
+        var s = String(cpuName || '');
+        if (!s) return null;
+        var m;
+        // Intel Core Ultra: series 1 (Meteor Lake, Dec 2023), 2 (2024), 3 (2025)
+        if ((m = s.match(/Core\s*(?:\(TM\)\s*)?Ultra\s*[3579]\s*(\d)\d{2}/i))) return { 1: 2023, 2: 2024, 3: 2025 }[m[1]] || null;
+        var INTEL_GEN = { 1: 2010, 2: 2011, 3: 2012, 4: 2013, 5: 2015, 6: 2015, 7: 2017, 8: 2017, 9: 2018, 10: 2020, 11: 2021, 12: 2022, 13: 2023, 14: 2024 };
+        if ((m = s.match(/(\d{1,2})(?:th|st|nd|rd)\s+Gen/i)) && INTEL_GEN[+m[1]]) return INTEL_GEN[+m[1]];
+        if ((m = s.match(/\bi[3579]-(\d{3,5})/i))) {
+            var num = m[1], gen;
+            if (num.length === 5) gen = +num.slice(0, 2);                       // i5-12400, i7-13700
+            else if (num.length === 4 && num[0] === '1') gen = +num.slice(0, 2); // i5-1135G7, i5-1235U
+            else if (num.length === 4) gen = +num[0];                             // i5-4590, i3-7100
+            else gen = 1;                                                         // i5-650
+            return INTEL_GEN[gen] || null;
+        }
+        if (/Core\s*(?:\(TM\)\s*)?2|Pentium\(R\)\s*Dual|Pentium\s*D\b/i.test(s)) return 2008;
+        if ((m = s.match(/\bG(\d{4})/i)) && /Pentium|Celeron/i.test(s)) {           // desktop Pentium/Celeron G
+            var g = +m[1];
+            if (g >= 7000) return 2022; if (g >= 6000) return 2020; if (g >= 5900) return 2020;
+            if (g >= 5400) return 2018; if (g >= 4500) return 2017; if (g >= 4400) return 2015;
+            if (g >= 3200) return 2014; if (g >= 2000) return 2012; return 2010;
+        }
+        if ((m = s.match(/\b([JN])(\d{4})\b/))) {                                   // low-power Pentium/Celeron
+            var n = +m[2];
+            if (n >= 6000) return 2021; if (n >= 5000) return 2017; if (n >= 4100) return 2019;
+            if (n >= 4000) return 2017; if (n >= 3000) return 2016; if (n >= 2000) return 2013; return 2013;
+        }
+        if (/Intel\(R\)\s*N\d{2,3}\b|\bN[12]\d{2}\b/.test(s)) return 2023;          // Intel N100 / N200
+        if (/\bAtom\b/i.test(s)) return 2010;
+        if ((m = s.match(/Xeon.*E3-12\d\d\s*v(\d)/i))) return { 1: 2011, 2: 2012, 3: 2013, 4: 2015, 5: 2015, 6: 2017 }[m[1]] || null;
+        // AMD
+        if (/Ryzen\s+AI/i.test(s)) return 2024;
+        if ((m = s.match(/Ryzen\s+[3579]\s+(?:PRO\s+)?(\d{3,4})/i))) {
+            var r = m[1];
+            if (r.length === 3) return 2025;                                        // Ryzen 5 220 (200 series)
+            return { 1: 2017, 2: 2018, 3: 2019, 4: 2020, 5: 2021, 6: 2022, 7: 2023, 8: 2024, 9: 2024 }[r[0]] || null;
+        }
+        if ((m = s.match(/Athlon\s+(?:Silver|Gold)?\s*(\d{4})/i))) return +m[1] >= 7000 ? 2022 : +m[1] >= 3000 ? 2020 : 2018;
+        if (/Athlon\s+\d{3}GE/i.test(s)) return 2018;
+        if ((m = s.match(/\bA(?:4|6|8|9|10|12)-(\d)\d{3}/i))) return { 5: 2012, 6: 2013, 7: 2015, 9: 2016 }[m[1]] || 2014;
+        if (/\bFX-\d{4}/i.test(s)) return 2012;
+        if (/\bE[12]-\d{4}/i.test(s)) return 2013;
+        if (/Phenom|Athlon\s*(II|64|X2)/i.test(s)) return 2009;
+        return null;
+    }
+
+    // Laptop processors carry a mobile suffix (U, H, HS, HX, P, Y, or G1-G7 on Ice/Tiger Lake).
+    function deviceClassOf(cpuName) {
+        var s = String(cpuName || '');
+        if (/\bi[3579]-\d{4,5}(U|H|HS|HX|HK|HQ|P|Y|G\d)\b/i.test(s)) return 'notebook';
+        if (/Core\s*(?:\(TM\)\s*)?Ultra\s*[3579]\s*\d{3}(U|H|V|HX)\b/i.test(s)) return 'notebook';
+        if (/Ryzen\s+[3579]\s+(?:PRO\s+)?\d{4}(U|H|HS|HX)\b/i.test(s)) return 'notebook';
+        if (/Athlon\s+(?:Silver|Gold)\s+\d{4}U/i.test(s)) return 'notebook';
+        return 'desktop';
+    }
+
+    // Government reference price for that class of computer in that Buddhist-era year: the
+    // exact year if listed, else the nearest earlier year, else the nearest later, else a default.
+    function referencePrice(criteria, cls, yearBE) {
+        var table = (criteria.referencePrices && criteria.referencePrices[cls]) || {};
+        var years = Object.keys(table).map(Number).filter(function (y) { return table[y] > 0; }).sort(function (a, b) { return a - b; });
+        if (yearBE && table[yearBE] > 0) return { price: Number(table[yearBE]), year: yearBE };
+        var before = years.filter(function (y) { return y <= yearBE; }).pop();
+        if (before) return { price: Number(table[before]), year: before };
+        if (years.length) return { price: Number(table[years[0]]), year: years[0] };
+        var fallback = (criteria.defaultPrice && criteria.defaultPrice[cls]) || 17000;
+        return { price: Number(fallback), year: null };
+    }
+
+    // Straight-line depreciation over the useful life, down to a salvage value of 1 baht, the way
+    // government asset registers keep a fully depreciated item on the books.
+    function depreciate(cost, acquiredAt, lifeYears, now) {
+        if (!(cost > 0) || !acquiredAt) return null;
+        var life = Math.max(1, Number(lifeYears) || 5);
+        var days = Math.max(0, (now - acquiredAt) / 86400000);
+        var fraction = Math.min(1, days / (life * 365.25));
+        var depreciation = Math.round((cost - 1) * fraction * 100) / 100;
+        return { depreciation: depreciation, bookValue: Math.max(1, Math.round((cost - depreciation) * 100) / 100), percent: Math.round(fraction * 100), fullyDepreciated: fraction >= 1, lifeYears: life };
+    }
+
 
     function evaluateCpu(cpuName) {
         if (!cpuName || typeof cpuName !== 'string') {
@@ -235,6 +327,28 @@
         var cpuName = (id.cpu_name) || (s && s.cpu && (s.cpu.model || s.cpu.name || s.cpu.brand)) || (node && node.cpu) || '';
         var cpuEval = evaluateCpu(cpuName);
 
+        // Acquisition year: the asset record's fiscal year, else the CPU's launch year,
+        // else the BIOS date -- the same order the server uses.
+        var biosDateYear = biosYear;
+        var asset = (root.ScpCachedAssets && nid && root.ScpCachedAssets[nid]) || {};
+        var fy = asset.fiscalYear ? parseInt(asset.fiscalYear, 10) : null;
+        var cpuYear = cpuLaunchYear(cpuName);
+        var yearSource = null, acquiredAt = null, acquiredYearBE = null;
+        if (fy) {
+            var fyBE = fy > 2400 ? fy : fy + 543;
+            biosYear = fyBE - 543; yearSource = 'asset'; acquiredYearBE = fyBE; acquiredAt = Date.UTC(fyBE - 543, 3, 1);
+        } else if (cpuYear) {
+            biosYear = cpuYear; yearSource = 'cpu'; acquiredYearBE = cpuYear + 543; acquiredAt = Date.UTC(cpuYear, 6, 1);
+        } else if (biosYear) {
+            yearSource = 'bios'; acquiredYearBE = biosYear + 543; acquiredAt = Date.UTC(biosYear, 6, 1);
+        }
+        if (yearSource) ageYears = Math.max(0, currentYear - biosYear);
+        var deviceClass = deviceClassOf(cpuName);
+        var ref = referencePrice(criteria, deviceClass, acquiredYearBE);
+        var purchasePrice = Number(asset.price) > 0 ? Number(asset.price) : null;
+        var costBasis = purchasePrice || ref.price;
+        var book = depreciate(costBasis, acquiredAt, criteria.usefulLifeYears, Date.now());
+
         var ramGb = 0;
         if (Array.isArray(win.memory) && win.memory.length) {
             var mBytes = win.memory.reduce(function (sum, m) { return sum + (Number(m.Capacity) || 0); }, 0);
@@ -362,7 +476,21 @@
             name: node.name || node.rname || '',
             room: node.room || (node.meshid && root.meshes && root.meshes[node.meshid] ? root.meshes[node.meshid].name : '') || 'General',
             ageYears: ageYears,
-            biosYear: biosYear,
+            biosYear: yearSource ? biosYear : null,
+            cpuYear: cpuYear,
+            biosDateYear: biosDateYear,
+            yearSource: yearSource,
+            acquiredYearBE: acquiredYearBE,
+            fiscalYear: fy,
+            deviceClass: deviceClass,
+            costBasis: costBasis,
+            costSource: purchasePrice ? 'asset' : 'reference',
+            referencePriceYearBE: ref.year,
+            depreciation: book ? book.depreciation : null,
+            bookValue: book ? book.bookValue : null,
+            depreciationPercent: book ? book.percent : null,
+            fullyDepreciated: book ? book.fullyDepreciated : null,
+            usefulLifeYears: book ? book.lifeYears : null,
             cpu: cpuName,
             cpuEval: cpuEval,
             ramGb: ramGb,
@@ -490,6 +618,10 @@
         isSsd: isSsd,
         getTotalRamGb: getTotalRamGb,
         assessDevice: assessDevice,
-        assessFleet: assessFleet
+        assessFleet: assessFleet,
+        cpuLaunchYear: cpuLaunchYear,
+        deviceClassOf: deviceClassOf,
+        referencePrice: referencePrice,
+        depreciate: depreciate
     };
 }(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this)));

@@ -242,6 +242,7 @@
                     }
                 });
                 render();
+                refreshOpenModal();
                 // The map page reads the same specs; give it the new numbers too.
                 if (mapPanel && !mapPanel.hidden && currentIsoMap) {
                     currentIsoMap.setNodes(allNodes().filter(matchesSearch));
@@ -794,6 +795,7 @@
                 else if (message && (message.action === 'getsysinfo') && message.nodeid) {
                     specs[message.nodeid] = (message.hardware || message.noinfo) ? message : null;
                     render();
+                    refreshOpenModal(message.nodeid);
                 } else if (message && (message.action === 'powertimeline') && message.nodeid) {
                     timelines[message.nodeid] = message.timeline || [];
                     render();
@@ -2373,10 +2375,29 @@
         return item;
     }
 
+    /* The card can be opened from the map before the dashboard has ever asked for specs.
+       Ask for what is missing, and redraw the open card when the answer arrives -- once,
+       since by then the specs are there and nothing is asked again. */
+    var modalNodeId = null;
+    function refreshOpenModal(nodeid) {
+        if (!modalNodeId || (nodeid && nodeid !== modalNodeId)) return;
+        var open = document.getElementById('scpComputerModal');
+        if (!open) { modalNodeId = null; return; }
+        var body = open.querySelector('.scp-cm-body'), scroll = body ? body.scrollTop : 0;
+        var node = allNodes().filter(function (n) { return n._id === modalNodeId; })[0];
+        if (!node) return;
+        showComputerDetailModal(node);
+        var again = document.querySelector('#scpComputerModal .scp-cm-body');
+        if (again) again.scrollTop = scroll;
+    }
     function showComputerDetailModal(node) {
         if (!node) return;
         var existing = document.getElementById('scpComputerModal');
         if (existing) existing.remove();
+        modalNodeId = node._id;
+        // only if the server has never answered for it -- an answer of 'no info' must not loop
+        if (!hardwareOf(node) && specs[node._id] === undefined) { specsAsked[node._id] = false; askForSpecs(node); }
+        if (!window.ScpCachedDeviceAssessments) loadFleetAssessment();
 
         var dialog = element('div', 'scp-asset-dialog-overlay scp-computer-modal-overlay');
         dialog.id = 'scpComputerModal';
@@ -2651,10 +2672,14 @@
         var footer = element('div', 'scp-cm-footer');
         var footLeft = element('div', 'scp-cm-footer-left');
         var refreshSpecsBtn = button(thai ? '🔄 รีเฟรชสเปกเครื่อง' : '🔄 Refresh Specs', 'scp-dash-refresh', function () {
+            // ask again for real: the old flag made this a no-op once the first request had gone
+            specsAsked[node._id] = false;
+            timelinesAsked[node._id] = false;
             askForSpecs(node);
             askForTimeline(node);
-            dialog.remove();
-            showComputerDetailModal(node);
+            loadFleetAssessment(true);
+            refreshSpecsBtn.textContent = thai ? '⏳ กำลังขอข้อมูลจากเครื่อง…' : '⏳ Asking the computer…';
+            refreshSpecsBtn.disabled = true;
         });
         footLeft.appendChild(refreshSpecsBtn);
 
@@ -4011,7 +4036,7 @@
             hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf,
             fixDrivers: fixDrivers, driverScript: driverScript, snapshot: snapshot,
             reloadAssessment: function () { loadFleetAssessment(true); render(); },
-            openMorningSummary: openMorningSummary, openQrSheet: openQrSheet };
+            openMorningSummary: openMorningSummary, openQrSheet: openQrSheet, showComputer: showComputerDetailModal };
         openDeepLink();
         setTimeout(show, 50);
     }

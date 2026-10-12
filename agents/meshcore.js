@@ -831,7 +831,7 @@ else {
 
 
 // MeshAgent JavaScript Core Module. This code is sent to and running on the mesh agent.
-var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.09.22.2', scpLanNative: (require('ILibWebRTC').scpEcdsa === true), value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
+var meshCoreObj = { action: 'coreinfo', scpRelease: '2026.10.12.1', scpLanNative: (require('ILibWebRTC').scpEcdsa === true), value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
 
 // Get the operating system description string
 try { require('os').name().then(function (v) { meshCoreObj.osdesc = v; meshCoreObjChanged(); }); } catch (ex) { }
@@ -2037,8 +2037,21 @@ function handleServerCommand(data) {
                             }
                         });
                         mesh.cmdchild.stderr.on('data', function (c) { replydata += c.toString(); sendConsoleText(c.toString()); });
-                        mesh.cmdchild.stdin.write(data.cmds + '\r\nexit\r\n');
+                        // SCP-Remote: "-command -" reads stdin like an interactive prompt, where a
+                        // block left open across lines is only run once a blank line follows. Without
+                        // one, "exit" is swallowed into that block, PowerShell never ends, no reply is
+                        // sent and every later command is refused as busy. The blank line closes it.
+                        mesh.cmdchild.stdin.write(data.cmds + '\r\n\r\nexit\r\n');
+                        // And a last resort, so one stuck script can never block the agent for good.
+                        var scpCmdChild = mesh.cmdchild;
+                        var scpCmdWatchdog = setTimeout(function () {
+                            if (mesh.cmdchild === scpCmdChild) {
+                                replydata += '\r\nSCP_TIMEOUT: stopped after 30 minutes';
+                                try { scpCmdChild.kill(); } catch (ex) { }
+                            }
+                        }, 1800000);
                         mesh.cmdchild.on('exit', function () {
+                            clearTimeout(scpCmdWatchdog);
                             if (data.reply) {
                                 mesh.SendCommand({ action: 'msg', type: 'runcommands', result: replydata, sessionid: data.sessionid, responseid: data.responseid });
                             } else {
@@ -3198,6 +3211,8 @@ function kvm_tunnel_consentpromise_closehandler()
 }
 
 function kvm_consent_ok(ws) {
+    if (!ws || !ws.httprequest || ws.scpKvmEnded) { return; }
+    try { require('scp-session-consent').grant(ws); } catch (ex) { }
     // User Consent Prompt is not required because no user is present
     if (ws.httprequest.consent && (ws.httprequest.consent & 1)){
         // User Notifications is required
@@ -3919,11 +3934,19 @@ function onTunnelData(data)
                     registry_consent_ok(this);
                 }
             } else if (this.httprequest.protocol == 5) {
+                if ((this.httprequest.soptions && this.httprequest.soptions.scpUnattended === true) ||
+                    (typeof this.httprequest.guestname === 'string' && this.httprequest.guestname.indexOf('SCP-App: ') === 0)) {
+                    this.httprequest.scpFilesAccepted = true;
+                }
                 // Files inherit only this share's explicitly approved, still-live desktop session.
                 if (require('scp-session-consent').scoped(this)) {
                     if (!require('scp-session-consent').join(this)) {
-                        this.write(JSON.stringify({ctrlChannel:'102938',type:'console',msg:'Approve the desktop session first / กรุณาอนุญาตหน้าจอรีโมตก่อน',msgid:2}));
-                        this.close(); return;
+                        if (this.httprequest.soptions && this.httprequest.soptions.scpUnattended === true) {
+                            this.httprequest.scpFilesAccepted = true;
+                        } else {
+                            this.write(JSON.stringify({ctrlChannel:'102938',type:'console',msg:'Approve the desktop session first / กรุณาอนุญาตหน้าจอรีโมตก่อน',msgid:2}));
+                            this.close(); return;
+                        }
                     }
                     this.httprequest.consent &= ~32;
                 }
@@ -4153,7 +4176,16 @@ function onTunnelData(data)
                     // Never start an interactive helper before file access is accepted.
                     // guestname is server supplied, not a browser command field.
                     try {
-                        if (process.platform !== 'win32' || this.httprequest.scpFilesAccepted !== true || typeof this.httprequest.guestname !== 'string' || this.httprequest.guestname.indexOf('SCP-App: ') !== 0) { throw new Error('CLIPBOARD_ACCESS_DENIED'); }
+                        if (process.platform !== 'win32') { throw new Error('CLIPBOARD_ACCESS_DENIED'); }
+                        var isScpApp = (typeof this.httprequest.guestname === 'string') && (this.httprequest.guestname.indexOf('SCP-App: ') === 0);
+                        var isDirectUser = (typeof this.httprequest.userid === 'string') || (typeof this.httprequest.username === 'string');
+                        var isUnattended = (this.httprequest.soptions && this.httprequest.soptions.scpUnattended === true) || ((this.httprequest.consent & 32) === 0);
+                        if (isUnattended || isScpApp || isDirectUser) {
+                            this.httprequest.scpFilesAccepted = true;
+                        }
+                        if (this.httprequest.scpFilesAccepted !== true || (!isScpApp && !isDirectUser)) {
+                            throw new Error('CLIPBOARD_ACCESS_DENIED');
+                        }
                         if (!this.httprequest.scpClipboard) { this.httprequest.scpClipboard = require('win-scp-clipboard').create(this); }
                         this.httprequest.scpClipboard.send(cmd);
                     } catch (ex) { this.write(JSON.stringify({ action: 'scpclip', id: cmd.id, ok: false, error: String(ex.message || ex) })); }

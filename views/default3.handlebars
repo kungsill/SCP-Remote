@@ -2372,7 +2372,7 @@
         var stars = {}; // Devices that have been "stared" by the user.
         var nodeShortIdent = 0;
         var desktop;
-        var desktopsettings = { encoding: 2, showfocus: false, showmouse: true, showcad: true, quality: 40, scaling: 1024, framerate: 50, localkeymap: false, swapmouse: false, remotekeymap: false, autoclipboard: false, autolock: false, agentencoding: 4 };
+        var desktopsettings = { encoding: 2, showfocus: false, showmouse: true, showcad: true, quality: 100, scaling: 1024, framerate: 50, localkeymap: false, swapmouse: false, remotekeymap: false, autoclipboard: false, autolock: false, agentencoding: 4 };
         var multidesktopsettings = { quality: 60, scaling: 512, framerate: 400, agentencoding: 4 }; // SCP-Remote: an eighth of the screen is too coarse to read
         var terminal;
         var files;
@@ -2619,6 +2619,12 @@
             var t = null;
             try { t = localStorage.getItem('desktopsettings'); } catch (ex) { }
             if (t != null) { desktopsettings = JSON.parse(t); }
+            // SCP-Remote: Hospital LAN - Always force 100% sharpness and full scaling from the start
+            if (!desktopsettings.quality || parseInt(desktopsettings.quality) < 100) { desktopsettings.quality = 100; }
+            if (!desktopsettings.scaling || parseInt(desktopsettings.scaling) < 1024) { desktopsettings.scaling = 1024; }
+            desktopsettings.agentencoding = 4;
+            desktopsettings.framerate = 50;
+            try { localStorage.setItem('desktopsettings', JSON.stringify(desktopsettings)); } catch (ex) { }
             t = null;
             try { t = localStorage.getItem('multidesktopsettings'); } catch (ex) { }
             if (t != null) { multidesktopsettings = JSON.parse(t); }
@@ -11410,6 +11416,10 @@
                         deskLastClipboardSent = null;
                     }
                     if (updateSessionTimer == null) { updateSessionTimer = setInterval(updateSessionTime, 1000); }
+                    if (desktop && desktop.m && desktop.m.SendCompressionLevel) {
+                        desktop.m.SendCompressionLevel(desktopsettings.agentencoding || 4, 100, 1024, desktopsettings.framerate || 50);
+                        if (desktop.m.SendRefresh) { desktop.m.SendRefresh(); }
+                    }
                     // On mobile, wake the agent to start streaming.
                     // SendRefresh alone is sometimes ignored before the first mouse event.
                     // Synthetic mousedown+mouseup guarantees the agent starts sending frames.

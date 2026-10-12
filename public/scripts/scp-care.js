@@ -31,12 +31,13 @@
         "try { Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True -ErrorAction Stop; $did['firewall']='on' } catch { $did['firewall']='failed' }",
         // Defender's real-time protection, but only where nothing else is actually guarding.
         // Before signatures, so the slow step below can never gate this important one.
-        "try {",
-        "  $av = @(Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction SilentlyContinue)",
-        "  $guard = @($av | Where-Object { (($_.productState -band 0x1000) -ne 0) -and (($_.productState -band 0x10) -eq 0) -and ($_.displayName -notmatch 'Defender') })",
-        "  if ($guard.Count -eq 0) { Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction SilentlyContinue; $did['defender']='on' }",
-        "  else { $did['defender']='left off, '+$guard[0].displayName+' is guarding' }",
-        "} catch { $did['defender']='unchanged' }",
+        // One statement per line: the agent feeds this to "powershell -command -" line by
+        // line, and there a block left open across lines waits for a blank line that never
+        // comes -- PowerShell then never exits and the panel waits for a reply forever.
+        "try { $av = @(Get-CimInstance -Namespace root\\SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction SilentlyContinue); " +
+            "$guard = @($av | Where-Object { (($_.productState -band 0x1000) -ne 0) -and (($_.productState -band 0x10) -eq 0) -and ($_.displayName -notmatch 'Defender') }); " +
+            "if ($guard.Count -eq 0) { Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction SilentlyContinue; $did['defender']='on' } " +
+            "else { $did['defender']='left off, '+$guard[0].displayName+' is guarding' } } catch { $did['defender']='unchanged' }",
         // Signatures last, and time-bounded. On a machine with no route out Update-MpSignature
         // blocks on the download until it times out on its own, which held the whole reply and
         // made the panel look stuck. Run it in a child process we can give up on after 90s.

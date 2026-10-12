@@ -173,7 +173,19 @@
     var longUptimeDays = 14;
 
     var activeView = 'overview', attentionExpanded = false;
-    var panel, body, scanState = {}, pending = null, timer = null;
+    var selectedCampusDept = null;
+    var campusViewMode = 'map';
+    var currentIsoMap = null, mapTimer = null;
+    /* Where computers were dragged to on the map (shared on the server) and whether the
+       map is in its arrange mode. Kept here so a refresh of the page keeps both. */
+    var mapPlacements = null, mapEditMode = false;
+    // The at-risk list on the map: open or not, which group, and whether the low-RAM banner was closed.
+    var mapRiskOpen = false, mapRiskFilter = 'all', mapRamAlertClosed = false, mapRiskRefresh = null;
+    var mapFullKey = null;
+    function mapTrafficOn() {
+        try { return window.localStorage.getItem('scpMapTraffic') !== '0'; } catch (e) { return true; }
+    }
+    var panel, mapPanel, body, scanState = {}, pending = null, timer = null;
 
     /* Driver installs in flight, keyed by the id we sent with the command so a reply can
        never be credited to the wrong computer. Unlike the software scan these may run on
@@ -230,6 +242,11 @@
                     }
                 });
                 render();
+                // The map page reads the same specs; give it the new numbers too.
+                if (mapPanel && !mapPanel.hidden && currentIsoMap) {
+                    currentIsoMap.setNodes(allNodes().filter(matchesSearch));
+                    if (mapRiskRefresh) mapRiskRefresh();
+                }
             }
         }).catch(function (err) {
             fleetAssessmentLoading = false;
@@ -344,10 +361,70 @@
             found.push({ level: 'warn', text: updating ? t('rebootPending') : t('rebootPendingFiles') });
         }
         faultsOf(node).forEach(function (fault) { found.push(fault); });
+        hardwareRisksOf(node).forEach(function (risk) { found.push(risk); });
         var scan = scanState[node._id];
         if (scan && scan.hits) { scan.hits.forEach(function (name) { found.push({ level: 'high', text: format(t('watched'), name) }); }); }
         return found;
     }
+    /* Hardware that makes a computer slow, unreliable or unsafe to keep using: too little
+       memory, an old processor, an old machine, a Windows that no longer gets security
+       fixes. Built only from what the computer actually reported -- a value nobody knows
+       (no memory list, no BIOS date, a processor the table does not recognise) raises
+       nothing, because a false alarm is how a warning list stops being read. */
+    function hardwareRisksOf(node) {
+        var a = (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice) ? window.ScpFleetAssess.assessDevice(node) : null;
+        if (!a) return [];
+        var found = [];
+        var ram = Number(a.ramGb) || 0;
+        if (ram > 0 && ram <= 4) {
+            found.push({ level: 'high', kind: 'ram', text: thai ? ('RAM ต่ำมาก ' + ram + ' GB — ช้า ค้างง่าย ควรเพิ่มเป็น 8 GB') : ('Very low RAM: ' + ram + ' GB — slow and freezes, upgrade to 8 GB') });
+        } else if (ram > 4 && ram < 8) {
+            found.push({ level: 'warn', kind: 'ram', text: thai ? ('RAM ' + ram + ' GB ต่ำกว่าที่แนะนำ (8 GB)') : ('RAM ' + ram + ' GB, below the recommended 8 GB') });
+        }
+        var cpu = String(a.cpuName || a.cpu || '').replace(/\(R\)|\(TM\)|CPU|Processor/gi, '').replace(/\s+/g, ' ').trim();
+        if (cpu && cpu !== '-') {
+            var ev = a.cpuEval || {};
+            var gen = typeof ev.gen === 'number' ? ev.gen : null;
+            var ancient = /\bAtom\b|Core\s*2|Pentium\s*(Dual|D\b|4)|Celeron\s*[NJ]\d{4}|Pentium\s*[NJ]\d{4}|\bAMD\s*(A\d+|E\d?-|FX)|Athlon\s*(II|64|X2)|Phenom/i.test(cpu);
+            var label = cpu + (gen ? (thai ? ' (รุ่นที่ ' + gen + ')' : ' (gen ' + gen + ')') : '');
+            if (ancient || (gen !== null && gen <= 4)) {
+                found.push({ level: 'high', kind: 'cpu', text: (thai ? 'CPU เก่ามาก: ' : 'Very old CPU: ') + label + (thai ? ' — ช้า เสี่ยงค้าง ไม่รองรับ Windows 11' : ' — slow, unreliable, no Windows 11') });
+            } else if ((gen !== null && gen < 8) || (ev.supported === false && ev.brand === 'AMD')) {
+                found.push({ level: 'warn', kind: 'cpu', text: (thai ? 'CPU รุ่นเก่า ไม่รองรับ Windows 11: ' : 'Old CPU, no Windows 11: ') + label });
+            }
+        }
+        // Only a real date counts: the BIOS year, or the fiscal year typed into the asset record.
+        var age = (a.biosYear || a.fiscalYear) ? Number(a.ageYears) : NaN;
+        if (age >= 10) {
+            found.push({ level: 'high', kind: 'age', text: thai ? ('เครื่องเก่ามาก อายุประมาณ ' + age + ' ปี — เสี่ยงเสียกลางคัน ควรเปลี่ยน') : ('Very old machine, about ' + age + ' years — likely to fail, replace') });
+        } else if (age >= 7) {
+            found.push({ level: 'warn', kind: 'age', text: thai ? ('เครื่องอายุประมาณ ' + age + ' ปี ครบเกณฑ์พิจารณาเปลี่ยน') : ('About ' + age + ' years old, due for replacement') });
+        }
+        var os = String(a.osCaption || a.os || node.osdesc || '');
+        if (a.isWin7 || /Windows\s*(XP|Vista|7|8)\b/i.test(os)) {
+            found.push({ level: 'high', kind: 'os', text: thai ? (os.replace(/Microsoft\s*/i, '') + ' หมดการสนับสนุนแล้ว — ไม่มีแพตช์ความปลอดภัย เสี่ยงไวรัส/แรนซัมแวร์') : (os + ' is out of support — no security fixes') });
+        } else if (a.isWin10 || /Windows\s*10\b/i.test(os)) {
+            found.push({ level: 'warn', kind: 'os', text: thai ? 'Windows 10 หมดการสนับสนุนแล้ว (14 ต.ค. 2568) ควรอัปเกรด' : 'Windows 10 support ended (14 Oct 2025), upgrade' });
+        }
+        return found;
+    }
+
+    // One line of the computer's specs, for the map card. Empty strings for what is unknown.
+    function specSummaryOf(node) {
+        var a = (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice) ? window.ScpFleetAssess.assessDevice(node) : null;
+        if (!a) return null;
+        var cpu = String(a.cpuName || a.cpu || '').replace(/\(R\)|\(TM\)|CPU|Processor/gi, '').replace(/\s+/g, ' ').trim();
+        return {
+            cpu: cpu && cpu !== '-' ? cpu : '',
+            ram: Number(a.ramGb) > 0 ? a.ramGb + ' GB' : '',
+            os: String(a.osCaption || a.os || node.osdesc || '').replace(/Microsoft\s*/i, ''),
+            age: (a.biosYear || a.fiscalYear) && a.ageYears != null ? a.ageYears : null,
+            disk: a.diskHasSsd ? 'SSD' : '',
+            cFree: (a.cDriveFreePct != null ? a.cDriveFreePct : a.cFreePercent),
+            score: a.healthScore != null ? a.healthScore : a.score
+        };
+    }
+
     function roomOf(node) {
         var mesh = window.meshes ? window.meshes[node.meshid] : null;
         return mesh && mesh.name ? mesh.name : t('allDevices');
@@ -542,7 +619,14 @@
             var row = element('div', 'scp-dash-attention-row scp-dash-attention-' + entry.worst);
             row.hidden = !attentionExpanded && index >= 5;
             var who = element('div', 'scp-dash-attention-who');
-            who.appendChild(element('strong', '', entry.node.name || ''));
+            var whoName = element('strong', '', entry.node.name || '');
+            whoName.style.cursor = 'pointer';
+            whoName.title = thai ? 'คลิก/จิ้มเพื่อดูสถานะและสเปกเครื่องอย่างละเอียด' : 'Click to view full diagnostics';
+            whoName.addEventListener('click', function (e) {
+                e.stopPropagation();
+                showComputerDetailModal(entry.node);
+            });
+            who.appendChild(whoName);
             who.appendChild(element('small', '', roomOf(entry.node)));
             row.appendChild(who);
             var what = element('div', 'scp-dash-attention-what');
@@ -1356,7 +1440,14 @@
         var label = element('span', 'scp-dash-label');
         
         var titleRow = element('div', 'scp-device-title-row');
-        titleRow.appendChild(element('strong', 'scp-device-name-text', node.name || node.rname || ''));
+        var devNameEl = element('strong', 'scp-device-name-text', node.name || node.rname || '');
+        devNameEl.style.cursor = 'pointer';
+        devNameEl.title = thai ? 'คลิก/จิ้มเพื่อดูสถานะและสเปกเครื่องอย่างละเอียด' : 'Click to view full diagnostics';
+        devNameEl.addEventListener('click', function (e) {
+            e.stopPropagation();
+            showComputerDetailModal(node);
+        });
+        titleRow.appendChild(devNameEl);
         var release = window.ScpConnection ? window.ScpConnection.releaseBadge(node, true) : null;
         if (release) { titleRow.appendChild(release); }
         label.appendChild(titleRow);
@@ -1423,6 +1514,20 @@
             var hTag = element('span', 'scp-health-' + devAss.healthStatus, 'Health: ' + devAss.healthScore);
             tagWrap.appendChild(wTag);
             tagWrap.appendChild(hTag);
+
+            var devIns = devAss.insight || (window.ScpFleetAssess && window.ScpFleetAssess.getDeviceInsight && window.ScpFleetAssess.getDeviceInsight(devAss));
+            if (devIns && (devIns.summary || devIns.why)) {
+                var bTag = element('span', 'scp-bulb-badge');
+                bTag.innerHTML = '<span class="scp-bulb-icon">💡</span> <span>' + (devIns.summary || (thai ? 'วิเคราะห์เครื่อง' : 'Insight')) + '</span>';
+                bTag.title = (devIns.what ? (devIns.what + '\n\n') : '') + (devIns.why ? ('เหตุผล: ' + devIns.why) : '');
+                bTag.addEventListener('click', (function (dev, insight) {
+                    return function (e) {
+                        e.stopPropagation();
+                        openDeviceInsightDialog(dev, insight);
+                    };
+                })(node, devIns));
+                tagWrap.appendChild(bTag);
+            }
             label.appendChild(tagWrap);
         }
         name.appendChild(label);
@@ -1529,6 +1634,11 @@
         tabEntries.forEach(function (entry) {
             var tab = button(entry[thai ? 1 : 2], 'scp-dash-tab', function () {
                 activeView = entry[0];
+                if (window.ScpReport && typeof window.ScpReport.close === 'function') window.ScpReport.close();
+                var rDialog = document.getElementById('scpReport');
+                if (rDialog) { try { rDialog.close(); } catch(e){} rDialog.removeAttribute('open'); }
+                var cDialog = document.getElementById('scpComputerModal');
+                if (cDialog) cDialog.remove();
                 if (activeView !== 'devices' && liveOn) { liveOn = false; stopAllTiles(); updateLiveControls(); }
                 render();
             });
@@ -1557,6 +1667,21 @@
         fleet.appendChild(element('small', '', thai ? 'เลือกเครื่องเพื่อดู CPU, RAM และโปรเซสแบบสด' : 'Select a device for live CPU, RAM and processes'));
         fleet.appendChild(button(thai ? 'ดูสถานะเครื่อง / Task Manager' : 'Monitor / Task Manager', 'scp-dash-refresh', function () { if(window.ScpMonitor) window.ScpMonitor.open(); }));
         overview.appendChild(fleet); overview.appendChild(attentionPanel(list)); sections.overview.appendChild(overview);
+
+        // Banner linking to the dedicated standalone Hospital Map page
+        var mapCard = element('div', 'scp-map-overview-banner');
+        var mapCardLeft = element('div', 'scp-map-overview-banner-left');
+        mapCardLeft.appendChild(element('span', 'scp-map-overview-banner-icon', '🗺️'));
+        var mapCardText = element('div', 'scp-map-overview-banner-text');
+        mapCardText.appendChild(element('h4', '', thai ? 'ผังแผนที่และจุดบริการโรงพยาบาล (3D HosMap)' : 'Hospital 3D Map & Service Points'));
+        mapCardText.appendChild(element('p', '', thai ? 'ดูโมเดล 3D อาคารผู้ป่วยนอก/ใน คลินิก และห้องตรวจ พร้อมตำแหน่งคอมพิวเตอร์และสถานะไฟสดทุกเครื่อง' : 'Interactive 3D model of hospital buildings with real-time workstation status'));
+        mapCardLeft.appendChild(mapCardText);
+        mapCard.appendChild(mapCardLeft);
+        var mapCardBtn = button(thai ? 'เปิดดูผังแผนที่ 3D →' : 'Open 3D Map →', 'scp-map-overview-banner-btn', function () {
+            showMap();
+        });
+        mapCard.appendChild(mapCardBtn);
+        sections.overview.appendChild(mapCard);
 
         // --- Assess Tab ---
         var assessSec = sections.assess;
@@ -1638,13 +1763,31 @@
                 if (cpuReason) {
                     tdCpu.appendChild(element('small', 'scp-dash-flag high', cpuReason));
                 }
+                var ins = d.insight || (window.ScpFleetAssess && window.ScpFleetAssess.getDeviceInsight && window.ScpFleetAssess.getDeviceInsight(d));
+                if (ins && (ins.summary || ins.why)) {
+                    var bulb = element('div', 'scp-bulb-badge');
+                    bulb.innerHTML = '<span class="scp-bulb-icon">💡</span> <span>' + (ins.summary || ins.what) + '</span>';
+                    bulb.title = (ins.what ? (ins.what + '\n\n') : '') + (ins.why ? ('เหตุผล: ' + ins.why) : '');
+                    bulb.addEventListener('click', (function (dev, insight) {
+                        return function (e) {
+                            e.stopPropagation();
+                            openDeviceInsightDialog(dev, insight);
+                        };
+                    })(d, ins));
+                    tdCpu.appendChild(bulb);
+                }
                 tr.appendChild(tdCpu);
 
                 tr.appendChild(element('td', '', (d.ramGb || 0) + ' GB'));
                 tr.appendChild(element('td', '', (d.diskHasSsd || d.hasSsd) ? 'SSD' : 'HDD'));
 
                 var tdWin = element('td');
-                tdWin.appendChild(element('span', 'scp-badge-' + d.win11Status, d.win11Status === 'eligible' ? (thai ? 'พร้อมใช้' : 'Eligible') : (d.win11Status === 'upgradable' ? (thai ? 'อัปเกรดได้' : 'Upgradable') : (thai ? 'ไม่รองรับ' : 'Ineligible'))));
+                var isWin11Already = d.isWin11 || d.win11Status === 'already_win11' || /Windows\s*11/i.test(d.os || d.osCaption || '');
+                var badgeCls = isWin11Already ? 'scp-badge-eligible' : ('scp-badge-' + d.win11Status);
+                var badgeTxt = isWin11Already ? (thai ? 'ลง Win 11 แล้ว' : 'Already Win 11') :
+                    (d.win11Status === 'eligible' ? (thai ? 'พร้อมใช้' : 'Eligible') :
+                    (d.win11Status === 'upgradable' ? (thai ? 'อัปเกรดได้' : 'Upgradable') : (thai ? 'ไม่รองรับ' : 'Ineligible')));
+                tdWin.appendChild(element('span', badgeCls, badgeTxt));
                 tr.appendChild(tdWin);
 
                 var tdHealth = element('td');
@@ -1818,10 +1961,30 @@
     // Measure the space actually left below the header instead of assuming a height,
     // which keeps working if the header or the language bar changes size.
     function fitHeight() {
-        if (!panel || panel.hidden) return;
-        var top = panel.getBoundingClientRect().top;
-        var available = window.innerHeight - top - 8;
-        panel.style.maxHeight = Math.max(240, available) + 'px';
+        if (panel && !panel.hidden) {
+            var top = panel.getBoundingClientRect().top;
+            var available = window.innerHeight - top - 8;
+            panel.style.maxHeight = Math.max(240, available) + 'px';
+        }
+        if (mapPanel && !mapPanel.hidden) {
+            var mTop = mapPanel.getBoundingClientRect().top;
+            // Stop above the footer when it sits over the bottom of the window.
+            var bottom = window.innerHeight;
+            var footer = document.getElementById('footer');
+            if (footer && footer.offsetHeight) {
+                var fTop = footer.getBoundingClientRect().top;
+                if (fTop > mTop && fTop < bottom) bottom = fTop;
+            }
+            var mAvailable = bottom - mTop - 8;
+            mapPanel.style.maxHeight = Math.max(240, mAvailable) + 'px';
+            // The map itself takes all the room left under the page's top bars, so nothing
+            // of it (legend, at-risk button) hides below the fold.
+            var wrap = mapPanel.querySelector('.scp-map-wrapper');
+            if (wrap && !wrap.classList.contains('scp-map-full')) {
+                var wTop = wrap.getBoundingClientRect().top - mapPanel.getBoundingClientRect().top + mapPanel.scrollTop;
+                wrap.style.height = Math.max(420, Math.round(mAvailable - wTop - 14)) + 'px';
+            }
+        }
     }
     function stripUnwantedNav() {
         [
@@ -1850,7 +2013,8 @@
             if (el) el.style.setProperty('display', 'none', 'important');
         });
     }
-    function show() {
+    function showDashboard() {
+        if (mapPanel) mapPanel.hidden = true;
         stripUnwantedNav();
         if (!panel) return;
         document.querySelectorAll('#page_leftbar .lbbutton').forEach(function (item) { item.classList.remove('lbbuttonsel'); });
@@ -1875,12 +2039,57 @@
         fitHeight();
         if (!timer) timer = window.setInterval(function(){loadDriverStatus();render();}, 10000);
     }
+    function showMap() {
+        if (panel) panel.hidden = true;
+        stripUnwantedNav();
+        if (!mapPanel) return;
+        document.querySelectorAll('#page_leftbar .lbbutton').forEach(function (item) { item.classList.remove('lbbuttonsel'); });
+        var navButton = document.getElementById('LeftMenuScpHosMap');
+        if (navButton) navButton.classList.add('lbbuttonsel');
+        for (var i = 0; i <= 60; i++) {
+            var page = document.getElementById('p' + i);
+            if (page && page.style.display !== 'none') { page.dataset.scpHidden = '1'; page.style.display = 'none'; }
+        }
+        ['MainSubMenuSpan', 'MeshSubMenuSpan', 'EventsSubMenuSpan', 'UserSubMenuSpan', 'ServerSubMenuSpan', 'UsersSubMenuSpan'].forEach(function (id) {
+            var sub = document.getElementById(id);
+            if (sub && sub.style.display !== 'none') { sub.dataset.scpHidden = '1'; sub.style.display = 'none'; }
+        });
+        if (typeof window.xxcurrentView !== 'undefined' && window.xxcurrentView !== 1) {
+            window.xxcurrentView = 1;
+        }
+        mapPanel.hidden = false;
+        listen();
+        renderMapPage();
+        fitHeight();
+        // Keep the computer status on the map live without rebuilding the page.
+        if (!mapTimer) mapTimer = window.setInterval(function () {
+            if (!mapPanel || mapPanel.hidden || campusViewMode !== 'map' || selectedCampusDept) return;
+            if (currentIsoMap && currentIsoMap.canvas.isConnected) {
+                currentIsoMap.setNodes(allNodes().filter(matchesSearch));
+                loadMapPlacements();
+                if (mapRiskRefresh) mapRiskRefresh();
+            }
+        }, 10000);
+    }
+    var show = showDashboard;
     function hide() {
+        if (mapPanel) mapPanel.hidden = true;
         if (!panel || panel.hidden) return;
         panel.hidden = true;
         stopAllTiles();
+        if (window.ScpReport && typeof window.ScpReport.close === 'function') window.ScpReport.close();
+        var rDialog = document.getElementById('scpReport');
+        if (rDialog) { try { rDialog.close(); } catch (e) {} rDialog.removeAttribute('open'); }
+        var iDialog = document.getElementById('scpInsightDialog');
+        if (iDialog) iDialog.remove();
+        var aDialog = document.getElementById('scpAssetDialog');
+        if (aDialog) aDialog.remove();
+        var cDialog = document.getElementById('scpComputerModal');
+        if (cDialog) cDialog.remove();
         var navButton = document.getElementById('LeftMenuScpDashboard');
         if (navButton) navButton.classList.remove('lbbuttonsel');
+        var mapNavBtn = document.getElementById('LeftMenuScpHosMap');
+        if (mapNavBtn) mapNavBtn.classList.remove('lbbuttonsel');
         document.querySelectorAll('[data-scp-hidden]').forEach(function (page) {
             page.style.display = '';
             delete page.dataset.scpHidden;
@@ -2020,6 +2229,1141 @@
     }
     window.openAssetEditDialog = openAssetEditDialog;
 
+    function openDeviceInsightDialog(d, ins) {
+        if (!d) return;
+        if (!ins) {
+            ins = d.insight || (window.ScpFleetAssess && window.ScpFleetAssess.getDeviceInsight && window.ScpFleetAssess.getDeviceInsight(d)) || { what: d.cpu || '', why: d.cpuReason || '', summary: '' };
+        }
+        var existingDialog = document.getElementById('scpInsightDialog');
+        if (existingDialog) existingDialog.remove();
+
+        var dialog = element('div', 'scp-asset-dialog-overlay');
+        dialog.id = 'scpInsightDialog';
+
+        var box = element('div', 'scp-asset-dialog-box scp-insight-dialog');
+
+        var header = element('div', 'scp-asset-dialog-header');
+        var title = element('h3', '', '💡 ' + (thai ? 'วิเคราะห์เครื่องและสาเหตุการประเมิน' : 'Device Insight & Reason'));
+        var closeBtn = element('button', 'scp-dialog-close-btn', '✕');
+        closeBtn.type = 'button';
+        closeBtn.onclick = function () { dialog.remove(); };
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+        box.appendChild(header);
+
+        var devInfo = element('div', 'scp-asset-dialog-device');
+        devInfo.innerHTML = '<strong>' + (d.name || d._id) + '</strong> · ' + (d.room || d.meshName || (thai ? 'ทั่วไป' : 'General')) + ' (' + (d.os || d.osCaption || '').replace('Microsoft ', '') + ')';
+        box.appendChild(devInfo);
+
+        var content = element('div', 'scp-bulb-modal-wrap');
+
+        var rowWhat = element('div', 'scp-bulb-modal-row');
+        rowWhat.appendChild(element('strong', '', '🖥️ ' + (thai ? 'เครื่องนี้คืออะไร / สเปก' : 'What is this device?')));
+        var whatText = element('div');
+        whatText.textContent = ins.what || (d.cpu || d.cpuName || '-');
+        rowWhat.appendChild(whatText);
+        content.appendChild(rowWhat);
+
+        var rowWhy = element('div', 'scp-bulb-modal-row');
+        rowWhy.appendChild(element('strong', '', '❓ ' + (thai ? 'เหตุผลการประเมิน (เพราะอะไร)' : 'Why this assessment?')));
+        var whyText = element('div');
+        whyText.textContent = ins.why || (d.cpuReason || '-');
+        rowWhy.appendChild(whyText);
+        content.appendChild(rowWhy);
+
+        var rowStatus = element('div', 'scp-bulb-modal-row');
+        rowStatus.appendChild(element('strong', '', '🩺 ' + (thai ? 'สถานะความพร้อมและคะแนนสุขภาพ' : 'Readiness & Health Score')));
+        var isInstalledWin11 = d.isWin11 || d.win11Status === 'already_win11' || /Windows\s*11/i.test(d.os || d.osCaption || '');
+        var isCpuSupp = d.cpuSupported || (d.cpuEval && d.cpuEval.supported);
+        var statusDesc = '';
+        if (isInstalledWin11) {
+            statusDesc = isCpuSupp ?
+                (thai ? 'ติดตั้ง Windows 11 แล้ว (สเปกผ่านเกณฑ์ทางการ 100%)' : 'Windows 11 Installed (Supported)') :
+                (thai ? 'ติดตั้ง Windows 11 แล้ว (ใช้งานได้ แต่สเปก CPU อยู่นอกลิสต์ทางการของ Microsoft)' : 'Windows 11 Installed (Unsupported CPU)');
+        } else if (d.win11Status === 'eligible') {
+            statusDesc = thai ? 'พร้อมอัปเกรดเป็น Windows 11' : 'Eligible for Win 11';
+        } else if (d.win11Status === 'upgradable') {
+            statusDesc = thai ? 'อัปเกรดฮาร์ดแวร์ก่อนได้' : 'Upgradable';
+        } else {
+            statusDesc = thai ? 'ไม่ผ่านเกณฑ์ Windows 11' : 'Ineligible';
+        }
+        var statusStr = (thai ? 'คะแนนสุขภาพ: ' : 'Health Score: ') + (d.healthScore || d.score || 0) + ' / 100 · สถานะ: ' + statusDesc;
+        var statusDiv = element('div');
+        statusDiv.textContent = statusStr;
+        rowStatus.appendChild(statusDiv);
+        content.appendChild(rowStatus);
+
+        box.appendChild(content);
+
+        var actions = element('div', 'scp-asset-dialog-actions');
+        var btnOk = element('button', 'scp-btn-save', thai ? 'เข้าใจแล้ว' : 'Close');
+        btnOk.type = 'button';
+        btnOk.onclick = function () { dialog.remove(); };
+        actions.appendChild(btnOk);
+        box.appendChild(actions);
+
+        dialog.appendChild(box);
+        dialog.addEventListener('click', function (e) { if (e.target === dialog) dialog.remove(); });
+        document.body.appendChild(dialog);
+    }
+    window.openDeviceInsightDialog = openDeviceInsightDialog;
+
+    function getDeptIcon(name) {
+        var lower = String(name || '').toLowerCase();
+        if (/er|ฉุกเฉิน|อุบัติเหตุ|emergency/i.test(lower)) return '🚑';
+        if (/ยา|pharm|ห้องยา|จ่ายยา/i.test(lower)) return '💊';
+        if (/ทันต|dent/i.test(lower)) return '🦷';
+        if (/opd|ผู้ป่วยนอก|คัดกรอง|ตรวจโรค|ซักประวัติ/i.test(lower)) return '🩺';
+        if (/แล็ป|lab|ชันสูตร|พยาธิ/i.test(lower)) return '🔬';
+        if (/x-ray|xray|รังสี|เอกซเรย์/i.test(lower)) return '🩻';
+        if (/ไต|dialysis/i.test(lower)) return '🫘';
+        if (/กายภาพ|pt|physio/i.test(lower)) return '🏃';
+        if (/คลอด|lr|ห้องผ่าตัด|or|สูติ/i.test(lower)) return '👶';
+        if (/ipd|หอผู้ป่วย|ตึกชาย|ตึกหญิง|วอร์ด|ward/i.test(lower)) return '🛏️';
+        if (/ari|ทางเดินหายใจ|หวัด/i.test(lower)) return '😷';
+        if (/คอม|it|สารสนเทศ|ศูนย์คอม|ไอที/i.test(lower)) return '💻';
+        if (/เวชระเบียน|การเงิน|ธุรการ|บริหาร|สสจ/i.test(lower)) return '📋';
+        return '🏥';
+    }
+
+    function formatUptime(node) {
+        if (!node.lastbootuptime) return thai ? 'ไม่ระบุ' : 'Unknown';
+        var diffMs = Date.now() - node.lastbootuptime;
+        if (diffMs < 0) return thai ? 'เพิ่งเปิดเครื่อง' : 'Just started';
+        var days = Math.floor(diffMs / 86400000);
+        var hours = Math.floor((diffMs % 86400000) / 3600000);
+        var mins = Math.floor((diffMs % 3600000) / 60000);
+        if (days > 0) return thai ? (days + ' วัน ' + hours + ' ชม.') : (days + 'd ' + hours + 'h');
+        if (hours > 0) return thai ? (hours + ' ชม. ' + mins + ' น.') : (hours + 'h ' + mins + 'm');
+        return thai ? (mins + ' นาที') : (mins + 'm');
+    }
+
+    function formatLastSeen(node) {
+        if (isOnline(node)) return thai ? 'ออนไลน์อยู่ในขณะนี้' : 'Online now';
+        var away = daysAway(node);
+        if (away === -1 || away == null) return thai ? 'ไม่ระบุ / ออฟไลน์' : 'Offline / Unknown';
+        if (away === 0) return thai ? 'วันนี้' : 'Today';
+        return thai ? (away + ' วันที่แล้ว') : (away + ' days ago');
+    }
+
+    function makeSpecItem(label, val, tone) {
+        var item = element('div', 'scp-cm-spec-item');
+        item.appendChild(element('span', 'scp-cm-spec-label', label));
+        var valEl = element('strong', 'scp-cm-spec-value' + (tone ? ' tone-' + tone : ''), String(val));
+        item.appendChild(valEl);
+        return item;
+    }
+
+    function showComputerDetailModal(node) {
+        if (!node) return;
+        var existing = document.getElementById('scpComputerModal');
+        if (existing) existing.remove();
+
+        var dialog = element('div', 'scp-asset-dialog-overlay scp-computer-modal-overlay');
+        dialog.id = 'scpComputerModal';
+
+        var box = element('div', 'scp-asset-dialog-box scp-computer-modal-box');
+
+        var online = isOnline(node);
+        var busy = isBusy(node);
+        var statusClass = online ? (busy ? 'busy' : 'idle') : 'off';
+        var statusText = online
+            ? (busy ? (thai ? 'กำลังใช้งาน' : 'In use') : (thai ? 'เปิดอยู่ (ว่าง)' : 'Online (idle)'))
+            : (thai ? 'ปิดเครื่อง / ออฟไลน์' : 'Offline');
+
+        var hardware = hardwareOf(node) || {};
+        var ident = hardware.identifiers || {};
+        var win = hardware.windows || {};
+        var devAss = (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice) ? window.ScpFleetAssess.assessDevice(node) : null;
+        var assetData = (window.ScpCachedAssets && window.ScpCachedAssets[node._id]) || {};
+
+        var header = element('div', 'scp-cm-header');
+        var titleLeft = element('div', 'scp-cm-title-wrap');
+        titleLeft.appendChild(element('span', 'scp-cm-icon', '🖥️'));
+        var titleTextWrap = element('div', 'scp-cm-title-text');
+        titleTextWrap.appendChild(element('h3', 'scp-cm-name', node.name || node.rname || '-'));
+        var subDept = element('div', 'scp-cm-sub-dept');
+        subDept.appendChild(element('span', 'scp-cm-dept-badge', '🏥 ' + roomOf(node)));
+        if (node.host && node.host !== node.name) {
+            subDept.appendChild(element('span', 'scp-cm-host-badge', node.host));
+        }
+        titleTextWrap.appendChild(subDept);
+        titleLeft.appendChild(titleTextWrap);
+        header.appendChild(titleLeft);
+
+        var headerRight = element('div', 'scp-cm-header-right');
+        headerRight.appendChild(element('span', 'scp-ws-status-badge ' + statusClass, statusText));
+        var closeBtn = element('button', 'scp-dialog-close-btn', '✕');
+        closeBtn.type = 'button';
+        closeBtn.title = thai ? 'ปิดหน้าต่าง' : 'Close';
+        closeBtn.onclick = function () { dialog.remove(); };
+        headerRight.appendChild(closeBtn);
+        header.appendChild(headerRight);
+        box.appendChild(header);
+
+        var quickBar = element('div', 'scp-cm-quick-bar');
+        var qUser = element('div', 'scp-cm-quick-card');
+        qUser.appendChild(element('span', 'scp-cm-quick-label', '👤 ' + (thai ? 'ผู้ใช้ล็อกอิน' : 'Signed-in user')));
+        qUser.appendChild(element('strong', 'scp-cm-quick-val', signedInUser(node) || (thai ? 'ไม่มีผู้ใช้' : 'None')));
+        quickBar.appendChild(qUser);
+
+        var qIp = element('div', 'scp-cm-quick-card');
+        qIp.appendChild(element('span', 'scp-cm-quick-label', '🌐 ' + (thai ? 'หมายเลข IP' : 'IP Address')));
+        qIp.appendChild(element('strong', 'scp-cm-quick-val', node.ip || node.host || '-'));
+        quickBar.appendChild(qIp);
+
+        var qUptime = element('div', 'scp-cm-quick-card');
+        qUptime.appendChild(element('span', 'scp-cm-quick-label', '⏱️ ' + (online ? (thai ? 'เปิดต่อเนื่อง' : 'Uptime') : (thai ? 'ใช้งานล่าสุด' : 'Last seen'))));
+        qUptime.appendChild(element('strong', 'scp-cm-quick-val', online ? formatUptime(node) : formatLastSeen(node)));
+        quickBar.appendChild(qUptime);
+
+        var qScore = element('div', 'scp-cm-quick-card');
+        var hScore = devAss ? (devAss.healthScore || 0) : 0;
+        var hScoreColor = hScore >= 80 ? 'ok' : (hScore >= 50 ? 'busy' : 'risk');
+        qScore.appendChild(element('span', 'scp-cm-quick-label', '❤️ ' + (thai ? 'สุขภาพเครื่อง' : 'Health Score')));
+        qScore.appendChild(element('strong', 'scp-cm-quick-val score-' + hScoreColor, hScore + ' / 100'));
+        quickBar.appendChild(qScore);
+        box.appendChild(quickBar);
+
+        var cmBody = element('div', 'scp-cm-body');
+
+        // Section 1: Hardware Specifications
+        var secHw = element('section', 'scp-cm-section');
+        secHw.appendChild(element('h4', 'scp-cm-section-title', '⚙️ ' + (thai ? 'สเปกฮาร์ดแวร์และอุปกรณ์' : 'Hardware Specifications')));
+        var hwGrid = element('div', 'scp-cm-spec-grid');
+
+        var cpuVal = ident.cpu_name || (devAss && devAss.cpu) || '-';
+        if (ident.cpu_cores) cpuVal += ' (' + ident.cpu_cores + ' cores)';
+        hwGrid.appendChild(makeSpecItem('Processor (CPU)', cpuVal));
+
+        var ramTotal = 0;
+        (win.memory || []).forEach(function (m) { ramTotal += Number(m.Capacity) || 0; });
+        var ramVal = ramTotal > 0 ? (gigabytes(ramTotal) + ' GB') : ((devAss && devAss.ramGb) ? (devAss.ramGb + ' GB') : '-');
+        if (win.memory && win.memory[0] && win.memory[0].Speed) ramVal += ' (' + win.memory[0].Speed + ' MHz)';
+        hwGrid.appendChild(makeSpecItem(thai ? 'หน่วยความจำ (RAM)' : 'Memory (RAM)', ramVal));
+
+        var osVal = (win.osCaption || node.osdesc || '-').replace('Microsoft ', '');
+        if (ident.os_arch) osVal += ' ' + ident.os_arch;
+        hwGrid.appendChild(makeSpecItem(thai ? 'ระบบปฏิบัติการ (OS)' : 'Operating System', osVal));
+
+        var mbVal = [ident.board_vendor, ident.board_name || ident.product_name].filter(Boolean).join(' ') || '-';
+        hwGrid.appendChild(makeSpecItem(thai ? 'เมนบอร์ด / รุ่นเครื่อง' : 'Motherboard / Model', mbVal));
+
+        var gpuVal = ident.gpu_name || '-';
+        hwGrid.appendChild(makeSpecItem(thai ? 'การ์ดแสดงผล (GPU)' : 'Graphics (GPU)', gpuVal));
+
+        var serialVal = ident.bios_serial || ident.chassis_serial || '-';
+        hwGrid.appendChild(makeSpecItem('Serial Number / BIOS', serialVal + (ident.bios_date ? (' · ' + ident.bios_date) : '')));
+        secHw.appendChild(hwGrid);
+
+        // Disks / Storage Drives
+        var vols = win.volumes || {};
+        var diskList = Object.keys(vols).map(function (k) {
+            var v = vols[k];
+            if (!v || v.dType !== 3 || !v.size) return null;
+            var totalGb = gigabytes(v.size);
+            var freeGb = gigabytes(v.sizeremaining);
+            var pctFree = Math.round((Number(v.sizeremaining) / Number(v.size)) * 100);
+            var usedGb = Math.max(0, totalGb - freeGb);
+            var pctUsed = Math.min(100, Math.max(0, 100 - pctFree));
+            return { letter: k, total: totalGb, free: freeGb, used: usedGb, pctFree: pctFree, pctUsed: pctUsed, fs: v.fileSystem || 'NTFS' };
+        }).filter(Boolean);
+
+        if (!diskList.length) {
+            disksOf(node).forEach(function (d) {
+                diskList.push({ letter: d.letter, total: null, free: d.free, used: null, pctFree: d.percent, pctUsed: 100 - d.percent, fs: 'NTFS' });
+            });
+        }
+
+        if (diskList.length) {
+            var diskContainer = element('div', 'scp-cm-disks-container');
+            diskContainer.appendChild(element('strong', 'scp-cm-disk-title', '💾 ' + (thai ? 'พื้นที่จัดเก็บข้อมูล (Storage Drives)' : 'Storage Drives')));
+            diskList.forEach(function (disk) {
+                var dBox = element('div', 'scp-cm-disk-item');
+                var dHead = element('div', 'scp-cm-disk-head');
+                var dLetter = element('span', 'scp-cm-disk-letter', 'ไดรฟ์ ' + disk.letter + ': (' + disk.fs + ')');
+                var dInfo = element('span', 'scp-cm-disk-info', disk.total
+                    ? (thai ? ('ว่าง ' + disk.free + ' GB จาก ' + disk.total + ' GB (' + disk.pctFree + '% ว่าง)') : (disk.free + ' GB free of ' + disk.total + ' GB (' + disk.pctFree + '% free)'))
+                    : (thai ? ('ว่าง ' + disk.free + ' GB (' + disk.pctFree + '%)') : (disk.free + ' GB free (' + disk.pctFree + '%)'))
+                );
+                dHead.appendChild(dLetter);
+                dHead.appendChild(dInfo);
+                dBox.appendChild(dHead);
+
+                var dBar = element('div', 'scp-cm-disk-bar');
+                var dFill = element('div', 'scp-cm-disk-fill');
+                dFill.style.width = disk.pctUsed + '%';
+                if (disk.pctFree <= 8) {
+                    dFill.className += ' disk-critical';
+                } else if (disk.pctFree <= 15) {
+                    dFill.className += ' disk-warn';
+                } else {
+                    dFill.className += ' disk-ok';
+                }
+                dBar.appendChild(dFill);
+                dBox.appendChild(dBar);
+                diskContainer.appendChild(dBox);
+            });
+            secHw.appendChild(diskContainer);
+        }
+        cmBody.appendChild(secHw);
+
+        // Section 2: Security & Protection
+        var secSec = element('section', 'scp-cm-section');
+        secSec.appendChild(element('h4', 'scp-cm-section-title', '🛡️ ' + (thai ? 'ระบบความปลอดภัยและการป้องกัน' : 'Security & Protection')));
+        var secGrid = element('div', 'scp-cm-spec-grid');
+
+        var avList = win.av || [];
+        var avDesc = thai ? 'ทำงานปกติ' : 'Active & Protected';
+        var avClass = 'ok';
+        if (avList.length) {
+            avDesc = avList.map(function (a) { return a.name || a.displayName || 'Antivirus'; }).join(', ');
+        } else {
+            var avRisks = risksOf(node).filter(function (r) { return /antivirus|ไวรัส/i.test(r.text); });
+            if (avRisks.length) {
+                avDesc = avRisks.map(function (r) { return r.text; }).join(', ');
+                avClass = 'risk';
+            }
+        }
+        secGrid.appendChild(makeSpecItem(thai ? 'แอนติไวรัส (Antivirus)' : 'Antivirus', avDesc, avClass));
+
+        var fwStatus = win.firewall != null ? (win.firewall ? (thai ? 'เปิดใช้งาน (ป้องกันอยู่)' : 'Enabled') : (thai ? 'ปิดอยู่' : 'Disabled')) : (thai ? 'เปิดใช้งาน' : 'Enabled');
+        var fwClass = (win.firewall === false) ? 'risk' : 'ok';
+        secGrid.appendChild(makeSpecItem(thai ? 'ไฟร์วอลล์ (Windows Firewall)' : 'Firewall', fwStatus, fwClass));
+
+        var wuRisks = risksOf(node).filter(function (r) { return /update|อัปเดต/i.test(r.text); });
+        var wuStatus = wuRisks.length ? wuRisks[0].text : (thai ? 'ทำงานปกติ' : 'Up to date');
+        var wuClass = wuRisks.length ? 'risk' : 'ok';
+        secGrid.appendChild(makeSpecItem('Windows Update', wuStatus, wuClass));
+
+        var rebootRisks = risksOf(node).filter(function (r) { return /restart|รีสตาร์ต|reboot/i.test(r.text); });
+        var rebootStatus = rebootRisks.length ? rebootRisks[0].text : (thai ? 'ไม่มีงานค้าง' : 'No reboot pending');
+        var rebootClass = rebootRisks.length ? 'busy' : 'ok';
+        secGrid.appendChild(makeSpecItem(thai ? 'สถานะรีสตาร์ต' : 'Pending Reboot', rebootStatus, rebootClass));
+        secSec.appendChild(secGrid);
+        cmBody.appendChild(secSec);
+
+        // Section 3: Assessment & Diagnostics
+        var secDiag = element('section', 'scp-cm-section');
+        secDiag.appendChild(element('h4', 'scp-cm-section-title', '🩺 ' + (thai ? 'การวินิจฉัยสุขภาพและความพร้อม Windows 11' : 'Diagnostics & Health Assessment')));
+
+        if (devAss) {
+            var evalCard = element('div', 'scp-cm-eval-box');
+            var w11Title = element('div', 'scp-cm-eval-line');
+            w11Title.appendChild(element('strong', '', 'Windows 11 Readiness: '));
+            var w11StatusBadge = element('span', 'scp-ws-w11-badge ' + (devAss.win11Status === 'eligible' ? 'ok' : (devAss.win11Status === 'upgradable' ? 'idle' : 'risk')),
+                devAss.win11Status === 'eligible' ? (thai ? 'พร้อมใช้งาน 100%' : 'Eligible') :
+                (devAss.win11Status === 'upgradable' ? (thai ? 'อัปเกรดฮาร์ดแวร์ก่อนได้' : 'Upgradable') : (thai ? 'ไม่ผ่านเกณฑ์ขั้นต่ำ' : 'Ineligible'))
+            );
+            w11Title.appendChild(w11StatusBadge);
+            evalCard.appendChild(w11Title);
+
+            if (devAss.win11Reasons && devAss.win11Reasons.length) {
+                var reasonList = element('ul', 'scp-cm-reason-list');
+                devAss.win11Reasons.forEach(function (r) {
+                    reasonList.appendChild(element('li', '', r));
+                });
+                evalCard.appendChild(reasonList);
+            }
+
+            var recLine = element('div', 'scp-cm-eval-line');
+            recLine.appendChild(element('strong', '', thai ? 'คำแนะนำการใช้งาน: ' : 'Recommendation: '));
+            var recText = devAss.recommendation === 'keep' ? (thai ? 'สภาพดี ใช้งานต่อได้ยาวนาน' : 'Good condition') :
+                (devAss.recommendation === 'upgrade_ram' ? (thai ? 'แนะนำเพิ่ม RAM เป็นอย่างน้อย 8-16 GB' : 'Upgrade RAM') :
+                (devAss.recommendation === 'upgrade_ssd' ? (thai ? 'แนะนำเปลี่ยนฮาร์ดดิสก์เป็น SSD เพื่อเพิ่มความเร็ว' : 'Upgrade to SSD') :
+                (thai ? 'ควรจัดสรรงบประมาณเพื่อจัดซื้อเครื่องทดแทน (ปลดระวาง)' : 'Recommend replacement')));
+            recLine.appendChild(element('span', 'scp-cm-rec-text', recText));
+            evalCard.appendChild(recLine);
+            secDiag.appendChild(evalCard);
+        }
+
+        var faults = faultsOf(node);
+        if (faults.length > 0) {
+            var faultBox = element('div', 'scp-cm-faults-box');
+            faultBox.appendChild(element('strong', '', '⚠️ ' + (thai ? 'อุปกรณ์ / ไดรเวอร์ที่พบปัญหา (' + faults.length + ' รายการ)' : 'Driver Issues (' + faults.length + ')')));
+            var fList = element('ul', 'scp-cm-fault-list');
+            faults.forEach(function (f) {
+                fList.appendChild(element('li', '', f.text));
+            });
+            faultBox.appendChild(fList);
+            secDiag.appendChild(faultBox);
+        }
+
+        var allRisks = risksOf(node);
+        if (allRisks.length > 0) {
+            var riskBox = element('div', 'scp-cm-risks-box');
+            riskBox.appendChild(element('strong', '', '🔔 ' + (thai ? 'สิ่งที่ตรวจพบ / รายการเฝ้าระวัง' : 'Attention Items')));
+            var rWrap = element('div', 'scp-cm-risk-wrap');
+            allRisks.forEach(function (r) {
+                rWrap.appendChild(element('span', 'scp-dash-flag ' + r.level, r.text));
+            });
+            riskBox.appendChild(rWrap);
+            secDiag.appendChild(riskBox);
+        } else {
+            var safeBox = element('div', 'scp-cm-safe-box');
+            safeBox.textContent = thai ? '✅ ระบบทำงานปกติ ไม่พบความเสี่ยงหรือสิ่งผิดปกติ' : '✅ System normal. No risks detected.';
+            secDiag.appendChild(safeBox);
+        }
+        cmBody.appendChild(secDiag);
+
+        // Section 4: Asset & Inventory (ครุภัณฑ์)
+        var secAsset = element('section', 'scp-cm-section');
+        secAsset.appendChild(element('h4', 'scp-cm-section-title', '🏷️ ' + (thai ? 'ข้อมูลครุภัณฑ์และทะเบียนทรัพย์สิน' : 'Asset Information')));
+        var assetGrid = element('div', 'scp-cm-spec-grid');
+        assetGrid.appendChild(makeSpecItem(thai ? 'หมายเลขครุภัณฑ์' : 'Asset Tag', assetData.assetNumber || (thai ? 'ยังไม่ได้ระบุ' : 'Unassigned')));
+        assetGrid.appendChild(makeSpecItem(thai ? 'ปีงบประมาณ' : 'Fiscal Year', assetData.fiscalYear ? ((thai ? 'พ.ศ. ' : 'FY ') + assetData.fiscalYear) : '-'));
+        assetGrid.appendChild(makeSpecItem(thai ? 'ราคาจัดซื้อ' : 'Purchase Price', assetData.price ? (Number(assetData.price).toLocaleString() + (thai ? ' บาท' : ' THB')) : '-'));
+        assetGrid.appendChild(makeSpecItem(thai ? 'งบจัดซื้อ / หมายเหตุ' : 'Budget / Note', assetData.note || '-'));
+        secAsset.appendChild(assetGrid);
+
+        var assetBtnRow = element('div', 'scp-cm-asset-actions');
+        var editAssetBtn = button(thai ? '✏️ ระบุ / แก้ไขข้อมูลครุภัณฑ์' : '✏️ Edit Asset Info', 'scp-dash-scan', function () {
+            if (typeof window.openAssetEditDialog === 'function') {
+                window.openAssetEditDialog(node._id);
+            }
+        });
+        assetBtnRow.appendChild(editAssetBtn);
+        secAsset.appendChild(assetBtnRow);
+        cmBody.appendChild(secAsset);
+        box.appendChild(cmBody);
+
+        // Footer Actions - STRICTLY NO REMOTE CONTROL BUTTON!
+        var footer = element('div', 'scp-cm-footer');
+        var footLeft = element('div', 'scp-cm-footer-left');
+        var refreshSpecsBtn = button(thai ? '🔄 รีเฟรชสเปกเครื่อง' : '🔄 Refresh Specs', 'scp-dash-refresh', function () {
+            askForSpecs(node);
+            askForTimeline(node);
+            dialog.remove();
+            showComputerDetailModal(node);
+        });
+        footLeft.appendChild(refreshSpecsBtn);
+
+        if (window.ScpReport) {
+            var reportBtn = button(thai ? '📄 พิมพ์ใบประเมินเครื่อง (PDF)' : '📄 Print Fact Sheet (PDF)', 'scp-dash-refresh', function () {
+                window.ScpReport.open('device', node._id);
+            });
+            footLeft.appendChild(reportBtn);
+        }
+        footer.appendChild(footLeft);
+
+        var closeFootBtn = button(thai ? 'ปิดหน้าต่าง' : 'Close', 'scp-cm-btn-close', function () {
+            dialog.remove();
+        });
+        footer.appendChild(closeFootBtn);
+        box.appendChild(footer);
+
+        dialog.appendChild(box);
+        dialog.addEventListener('click', function (e) {
+            if (e.target === dialog) dialog.remove();
+        });
+        function onKey(e) {
+            if (e.key === 'Escape') {
+                dialog.remove();
+                document.removeEventListener('keydown', onKey);
+            }
+        }
+        document.addEventListener('keydown', onKey);
+        document.body.appendChild(dialog);
+    }
+    window.showComputerDetailModal = showComputerDetailModal;
+
+    function workstationCard(node) {
+        var online = isOnline(node);
+        var busy = isBusy(node);
+        var statusClass = online ? (busy ? 'busy' : 'idle') : 'off';
+        var statusText = online
+            ? (busy ? (thai ? 'กำลังใช้งาน' : 'In use') : (thai ? 'เปิดอยู่ (ว่าง)' : 'Online (idle)'))
+            : (thai ? 'ปิดเครื่อง' : 'Offline');
+
+        var card = element('article', 'scp-workstation-card status-' + statusClass);
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.title = thai ? ('คลิก/จิ้ม เพื่อดูข้อมูลสถานะ ' + (node.name || '')) : ('Click to view diagnostics for ' + (node.name || ''));
+
+        var topRow = element('div', 'scp-ws-top');
+        var iconBox = element('div', 'scp-ws-icon-box');
+        iconBox.appendChild(element('span', 'scp-ws-device-icon', '🖥️'));
+        var pulseDot = element('span', 'scp-dash-dot ' + (online ? (busy ? 'busy' : 'idle') : 'off'));
+        iconBox.appendChild(pulseDot);
+        topRow.appendChild(iconBox);
+
+        var badge = element('span', 'scp-ws-status-badge ' + statusClass, statusText);
+        topRow.appendChild(badge);
+        card.appendChild(topRow);
+
+        var nameEl = element('strong', 'scp-ws-name', node.name || node.rname || '-');
+        card.appendChild(nameEl);
+
+        var user = signedInUser(node);
+        var userEl = element('div', 'scp-ws-user');
+        userEl.appendChild(element('span', 'scp-ws-user-icon', '👤'));
+        userEl.appendChild(element('span', 'scp-ws-user-text', user || (thai ? 'ไม่มีผู้ใช้ล็อกอิน' : 'No user')));
+        card.appendChild(userEl);
+
+        var metaRow = element('div', 'scp-ws-meta');
+        var ip = node.ip || node.host || '';
+        if (ip) {
+            metaRow.appendChild(element('span', 'scp-ws-ip', 'IP ' + ip));
+        }
+        var os = (node.osdesc || '').replace('Microsoft ', '');
+        if (os) {
+            metaRow.appendChild(element('span', 'scp-ws-os', os));
+        }
+        card.appendChild(metaRow);
+
+        var line = specLine(node);
+        if (line) {
+            card.appendChild(element('div', 'scp-ws-specs', line));
+        }
+
+        if (window.ScpFleetAssess && window.ScpFleetAssess.assessDevice) {
+            var ass = window.ScpFleetAssess.assessDevice(node);
+            if (ass) {
+                var scoreRow = element('div', 'scp-ws-score-row');
+                var scClass = ass.healthStatus === 'good' ? 'ok' : (ass.healthStatus === 'fair' ? 'busy' : 'risk');
+                scoreRow.appendChild(element('span', 'scp-ws-score-badge ' + scClass, '❤️ ' + (ass.healthScore || 0) + '/100'));
+                var w11Class = ass.win11Status === 'eligible' ? 'ok' : (ass.win11Status === 'upgradable' ? 'idle' : 'risk');
+                var w11Text = ass.win11Status === 'eligible' ? 'Win 11 Ready' : (ass.win11Status === 'upgradable' ? 'Win 11 Upgradable' : 'Win 11 Ineligible');
+                scoreRow.appendChild(element('span', 'scp-ws-w11-badge ' + w11Class, w11Text));
+                card.appendChild(scoreRow);
+            }
+        }
+
+        var risks = risksOf(node);
+        if (risks.length > 0) {
+            var riskWrap = element('div', 'scp-ws-risks');
+            risks.slice(0, 2).forEach(function (r) {
+                riskWrap.appendChild(element('span', 'scp-dash-flag ' + r.level, r.text));
+            });
+            if (risks.length > 2) {
+                riskWrap.appendChild(element('span', 'scp-dash-flag info', '+' + (risks.length - 2)));
+            }
+            card.appendChild(riskWrap);
+        }
+
+        var hint = element('div', 'scp-ws-footer-hint');
+        hint.appendChild(element('span', '', thai ? '🔍 จิ้ม/คลิกดูสถานะเครื่องทั้งหมด' : '🔍 Tap to view all diagnostics'));
+        card.appendChild(hint);
+
+        function triggerModal(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            showComputerDetailModal(node);
+        }
+        card.addEventListener('click', triggerModal);
+        card.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { triggerModal(e); }
+        });
+
+        return card;
+    }
+
+    function renderHospitalCampus(rooms, list, everyRoom) {
+        var container = element('div', 'scp-campus-section');
+
+        // Department-specific Workstation View
+        if (selectedCampusDept && rooms[selectedCampusDept]) {
+            var deptName = selectedCampusDept;
+            var deptNodes = (rooms[deptName] || []).filter(matchesSearch);
+            var onlineCount = deptNodes.filter(isOnline).length;
+            var busyCount = deptNodes.filter(isBusy).length;
+            var offlineCount = deptNodes.length - onlineCount;
+            var riskCount = deptNodes.filter(function (n) { return risksOf(n).length > 0; }).length;
+
+            var header = element('div', 'scp-campus-dept-header');
+            var backBtn = button(thai ? '← กลับไปดูภาพรวมทุกแผนก' : '← All Departments (Overview)', 'scp-campus-back-btn', function () {
+                selectedCampusDept = null;
+                rerenderCampus();
+            });
+            header.appendChild(backBtn);
+
+            var titleBox = element('div', 'scp-campus-dept-title-box');
+            var icon = getDeptIcon(deptName);
+            var titleRow = element('div', 'scp-campus-dept-title-row');
+            titleRow.appendChild(element('span', 'scp-campus-dept-icon-lg', icon));
+            titleRow.appendChild(element('h3', 'scp-campus-dept-name-lg', deptName));
+            titleBox.appendChild(titleRow);
+
+            var badgeRow = element('div', 'scp-campus-dept-badges');
+            badgeRow.appendChild(element('span', 'scp-chip-metric scp-chip-total', (thai ? 'คอมพิวเตอร์ทั้งหมด ' : 'Total: ') + deptNodes.length + (thai ? ' เครื่อง' : '')));
+            badgeRow.appendChild(element('span', 'scp-chip-metric scp-chip-ok', (thai ? 'เปิดอยู่ ' : 'Online: ') + onlineCount));
+            badgeRow.appendChild(element('span', 'scp-chip-metric scp-chip-busy', (thai ? 'กำลังใช้งาน ' : 'In Use: ') + busyCount));
+            if (offlineCount > 0) {
+                badgeRow.appendChild(element('span', 'scp-chip-metric scp-chip-off', (thai ? 'ปิด/ออฟไลน์ ' : 'Offline: ') + offlineCount));
+            }
+            if (riskCount > 0) {
+                badgeRow.appendChild(element('span', 'scp-chip-metric scp-chip-risk', (thai ? 'ต้องดูแล ' : 'Attention: ') + riskCount));
+            }
+            titleBox.appendChild(badgeRow);
+            header.appendChild(titleBox);
+            container.appendChild(header);
+
+            var instruction = element('div', 'scp-campus-instruction');
+            instruction.textContent = thai
+                ? '💡 ผังคอมพิวเตอร์ประจำแผนก: เอาเมาส์ชี้หรือคลิก/จิ้มที่เครื่องเพื่อดูสเปกและสถานะเครื่องอย่างละเอียด'
+                : '💡 Workstation layout: Hover or tap/click any computer to view complete diagnostics and status.';
+            container.appendChild(instruction);
+
+            var wsGrid = element('div', 'scp-workstation-grid');
+            if (!deptNodes.length) {
+                wsGrid.appendChild(element('div', 'scp-dash-empty-room', thai ? 'ไม่มีคอมพิวเตอร์ในแผนกนี้' : 'No computers in this department'));
+            } else {
+                deptNodes.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); }).forEach(function (node) {
+                    wsGrid.appendChild(workstationCard(node));
+                });
+            }
+            container.appendChild(wsGrid);
+            return container;
+        }
+
+        // Header Bar with Mode Toggle (3D Map vs Department Cards)
+        var campusModeBar = element('div', 'scp-map-header-bar');
+        var hTitle = element('div', 'scp-campus-head-title');
+        hTitle.appendChild(element('h3', '', thai ? 'ผังแผนที่และจุดบริการโรงพยาบาล' : 'Hospital Map & Campus View'));
+        hTitle.appendChild(element('p', '', thai ? 'แผนที่สามมิติ Interactive แสดงตำแหน่งเครื่องคอมพิวเตอร์และสถานะการทำงานจริง' : '3D Interactive Isometric Map showing real-time computer locations and status.'));
+        campusModeBar.appendChild(hTitle);
+
+        var toggleWrap = element('div', 'scp-map-mode-toggle');
+        var btnMap = button(thai ? '🗺️ แผนที่ 3D (HosMap)' : '🗺️ 3D Map', 'scp-map-mode-btn' + (campusViewMode === 'map' ? ' active' : ''), function () {
+            campusViewMode = 'map';
+            rerenderCampus();
+        });
+        var btnCards = button(thai ? '🏢 ผังการ์ดแผนก' : '🏢 Department Cards', 'scp-map-mode-btn' + (campusViewMode === 'cards' ? ' active' : ''), function () {
+            campusViewMode = 'cards';
+            rerenderCampus();
+        });
+        toggleWrap.appendChild(btnMap);
+        toggleWrap.appendChild(btnCards);
+        campusModeBar.appendChild(toggleWrap);
+        container.appendChild(campusModeBar);
+
+        // 3D Isometric Map View
+        if (campusViewMode === 'map') {
+            var mapWrapper = element('div', 'scp-map-wrapper');
+            // Keep the same canvas and map across rebuilds: the view (floor, zoom, rotation)
+            // survives a refresh and no second render loop is ever started.
+            var canvas = (currentIsoMap && !currentIsoMap._destroyed) ? currentIsoMap.canvas : element('canvas');
+            canvas.id = 'scpHosMapCanvas';
+            mapWrapper.appendChild(canvas);
+
+            var controls = element('div', 'scp-map-controls');
+            var zIn = button('+', 'scp-map-ctrl-btn', function () { if (currentIsoMap) currentIsoMap.zoomBy(1.25); });
+            zIn.title = thai ? 'ขยาย (Zoom In)' : 'Zoom In';
+            var zOut = button('−', 'scp-map-ctrl-btn', function () { if (currentIsoMap) currentIsoMap.zoomBy(0.8); });
+            zOut.title = thai ? 'ย่อ (Zoom Out)' : 'Zoom Out';
+            var rotL = button('↺', 'scp-map-ctrl-btn', function () { if (currentIsoMap) currentIsoMap.rotate(Math.PI / 4); });
+            rotL.title = thai ? 'หมุนซ้าย (Rotate Left)' : 'Rotate Left';
+            var rotR = button('↻', 'scp-map-ctrl-btn', function () { if (currentIsoMap) currentIsoMap.rotate(-Math.PI / 4); });
+            rotR.title = thai ? 'หมุนขวา (Rotate Right)' : 'Rotate Right';
+            var homeBtn = button('⌂', 'scp-map-ctrl-btn', function () { if (currentIsoMap) currentIsoMap.fit(); });
+            homeBtn.title = thai ? 'มุมมองเริ่มต้น (Reset View)' : 'Reset View';
+
+            controls.appendChild(zIn);
+            controls.appendChild(zOut);
+            controls.appendChild(rotL);
+            controls.appendChild(rotR);
+            controls.appendChild(homeBtn);
+            // Full screen: the map covers the whole window; Esc or the same button returns.
+            var fullBtn = button('⛶', 'scp-map-ctrl-btn', function () { setMapFull(!mapWrapper.classList.contains('scp-map-full')); });
+            fullBtn.title = thai ? 'เต็มจอ (Esc เพื่อออก)' : 'Full screen (Esc to exit)';
+            var setMapFull = function (on) {
+                mapWrapper.classList.toggle('scp-map-full', on);
+                document.body.classList.toggle('scp-map-full-open', on);
+                fullBtn.textContent = on ? '✕' : '⛶';
+                fullBtn.title = on ? (thai ? 'ออกจากเต็มจอ (Esc)' : 'Exit full screen (Esc)') : (thai ? 'เต็มจอ (Esc เพื่อออก)' : 'Full screen (Esc to exit)');
+                if (!on) fitHeight();
+                if (currentIsoMap) window.requestAnimationFrame(function () { currentIsoMap.resize(); currentIsoMap.fit(); });
+            };
+            if (mapFullKey) document.removeEventListener('keydown', mapFullKey);
+            mapFullKey = function (e) {
+                if (e.key === 'Escape' && mapWrapper.classList.contains('scp-map-full')) setMapFull(false);
+            };
+            document.addEventListener('keydown', mapFullKey);
+            controls.appendChild(fullBtn);
+            // People and cars moving on the campus roads. Remembered per browser.
+            var trafficBtn = button('🚶', 'scp-map-ctrl-btn' + (mapTrafficOn() ? ' on' : ''), function () {
+                var next = !mapTrafficOn();
+                try { window.localStorage.setItem('scpMapTraffic', next ? '1' : '0'); } catch (e) { /* private window */ }
+                trafficBtn.classList.toggle('on', next);
+                trafficBtn.title = next ? (thai ? 'ปิดภาพคนเดิน/รถวิ่ง' : 'Hide people and cars') : (thai ? 'แสดงคนเดิน/รถวิ่ง' : 'Show people and cars');
+                if (currentIsoMap) currentIsoMap.setTraffic(next);
+            });
+            trafficBtn.title = mapTrafficOn() ? (thai ? 'ปิดภาพคนเดิน/รถวิ่ง' : 'Hide people and cars') : (thai ? 'แสดงคนเดิน/รถวิ่ง' : 'Show people and cars');
+            controls.appendChild(trafficBtn);
+            mapWrapper.appendChild(controls);
+
+            // Arrange mode: drag computers to where they really stand. Saved for everyone.
+            var editBar = element('div', 'scp-map-edit-bar');
+            var toast = element('div', 'scp-map-toast');
+            toast.hidden = true;
+            var toastTimer = null;
+            var showToast = function (text, bad) {
+                toast.textContent = text;
+                toast.className = 'scp-map-toast' + (bad ? ' bad' : '');
+                toast.hidden = false;
+                if (toastTimer) window.clearTimeout(toastTimer);
+                toastTimer = window.setTimeout(function () { toast.hidden = true; }, 2600);
+            };
+            var paintEditBar = function () {
+                editBar.textContent = '';
+                editBar.classList.toggle('on', mapEditMode);
+                mapWrapper.classList.toggle('scp-map-editing', mapEditMode);
+                if (!mapEditMode) {
+                    editBar.appendChild(button(thai ? '✥ จัดตำแหน่งเครื่อง' : '✥ Arrange computers', 'scp-map-edit-btn', function () {
+                        mapEditMode = true;
+                        if (currentIsoMap) currentIsoMap.setEditMode(true);
+                        paintEditBar();
+                    }));
+                    return;
+                }
+                editBar.appendChild(element('span', 'scp-map-edit-text', thai
+                    ? '✥ โหมดจัดตำแหน่ง: ลากเครื่องไปวางตรงไหนก็ได้ · ในภาพรวม ลากไปวางบนตึกเพื่อย้ายเข้าตึกนั้น · คลิกขวาที่เครื่องเพื่อคืนตำแหน่งอัตโนมัติ'
+                    : '✥ Arrange mode: drag any computer anywhere · on the campus, drop on a building to move it inside · right-click a computer to reset it'));
+                editBar.appendChild(button(thai ? '✓ เสร็จสิ้น' : '✓ Done', 'scp-map-edit-done', function () {
+                    mapEditMode = false;
+                    if (currentIsoMap) currentIsoMap.setEditMode(false);
+                    paintEditBar();
+                }));
+            };
+            if (window.ScpOperations) {
+                paintEditBar();
+                mapWrapper.appendChild(editBar);
+            }
+            mapWrapper.appendChild(toast);
+            var savePlacement = function (node, placement, previous) {
+                var data = placement ? { nodeid: node._id, floor: placement.floor, x: placement.x, y: placement.y } : { nodeid: node._id, clear: true };
+                window.ScpOperations.request('mapPlacementSet', data).then(function () {
+                    if (!mapPlacements) mapPlacements = {};
+                    if (placement) mapPlacements[node._id] = placement; else delete mapPlacements[node._id];
+                    showToast(placement
+                        ? (thai ? 'บันทึกตำแหน่ง ' : 'Saved position of ') + (node.name || '')
+                        : (thai ? 'คืนตำแหน่งอัตโนมัติให้ ' : 'Reset position of ') + (node.name || ''));
+                }).catch(function (error) {
+                    // Put it back where it was, so the map never shows a position that was not saved.
+                    if (currentIsoMap) {
+                        if (previous) currentIsoMap.placements[node._id] = previous; else delete currentIsoMap.placements[node._id];
+                        currentIsoMap.setPlacements(currentIsoMap.placements);
+                    }
+                    var why = error && error.message;
+                    showToast((thai ? 'บันทึกไม่สำเร็จ: ' : 'Could not save: ') + (why === 'ACCESS_DENIED' ? (thai ? 'ไม่มีสิทธิ์กับเครื่องนี้' : 'no rights to this computer')
+                        : why === 'UNKNOWN_OPERATION' ? (thai ? 'เซิร์ฟเวอร์ยังเป็นเวอร์ชันเก่า กรุณารีสตาร์ทบริการ SCP-Remote' : 'the server needs a restart to enable this')
+                        : why || ''), true);
+                });
+            };
+
+            var floorBar = element('div', 'scp-map-floor-bar');
+            floorBar.appendChild(element('span', 'scp-map-floor-label', thai ? 'อาคาร / ชั้น:' : 'Floor:'));
+            var selectEl = document.createElement('select');
+            selectEl.className = 'scp-map-floor-select';
+
+            var floorOptions = [
+                ['flr_campus', thai ? '🏥 ภาพรวมโรงพยาบาล (Campus Map)' : '🏥 Campus Overview'],
+                ['flr_opd_1', thai ? '🩺 โซน OPD (ผู้ป่วยนอก / ER / ห้องยา / LAB)' : '🩺 OPD Zone (Floor 1)'],
+                ['flr_dental_1', thai ? '🦷 ตึกทันตกรรม ชั้น 1 (ทันตกรรม)' : '🦷 Dental building, floor 1 (clinic)'],
+                ['flr_dental_2', thai ? '🏢 ตึกทันตกรรม ชั้น 2 (ธุรการ · การเงิน · พัสดุ · โสต · พขร)' : '🏢 Dental building, floor 2 (offices)'],
+                ['flr_ari_1', thai ? '😷 คลินิก ARI (ทางเดินหายใจ)' : '😷 ARI Clinic'],
+                ['flr_dialysis_1', thai ? '🫘 ศูนย์ไตเทียม (Dialysis)' : '🫘 Dialysis Center'],
+                ['flr_ipdm_1', thai ? '🛏️ ตึกผู้ป่วยในชาย (IPD Male)' : '🛏️ Male Inpatient Ward'],
+                ['flr_ipdf_1', thai ? '🛏️ ตึกผู้ป่วยในหญิง (IPD Female)' : '🛏️ Female Inpatient Ward'],
+                ['flr_lr_1', thai ? '👶 ห้องคลอด · ห้องผ่าตัด (LR / OR)' : '👶 Delivery & OR'],
+                ['flr_physio_1', thai ? '🏃 แผนกกายภาพบำบัด (Physio)' : '🏃 Physiotherapy'],
+                ['flr_clinic_1', thai ? '📋 คลินิกพิเศษ (Special Clinic)' : '📋 Special Clinic'],
+                ['flr_promo_1', thai ? '💉 ตึกเวชปฏิบัติ · ส่งเสริมสุขภาพ' : '💉 General Practice & Health Promotion'],
+                ['flr_psych_1', thai ? '🧠 ตึกจิตเวช (Psychiatry)' : '🧠 Psychiatry'],
+                ['flr_thaimed_1', thai ? '🌿 แพทย์แผนไทย (Thai Medicine)' : '🌿 Thai Traditional Medicine']
+            ];
+            floorOptions.forEach(function (opt) {
+                var optEl = document.createElement('option');
+                optEl.value = opt[0];
+                optEl.textContent = opt[1];
+                if (opt[0] === (currentIsoMap ? currentIsoMap.floorId : 'flr_campus')) optEl.selected = true;
+                selectEl.appendChild(optEl);
+            });
+            selectEl.addEventListener('change', function () {
+                if (currentIsoMap) currentIsoMap.setFloor(selectEl.value);
+            });
+            floorBar.appendChild(selectEl);
+            var campusBtn = button(thai ? '← ภาพรวม รพ.' : '← Campus', 'scp-map-back-btn', function () {
+                if (currentIsoMap) currentIsoMap.setFloor('flr_campus');
+            });
+            campusBtn.hidden = !currentIsoMap || currentIsoMap.floorId === 'flr_campus';
+            floorBar.appendChild(campusBtn);
+            // Floor 1 / Floor 2 buttons, only for a building that has more than one floor plan.
+            var levelBar = element('div', 'scp-map-level-bar');
+            var paintLevels = function (floorId) {
+                levelBar.textContent = '';
+                var floors = currentIsoMap ? currentIsoMap.floorsOf(floorId) : [];
+                levelBar.hidden = floors.length < 2;
+                floors.forEach(function (f) {
+                    levelBar.appendChild(button((thai ? 'ชั้น ' : 'Floor ') + (f.level || 1), 'scp-map-level-btn' + (f.id === floorId ? ' on' : ''), function () {
+                        if (currentIsoMap) currentIsoMap.setFloor(f.id);
+                    }));
+                });
+            };
+            levelBar.hidden = true;
+            floorBar.appendChild(levelBar);
+            mapWrapper.appendChild(floorBar);
+
+            var legend = element('div', 'scp-map-legend');
+            var legOk = element('span', 'scp-map-legend-item');
+            legOk.appendChild(element('span', 'scp-map-legend-dot ok'));
+            legOk.appendChild(element('span', '', thai ? 'เปิดอยู่ (ว่าง)' : 'Online'));
+            legend.appendChild(legOk);
+
+            var legBusy = element('span', 'scp-map-legend-item');
+            legBusy.appendChild(element('span', 'scp-map-legend-dot busy'));
+            legBusy.appendChild(element('span', '', thai ? 'กำลังใช้งาน' : 'In Use'));
+            legend.appendChild(legBusy);
+
+            var legOff = element('span', 'scp-map-legend-item');
+            legOff.appendChild(element('span', 'scp-map-legend-dot off'));
+            legOff.appendChild(element('span', '', thai ? 'ปิดเครื่อง' : 'Offline'));
+            legend.appendChild(legOff);
+
+            var legCount = element('span', 'scp-map-legend-item');
+            legCount.appendChild(element('span', 'scp-map-legend-chip', '🖥 4/5'));
+            legCount.appendChild(element('span', '', thai ? 'เปิดอยู่ / ทั้งหมดในอาคาร' : 'online / total in building'));
+            legend.appendChild(legCount);
+
+            legend.appendChild(element('span', 'scp-map-legend-hint', thai ? 'ลากเพื่อเลื่อน · ลูกกลิ้งเพื่อซูม · คลิกอาคารเพื่อดูภายใน · คลิกเครื่องเพื่อดูสเปก' : 'Drag to pan · scroll to zoom · click a building to look inside · click a PC for details'));
+            mapWrapper.appendChild(legend);
+
+            var legRisk = element('span', 'scp-map-legend-item');
+            legRisk.appendChild(element('span', 'scp-map-legend-risk', '!'));
+            legRisk.appendChild(element('span', '', thai ? 'เครื่องเสี่ยง (RAM ต่ำ / CPU เก่า / ไม่ปลอดภัย)' : 'At risk (low RAM / old CPU / unsafe)'));
+            legend.appendChild(legRisk);
+
+            /* ---- Spec card on hover ---- */
+            var card = element('div', 'scp-map-card');
+            card.hidden = true;
+            mapWrapper.appendChild(card);
+            var showCard = function (node, sx, sy) {
+                if (!node || mapEditMode) { card.hidden = true; return; }
+                card.textContent = '';
+                var head = element('div', 'scp-map-card-head');
+                head.appendChild(element('strong', '', node.name || node.rname || '-'));
+                var on = isOnline(node), busy = isBusy(node);
+                head.appendChild(element('span', 'scp-map-card-status ' + (on ? (busy ? 'busy' : 'ok') : 'off'),
+                    on ? (busy ? (thai ? 'กำลังใช้งาน' : 'In use') : (thai ? 'เปิดอยู่' : 'Online')) : (thai ? 'ปิดเครื่อง' : 'Offline')));
+                card.appendChild(head);
+                var sub = roomOf(node) + (signedInUser(node) ? ' · 👤 ' + signedInUser(node) : '');
+                card.appendChild(element('div', 'scp-map-card-sub', sub));
+
+                var spec = specSummaryOf(node);
+                var rows = element('div', 'scp-map-card-specs');
+                var addRow = function (label, value, bad) {
+                    if (!value && value !== 0) return;
+                    var r = element('div', 'scp-map-card-row' + (bad ? ' bad' : ''));
+                    r.appendChild(element('span', '', label));
+                    r.appendChild(element('b', '', String(value)));
+                    rows.appendChild(r);
+                };
+                if (spec && (spec.cpu || spec.ram)) {
+                    addRow('CPU', spec.cpu);
+                    var ramN = parseFloat(spec.ram);
+                    addRow('RAM', spec.ram, ramN > 0 && ramN <= 4);
+                    addRow('Windows', spec.os);
+                    if (spec.age != null) addRow(thai ? 'อายุเครื่อง' : 'Age', '~' + spec.age + (thai ? ' ปี' : ' yr'), spec.age >= 7);
+                    if (spec.cFree != null && spec.cFree < 100) addRow(thai ? 'ไดรฟ์ C ว่าง' : 'C: free', spec.cFree + '%', spec.cFree <= 10);
+                    if (spec.score != null) addRow(thai ? 'คะแนนสุขภาพ' : 'Health', spec.score + ' / 100', spec.score < 50);
+                } else {
+                    rows.appendChild(element('div', 'scp-map-card-empty', thai ? 'ยังไม่มีข้อมูลสเปก — เครื่องนี้ยังไม่เคยรายงานฮาร์ดแวร์' : 'No specs yet — this computer has not reported its hardware'));
+                }
+                card.appendChild(rows);
+
+                var risks = risksOf(node);
+                if (risks.length) {
+                    var list = element('ul', 'scp-map-card-risks');
+                    risks.sort(function (a, b) { return (a.level === 'high' ? 0 : 1) - (b.level === 'high' ? 0 : 1); });
+                    risks.slice(0, 6).forEach(function (r) { list.appendChild(element('li', r.level === 'high' ? 'high' : 'warn', r.text)); });
+                    if (risks.length > 6) list.appendChild(element('li', 'more', '+' + (risks.length - 6) + (thai ? ' รายการ' : ' more')));
+                    card.appendChild(list);
+                } else if (spec && (spec.cpu || spec.ram)) {
+                    card.appendChild(element('div', 'scp-map-card-good', thai ? '✓ ไม่พบความเสี่ยง' : '✓ No risks found'));
+                }
+                card.appendChild(element('div', 'scp-map-card-hint', thai ? 'คลิกเพื่อดูรายละเอียดทั้งหมด' : 'Click for full details'));
+
+                card.hidden = false;
+                var W = mapWrapper.clientWidth, H = mapWrapper.clientHeight;
+                var cw = card.offsetWidth, ch = card.offsetHeight;
+                var left = sx + 22, top = sy - ch / 2;
+                if (left + cw > W - 12) left = sx - cw - 22;
+                card.style.left = Math.max(12, left) + 'px';
+                card.style.top = Math.max(12, Math.min(H - ch - 12, top)) + 'px';
+            };
+
+            /* ---- At-risk computers: alert + list ---- */
+            var riskKinds = [
+                ['all', thai ? 'ทั้งหมด' : 'All'],
+                ['ram', thai ? 'RAM ต่ำ' : 'Low RAM'],
+                ['cpu', thai ? 'CPU เก่า' : 'Old CPU'],
+                ['age', thai ? 'เครื่องเก่า' : 'Old PC'],
+                ['os', 'Windows'],
+                ['security', thai ? 'ความปลอดภัย/อื่นๆ' : 'Security/other']
+            ];
+            var riskBtn = element('button', 'scp-map-risk-btn');
+            riskBtn.type = 'button';
+            var riskPanel = element('div', 'scp-map-risk-panel');
+            var ramAlert = element('div', 'scp-map-alert');
+            mapWrapper.appendChild(riskBtn);
+            mapWrapper.appendChild(riskPanel);
+            mapWrapper.appendChild(ramAlert);
+
+            var collectRisks = function () {
+                var items = [];
+                allNodes().filter(matchesSearch).forEach(function (node) {
+                    var risks = risksOf(node);
+                    if (!risks.length) return;
+                    var high = risks.filter(function (r) { return r.level === 'high'; }).length;
+                    items.push({ node: node, risks: risks, high: high });
+                });
+                items.sort(function (a, b) { return (b.high - a.high) || (b.risks.length - a.risks.length) || String(a.node.name).localeCompare(String(b.node.name)); });
+                return items;
+            };
+            var kindOf = function (r) { return r.kind || 'security'; };
+
+            var paintRisk = function () {
+                var items = collectRisks();
+                var highCount = items.filter(function (i) { return i.high > 0; }).length;
+                riskBtn.textContent = '⚠️ ' + (thai ? 'เครื่องเสี่ยง ' : 'At risk ') + highCount + (items.length > highCount ? ' (+' + (items.length - highCount) + ')' : '');
+                riskBtn.className = 'scp-map-risk-btn' + (highCount ? ' hot' : '') + (mapRiskOpen ? ' open' : '');
+                riskBtn.title = thai ? 'ตัวเลขแรก = เสี่ยงสูง, ในวงเล็บ = ควรระวัง' : 'First number = serious, in brackets = minor';
+
+                // Low-RAM alert: asked for specifically, so it gets its own banner.
+                var lowRam = items.filter(function (i) { return i.risks.some(function (r) { return r.kind === 'ram' && r.level === 'high'; }); });
+                ramAlert.textContent = '';
+                ramAlert.hidden = !lowRam.length || mapRamAlertClosed;
+                if (lowRam.length) {
+                    var msg = element('button', 'scp-map-alert-msg', (thai ? '⚠️ พบ ' + lowRam.length + ' เครื่องที่ RAM ต่ำ (4 GB หรือน้อยกว่า) — ทำงานช้า ค้างง่าย · กดเพื่อดูรายชื่อ' : '⚠️ ' + lowRam.length + ' computers have 4 GB RAM or less — click to see them'));
+                    msg.type = 'button';
+                    msg.addEventListener('click', function () { mapRiskOpen = true; mapRiskFilter = 'ram'; paintRisk(); });
+                    ramAlert.appendChild(msg);
+                    var x = button('✕', 'scp-map-alert-close', function () { mapRamAlertClosed = true; ramAlert.hidden = true; });
+                    x.title = thai ? 'ซ่อน' : 'Hide';
+                    ramAlert.appendChild(x);
+                }
+
+                riskPanel.textContent = '';
+                riskPanel.hidden = !mapRiskOpen;
+                if (!mapRiskOpen) return;
+                var ph = element('div', 'scp-map-risk-head');
+                ph.appendChild(element('strong', '', thai ? '⚠️ เครื่องที่มีความเสี่ยง' : '⚠️ Computers at risk'));
+                ph.appendChild(button('✕', 'scp-map-alert-close', function () { mapRiskOpen = false; paintRisk(); }));
+                riskPanel.appendChild(ph);
+                var chips = element('div', 'scp-map-risk-chips');
+                riskKinds.forEach(function (k) {
+                    var n = k[0] === 'all' ? items.length : items.filter(function (i) { return i.risks.some(function (r) { return kindOf(r) === k[0]; }); }).length;
+                    chips.appendChild(button(k[1] + ' ' + n, 'scp-map-risk-chip' + (mapRiskFilter === k[0] ? ' on' : ''), function () { mapRiskFilter = k[0]; paintRisk(); }));
+                });
+                riskPanel.appendChild(chips);
+                var listEl = element('div', 'scp-map-risk-list');
+                var shown = items.filter(function (i) { return mapRiskFilter === 'all' || i.risks.some(function (r) { return kindOf(r) === mapRiskFilter; }); });
+                if (!shown.length) listEl.appendChild(element('div', 'scp-map-card-empty', thai ? 'ไม่พบเครื่องในหมวดนี้ 👍' : 'Nothing in this group 👍'));
+                shown.slice(0, 200).forEach(function (i) {
+                    var main = i.risks.filter(function (r) { return mapRiskFilter === 'all' || kindOf(r) === mapRiskFilter; });
+                    main.sort(function (a, b) { return (a.level === 'high' ? 0 : 1) - (b.level === 'high' ? 0 : 1); });
+                    var row = element('button', 'scp-map-risk-row');
+                    row.type = 'button';
+                    row.appendChild(element('span', 'scp-map-risk-dot ' + (main[0].level === 'high' ? 'high' : 'warn')));
+                    var txt = element('span', 'scp-map-risk-txt');
+                    txt.appendChild(element('b', '', (i.node.name || '-') + ' · ' + roomOf(i.node)));
+                    txt.appendChild(element('small', '', main[0].text + (main.length > 1 ? (thai ? ' และอีก ' : ' and ') + (main.length - 1) + (thai ? ' เรื่อง' : ' more') : '')));
+                    row.appendChild(txt);
+                    row.title = i.risks.map(function (r) { return '• ' + r.text; }).join('\n');
+                    row.addEventListener('click', function () {
+                        if (currentIsoMap && !currentIsoMap.focusNode(i.node._id)) showComputerDetailModal(i.node);
+                    });
+                    listEl.appendChild(row);
+                });
+                riskPanel.appendChild(listEl);
+            };
+            riskBtn.addEventListener('click', function () { mapRiskOpen = !mapRiskOpen; paintRisk(); });
+            mapRiskRefresh = paintRisk;
+            paintRisk();
+
+            container.appendChild(mapWrapper);
+
+            if (window.ScpHosMap) {
+                var initIsoMap = function () {
+                    var syncFloorSelect = function (floorId) {
+                        if (selectEl.value !== floorId) selectEl.value = floorId;
+                        campusBtn.hidden = floorId === 'flr_campus';
+                        paintLevels(floorId);
+                    };
+                    window.ScpHosMap.loadMapData(function (err, mapDoc) {
+                        if (err || !mapDoc) {
+                            mapWrapper.appendChild(element('div', 'scp-dash-empty-room', thai ? 'โหลดข้อมูลแผนที่ไม่สำเร็จ ลองกดรีเฟรชอีกครั้ง' : 'Could not load the map data. Try Refresh.'));
+                            return;
+                        }
+                        var canvasEl = document.getElementById('scpHosMapCanvas');
+                        if (!canvasEl) return;
+                        if (!currentIsoMap || currentIsoMap._destroyed || currentIsoMap.canvas !== canvasEl) {
+                            if (currentIsoMap) currentIsoMap.destroy();
+                            currentIsoMap = new window.ScpHosMap.IsoMap(canvasEl, {
+                                onNodeClick: function (node) {
+                                    showComputerDetailModal(node);
+                                },
+                                isOnline: isOnline,
+                                isBusy: isBusy,
+                                signedInUser: signedInUser,
+                                roomOf: roomOf,
+                                riskLevel: function (node) {
+                                    var risks = risksOf(node);
+                                    if (!risks.length) return null;
+                                    return risks.some(function (r) { return r.level === 'high'; }) ? 'high' : 'warn';
+                                }
+                            });
+                            if (mapPlacements) currentIsoMap.setPlacements(Object.assign({}, mapPlacements));
+                            currentIsoMap.opts.onFloorChange = syncFloorSelect;
+                            currentIsoMap.setMap(mapDoc);
+                        }
+                        currentIsoMap.opts.onFloorChange = syncFloorSelect;
+                        currentIsoMap.opts.onPlace = window.ScpOperations ? savePlacement : null;
+                        currentIsoMap.opts.onHoverNode = showCard;
+                        if (currentIsoMap.traffic !== mapTrafficOn()) currentIsoMap.setTraffic(mapTrafficOn());
+                        if (currentIsoMap.editMode !== (mapEditMode && !!window.ScpOperations)) currentIsoMap.setEditMode(mapEditMode && !!window.ScpOperations);
+                        syncFloorSelect(currentIsoMap.floorId);
+                        loadMapPlacements();
+                        currentIsoMap.setNodes(list.filter(matchesSearch));
+                        currentIsoMap.resize();
+                    });
+                };
+                if (typeof window.requestAnimationFrame === 'function') {
+                    window.requestAnimationFrame(initIsoMap);
+                } else {
+                    window.setTimeout(initIsoMap, 30);
+                }
+            }
+
+            return container;
+        }
+
+        // Campus Overview: All Department Cards Grid
+        var grid = element('div', 'scp-campus-grid');
+        everyRoom.forEach(function (deptName) {
+            var group = (rooms[deptName] || []).filter(matchesSearch);
+            var onlineCount = group.filter(isOnline).length;
+            var busyCount = group.filter(isBusy).length;
+            var offlineCount = group.length - onlineCount;
+            var riskCount = group.filter(function (n) { return risksOf(n).length > 0; }).length;
+            var onlinePct = group.length ? Math.round((onlineCount / group.length) * 100) : 0;
+
+            var card = element('article', 'scp-dept-card');
+            card.setAttribute('role', 'button');
+            card.setAttribute('tabindex', '0');
+            card.title = thai ? ('คลิกเพื่อดูคอมพิวเตอร์ในแผนก ' + deptName) : ('Click to view workstations in ' + deptName);
+
+            var cardTop = element('div', 'scp-dept-card-top');
+            var iconWrap = element('div', 'scp-dept-card-icon', getDeptIcon(deptName));
+            cardTop.appendChild(iconWrap);
+
+            var headerTexts = element('div', 'scp-dept-card-info');
+            headerTexts.appendChild(element('h4', 'scp-dept-name', deptName));
+            headerTexts.appendChild(element('span', 'scp-dept-total-badge', group.length + (thai ? ' เครื่อง' : ' devices')));
+            cardTop.appendChild(headerTexts);
+            card.appendChild(cardTop);
+
+            var pBar = element('div', 'scp-dept-prog-bar');
+            var pFill = element('div', 'scp-dept-prog-fill');
+            pFill.style.width = onlinePct + '%';
+            pBar.appendChild(pFill);
+            card.appendChild(pBar);
+
+            var statsRow = element('div', 'scp-dept-stats-row');
+            statsRow.appendChild(element('span', 'scp-dept-stat-pill pill-ok', '🟢 ' + onlineCount + (thai ? ' เปิด' : ' on')));
+            if (busyCount > 0) {
+                statsRow.appendChild(element('span', 'scp-dept-stat-pill pill-busy', '🔵 ' + busyCount + (thai ? ' กำลังใช้' : ' busy')));
+            }
+            if (offlineCount > 0) {
+                statsRow.appendChild(element('span', 'scp-dept-stat-pill pill-off', '⚪ ' + offlineCount + (thai ? ' ปิด' : ' off')));
+            }
+            if (riskCount > 0) {
+                statsRow.appendChild(element('span', 'scp-dept-stat-pill pill-risk', '⚠️ ' + riskCount + (thai ? ' ต้องดูแล' : ' risk')));
+            }
+            card.appendChild(statsRow);
+
+            var cardFooter = element('div', 'scp-dept-card-footer');
+            cardFooter.appendChild(element('span', 'scp-dept-action-link', thai ? 'ดูผังคอมพิวเตอร์ในแผนก →' : 'View workstations →'));
+            card.appendChild(cardFooter);
+
+            function openDept() {
+                selectedCampusDept = deptName;
+                rerenderCampus();
+                var target = document.getElementById('scpHosMapPage') || document.getElementById('scp-dash-view-overview');
+                if (target) {
+                    var el = target.querySelector('.scp-campus-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+
+            card.addEventListener('click', openDept);
+            card.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDept(); }
+            });
+
+            grid.appendChild(card);
+        });
+        container.appendChild(grid);
+        return container;
+    }
+
+    function rerenderCampus() {
+        if (mapPanel && !mapPanel.hidden) {
+            renderMapPage();
+        } else {
+            render();
+        }
+    }
+
+    // Fetch the shared computer positions for the map. Skipped while someone is arranging,
+    // so a slow reply can never jump a computer back from where it was just dropped.
+    function loadMapPlacements() {
+        if (!window.ScpOperations || mapEditMode) return;
+        window.ScpOperations.request('mapPlacements').then(function (map) {
+            if (mapEditMode) return;
+            mapPlacements = map || {};
+            if (currentIsoMap && !currentIsoMap._destroyed) currentIsoMap.setPlacements(Object.assign({}, mapPlacements));
+        }).catch(function () { /* the map still works with automatic positions */ });
+    }
+
+    function renderMapPage() {
+        if (!mapPanel || mapPanel.hidden) return;
+        loadFleetAssessment();
+        while (mapPanel.firstChild) mapPanel.removeChild(mapPanel.firstChild);
+
+        var list = allNodes();
+        var rooms = {};
+        Object.keys(window.meshes || {}).forEach(function (id) {
+            var mesh = window.meshes[id];
+            if (mesh && mesh.name) rooms[mesh.name] = [];
+        });
+        list.forEach(function (node) {
+            var room = roomOf(node);
+            if (!rooms[room]) rooms[room] = [];
+            rooms[room].push(node);
+        });
+        var everyRoom = Object.keys(rooms).sort();
+
+        var topBar = element('div', 'scp-map-standalone-bar');
+        var breadcrumb = element('span', 'scp-eyebrow', thai ? 'โรงพยาบาลสีชมพู / ผังแผนที่ & จุดบริการ' : 'Sichomphu Hospital / Campus Map');
+        topBar.appendChild(breadcrumb);
+
+        var topActions = element('div', 'scp-map-standalone-actions');
+        topActions.appendChild(button(thai ? '🔄 รีเฟรชสถานะ' : '🔄 Refresh', 'scp-dash-refresh', function () {
+            loadFleetAssessment(true);
+            renderMapPage();
+        }));
+        topActions.appendChild(button(thai ? '📊 ไปยังแดชบอร์ด' : '📊 Go to Dashboard', 'scp-dash-refresh', function () {
+            showDashboard();
+        }));
+        topBar.appendChild(topActions);
+        mapPanel.appendChild(topBar);
+
+        mapPanel.appendChild(renderHospitalCampus(rooms, list, everyRoom));
+        document.body.classList.remove('scp-map-full-open');
+        fitHeight();
+    }
+
     function init() {
         if (panel) return;
         var bar = document.getElementById('page_leftbar');
@@ -2042,13 +3386,42 @@
         navButton.appendChild(svg);
         navButton.appendChild(element('span', 'scp-nav-label', t('title')));
         navButton.addEventListener('click', function () {
-            if (typeof window.go === 'function') { window.go(1); } else { show(); }
+            if (typeof window.go === 'function') { window.go(1); } else { show('overview'); }
         });
         navButton.addEventListener('keypress', function (event) {
-            if (event.key === 'Enter') { if (typeof window.go === 'function') { window.go(1); } else { show(); } }
+            if (event.key === 'Enter') { if (typeof window.go === 'function') { window.go(1); } else { show('overview'); } }
         });
+
+        var mapNavButton = element('div', 'lbbutton');
+        mapNavButton.id = 'LeftMenuScpHosMap';
+        mapNavButton.tabIndex = 0;
+        mapNavButton.title = thai ? 'ผังแผนที่ รพ.' : 'Hospital Map';
+        mapNavButton.setAttribute('role', 'button');
+        mapNavButton.setAttribute('aria-label', thai ? 'ผังแผนที่ รพ.' : 'Hospital Map');
+        var mapSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        mapSvg.setAttribute('viewBox', '0 0 24 24');
+        mapSvg.setAttribute('aria-hidden', 'true');
+        mapSvg.classList.add('scp-nav-icon');
+        var mapPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        mapPath.setAttribute('d', 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z');
+        mapSvg.appendChild(mapPath);
+        mapNavButton.appendChild(mapSvg);
+        mapNavButton.appendChild(element('span', 'scp-nav-label', thai ? 'ผังแผนที่ รพ.' : 'Hospital Map'));
+        mapNavButton.addEventListener('click', function () {
+            showMap();
+        });
+        mapNavButton.addEventListener('keypress', function (event) {
+            if (event.key === 'Enter') { showMap(); }
+        });
+
         var first = document.getElementById('LeftMenuMyDevices');
-        if (first) bar.insertBefore(navButton, first); else bar.appendChild(navButton);
+        if (first) {
+            bar.insertBefore(navButton, first);
+            bar.insertBefore(mapNavButton, first);
+        } else {
+            bar.appendChild(navButton);
+            bar.appendChild(mapNavButton);
+        }
 
         panel = element('div', 'scp-dash');
         panel.id = 'scpDashboard';
@@ -2086,6 +3459,11 @@
         panel.appendChild(body);
         devices.parentElement.insertBefore(panel, devices);
 
+        mapPanel = element('div', 'scp-map-page');
+        mapPanel.id = 'scpHosMapPage';
+        mapPanel.hidden = true;
+        devices.parentElement.insertBefore(mapPanel, devices);
+
         // Leaving through other menu buttons closes dashboard, but My Devices (1) opens dashboard.
         if (typeof window.go === 'function') {
             var original = window.go;
@@ -2113,7 +3491,7 @@
         }
         loadRoomFilter();
         window.addEventListener('resize', fitHeight);
-        window.ScpDashboard = { show: show, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
+        window.ScpDashboard = { show: show, showDashboard: showDashboard, showMap: showMap, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
             exportInventory: exportInventory, specLine: specLine, disksOf: disksOf,
             hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway,
             hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf,

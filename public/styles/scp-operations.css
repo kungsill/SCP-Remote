@@ -28,7 +28,8 @@
 .night #scpServices .scp-svc-row{background:#3b202e;border-color:#4a2b3b}
 
 /* Fleet report dialog */
-#scpReport{width:min(920px,92vw);max-height:88vh;display:flex;flex-direction:column;border:1px solid #dbbecd;border-radius:16px;padding:22px;color:#3b202e;background:#f8fbfa;font-family:inherit}
+#scpReport:not([open]){display:none!important}
+#scpReport[open]{width:min(920px,92vw);max-height:88vh;display:flex;flex-direction:column;position:fixed;inset:0;margin:auto;z-index:99999;border:1px solid #dbbecd;border-radius:16px;padding:22px;color:#3b202e;background:#f8fbfa;font-family:inherit}
 #scpReport::backdrop{background:#1238}
 #scpReport header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 #scpReport h2{margin:0}

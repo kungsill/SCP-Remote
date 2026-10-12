@@ -67,6 +67,7 @@ exports.handle = async function (ctx, cmd) {
   });queues.set(id,job);try{return await job;}finally{if(queues.get(id)===job)queues.delete(id);}
  }
  if (cmd.op === 'fleetAssessment') {
+  try { delete require.cache[require.resolve('./fleet-assess')]; } catch (e) {}
   const assessEngine = require('./fleet-assess');
   const nodes = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('node', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
   const allowedNodes = [];
@@ -153,6 +154,30 @@ exports.handle = async function (ctx, cmd) {
   };
   await save(row);
   return row;
+ }
+ if (cmd.op === 'mapPlacements') {
+  // Where each computer was dragged to on the hospital map. Shared by everyone, so the map
+  // looks the same on every screen; only computers this user may see are returned.
+  const rows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scpmappos', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const map = {};
+  for (const row of rows) { if (row && row.nodeid && await access(row.nodeid)) map[row.nodeid] = { floor: row.floor, x: row.x, y: row.y }; }
+  return map;
+ }
+ if (cmd.op === 'mapPlacementSet') {
+  if (typeof cmd.nodeid !== 'string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
+  const id = 'scpmappos/' + domain.id + '/' + cmd.nodeid;
+  if (cmd.clear === true) {
+   await new Promise((resolve, reject) => db.Remove(id, e => e ? reject(e) : resolve()));
+   return { cleared: true };
+  }
+  if (typeof cmd.floor !== 'string' || !/^flr_[a-z0-9_]{1,40}$/.test(cmd.floor)) throw Error('INVALID_INPUT');
+  // x/y null means "somewhere in that building", placed automatically.
+  const coord = v => { if (v === null || v === undefined) return null; if (typeof v !== 'number' || !isFinite(v) || v < 0 || v > 5000) throw Error('INVALID_INPUT'); return Math.round(v * 100) / 100; };
+  const x = coord(cmd.x), y = coord(cmd.y);
+  if ((x === null) !== (y === null)) throw Error('INVALID_INPUT');
+  const row = { _id: id, type: 'scpmappos', domain: domain.id, nodeid: cmd.nodeid, floor: cmd.floor, x: x, y: y, updated: Date.now(), updatedBy: user._id };
+  await save(row);
+  return { floor: row.floor, x: row.x, y: row.y };
  }
  throw Error('UNKNOWN_OPERATION');
 };

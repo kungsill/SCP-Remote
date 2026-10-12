@@ -42,15 +42,17 @@
             var intelCoreMatch = name.match(/i[3579]-(\d{4,5})/i);
             if (intelCoreMatch) {
                 var modelNum = parseInt(intelCoreMatch[1], 10);
-                var g = modelNum >= 10000 ? Math.floor(modelNum / 1000) : Math.floor(modelNum / 1000);
+                var g = Math.floor(modelNum / 1000);
+                if (modelNum >= 10000) g = Math.floor(modelNum / 1000);
+                else if (modelNum >= 1000 && modelNum <= 1999) g = Math.floor(modelNum / 100);
                 if (g >= 8) {
                     return { supported: true, brand: 'Intel', gen: g, reason: 'Intel Core Gen ' + g + ' (รองรับ)' };
                 } else {
                     return { supported: false, brand: 'Intel', gen: g, reason: 'Intel Core Gen ' + g + ' (ต่ำกว่า Gen 8)' };
                 }
             }
-            if (/G6400|G7400|Pentium.*Gold.*G6/i.test(name)) {
-                return { supported: true, brand: 'Intel', gen: 10, reason: 'Intel Pentium Gold (รองรับ)' };
+            if (/G6400|G7400|G5905|G5925|G6900|Pentium.*Gold.*G[67]|Celeron.*G59/i.test(name)) {
+                return { supported: true, brand: 'Intel', gen: 10, reason: 'Intel 10th Gen+ (รองรับ)' };
             }
             if (/G4400|G5400|Pentium|Celeron/i.test(name)) {
                 return { supported: false, brand: 'Intel', gen: null, reason: 'Intel Pentium/Celeron รุ่นเก่า (ไม่ผ่านเกณฑ์)' };
@@ -58,8 +60,16 @@
         }
 
         if (/AMD|Ryzen/i.test(name)) {
-            if (/2200G|2400G/i.test(name)) {
-                return { supported: false, brand: 'AMD', gen: 'Zen 1', reason: 'AMD Ryzen 2000G (Zen 14nm ไม่ผ่านเกณฑ์ Win 11)' };
+            if (/2200G|2400G|A\d-\d+|FX-\d+/i.test(name)) {
+                return { supported: false, brand: 'AMD', gen: 'Zen 1', reason: 'AMD Ryzen 2000G/Zen 1 (ไม่ผ่านเกณฑ์ Win 11)' };
+            }
+            // Modern Ryzen 200 Series (Ryzen 5 220, Ryzen 7 250 w/ Radeon 740M/760M) - Zen 4, 2025 (พ.ศ. 2568)
+            if (/Ryzen\s+[3579]\s+2\d{2}\b/i.test(name) || /740M|760M|780M|840M|880M/i.test(name)) {
+                return { supported: true, brand: 'AMD', gen: 'Zen 4', reason: 'AMD Ryzen 200 Series (ปี 2568 / สถาปัตยกรรม Zen 4 รองรับ)' };
+            }
+            // Ryzen AI series (Zen 5)
+            if (/Ryzen\s+AI/i.test(name)) {
+                return { supported: true, brand: 'AMD', gen: 'Zen 5', reason: 'AMD Ryzen AI Series (Zen 5 รองรับ)' };
             }
             var ryzenMatch = name.match(/Ryzen\s+[3579]\s+(PRO\s+)?(\d{4})/i);
             if (ryzenMatch) {
@@ -68,8 +78,11 @@
                     return { supported: true, brand: 'AMD', gen: 'Zen+/Zen2+', reason: 'AMD Ryzen ' + series + ' (รองรับ)' };
                 }
             }
-            if (/5500U|7520U|4300G|1220P/i.test(name)) {
+            if (/5500U|7520U|4300G|3200G|1220P/i.test(name)) {
                 return { supported: true, brand: 'AMD', gen: 'Zen2/3', reason: 'AMD Ryzen ยุคใหม่ (รองรับ)' };
+            }
+            if (/Athlon\s+Silver\s+3050U/i.test(name)) {
+                return { supported: false, brand: 'AMD', gen: 'Zen 14nm', reason: 'AMD Athlon Silver 3050U (สถาปัตยกรรม Zen 14nm ไม่ผ่านเกณฑ์)' };
             }
         }
 
@@ -102,6 +115,95 @@
         var m = raw.match(/(\d+)\s*GB/i);
         if (m) return parseInt(m[1], 10);
         return 0;
+    }
+
+    // Explain clearly what device is and why it passed/failed assessment
+    function getDeviceInsight(d) {
+        if (!d) return { what: '', why: '', summary: '' };
+        var cpu = String(d.cpu || d.cpuName || '').trim();
+        var os = String(d.os || d.osCaption || '').replace('Microsoft ', '').trim();
+        var isWin11 = /Windows 11/i.test(os);
+        var age = d.ageYears;
+        var yr = d.fiscalYear ? ('พ.ศ. ' + d.fiscalYear) : (d.biosYear ? ('พ.ศ. ' + (d.biosYear + 543)) : null);
+
+        var what = '';
+        var why = '';
+        var summary = '';
+
+        if (/Ryzen\s+[3579]\s+2\d{2}\b/i.test(cpu) || /740M|760M|780M/i.test(cpu)) {
+            what = 'AMD Ryzen 200 Series (Zen 4, กราฟิก RDNA 3) ผลิตปี 2568' + (yr ? ' (' + yr + ')' : '');
+            why = 'เครื่องใหม่เอี่ยม สถาปัตยกรรมยุคใหม่ 4nm รองรับ Windows 11 และมาตรฐานความปลอดภัย TPM 2.0 ครบถ้วน';
+            summary = 'เครื่องใหม่ปี 2568 (Zen 4) รองรับ Win 11 เต็มรูปแบบ';
+        } else if (/2200G|2400G/i.test(cpu)) {
+            what = 'AMD Ryzen G-Series ยุคแรก (Zen 1 14nm) สร้างราวปี 2561' + (age ? ' (อายุ ~' + age + ' ปี)' : '');
+            if (isWin11) {
+                why = 'เครื่องนี้ติดตั้ง Windows 11 ใช้งานได้ (ผ่าน TPM 2.0 / Bypass) แต่รหัส CPU รุ่นนี้ไม่อยู่ในลิสต์รับรองทางการของ Microsoft เนื่องจากเป็นแกน Zen 14nm';
+                summary = 'ติดตั้ง Win 11 แล้ว (CPU Zen 1 อยู่นอกลิสต์ทางการ)';
+            } else {
+                why = 'Microsoft ไม่รองรับ Windows 11 เนื่องจากชิป Zen 1st Gen ขาดคำสั่งความปลอดภัยฮาร์ดแวร์ MBEC/HVCI';
+                summary = 'สถาปัตยกรรม Zen 1 (14nm) Microsoft ไม่รองรับ';
+            }
+        } else if (/Athlon\s+Silver\s+3050U/i.test(cpu)) {
+            what = 'AMD Athlon Silver 3050U (เปิดตัวปี 2563)' + (yr ? ' (' + yr + ')' : '');
+            if (isWin11) {
+                why = 'เครื่องนี้ติดตั้ง Windows 11 ใช้งานได้จริงเพราะมี TPM 2.0 และ UEFI รองรับ แต่รหัส CPU รุ่นนี้ไม่อยู่ในลิสต์รับรองทางการของ Microsoft (เนื่องจากแกนภายในเป็น Zen 14nm 2-Core)';
+                summary = 'ติดตั้ง Win 11 แล้ว (CPU อยู่นอกลิสต์ทางการของ MS)';
+            } else {
+                why = 'แม้จำหน่ายปี 2563 แต่ภายในใช้โครงสร้าง Zen 1st Gen (14nm) 2-Core จึงไม่ผ่านเกณฑ์ความปลอดภัยอย่างเป็นทางการของ Windows 11';
+                summary = 'โครงสร้าง Zen 1 14nm อยู่นอกลิสต์ทางการ';
+            }
+        } else if (/G5905|G5925|G6900|Celeron.*G59/i.test(cpu)) {
+            what = 'Intel Celeron Gen 10 (Comet Lake) ผลิตปี 2563' + (yr ? ' (' + yr + ')' : '');
+            why = 'เป็นชิปตระกูล 10th Gen ขึ้นไปที่ Microsoft บรรจุไว้ในรายการรองรับ Windows 11 อย่างเป็นทางการ';
+            summary = 'Celeron Gen 10 รองรับ Windows 11 อย่างเป็นทางการ';
+        } else if (/G4400|G5400/i.test(cpu)) {
+            what = 'Intel Pentium ตระกูลเก่า (Skylake/Gen 6-8) สร้างปี 2558-2561' + (age ? ' (อายุ ~' + age + ' ปี)' : '');
+            why = 'รุ่นประหยัดสถาปัตยกรรมเก่า ต่ำกว่าเกณฑ์ขั้นต่ำ Gen 8 ขาดฟังก์ชันความปลอดภัยระดับฮาร์ดแวร์';
+            summary = 'รุ่นเก่าต่ำกว่าเกณฑ์ Gen 8 ขาดชิปความปลอดภัย';
+        } else if (/i[3579]-(\d{4,5})/i.test(cpu) || /(\d{1,2})(?:th|st|nd|rd)\s+Gen/i.test(cpu)) {
+            var gen = null;
+            var nth = cpu.match(/(\d{1,2})(?:th|st|nd|rd)\s+Gen/i);
+            if (nth) gen = parseInt(nth[1], 10);
+            else {
+                var cm = cpu.match(/i[3579]-(\d{4,5})/i);
+                var num = parseInt(cm[1], 10);
+                if (num >= 10000) gen = Math.floor(num / 1000);
+                else if (num >= 1000 && num <= 1999) gen = Math.floor(num / 100);
+                else gen = Math.floor(num / 1000);
+            }
+
+            var genYears = {
+                2: '2554 (อายุ ~15 ปี)', 3: '2555 (อายุ ~14 ปี)', 4: '2557 (อายุ ~12 ปี)',
+                6: '2559 (อายุ ~10 ปี)', 7: '2560 (อายุ ~9 ปี)', 8: '2561 (อายุ ~8 ปี)',
+                9: '2562 (อายุ ~7 ปี)', 10: '2563 (อายุ ~6 ปี)', 11: '2564 (อายุ ~5 ปี)',
+                12: '2565 (อายุ ~4 ปี)', 13: '2566 (อายุ ~3 ปี)', 14: '2567 (อายุ ~2 ปี)'
+            };
+            var genInfo = genYears[gen] || ('Gen ' + gen);
+
+            what = 'Intel Core Gen ' + gen + ' (เปิดตัวราวปี ' + genInfo + ')' + (yr ? ' จัดซื้อ ' + yr : '');
+            if (gen >= 8) {
+                why = 'สถาปัตยกรรม Intel Gen ' + gen + ' รองรับชุดคำสั่งความปลอดภัย MBEC/VBS และ TPM 2.0 ครบถ้วนตามมาตรฐาน Windows 11';
+                summary = 'Intel Gen ' + gen + ' รองรับ Windows 11 แท้ตามเกณฑ์มาตรฐาน';
+            } else {
+                if (isWin11) {
+                    why = 'ฮาร์ดแวร์จริงเป็น Gen ' + gen + ' เก่ากว่าเกณฑ์ขั้นต่ำ (ต้องการ Gen 8+) ที่ติดตั้ง Windows 11 ได้เกิดจากการ Bypass ข้อกำหนดความปลอดภัย';
+                    summary = 'เครื่อง Gen ' + gen + ' รัน Win 11 แบบ Bypass ข้อกำหนด';
+                } else {
+                    why = 'สถาปัตยกรรม Gen ' + gen + ' เก่ากว่าเกณฑ์ขั้นต่ำของ Microsoft (Gen 8) จึงไม่สามารถอัปเกรดเป็น Windows 11 ได้';
+                    summary = 'เครื่อง Gen ' + gen + ' เก่ากว่าเกณฑ์ขั้นต่ำ (ต้องการ Gen 8+)';
+                }
+            }
+        } else if (/Ryzen/i.test(cpu)) {
+            what = 'AMD Ryzen ตระกูลใหม่';
+            why = 'สถาปัตยกรรม Zen รองรับระบบความปลอดภัยระดับฮาร์ดแวร์และ fTPM ของ Windows 11';
+            summary = 'AMD Ryzen ยุคใหม่ ผ่านเกณฑ์รองรับ Windows 11';
+        } else {
+            what = cpu || 'เครื่องคอมพิวเตอร์ทั่วไป';
+            why = (d.cpuEval && d.cpuEval.reason) || d.cpuReason || 'ตรวจสอบจากฐานข้อมูลคุณสมบัติฮาร์ดแวร์';
+            summary = (d.cpuEval && d.cpuEval.supported) || d.cpuSupported ? 'สเปกฮาร์ดแวร์ผ่านเกณฑ์' : 'สเปกไม่ผ่านเกณฑ์ทางการ';
+        }
+
+        return { what: what, why: why, summary: summary };
     }
 
     function assessDevice(node, customCriteria) {
@@ -272,7 +374,7 @@
             isWin11: isWin11,
             isWin10: isWin10,
             isWin7: isWin7,
-            win11Status: win11Eligible ? 'eligible' : (win11Upgradable ? 'upgradable' : 'ineligible'),
+            win11Status: isWin11 ? 'already_win11' : (win11Eligible ? 'eligible' : (win11Upgradable ? 'upgradable' : 'ineligible')),
             win11Blockers: win11Blockers,
             upgradeActions: upgradeActions,
             upgradeCost: upgradeCost,
@@ -281,7 +383,18 @@
             survival: survival,
             replacementYear: replacementYear,
             recommendation: rec,
-            estimatedCost: rec === 'replace' ? criteria.costs.newDevice : (rec === 'upgrade' ? upgradeCost : 0)
+            estimatedCost: rec === 'replace' ? criteria.costs.newDevice : (rec === 'upgrade' ? upgradeCost : 0),
+            insight: getDeviceInsight({
+                cpu: cpuName,
+                cpuName: cpuName,
+                os: osName,
+                osCaption: osName,
+                ageYears: ageYears,
+                biosYear: biosYear,
+                fiscalYear: node && node.fiscalYear,
+                cpuReason: cpuEval.reason,
+                cpuSupported: cpuEval.supported
+            })
         };
     }
 
@@ -297,7 +410,7 @@
 
         var summary = {
             total: list.length,
-            win11: { eligible: 0, upgradable: 0, ineligible: 0 },
+            win11: { eligible: 0, upgradable: 0, ineligible: 0, already_win11: 0 },
             health: { good: 0, fair: 0, poor: 0, critical: 0, averageScore: 0 },
             forecast: {
                 currentYear: 0,
@@ -323,7 +436,11 @@
             var a = assessDevice(node, criteria);
             summary.devices.push(a);
 
-            summary.win11[a.win11Status]++;
+            if (summary.win11[a.win11Status] !== undefined) {
+                summary.win11[a.win11Status]++;
+            } else {
+                summary.win11[a.win11Status] = 1;
+            }
             summary.health[a.healthStatus]++;
             totalScore += a.healthScore;
 
@@ -369,6 +486,7 @@
     root.ScpFleetAssess = {
         DEFAULT_CRITERIA: DEFAULT_CRITERIA,
         evaluateCpu: evaluateCpu,
+        getDeviceInsight: getDeviceInsight,
         isSsd: isSsd,
         getTotalRamGb: getTotalRamGb,
         assessDevice: assessDevice,

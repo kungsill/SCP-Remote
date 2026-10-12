@@ -472,6 +472,21 @@
         evalBox.appendChild(scoreBar);
         evalBox.appendChild(el('p', t('Health Score: ', 'คะแนนสุขภาพ: ') + cur.healthScore + ' / 100 (' + cur.healthStatus.toUpperCase() + ')'));
 
+        var repIns = cur.insight || (window.ScpFleetAssess && window.ScpFleetAssess.getDeviceInsight && window.ScpFleetAssess.getDeviceInsight(cur));
+        if (repIns && (repIns.what || repIns.why)) {
+            var bannerCls = 'scp-bulb-banner' + (cur.win11Status === 'eligible' ? ' scp-bulb-banner-good' : (cur.win11Status === 'upgradable' ? ' scp-bulb-banner-warn' : ' scp-bulb-banner-danger'));
+            var bulbBanner = el('div', null, bannerCls);
+            var bIcon = el('span', '💡', null);
+            bIcon.style.fontSize = '18px';
+            bIcon.style.lineHeight = '1';
+            bulbBanner.appendChild(bIcon);
+            var bBody = el('div', null, null);
+            bBody.appendChild(el('strong', repIns.what || t('Hardware Insight', 'วิเคราะห์เครื่องและสาเหตุ')));
+            bBody.appendChild(el('div', repIns.why || ''));
+            bulbBanner.appendChild(bBody);
+            evalBox.appendChild(bulbBanner);
+        }
+
         if (cur.win11Blockers && cur.win11Blockers.length) {
             evalBox.appendChild(el('h5', t('Windows 11 Blockers:', 'ข้อจำกัดสำหรับ Windows 11:')));
             var bUl = el('ul', null, 'scp-report-reasons');
@@ -660,6 +675,13 @@
         render();
     }
 
+    function close() {
+        if (dialog) {
+            try { dialog.close(); } catch (e) {}
+            dialog.removeAttribute('open');
+        }
+    }
+
     function open(mode, deviceId) {
         if (mode) currentReportMode = mode;
         if (deviceId) selectedDeviceId = deviceId;
@@ -669,11 +691,19 @@
             head.appendChild(el('h2', t('Hardware Assessment & Fleet Report', 'รายงานและประเมินสภาพคอมพิวเตอร์')));
             head.appendChild(button(t('Print / Save PDF', 'พิมพ์ / บันทึก PDF'), 'scp-report-print-btn', printReport));
             head.appendChild(button(t('Refresh', 'รีเฟรช'), '', refresh));
-            head.appendChild(button(t('Close', 'ปิด'), '', function () { dialog.close(); }));
+            head.appendChild(button(t('Close', 'ปิด'), '', function () { close(); }));
             dialog.appendChild(head);
             bodyBox = el('div', null, 'scp-report-scroll');
             dialog.appendChild(bodyBox);
             document.body.appendChild(dialog);
+
+            dialog.addEventListener('click', function (e) {
+                if (e.target === dialog) { close(); }
+            });
+            dialog.addEventListener('cancel', function (e) {
+                e.preventDefault();
+                close();
+            });
         }
         if (!dialog.open) { dialog.showModal(); }
         refresh();
@@ -681,6 +711,7 @@
 
     root.ScpReport = {
         open: open,
+        close: close,
         summarize: summarize,
         _buildBody: buildBody,
         createBarChart: createBarChart,

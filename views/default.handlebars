@@ -74,6 +74,7 @@
     <script defer src="{{{domainurl}}}scripts/scp-care.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-operations.css" />
     <script defer src="{{{domainurl}}}scripts/scp-assess.js"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-map.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-dashboard.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-transfer.css" />
     <script defer src="{{{domainurl}}}scripts/scp-transfer.js"></script>
@@ -1964,16 +1965,12 @@
             // to read. On a hospital LAN there is bandwidth to spare, so lift anyone still
             // on that old default once. A quality chosen deliberately is left alone, and
             // this runs only once per browser.
-            try {
-                if (localStorage.getItem('scpDesktopQuality3') == null) {
-                    if (desktopsettings.quality == null || parseInt(desktopsettings.quality) <= 80) { desktopsettings.quality = 100; }
-                    if (desktopsettings.agentencoding == null || parseInt(desktopsettings.agentencoding) == 2) { desktopsettings.agentencoding = 4; }
-                    if (multidesktopsettings.quality == null || parseInt(multidesktopsettings.quality) <= 20) { multidesktopsettings.quality = 40; }
-                    localStorage.setItem('scpDesktopQuality3', 'webp100');
-                    localStorage.setItem('desktopsettings', JSON.stringify(desktopsettings));
-                    localStorage.setItem('multidesktopsettings', JSON.stringify(multidesktopsettings));
-                }
-            } catch (ex) { }
+            // SCP-Remote: Hospital LAN - Always force 100% full quality & 1024 full scaling from the start
+            if (!desktopsettings.quality || parseInt(desktopsettings.quality) < 100) { desktopsettings.quality = 100; }
+            if (!desktopsettings.scaling || parseInt(desktopsettings.scaling) < 1024) { desktopsettings.scaling = 1024; }
+            desktopsettings.agentencoding = 4;
+            desktopsettings.framerate = 50;
+            try { localStorage.setItem('desktopsettings', JSON.stringify(desktopsettings)); } catch (ex) { }
             try {
                 if (localStorage.getItem('scpMultiDesktopSharp1') == null) {
                     if (multidesktopsettings.scaling == null || parseInt(multidesktopsettings.scaling) <= 256) { multidesktopsettings.scaling = 512; }

@@ -260,3 +260,25 @@ test('book value uses the official MDES office price of the year a computer was 
     assert.equal(fa.referencePrice(c, 'aio', 2558).price, 16000, 'no All-in-One item before 2561: office PC price of that year');
     assert.ok(ref.historySources['desktop:2566'].startsWith('mdes-6650'));
 });
+
+test('the read-only check drives SSD detection and spare-part advice with prices', () => {
+    const fa = require('../fleet-assess');
+    const node = { _id: 'n', name: 'PC' };
+    const si = { hardware: { identifiers: { cpu_name: 'Intel(R) Core(TM) i5-10400 CPU', storage_devices: [{ Model: 'KINGSTON SA400S37240G' }] }, windows: { memory: [{ Capacity: 8 * 1024 ** 3 }], osinfo: { Caption: 'Microsoft Windows 11 Pro' } } } };
+    // the model name alone does not say SSD; the computer's own answer does
+    assert.equal(fa.assessDevice(node, si, null, null, null).diskHasSsd, false);
+    const probe = { chassis: [3], disks: [{ model: 'KINGSTON SA400S37240G', media: 'SSD', bus: 'SATA', health: 'Healthy', system: true }], batteries: [], cmosResets: 2, throttle: 9 };
+    const a = fa.assessDevice(node, si, null, null, probe);
+    assert.equal(a.diskHasSsd, true);
+    assert.equal(a.diskSource, 'probe');
+    assert.deepEqual(a.maintenance.map(m => m.type), ['cmos', 'fan', 'ups']);
+    assert.equal(a.maintenanceCost, 50 + 350, 'the optional UPS is not counted as needed');
+    const failing = fa.assessDevice(node, si, { costs: { ssdUpgrade: 1800 } }, null, Object.assign({}, probe, { disks: [{ media: 'HDD', health: 'Warning', system: true }], cmosResets: 0, throttle: 0 }));
+    assert.equal(failing.diskHasSsd, false);
+    assert.equal(failing.maintenance[0].type, 'disk');
+    assert.equal(failing.maintenance[0].cost, 1800);
+    const fleet = fa.assessFleet([node], [Object.assign({ _id: 'sin' }, si)], null, null, null, { n: probe });
+    assert.equal(fleet.maintenance.cmos, 1);
+    assert.equal(fleet.maintenance.ups, 1);
+    assert.equal(fleet.maintenance.upsCost, 2500);
+});

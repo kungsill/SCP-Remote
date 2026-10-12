@@ -1801,6 +1801,22 @@
                 'Upgrade ' + upgradeableDevices.length + ' devices: estimated ฿' + upgradeCost.toLocaleString() + ' vs ฿' + replacementCost.toLocaleString() + ' new · estimated savings ฿' + Math.max(0, replacementCost - upgradeCost).toLocaleString() + ' (configured prices)'));
         }
 
+        // Spare parts the read-only check found a need for, across the computers shown.
+        var partCount = { disk: 0, cmos: 0, fan: 0, ups: 0 }, partCost = 0, upsCost = 0;
+        assessedDevices.forEach(function (d) {
+            (d.maintenance || []).forEach(function (m) {
+                partCount[m.type] = (partCount[m.type] || 0) + 1;
+                if (m.optional) upsCost += m.cost || 0; else partCost += m.cost || 0;
+            });
+        });
+        if (partCount.disk || partCount.cmos || partCount.fan || partCount.ups) {
+            assessSec.appendChild(element('p', 'scp-assess-savings', thai
+                ? ('🔧 อะไหล่ที่ควรเปลี่ยน: ดิสก์ใกล้เสีย ' + partCount.disk + ' · ถ่าน BIOS ' + partCount.cmos + ' · พัดลม/ความร้อน ' + partCount.fan + ' เครื่อง — งบประมาณ ' + partCost.toLocaleString() + ' บาท' +
+                    (partCount.ups ? ' · ไม่พบ UPS ต่อ USB ' + partCount.ups + ' เครื่อง (ถ้าซื้อครบ ≈ ' + upsCost.toLocaleString() + ' บาท)' : ''))
+                : ('🔧 Parts: failing disks ' + partCount.disk + ' · BIOS batteries ' + partCount.cmos + ' · fans/heat ' + partCount.fan + ' — ฿' + partCost.toLocaleString() +
+                    (partCount.ups ? ' · no USB UPS on ' + partCount.ups + ' (≈ ฿' + upsCost.toLocaleString() + ')' : ''))));
+        }
+
         var aFilterWrap = element('div', 'scp-dash-assess-filters');
         aFilterWrap.appendChild(element('span', 'scp-dash-rooms-label', thai ? 'กรองตามสถานะ:' : 'Filter:'));
         assessFilters.forEach(function (f) {
@@ -1900,6 +1916,9 @@
                 (d.win11Blockers || []).forEach(function (reason) { tdWin.appendChild(element('small', 'scp-dash-note', reason)); });
                 (d.upgradeActions || d.upgradeSuggestions || []).forEach(function (action) {
                     tdWin.appendChild(element('small', 'scp-dash-note', typeof action === 'string' ? action : action.note));
+                });
+                (d.maintenance || []).forEach(function (m) {
+                    tdWin.appendChild(element('small', 'scp-dash-note' + (m.urgent ? ' scp-note-urgent' : ''), '🔧 ' + m.note + ' (≈ ' + (m.cost || 0).toLocaleString() + (thai ? ' บาท)' : ' THB)')));
                 });
                 if (d.recommendation === 'upgrade') tdWin.appendChild(element('small', 'scp-dash-note', (thai ? 'งบอัปเกรดประมาณ ' : 'Estimated upgrade ฿') + (d.upgradeCost || 0).toLocaleString() + (thai ? ' บาท' : '')));
                 tr.appendChild(tdWin);
@@ -2789,6 +2808,12 @@
             assetGrid.appendChild(makeSpecItem(thai ? 'Windows แท้ / Activate' : 'Genuine Windows', licV.text, licV.level ? 'risk' : (licV.state === 'genuine' ? 'ok' : '')));
             var offV = officeVerdictOf(node);
             if (offV.state !== 'unknown') assetGrid.appendChild(makeSpecItem('Microsoft Office', offV.text, offV.level ? 'risk' : (offV.state === 'genuine' ? 'ok' : '')));
+            var partItems = (bookA.upgradeActions || bookA.upgradeSuggestions || []).filter(function (a) { return a && a.cost; }).concat(bookA.maintenance || []);
+            if (partItems.length) {
+                assetGrid.appendChild(makeSpecItem(thai ? '🔧 อะไหล่ / งานซ่อมที่แนะนำ' : '🔧 Recommended parts / repairs', partItems.map(function (m) {
+                    return m.note + ' (≈ ' + Number(m.cost || 0).toLocaleString() + (thai ? ' บาท' : ' THB') + (m.optional ? (thai ? ', ถ้ายังไม่มี' : ', if missing') : '') + ')';
+                }).join(' · '), partItems.some(function (m) { return m.urgent; }) ? 'risk' : ''));
+            }
             assetGrid.appendChild(makeSpecItem(thai ? 'ประเภทเครื่อง' : 'Device type', typeLabel(bookA.deviceClass) + (bookA.modelName ? ' · ' + bookA.modelName : '') + ' · ' + typeSourceLabel(bookA.deviceTypeSource)));
             assetGrid.appendChild(makeSpecItem(thai ? 'ปีที่ได้มา (ประมาณ)' : 'Acquired (approx.)', bookA.acquiredYearBE ? ((thai ? 'พ.ศ. ' : 'BE ') + bookA.acquiredYearBE + ' · ' + srcText) : '-'));
             assetGrid.appendChild(makeSpecItem(thai ? 'ราคาตั้งต้น' : 'Cost basis', baht(bookA.costBasis) + ' · ' + (bookA.costSource === 'asset'
@@ -3770,8 +3795,16 @@
         "$ErrorActionPreference='SilentlyContinue'",
         "$e = Get-CimInstance Win32_SystemEnclosure; $p = Get-CimInstance Win32_ComputerSystemProduct; $c = Get-CimInstance Win32_ComputerSystem",
         "$int = @(Get-CimInstance -Namespace root\\wmi -ClassName WmiMonitorConnectionParams | Where-Object { $_.VideoOutputTechnology -eq 2147483648 }).Count",
-        "$o = @{ chassis = @($e.ChassisTypes); model = [string]$p.Version; name = [string]$p.Name; system = [string]$c.Model; pcType = [int]$c.PCSystemType; internal = $int }",
-        "Write-Output ('SCP_CHASSIS:' + ($o | ConvertTo-Json -Compress))",
+        // Parts worth replacing, read only: the real disk type and health (and which disk holds C:),
+        // a USB-connected UPS, the clock reset to an old year at boot (a flat BIOS battery), and the
+        // processor slowed by firmware (usually heat: a dusty or dead fan).
+        "$sysDisk = [string](Get-Partition -DriveLetter C -ErrorAction SilentlyContinue | Select-Object -First 1).DiskNumber",
+        "$dsk = @(Get-PhysicalDisk -ErrorAction SilentlyContinue | ForEach-Object { @{ model = [string]$_.FriendlyName; media = [string]$_.MediaType; bus = [string]$_.BusType; health = [string]$_.HealthStatus; sizeGb = [int]($_.Size / 1GB); system = ([string]$_.DeviceId -eq $sysDisk) } })",
+        "$bat = @(Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | ForEach-Object { @{ name = [string]$_.Name; charge = [int]$_.EstimatedChargeRemaining; status = [int]$_.BatteryStatus } })",
+        "$cmos = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-General'; Id = 1; StartTime = (Get-Date).AddDays(-180) } -MaxEvents 300 -ErrorAction SilentlyContinue | Where-Object { $_.Properties.Count -ge 2 -and ([datetime]$_.Properties[1].Value).Year -lt 2015 }).Count",
+        "$thr = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Processor-Power'; Id = 37; StartTime = (Get-Date).AddDays(-30) } -MaxEvents 500 -ErrorAction SilentlyContinue).Count",
+        "$o = @{ chassis = @($e.ChassisTypes); model = [string]$p.Version; name = [string]$p.Name; system = [string]$c.Model; pcType = [int]$c.PCSystemType; internal = $int; disks = $dsk; batteries = $bat; cmosResets = $cmos; throttle = $thr }",
+        "Write-Output ('SCP_CHASSIS:' + ($o | ConvertTo-Json -Compress -Depth 4))",
         // Windows activation, the same record that decides the "Activate Windows" watermark.
         // The product key itself is never sent: only whether an OEM key is in the firmware.
         '$lic = @(Get-CimInstance SoftwareLicensingProduct -Filter "ApplicationID=\'55c92734-d682-4d71-983e-d6ec3f16059f\' AND PartialProductKey IS NOT NULL") | Where-Object { $_.Description -like \'*Operating System*\' } | Select-Object -First 1',
@@ -3937,6 +3970,9 @@
         section(thai ? '📄 Office ไม่แท้ / ยังไม่ Activate' : '📄 Office not genuine / not activated', list.filter(function (n) { return officeVerdictOf(n).level; }), function (n) { return officeVerdictOf(n).text; });
         section(thai ? '🔎 ควรตรวจเอกสารสิทธิ์ (Digital License ด้วยคีย์ทั่วไป)' : '🔎 Check the licence paperwork (digital licence, generic key)', list.filter(function (n) { return licenseVerdictOf(n).review; }), function () { return thai ? 'ยืนยันด้วยใบสั่งซื้อหรือสิทธิ์อัปเกรด' : 'confirm with a purchase or upgrade record'; });
         section(thai ? '🧠 RAM ต่ำ (≤ 4 GB)' : '🧠 Low RAM (≤ 4 GB)', lowRam, function (n) { var s = specSummaryOf(n); return s && s.ram; });
+        var partsOf = function (n) { var a = window.ScpFleetAssess && window.ScpFleetAssess.assessDevice(n); return ((a && a.maintenance) || []).filter(function (m) { return !m.optional; }); };
+        section(thai ? '🔧 อะไหล่ที่ควรเปลี่ยน (ดิสก์ / ถ่าน BIOS / พัดลม)' : '🔧 Parts to replace (disk / BIOS battery / fan)', list.filter(function (n) { return partsOf(n).length; }),
+            function (n) { return partsOf(n).map(function (m) { return m.note.split(' — ')[0]; }).join(', '); });
 
         var tickets = element('section', 'scp-extra-section');
         tickets.appendChild(element('h4', '', thai ? '🛠️ งานซ่อมค้าง' : '🛠️ Open repairs'));

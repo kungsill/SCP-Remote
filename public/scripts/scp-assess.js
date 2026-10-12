@@ -398,6 +398,13 @@
         if (!diskHasSsd && Array.isArray(id.storage_devices)) {
             diskHasSsd = id.storage_devices.some(function (d) { return isSsd(d.Model || d.Caption); });
         }
+        // the computer's own answer about the disk holding C: beats the model-name guess
+        var probed = (root.ScpCachedChassis && nid && root.ScpCachedChassis[nid]) || null;
+        var sysDisk = root.ScpPriceReference.systemDiskOf(probed), diskSource = 'model';
+        if (sysDisk && (/^(SSD|HDD)$/i.test(sysDisk.media || '') || /NVMe/i.test(sysDisk.bus || ''))) {
+            diskHasSsd = /SSD/i.test(sysDisk.media || '') || /NVMe/i.test(sysDisk.bus || '');
+            diskSource = 'probe';
+        }
 
         var cDriveFreePct = 100;
         if (win.volumes && win.volumes.C && win.volumes.C.size) {
@@ -514,6 +521,9 @@
             fiscalYear: fy,
             deviceClass: deviceClass,
             deviceTypeSource: devType.source,
+            diskSource: diskSource,
+            maintenance: root.ScpPriceReference.maintenanceFor(probed, deviceClass, criteria.costs),
+            maintenanceCost: root.ScpPriceReference.maintenanceFor(probed, deviceClass, criteria.costs).filter(function (m) { return !m.optional; }).reduce(function (s, m) { return s + (m.cost || 0); }, 0),
             modelName: (probe && probe.model) || '',
             costBasis: costBasis,
             costSource: purchasePrice ? 'asset' : 'reference',

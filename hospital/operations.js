@@ -101,6 +101,13 @@ exports.handle = async function (ctx, cmd) {
   if (!admin && !(user.siteadmin & 2)) throw Error('ACCESS_DENIED');
   const assessEngine = require('./fleet-assess');
   const newCriteria = Object.assign({}, assessEngine.DEFAULT_CRITERIA, cmd.criteria);
+  // Unit prices (new PC, RAM, SSD, CPU, UPS, fan, BIOS battery): plain baht amounts only.
+  const costs = {};
+  for (const [key, value] of Object.entries((cmd.criteria && cmd.criteria.costs) || {})) {
+   const v = Number(value);
+   if (/^[a-zA-Z]{2,30}$/.test(key) && v >= 0 && v <= 1000000) costs[key] = Math.round(v);
+  }
+  newCriteria.costs = Object.assign({}, assessEngine.DEFAULT_CRITERIA.costs, costs);
   // Book-value settings: a useful life the Comptroller General allows for computers (3-5
   // years), and reference prices kept to sane Buddhist-era years and baht amounts.
   const life = Number(newCriteria.usefulLifeYears);
@@ -182,7 +189,16 @@ exports.handle = async function (ctx, cmd) {
    const chassis = Array.isArray(it.chassis) ? it.chassis.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n < 100).slice(0, 8) : [];
    const str = v => typeof v === 'string' ? v.slice(0, 120) : '';
    await save({ _id: 'scpchassis/' + it.nodeid, type: 'scpchassis', domain: domain.id, nodeid: it.nodeid, chassis, model: str(it.model), name: str(it.name), system: str(it.system),
-    pcType: Number(it.pcType) || 0, internal: Math.max(0, Math.min(9, Number(it.internal) || 0)), updated: Date.now(), by: user._id });
+    pcType: Number(it.pcType) || 0, internal: Math.max(0, Math.min(9, Number(it.internal) || 0)),
+    // parts: disk type/health, a USB UPS, BIOS clock resets, heat throttling -- short facts only
+    disks: (Array.isArray(it.disks) ? it.disks : []).filter(d => d && typeof d === 'object').slice(0, 8).map(d => ({
+     model: str(d.model), media: str(d.media).slice(0, 20), bus: str(d.bus).slice(0, 20), health: str(d.health).slice(0, 20),
+     sizeGb: Math.max(0, Math.min(100000, Number(d.sizeGb) || 0)), system: d.system === true })),
+    batteries: (Array.isArray(it.batteries) ? it.batteries : []).filter(b => b && typeof b === 'object').slice(0, 3).map(b => ({
+     name: str(b.name), charge: Math.max(0, Math.min(100, Number(b.charge) || 0)), status: Math.max(0, Math.min(99, Number(b.status) || 0)) })),
+    cmosResets: Math.max(0, Math.min(1000, Number(it.cmosResets) || 0)),
+    throttle: Math.max(0, Math.min(100000, Number(it.throttle) || 0)),
+    updated: Date.now(), by: user._id });
    saved++;
   }
   return { saved };

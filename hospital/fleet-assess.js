@@ -392,6 +392,13 @@ function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
         driveModels.push(d.Model || d.Caption || '');
         if (isSsd(d.Model || d.Caption)) hasSsd = true;
     }
+    // What the computer itself reported (disk holding C:) beats guessing from the model name.
+    const sysDisk = priceReference.systemDiskOf(probe);
+    let diskSource = 'model';
+    if (sysDisk && (/^(SSD|HDD)$/i.test(sysDisk.media || '') || /NVMe/i.test(sysDisk.bus || ''))) {
+        hasSsd = /SSD/i.test(sysDisk.media || '') || /NVMe/i.test(sysDisk.bus || '');
+        diskSource = 'probe';
+    }
 
     // Disk volumes & space
     const volumes = win.volumes || {};
@@ -536,6 +543,9 @@ function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
         estimatedCost = 0;
     }
 
+    // Spare parts the check found a need for (disk, BIOS battery, fan, UPS).
+    const maintenance = priceReference.maintenanceFor(probe, deviceClass, criteria.costs);
+    const maintenanceCost = maintenance.filter(m => !m.optional).reduce((sum, m) => sum + (m.cost || 0), 0);
     const healthStatus = score >= 80 ? 'good' : (score >= 60 ? 'fair' : (score >= 40 ? 'poor' : 'critical'));
     const upgCost = upgradeSuggestions.reduce((sum, s) => sum + (s.cost || 0), 0);
 
@@ -605,6 +615,9 @@ function assessDevice(node, sysinfo, customCriteria, assetData, probe) {
         acquiredYearBE: acquiredYearBE,
         deviceClass: deviceClass,
         deviceTypeSource: devType.source,
+        diskSource: diskSource,
+        maintenance: maintenance,
+        maintenanceCost: maintenanceCost,
         modelName: (probe && probe.model) || '',
         costBasis: costBasis,
         costSource: purchasePrice > 0 ? 'asset' : 'reference',
@@ -710,6 +723,14 @@ function assessFleet(nodes, sysinfos, customCriteria, meshMap, assetMap, probeMa
 
     // Readiness has three exclusive groups. Critical/replace is a separate health flag
     // and can overlap them; it must use the same predicate as the dashboard filter.
+    // Spare parts across the fleet, by kind, with the cost of the ones that are needed now.
+    summary.maintenance = { disk: 0, cmos: 0, fan: 0, ups: 0, cost: 0, upsCost: 0 };
+    for (const d of list) {
+        for (const m of (d.maintenance || [])) {
+            summary.maintenance[m.type] = (summary.maintenance[m.type] || 0) + 1;
+            if (m.optional) summary.maintenance.upsCost += m.cost || 0; else summary.maintenance.cost += m.cost || 0;
+        }
+    }
     const upgradableList = list.filter(d => d.win11Status === 'upgradable');
     summary.win11 = {
         eligible: list.filter(d => d.win11Status === 'eligible' || d.win11Status === 'already_win11').length,

@@ -28,7 +28,9 @@
     function resolveCriteria(defaults, custom) {
         custom = custom || {};
         var c = Object.assign({}, defaults, custom);
-        c.costs = Object.assign({}, defaults.costs, custom.costs);
+        var partPrices = {};
+        Object.keys(parts).forEach(function (k) { partPrices[k] = parts[k].price; });
+        c.costs = Object.assign(partPrices, defaults.costs, custom.costs);
         c.weights = Object.assign({}, defaults.weights, custom.weights);
         c.budgetYearBE = Number(custom.budgetYearBE || defaults.budgetYearBE || 2570);
         if (!Number.isInteger(c.budgetYearBE) || c.budgetYearBE < 2540 || c.budgetYearBE > 2700) c.budgetYearBE = 2570;
@@ -52,7 +54,51 @@
         }
         return { price: Number(criteria.costs.newDevice) || 26000, yearBE: criteria.budgetYearBE, draft: false, label: 'ราคาประมาณที่ตั้งเอง' };
     }
-    var api = { catalog: catalog, source: source, profiles: profiles, history: history, historySources: historySources, resolveCriteria: resolveCriteria, replacementPrice: replacementPrice };
+    /* Spare parts. Only the UPS has a government reference price (MDES lists it as equipment);
+       RAM, SSD, CPU, fans and BIOS batteries are supplies with no MDES price, so these are
+       market estimates the administrator can change on the criteria screen. */
+    var parts = {
+        ramUpgrade: { price: 1200, label: 'RAM 8 GB (DDR4)', source: 'ราคาตลาดโดยประมาณ' },
+        ssdUpgrade: { price: 1500, label: 'SSD 512 GB (SATA)', source: 'ราคาตลาดโดยประมาณ' },
+        cpuUpgrade: { price: 3500, label: 'CPU (รุ่นที่ใส่แทนได้ใน socket เดิม)', source: 'ราคาตลาดโดยประมาณ' },
+        upsUnit: { price: 2500, label: 'เครื่องสำรองไฟฟ้า (UPS) 800 VA', source: 'ราคากลาง MDES ฉบับ ธ.ค. 2568 หน้า 28' },
+        fanUnit: { price: 350, label: 'พัดลมระบายความร้อน CPU + ซิลิโคน', source: 'ราคาตลาดโดยประมาณ' },
+        cmosBattery: { price: 50, label: 'ถ่าน BIOS (CR2032)', source: 'ราคาตลาดโดยประมาณ' }
+    };
+
+    // The disk Windows runs from, from what the computer reported when checked.
+    function systemDiskOf(probe) {
+        var disks = (probe && Array.isArray(probe.disks)) ? probe.disks : [];
+        if (!disks.length) return null;
+        for (var i = 0; i < disks.length; i++) if (disks[i] && disks[i].system) return disks[i];
+        return disks[0];
+    }
+
+    // Parts a computer needs, judged from the read-only check: a failing disk, a flat BIOS
+    // battery (clock reset to an old year at boot), heat throttling (fan), and no UPS on USB.
+    // The UPS is optional: a UPS without a USB cable cannot be seen from Windows.
+    function maintenanceFor(probe, deviceClass, costs) {
+        var out = [];
+        if (!probe) return out;
+        var cost = function (key) { return Number((costs || {})[key]) || parts[key].price; };
+        var disk = systemDiskOf(probe);
+        if (disk && disk.health && !/^Healthy$/i.test(disk.health) && !/^$|Unknown/i.test(disk.health)) {
+            out.push({ type: 'disk', cost: cost('ssdUpgrade'), urgent: true, note: 'ดิสก์ที่ลง Windows เริ่มเสีย (สถานะ ' + disk.health + ') — สำรองข้อมูลแล้วเปลี่ยนเป็น SSD โดยด่วน' });
+        }
+        if (Number(probe.cmosResets) > 0) {
+            out.push({ type: 'cmos', cost: cost('cmosBattery'), note: 'เปลี่ยนถ่าน BIOS (CR2032) — เวลาเครื่องรีเซ็ตกลับปีเก่าตอนเปิดเครื่อง ' + probe.cmosResets + ' ครั้งใน 6 เดือน' });
+        }
+        if (Number(probe.throttle) >= 5) {
+            out.push({ type: 'fan', cost: cost('fanUnit'), note: 'ทำความสะอาด/เปลี่ยนพัดลม CPU — ซีพียูถูกลดความเร็ว ' + probe.throttle + ' ครั้งใน 30 วัน (มักเกิดจากความร้อน)' });
+        }
+        if (deviceClass !== 'notebook' && Array.isArray(probe.batteries) && !probe.batteries.length) {
+            out.push({ type: 'ups', cost: cost('upsUnit'), optional: true, note: 'ไม่พบ UPS ที่ต่อสาย USB — ถ้ายังไม่มี UPS ควรมี (800 VA ราคากลาง ' + cost('upsUnit').toLocaleString() + ' บาท)' });
+        }
+        return out;
+    }
+
+    var api = { catalog: catalog, source: source, profiles: profiles, history: history, historySources: historySources, parts: parts,
+        systemDiskOf: systemDiskOf, maintenanceFor: maintenanceFor, resolveCriteria: resolveCriteria, replacementPrice: replacementPrice };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.ScpPriceReference = api;
 }(typeof window !== 'undefined' ? window : globalThis));

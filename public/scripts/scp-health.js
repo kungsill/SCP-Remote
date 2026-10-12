@@ -146,6 +146,10 @@
             return ["$ErrorActionPreference = 'SilentlyContinue'", "$e = $null; Optimize-Volume -DriveLetter C -ReTrim -ErrorVariable e",
                 out('trim', 'ok = (-not $e); error = [string]($e | Select-Object -First 1)')].join('\r\n');
         },
+        power_balanced: function () {
+            return ["$ErrorActionPreference = 'SilentlyContinue'", "powercfg /setactive SCHEME_BALANCED", "$pp = [string](powercfg /getactivescheme)",
+                out('power_balanced', "ok = ($pp -match '381b4222-f694-41f0-9685-ff5bb260df2e'); plan = $pp")].join('\r\n');
+        },
         startup: function (arg) {
             // arg = { scope, name, on }; the scope picks one of five fixed registry paths
             if (!SCOPES[arg.scope]) throw Error('NOT_ALLOWED');
@@ -231,6 +235,7 @@
         dns_flush: t('flush the DNS cache', 'ล้างแคช DNS'),
         svc_start: t('start the service', 'เปิดบริการ'),
         trim: t('TRIM the SSD (tells it which space is free, keeps it fast)', 'สั่ง TRIM ให้ SSD (บอกพื้นที่ว่าง ช่วยให้เร็วเหมือนใหม่)'),
+        power_balanced: t('switch the power plan to Balanced', 'ตั้งโหมดพลังงานเป็น Balanced'),
         startup: t('change the start-up program', 'เปลี่ยนการเปิดพร้อมเครื่อง'),
         fonts: t('install Thai fonts', 'ติดตั้งฟอนต์ไทย')
     };
@@ -396,7 +401,7 @@
         if (d.tempMb >= 2000) add(SPD, 'warn', t('Temporary files: ', 'ไฟล์ชั่วคราว ') + (d.tempMb / 1024).toFixed(1) + ' GB', '', cleanFix);
         else if (d.tempMb >= 0) add(SPD, 'ok', t('Temporary files: ', 'ไฟล์ชั่วคราว ') + d.tempMb + ' MB');
         var plan = (String(d.power || '').match(/\(([^)]+)\)/) || [])[1] || '';
-        if (/saver|ประหยัด/i.test(plan)) add(SPD, 'warn', t('Power plan: ', 'โหมดพลังงาน: ') + plan, t('Power saver slows the processor; Balanced is better for work.', 'โหมดประหยัดพลังงานทำให้ CPU ช้า ควรใช้ Balanced'));
+        if (/saver|ประหยัด/i.test(plan)) add(SPD, 'warn', t('Power plan: ', 'โหมดพลังงาน: ') + plan, t('Power saver slows the processor; Balanced is better for work.', 'โหมดประหยัดพลังงานทำให้ CPU ช้า ควรใช้ Balanced'), [{ label: t('Set Balanced', 'ตั้งเป็น Balanced'), action: 'power_balanced' }]);
         if (/SSD/i.test(d.diskType)) add(SPD, 'ok', t('SSD drive', 'ใช้ SSD'), t('TRIM keeps an SSD as fast as new; Windows does it weekly, this does it now.', 'TRIM ช่วยให้ SSD เร็วเหมือนใหม่ (Windows ทำทุกสัปดาห์ กดเพื่อทำตอนนี้)'), [{ label: 'TRIM', action: 'trim' }]);
         // fonts
         var miss = d.fontsMissing || [];

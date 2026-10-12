@@ -1309,6 +1309,10 @@
                     ctx.strokeStyle = shade(base, 0.8);
                     ctx.lineWidth = 1;
                     ctx.stroke();
+                    // cartoon style: car park bays and cars, pitch and court markings
+                    if (this.anime && this._drawGroundDetail) this._drawGroundDetail(ctx, r, g);
+                } else if (this.anime && this._drawLandmark && this._drawLandmark(ctx, r, g, top)) {
+                    // drawn as itself (the Buddha statue, the flagpole) instead of a box
                 } else {
                     this._drawPrism(ctx, r.polygon, g.sign, 0, top, base, {
                         top: shade(base, isHover ? 1.28 : 1.12),
@@ -2407,6 +2411,7 @@
         if (!this._trafficOn() && !trees) return;
         var self = this, list = [];
         if (trees) trees.forEach(function (tr) { list.push({ tree: tr, depth: tr.depth }); });
+        if (this.anime && this._extraActors) this._extraActors(list); // players, the flag, sparkles
         if (this._trafficOn()) this._agents.forEach(function (ag) {
             if (ag.hidden) return;
             var pos = self._agentPos(ag);
@@ -2415,7 +2420,8 @@
         });
         list.sort(function (a, b) { return a.depth - b.depth; });
         list.forEach(function (it) {
-            if (it.tree) self._drawTree(ctx, it.tree);
+            if (it.draw) it.draw(ctx);
+            else if (it.tree) self._drawTree(ctx, it.tree);
             else if (it.ag.type === 'walker') self._drawWalker(ctx, it.ag, it.pos);
             else self._drawCar(ctx, it.ag, it.pos);
         });
@@ -2500,7 +2506,7 @@
     var pendingLoad = null;
     window.ScpHosMap = {
         IsoMap: IsoMap,
-        util: { shade: shade, mix: mix, pointInPoly: pointInPoly, roundRectPath: roundRectPath, stableIndex: stableIndex,
+        util: { shade: shade, mix: mix, pointInPoly: pointInPoly, signedArea: signedArea, roundRectPath: roundRectPath, stableIndex: stableIndex,
             ROAD_W: ROAD_W, PATH_W: PATH_W, REDUCED_MOTION: REDUCED_MOTION, PALETTE: PALETTE },
         loadMapData: function (callback) {
             if (window.__scpHosMapData) {

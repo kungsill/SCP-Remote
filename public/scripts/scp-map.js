@@ -104,6 +104,8 @@
         pm_ward: /ตึกเวช|เวชปฏิบัติ/i
     };
     var PC_ROOM_KINDS = { service: 1, counter: 1, window: 1 };
+    // Campus features the cartoon style draws as themselves rather than as buildings.
+    var LANDMARKS = /^c_(sign|buddha|flag)$/;
 
     // Room floor colours on floor plans: each kind gets its own clear tint.
     var ROOM_COLOR = {
@@ -1767,6 +1769,7 @@
         for (var i = 0; i < rooms.length; i++) {
             var r = rooms[i];
             if (!r.name || r.kind === 'corridor') continue;
+            if (this.anime && r.id === 'c_sign') continue; // the cartoon sign shows the name itself
             var g = this._geom.get(r);
             var isBuilding = r.kind === 'building';
             var st = stats.get(r);
@@ -2068,6 +2071,7 @@
                 return;
             }
             if (g.h < 0.5) return;
+            if (self.anime && LANDMARKS.test(r.id)) return; // the sign, statue and flagpole have no windows
             var lit = st && st.total ? 10 + Math.round(85 * st.online / st.total) : 22;
             var levels = g.levels || Math.max(1, Math.round(g.h / 2.6));
             var poly = r.polygon, n = poly.length, h = self._roofOf(r);
@@ -2113,6 +2117,7 @@
             });
         }
         ctx.restore();
+        if (this.anime && this._relight) this._relight(ctx, rooms); // the hospital sign stays lit
     };
 
     // How many people walk, and where to, follows how many computers are in use.
@@ -2506,7 +2511,7 @@
     var pendingLoad = null;
     window.ScpHosMap = {
         IsoMap: IsoMap,
-        util: { shade: shade, mix: mix, pointInPoly: pointInPoly, signedArea: signedArea, roundRectPath: roundRectPath, stableIndex: stableIndex,
+        util: { shade: shade, mix: mix, pointInPoly: pointInPoly, signedArea: signedArea, LANDMARKS: LANDMARKS, roundRectPath: roundRectPath, stableIndex: stableIndex,
             ROAD_W: ROAD_W, PATH_W: PATH_W, REDUCED_MOTION: REDUCED_MOTION, PALETTE: PALETTE },
         loadMapData: function (callback) {
             if (window.__scpHosMapData) {

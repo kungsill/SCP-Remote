@@ -195,7 +195,7 @@
         var self = this, c = this._c, s = this._s;
         ctx.save();
         rooms.forEach(function (r) {
-            if (r.kind !== 'building') return;
+            if (r.kind !== 'building' || U.LANDMARKS.test(r.id)) return;
             var g = self._geom.get(r);
             if (g.h < 1.2) return;
             var levels = g.levels || Math.max(1, Math.round(g.h / 2.6));
@@ -991,7 +991,94 @@
     P._drawLandmark = function (ctx, r, g, top) {
         if (r.id === 'c_buddha') { this._drawBuddha(ctx, r, g); return true; }
         if (r.id === 'c_flag') { this._drawFlagpole(ctx, r, g); return true; }
+        if (r.id === 'c_sign') { this._drawHospitalSign(ctx, r, g); return true; }
         return false;
+    };
+
+    // After the night shade: draw the sign again so it shines, with a warm glow.
+    P._relight = function (ctx, rooms) {
+        for (var i = 0; i < rooms.length; i++) {
+            if (rooms[i].id === 'c_sign') this._drawHospitalSign(ctx, rooms[i], this._geom.get(rooms[i]));
+        }
+    };
+
+    /* The hospital's name sign: a white board in a pink frame on a low plinth, with a bed of
+       pink flowers in front. The lettering is laid onto whichever face of the board looks
+       towards the viewer, and always reads left to right however the map is turned. */
+    P._drawHospitalSign = function (ctx, r, g) {
+        var b = g.b, s = this.scale;
+        var alongX = (b.x2 - b.x1) >= (b.y2 - b.y1);
+        var cx = (b.x1 + b.x2) / 2, cy = (b.y1 + b.y2) / 2;
+        var len = (alongX ? b.x2 - b.x1 : b.y2 - b.y1) - 1.6, depth = 0.7, z0 = 0.45, z1 = 3.1;
+        var board = alongX ? rectPoly(cx - len / 2, cy - depth / 2, cx + len / 2, cy + depth / 2)
+            : rectPoly(cx - depth / 2, cy - len / 2, cx + depth / 2, cy + len / 2);
+        // plinth and flower bed
+        this._drawPrism(ctx, rectPoly(b.x1 + 0.3, b.y1 + 0.3, b.x2 - 0.3, b.y2 - 0.3), g.sign, 0, z0, '#f4f0e6', { top: '#fffaf0', edge: INK });
+        // which long face looks at the viewer
+        var c = this._c, sn = this._s, nx = alongX ? 0 : 1, ny = alongX ? 1 : 0;
+        var face = (nx * c - ny * sn) + (nx * sn + ny * c) > 0 ? 1 : -1;
+        var bedOff = depth / 2 + 0.9, self = this;
+        var drawBed = function () {
+            self._polyPath(ctx, alongX ? rectPoly(cx - len / 2, cy + face * bedOff - 0.6, cx + len / 2, cy + face * bedOff + 0.6)
+                : rectPoly(cx + face * bedOff - 0.6, cy - len / 2, cx + face * bedOff + 0.6, cy + len / 2), z0 + 0.01);
+            ctx.fillStyle = '#8fcf7c';
+            ctx.fill();
+            if (s >= 2) {
+                for (var k = 0; k < 14; k++) {
+                    var u = (k + 0.5) / 14 - 0.5;
+                    var fp = alongX ? self.project(cx + u * len, cy + face * bedOff + ((k % 2) - 0.5) * 0.6, z0 + 0.25)
+                        : self.project(cx + face * bedOff + ((k % 2) - 0.5) * 0.6, cy + u * len, z0 + 0.25);
+                    ctx.fillStyle = k % 3 ? '#f9a8cf' : '#ffffff';
+                    ctx.beginPath(); ctx.arc(fp[0], fp[1], Math.max(1, s * 0.22), 0, Math.PI * 2); ctx.fill();
+                }
+            }
+        };
+        // the board itself, then a pink cap along its top
+        var sign = U.signedArea(board) >= 0 ? 1 : -1;
+        this._drawPrism(ctx, board, sign, z0, z1, '#ffffff', { top: '#f9a8cf', edge: INK });
+        // the face's two bottom corners, ordered so the text runs left to right on screen
+        var fy = alongX ? cy + face * depth / 2 : null, fx = alongX ? null : cx + face * depth / 2;
+        var A = alongX ? [cx - len / 2, fy] : [fx, cy - len / 2], B = alongX ? [cx + len / 2, fy] : [fx, cy + len / 2];
+        var pa = this.project(A[0], A[1], z1), pb = this.project(B[0], B[1], z1);
+        if (pa[0] > pb[0]) { var tmp = pa; pa = pb; pb = tmp; }
+        var faceH = (z1 - z0) * s * 1.5;
+        if (Math.abs(pb[0] - pa[0]) < 18 || faceH < 6) { drawBed(); return; } // seen edge-on or too far away to read
+        ctx.save();
+        // local units: 100 across the board, 100 * height/length down
+        var W = 100, Hl = 100 * (z1 - z0) / len;
+        ctx.transform((pb[0] - pa[0]) / W, (pb[1] - pa[1]) / W, 0, faceH / Hl, pa[0], pa[1]);
+        ctx.strokeStyle = '#b02a72';
+        ctx.lineWidth = 2.2;
+        ctx.strokeRect(2.5, 2.5, W - 5, Hl - 5);
+        ctx.fillStyle = this.night ? '#fff4d6' : '#ffffff';
+        ctx.fillRect(3.6, 3.6, W - 7.2, Hl - 7.2);
+        // logo: a pink heart-cross
+        var lx = 12, ly = Hl / 2, lr = Hl * 0.3;
+        ctx.fillStyle = '#b02a72';
+        ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(lx - lr * 0.18, ly - lr * 0.62, lr * 0.36, lr * 1.24);
+        ctx.fillRect(lx - lr * 0.62, ly - lr * 0.18, lr * 1.24, lr * 0.36);
+        // the name, in Thai, with the English underneath
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#8c1d5a';
+        ctx.font = '700 ' + (Hl * 0.36).toFixed(2) + 'px "IBM Plex Sans Thai", "Noto Sans Thai", sans-serif';
+        ctx.fillText('โรงพยาบาลสีชมพู', 57, Hl * 0.43, 80);
+        ctx.fillStyle = '#6b5a8a';
+        ctx.font = '600 ' + (Hl * 0.15).toFixed(2) + 'px sans-serif';
+        ctx.fillText('SICHOMPHU HOSPITAL', 57, Hl * 0.76, 70);
+        ctx.restore();
+        drawBed(); // in front of the board
+        if (this.night) {
+            // lit at night
+            var mid = this.project(cx, cy, (z0 + z1) / 2), rad = Math.max(20, len * s * 0.8);
+            var gl = ctx.createRadialGradient(mid[0], mid[1], 0, mid[0], mid[1], rad);
+            gl.addColorStop(0, 'rgba(255, 240, 200, 0.35)');
+            gl.addColorStop(1, 'rgba(255, 240, 200, 0)');
+            ctx.fillStyle = gl;
+            ctx.beginPath(); ctx.arc(mid[0], mid[1], rad, 0, Math.PI * 2); ctx.fill();
+        }
     };
 
     // A golden seated Buddha on a two-tier white and gold base, on a lotus.

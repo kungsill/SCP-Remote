@@ -567,7 +567,7 @@
                     for (var z = 0; z < 2; z++) {
                         var q = (t * 0.45 + ph + z * 0.5) % 1;
                         ctx.fillStyle = 'rgba(167, 139, 250, ' + Math.sin(q * Math.PI).toFixed(2) + ')';
-                        ctx.fillText('z', x + 9 + q * 5, y - 9 - q * 11);
+                        ctx.fillText('z', x + 12 + q * 5, y - 1 - q * 9);
                     }
                 }
             } else if (f.busy) {
@@ -583,7 +583,7 @@
                 ctx.beginPath(); ctx.moveTo(x - 1.2, y + 2.2); ctx.lineTo(x + 1.2, y + 2.2); ctx.stroke();
                 if (t) {
                     // typing dots in a little bubble
-                    var bx = x + 11, by = y - 12;
+                    var bx = x + 15, by = y - 1; // beside the screen, clear of the name label
                     roundRectPath(ctx, bx - 6, by - 3.5, 12, 7, 3.5);
                     ctx.fillStyle = '#ffffff';
                     ctx.fill();

@@ -243,6 +243,39 @@ exports.handle = async function (ctx, cmd) {
   const map = {}; for (const row of rows) if (row && row.nodeid && await access(row.nodeid)) map[row.nodeid] = row;
   return map;
  }
+ if (cmd.op === 'healthSave') {
+  // The SCPclear-style health check (read-only) as each computer answered it. Kept whole but
+  // bounded, so the dashboard can show the last result while the computer is off.
+  if (!Array.isArray(cmd.items) || cmd.items.length > 1000) throw Error('INVALID_INPUT');
+  let saved = 0;
+  for (const it of cmd.items) {
+   if (!it || typeof it.nodeid !== 'string' || !it.data || typeof it.data !== 'object' || Array.isArray(it.data)) continue;
+   if (!await access(it.nodeid)) continue;
+   const text = JSON.stringify(it.data);
+   if (text.length > 30000) continue;
+   await save({ _id: 'scphealth/' + it.nodeid, type: 'scphealth', domain: domain.id, nodeid: it.nodeid, data: JSON.parse(text), updated: Date.now(), by: user._id });
+   saved++;
+  }
+  return { saved };
+ }
+ if (cmd.op === 'healthList') {
+  const rows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scphealth', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const map = {}; for (const row of rows) if (row && row.nodeid && await access(row.nodeid)) map[row.nodeid] = { data: row.data, updated: row.updated };
+  return map;
+ }
+ if (cmd.op === 'healthLog') {
+  // Who pressed which fix on which computer, and what it reported. The last 30 per computer.
+  const ACTIONS = ['printer_fix', 'spooler_restart', 'printer_test', 'printer_resume', 'dns_flush', 'svc_start', 'trim', 'startup', 'fonts'];
+  if (typeof cmd.nodeid !== 'string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
+  if (ACTIONS.indexOf(cmd.action) < 0) throw Error('INVALID_INPUT');
+  const key = 'scphealthlog/' + cmd.nodeid;
+  const before = await get(key).catch(() => null);
+  const resultText = cmd.result && typeof cmd.result === 'object' ? JSON.stringify(cmd.result) : '';
+  const result = resultText && resultText.length <= 2000 ? JSON.parse(resultText) : (resultText ? { truncated: true } : null);
+  const entries = ((before && before.entries) || []).concat([{ at: Date.now(), action: cmd.action, ok: cmd.ok === true, result, by: user._id }]).slice(-30);
+  await save({ _id: key, type: 'scphealthlog', domain: domain.id, nodeid: cmd.nodeid, entries, updated: Date.now() });
+  return { saved: 1 };
+ }
  if (cmd.op === 'careStart') {
   // Safe auto-care was sent to these computers. Kept so the result survives a reload and
   // shows who started it; the agent's reply (meshagent.js) fills in the result.
@@ -280,6 +313,8 @@ exports.handle = async function (ctx, cmd) {
   if (cleanup && cleanup.updated) out.push({ at: cleanup.updated, kind: 'cleanup', note: String(cleanup.result || '').replace(/SCP_CLEANUP_PROGRESS:\{[^\r\n]*\}/g, '').trim().slice(-200), progress: cleanup.progress === true });
   const care = await one('scpcare/' + id);
   if (care && care.updated) out.push({ at: care.updated, kind: 'care', state: care.state, result: care.result, by: who(care.by) });
+  const healthLog = await one('scphealthlog/' + id);
+  for (const h of ((healthLog && healthLog.entries) || [])) out.push({ at: h.at, kind: 'health', action: h.action, ok: h.ok, result: h.result, by: who(h.by) });
   const place = await one('scpmappos/' + domain.id + '/' + id);
   if (place && place.updated) out.push({ at: place.updated, kind: 'moved', floor: place.floor, by: who(place.updatedBy) });
   const asset = await one('scpasset/' + domain.id + '/' + id);

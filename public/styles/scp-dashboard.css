@@ -2089,3 +2089,36 @@ body.scp-map-full-open {
     .scp-cm-footer-left > * { flex: 1 1 auto; }
     .scp-cm-btn-close { flex: 1 1 100%; }
 }
+
+/* Health check & quick fixes (scp-health.js) */
+.scp-health-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.scp-health-hint { color: var(--scp-muted); font-size: 12px; margin: 4px 0 8px; }
+.scp-health-sum { font-weight: 700; margin: 6px 0 10px; }
+.scp-health-note { font-size: 12.5px; font-weight: 600; padding: 7px 10px; border-radius: 10px; margin: 6px 0; white-space: pre-wrap; }
+.scp-health-note.ok { background: #e2f6ef; color: #16745c; }
+.scp-health-note.bad { background: #fde8e8; color: #b91c1c; }
+.scp-health-note.warn, .scp-health-note.busy { background: #fff4dc; color: #92400e; }
+.scp-health-group h5 { margin: 12px 0 6px; font-size: 12px; letter-spacing: .3px; color: var(--scp-muted); text-transform: uppercase; }
+.scp-health-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--scp-line); border-radius: 12px; margin-bottom: 6px; background: var(--scp-surface); }
+.scp-health-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: #94a3b8; }
+.scp-health-row.ok .scp-health-dot { background: #168065; }
+.scp-health-row.warn .scp-health-dot { background: #f59e0b; }
+.scp-health-row.bad .scp-health-dot { background: #dc2626; }
+.scp-health-row.bad { border-color: #fca5a5; }
+.scp-health-row.off { opacity: .7; }
+.scp-health-txt { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.scp-health-txt strong { font-size: 13px; overflow-wrap: anywhere; }
+.scp-health-txt small { color: var(--scp-muted); font-size: 11.5px; overflow-wrap: anywhere; }
+.scp-health-btn { flex: none; border: 1px solid var(--scp-line); background: var(--scp-surface); color: var(--scp-accent, #b02a72); border-radius: 9px; padding: 6px 11px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.scp-health-btn:hover { background: var(--scp-soft); }
+.scp-health-btn.primary { background: var(--scp-accent, #b02a72); border-color: var(--scp-accent, #b02a72); color: #fff; }
+.scp-health-btn:disabled { opacity: .5; cursor: default; }
+.scp-health-more { margin-top: 10px; }
+.scp-health-more summary { cursor: pointer; font-weight: 700; font-size: 13px; padding: 6px 0; }
+.scp-health-more > .scp-health-btn.primary { margin-top: 6px; }
+.scp-health-line { font-size: 12.5px; padding: 3px 0; }
+.scp-health-fleet { display: grid; gap: 6px; max-height: 60vh; overflow-y: auto; margin-top: 8px; }
+.scp-health-fleet-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; text-align: left; border: 1px solid var(--scp-line); border-radius: 12px; padding: 8px 12px; background: var(--scp-surface); color: var(--scp-ink); cursor: pointer; }
+.scp-health-fleet-row small { grid-column: 1 / -1; color: var(--scp-muted); }
+.scp-health-fleet-row:hover { background: var(--scp-soft); }
+@media (max-width: 700px) { .scp-health-row { flex-wrap: wrap; } .scp-health-row .scp-health-btn { margin-left: 20px; } }

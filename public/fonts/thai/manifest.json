@@ -1,0 +1,120 @@
+{
+ "version": 1,
+ "source": "Google Fonts (github.com/google/fonts), SIL Open Font License 1.1",
+ "fonts": [
+  {
+   "file": "IBMPlexSansThai-Bold.ttf",
+   "name": "IBM Plex Sans Thai Bold (TrueType)",
+   "sha256": "F88FBE0A3717C93DEDDF4B13E50A05C9ADCD38F58D675D9D5D0B869961851667",
+   "size": 116552
+  },
+  {
+   "file": "IBMPlexSansThai-Medium.ttf",
+   "name": "IBM Plex Sans Thai Medium (TrueType)",
+   "sha256": "46BA1B7365CC2C583914F23914CCE46E836A72662E34F6E3029B15AAA10B792E",
+   "size": 116304
+  },
+  {
+   "file": "IBMPlexSansThai-Regular.ttf",
+   "name": "IBM Plex Sans Thai (TrueType)",
+   "sha256": "EEE061D1BAC39BE40F9BB94498898CD1894F5D3D9A2F0EE6CBD48A6BD03D052B",
+   "size": 116004
+  },
+  {
+   "file": "Kanit-Bold.ttf",
+   "name": "Kanit Bold (TrueType)",
+   "sha256": "5DEC5B080DAB13DE9D2295437C0FF3EC05C9E75587DFC31358C005EB4EFA5E70",
+   "size": 176136
+  },
+  {
+   "file": "Kanit-Light.ttf",
+   "name": "Kanit Light (TrueType)",
+   "sha256": "7C04B0BE6011782FCC4C032F4033EF6F6BA1FEF99B135BA1EE68B800C53017EC",
+   "size": 171384
+  },
+  {
+   "file": "Kanit-Medium.ttf",
+   "name": "Kanit Medium (TrueType)",
+   "sha256": "50A237034244026A7C63FE55E24E0B4298BABE363CDE043E032075B764C545A2",
+   "size": 174628
+  },
+  {
+   "file": "Kanit-Regular.ttf",
+   "name": "Kanit (TrueType)",
+   "sha256": "27170C049660B2F962D3ED28441FD20F4C743503CA031FEC9C2B4542D6C52736",
+   "size": 173148
+  },
+  {
+   "file": "NotoSansThai-Variable.ttf",
+   "name": "Noto Sans Thai (TrueType)",
+   "sha256": "5A1C559BB539583C8A1FD99D1C5B9491E5E14478C9CD2BD0970D5C3096CC9EF8",
+   "size": 218652
+  },
+  {
+   "file": "Prompt-Bold.ttf",
+   "name": "Prompt Bold (TrueType)",
+   "sha256": "02813CA4F93C1DF27E271F10FEF3DB6E34E66751AE1F4A3ED82AE06CB20150EA",
+   "size": 178804
+  },
+  {
+   "file": "Prompt-Light.ttf",
+   "name": "Prompt Light (TrueType)",
+   "sha256": "79412CF5EF7F60D7F1DFF4E178707B0BC662DD76608697A7A36B4769454F8B82",
+   "size": 161980
+  },
+  {
+   "file": "Prompt-Medium.ttf",
+   "name": "Prompt Medium (TrueType)",
+   "sha256": "6A42451BE692EBA473C639F4BCDC6C6D9160A3D632319A64287E3ED1FAE15D6B",
+   "size": 176444
+  },
+  {
+   "file": "Prompt-Regular.ttf",
+   "name": "Prompt (TrueType)",
+   "sha256": "DBD497803CEC3CAFFBC6B7F599CA6FED8BEEA0ED7E0AD1E098130C5EBBC4FD42",
+   "size": 168932
+  },
+  {
+   "file": "Sarabun-Bold.ttf",
+   "name": "Sarabun Bold (TrueType)",
+   "sha256": "D38308CA27D067B9A1B79006337C1F9A66C29AA016D96A9D88D3801DA7FA83B9",
+   "size": 89804
+  },
+  {
+   "file": "Sarabun-BoldItalic.ttf",
+   "name": "Sarabun Bold Italic (TrueType)",
+   "sha256": "5EF1B930F9A3AFED5EC83374B5617CAD3A89D91A8FC5E372DC028C2AA2950F8D",
+   "size": 92948
+  },
+  {
+   "file": "Sarabun-Italic.ttf",
+   "name": "Sarabun Italic (TrueType)",
+   "sha256": "595A968E97A8B8179A6BDE2D74D4F91B11475DCFB6CF270037D76D8ED71160EA",
+   "size": 93248
+  },
+  {
+   "file": "Sarabun-Light.ttf",
+   "name": "Sarabun Light (TrueType)",
+   "sha256": "9EFD75E5EBB6D7755CCA3FAA5906C77A4BBD39C9AAC0ED23BF7F4BA33B02F688",
+   "size": 90440
+  },
+  {
+   "file": "Sarabun-Medium.ttf",
+   "name": "Sarabun Medium (TrueType)",
+   "sha256": "CC7C3016DAAB3321674FDF6E2EF59850DC0C07503DE1CBDB8B90FE8080ADA2B4",
+   "size": 90292
+  },
+  {
+   "file": "Sarabun-Regular.ttf",
+   "name": "Sarabun (TrueType)",
+   "sha256": "226D4F368FBC0457990DDEF2692679BADFD2C1A4E89E5AC4D43C10BA7743B2F1",
+   "size": 90220
+  },
+  {
+   "file": "Sarabun-SemiBold.ttf",
+   "name": "Sarabun SemiBold (TrueType)",
+   "sha256": "C0BB057D86E4A12097D701AC0953597E315788D47A446F5B63A6604AB21DCEBA",
+   "size": 90200
+  }
+ ]
+}

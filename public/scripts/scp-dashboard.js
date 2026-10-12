@@ -803,6 +803,7 @@
         window.meshserver.onMessage = function (server, message) {
             try {
                 if (chassisReceive(message)) { /* the type check answered its own request */ }
+                else if (window.ScpHealth && window.ScpHealth.receive(message)) { /* the health check or a fix answered */ }
                 else if (window.ScpCare && window.ScpCare.receive(message)) { /* care answered its own request */ }
                 else if (window.ScpServices && window.ScpServices.receive(message)) { /* services answered its own request */ }
                 else if (window.ScpPrograms && window.ScpPrograms.receive(message)) { /* it answered its own question */ }
@@ -2833,6 +2834,7 @@
         assetBtnRow.appendChild(editAssetBtn);
         secAsset.appendChild(assetBtnRow);
         cmBody.appendChild(secAsset);
+        if (window.ScpHealth) cmBody.appendChild(window.ScpHealth.section(node));
         cmBody.appendChild(historySection(node));
         box.appendChild(cmBody);
 
@@ -4106,7 +4108,7 @@
             list.textContent = '';
             if (!rows || !rows.length) { list.appendChild(element('li', 'scp-extra-muted', thai ? 'ยังไม่มีประวัติ' : 'No history yet')); return; }
             rows.forEach(function (e) {
-                var icon = { ticket: '🛠️', driver: '🧩', cleanup: '🧹', care: '🛡️', moved: '📍', asset: '🏷️' }[e.kind] || '•';
+                var icon = { ticket: '🛠️', driver: '🧩', cleanup: '🧹', care: '🛡️', moved: '📍', asset: '🏷️', health: '🩺' }[e.kind] || '•';
                 var text = '';
                 if (e.kind === 'ticket') text = (thai ? 'งานซ่อม: ' : 'Repair: ') + e.title + ' — ' + e.status + (e.note && e.note !== 'Created' ? ' (' + e.note + ')' : '');
                 else if (e.kind === 'driver') text = (thai ? 'ติดตั้งไดรเวอร์: ' : 'Drivers: ') + (e.progress ? (thai ? 'กำลังทำ' : 'running') : (e.note || '-'));
@@ -4114,6 +4116,8 @@
                 else if (e.kind === 'care') text = (thai ? 'ดูแลอัตโนมัติ: ' : 'Safe auto-care: ') + (e.state || '') + (e.result ? ' · ' + Object.keys(e.result).map(function (k) { return k + ' ' + e.result[k]; }).join(', ') : '');
                 else if (e.kind === 'moved') text = (thai ? 'ย้ายตำแหน่งบนแผนที่ → ' : 'Moved on the map → ') + floorName(e.floor);
                 else if (e.kind === 'asset') text = (thai ? 'แก้ข้อมูลครุภัณฑ์ ' : 'Asset record ') + (e.note || '');
+                else if (e.kind === 'health') text = (e.ok ? '✓ ' : '✗ ') + ({ printer_fix: thai ? 'แก้ปริ้นไม่ออก (ล้างคิว)' : 'Fixed printing (cleared queue)', spooler_restart: thai ? 'รีสตาร์ท Print Spooler' : 'Restarted spooler', printer_test: thai ? 'พิมพ์หน้าทดสอบ' : 'Test page', printer_resume: thai ? 'สั่งเครื่องพิมพ์ทำงานต่อ' : 'Resumed printer', dns_flush: thai ? 'ล้าง DNS' : 'Flushed DNS', svc_start: thai ? 'เปิดบริการ' : 'Started service', trim: 'TRIM SSD', startup: thai ? 'เปลี่ยนโปรแกรมเปิดพร้อมเครื่อง' : 'Start-up program', fonts: thai ? 'ติดตั้งฟอนต์ไทย' : 'Thai fonts' }[e.action] || e.action) +
+                    (e.result && e.action === 'printer_fix' ? (thai ? ' · งานค้าง ' : ' · jobs ') + e.result.before + ' → ' + e.result.after : '') + (e.result && e.action === 'fonts' ? (thai ? ' · ใหม่ ' : ' · new ') + (e.result.installed || 0) : '');
                 var li = element('li');
                 li.appendChild(element('span', 'scp-history-icon', icon));
                 var body = element('div');
@@ -4377,6 +4381,10 @@
         actions.appendChild(button(thai ? '📰 สรุปประจำวัน' : '📰 Daily summary', 'scp-dash-refresh', openMorningSummary));
         actions.appendChild(button(thai ? '🏷️ QR ติดเครื่อง' : '🏷️ QR stickers', 'scp-dash-refresh', openQrSheet));
         actions.appendChild(button(thai ? '🔍 ตรวจเครื่อง (ชนิด / Windows แท้)' : '🔍 Check type / genuine Windows', 'scp-dash-refresh', probeChassis));
+        if (window.ScpHealth) {
+            actions.appendChild(button(thai ? '🩺 ตรวจสุขภาพทุกเครื่อง' : '🩺 Health check all', 'scp-dash-refresh', function () { window.ScpHealth.openFleet(allNodes(), overlayDialog); }));
+            actions.appendChild(button(thai ? '🔤 ติดตั้งฟอนต์ไทย' : '🔤 Install Thai fonts', 'scp-dash-refresh', function () { window.ScpHealth.openFonts(allNodes(), overlayDialog); }));
+        }
         actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));
         var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);
         heading.appendChild(actions);
@@ -4432,7 +4440,7 @@
         loadRoomFilter();
         window.addEventListener('resize', fitHeight);
         window.ScpDashboard = { show: show, showDashboard: showDashboard, showMap: showMap, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
-            exportInventory: exportInventory, specLine: specLine, disksOf: disksOf,
+            exportInventory: exportInventory, nodes: allNodes, specLine: specLine, disksOf: disksOf,
             hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway,
             hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf,
             fixDrivers: fixDrivers, driverScript: driverScript, snapshot: snapshot,

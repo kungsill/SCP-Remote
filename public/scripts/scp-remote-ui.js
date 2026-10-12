@@ -76,7 +76,10 @@
   const name=document.createElement('strong');name.id='scp-app-device';
   name.textContent=th?'กำลังเปิด…':'Opening…';
   const state=document.createElement('span');state.id='scp-app-state';state.setAttribute('role','status');
-  bar.append(back,name,state);
+  // shown only while the picture is zoomed in: one tap back to the whole screen
+  fitBtn=document.createElement('button');fitBtn.type='button';fitBtn.className='scp-app-fit';fitBtn.hidden=true;
+  fitBtn.onclick=function(){zoomTo(1);};
+  bar.append(back,name,state,fitBtn);
   document.body.insertBefore(bar,document.body.firstChild);
 
   // The view, the machine and the connection all change while the page stays put, so all three
@@ -88,6 +91,7 @@
     showing=onScreen;
     document.body.classList.toggle('scp-app-view',onScreen);
     bar.hidden=!onScreen;
+    if(!onScreen&&zoom>1)zoomTo(1);
     layout();
    }
    if(!onScreen)return;
@@ -104,6 +108,68 @@
   },250);
  }
 
- root.ScpRemoteUI={mount(node){ensure();node.hidden=true;body.append(node);}};
+ // On a phone the whole remote screen is shrunk to fit, so its text is too small to read or
+ // tap. Two fingers zoom the picture (up to 4x) round the point between them and move it; one
+ // finger then slides the zoomed picture, and a tap is still a click on the remote computer.
+ // Only the picture on this phone grows: the remote computer's own screen and resolution are
+ // left exactly as they are, so whoever is sitting at it sees nothing change.
+ //
+ // The remote mouse is placed from where the tap lands on the picture (offsetX against the
+ // picture's displayed width), which stays right however large the picture is drawn or far it
+ // is scrolled. Two-finger touches never become clicks, so pinching presses nothing remotely.
+ let zoom=1,fit=null,fitBtn=null;
+ function zoomTo(z){
+  const parent=document.getElementById('DeskParent'),desk=document.getElementById('Desk');
+  if(!parent||!desk)return;
+  zoom=Math.max(1,Math.min(4,z));
+  if(zoom<1.04){zoom=1;parent.classList.remove('scp-zoomed');if(typeof root.deskAdjust==='function')root.deskAdjust();}
+  else if(fit){desk.style.width=Math.round(fit.w*zoom)+'px';desk.style.height=Math.round(fit.h*zoom)+'px';desk.style.marginTop='0px';parent.style.overflow='auto';parent.classList.add('scp-zoomed');}
+  if(fitBtn){fitBtn.hidden=zoom===1;fitBtn.textContent=(document.documentElement.lang==='th'?'พอดีจอ':'Fit')+' · '+Math.round(zoom*100)+'%';}
+ }
+ function pinchZoom(){
+  const parent=document.getElementById('DeskParent');
+  if(!parent||parent.dataset.scpPinch)return;
+  parent.dataset.scpPinch='1';
+  // The page sizes the picture to fit whenever the window changes; remember that size, then
+  // put the zoom back on top of it.
+  const original=root.deskAdjust;
+  if(typeof original==='function'&&!original.scpZoom){
+   root.deskAdjust=function(){
+    const out=original.apply(this,arguments);
+    const desk=document.getElementById('Desk');
+    if(desk){const r=desk.getBoundingClientRect();if(r.width>0&&r.height>0)fit={w:r.width,h:r.height};}
+    // 1 is the page's own 1:1 mode, which already scrolls; zoom only on top of fitting
+    if(zoom>1&&root.deskAspectRatio!==1)zoomTo(zoom);
+    return out;
+   };
+   root.deskAdjust.scpZoom=true;
+  }
+  let pinch=null;
+  const span=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY)||1;
+  const mid=t=>({x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2});
+  parent.addEventListener('touchstart',function(e){
+   if(e.touches.length!==2||root.deskAspectRatio===1)return;
+   e.preventDefault();
+   if(zoom===1){const desk=document.getElementById('Desk');if(desk){const r=desk.getBoundingClientRect();fit={w:r.width,h:r.height};}}
+   pinch={d0:span(e.touches),z0:zoom,m0:mid(e.touches),sl:parent.scrollLeft,st:parent.scrollTop};
+  },{passive:false,capture:true});
+  parent.addEventListener('touchmove',function(e){
+   if(!pinch||e.touches.length!==2)return;
+   e.preventDefault(); // not the browser's own page zoom
+   const box=parent.getBoundingClientRect(),m=mid(e.touches);
+   // the point of the picture that was between the fingers stays between them
+   const cx=(pinch.sl+pinch.m0.x-box.left)/pinch.z0,cy=(pinch.st+pinch.m0.y-box.top)/pinch.z0;
+   zoomTo(pinch.z0*span(e.touches)/pinch.d0);
+   parent.scrollLeft=cx*zoom-(m.x-box.left);
+   parent.scrollTop=cy*zoom-(m.y-box.top);
+  },{passive:false,capture:true});
+  const end=function(e){if(pinch&&e.touches.length<2){pinch=null;if(zoom<1.04)zoomTo(1);}};
+  parent.addEventListener('touchend',end,{capture:true});
+  parent.addEventListener('touchcancel',end,{capture:true});
+ }
+
+ root.ScpRemoteUI={mount(node){ensure();node.hidden=true;body.append(node);},zoomTo:zoomTo};
+ // DeskParent is part of the page from the start; wait for it rather than assume the order.
+ (function waitDesk(n){if(document.getElementById('DeskParent'))pinchZoom();else if(n<120)setTimeout(function(){waitDesk(n+1);},500);})(0);
  appView();
 })(window);

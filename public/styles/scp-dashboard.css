@@ -2039,3 +2039,31 @@ body.scp-map-full-open {
         radial-gradient(ellipse at 80% 8%, rgba(255, 248, 214, 0.35), transparent 22%),
         linear-gradient(180deg, #161238 0%, #2a1f5c 70%, #3b2470 100%);
 }
+
+/* Phones: the map gets the screen, and the panels round it are packed into thin rows instead
+   of columns that cover it. Arranging computers by dragging needs a mouse, so it stays on the
+   desktop; everything else is still one tap away. */
+@media (max-width: 700px) {
+    .scp-map-wrapper { height: calc(100svh - 150px); min-height: 460px; border-radius: 14px; }
+    .scp-map-floor-bar { top: 8px; left: 8px; right: 8px; padding: 4px 8px; border-radius: 12px; }
+    .scp-map-floor-label { display: none; }
+    .scp-map-floor-select { flex: 1; min-width: 0; font-size: 13px; padding: 6px 8px; }
+    .scp-map-view-bar { top: 52px; left: 8px; right: auto; }
+    .scp-map-view-btn { padding: 5px 8px; font-size: 11.5px; }
+    .scp-map-risk-btn { bottom: 98px; right: 8px; padding: 6px 10px; font-size: 11.5px; border-radius: 10px; }
+    .scp-map-alert { top: 92px; left: 8px; right: 8px; max-width: none; }
+    .scp-map-alert-msg { font-size: 11.5px; padding: 6px 4px 6px 10px; }
+    .scp-map-plan-box { top: 92px; left: 8px; right: 8px; max-width: none; }
+    .scp-map-risk-panel { top: 92px; left: 8px; right: 8px; bottom: 60px; width: auto; }
+    /* the buttons become one row along the bottom that scrolls sideways */
+    .scp-map-controls { top: auto; bottom: 8px; left: 8px; right: 8px; flex-direction: row; overflow-x: auto; padding: 5px; gap: 5px; scrollbar-width: none; }
+    .scp-map-controls::-webkit-scrollbar { display: none; }
+    .scp-map-ctrl-btn { flex: 0 0 auto; width: 38px; height: 38px; }
+    /* the legend: just the colours, in one line above the buttons */
+    .scp-map-legend { bottom: 60px; left: 8px; right: 8px; max-width: none; gap: 8px; padding: 5px 10px; font-size: 10.5px; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+    .scp-map-legend::-webkit-scrollbar { display: none; }
+    .scp-map-legend-hint { display: none; }
+    .scp-map-alert-feed { bottom: 136px; left: 8px; right: 8px; max-width: none; }
+    .scp-map-edit-bar, .scp-map-edit-bar.on { display: none; }
+    .scp-map-card { width: min(290px, calc(100% - 16px)); }
+}

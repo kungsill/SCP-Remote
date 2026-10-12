@@ -127,3 +127,7 @@ body.scp-app-view #column_l{padding:0!important;left:0!important;width:100%!impo
 body.scp-app-view #page_content{top:0!important;bottom:0!important;left:0!important;right:0!important}
 body.scp-app-view #container{border:0!important;min-width:0!important}
 @media(max-width:560px){body.scp-app-view #scp-app-device{font-size:15px}}
+/* Pinch-zoomed remote picture: one finger slides it, and a button in the bar fits it again */
+#DeskParent.scp-zoomed{touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+body.scp-app-view #scp-app-bar .scp-app-fit{flex:none;border:1px solid var(--scp-line,#f0dbe6);background:var(--scp-surface,#fff);color:var(--scp-accent,#b02a72);font-size:11px;font-weight:700;padding:5px 10px;border-radius:9px;cursor:pointer;white-space:nowrap}
+body.scp-app-view #scp-app-bar .scp-app-fit[hidden]{display:none}

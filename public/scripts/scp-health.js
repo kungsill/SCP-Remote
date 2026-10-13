@@ -111,7 +111,11 @@
             "$tmp = [int]((@(Get-ChildItem -Path ($env:SystemRoot + '\\Temp'), 'C:\\Users\\*\\AppData\\Local\\Temp' -File -Recurse -Force -ErrorAction SilentlyContinue) | Measure-Object Length -Sum).Sum / 1MB)",
             "$pp = [string](powercfg /getactivescheme)",
             "$fk = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'; $fnames = @($fk.PSObject.Properties | ForEach-Object { $_.Name })",
-            "$miss = @(" + psList(fontsWanted().map(function (f) { return f.name; })) + " | Where-Object { $fnames -notcontains $_ })",
+            // A font put in by hand or another installer is registered under another name: the same file (by SHA-256) counts too.
+            "$want = @(" + fontsWanted().map(function (f) { return "@{ n = '" + f.name.replace(/'/g, "''") + "'; h = '" + f.sha256 + "'; s = " + (+f.size || 0) + " }"; }).join(', ') + ")",
+            "$sizes = @($want | ForEach-Object { $_.s }); $fhash = @{}",
+            "Get-ChildItem ($env:SystemRoot + '\\Fonts') -File -ErrorAction SilentlyContinue | Where-Object { $sizes -contains $_.Length } | ForEach-Object { $fhash[(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash] = $true }",
+            "$miss = @($want | Where-Object { ($fnames -notcontains $_.n) -and -not $fhash[$_.h] } | ForEach-Object { $_.n })",
             "$thsb = [bool]($fnames | Where-Object { $_ -match 'TH ?Sarabun' })",
             "$syn = [bool](Select-String -Path ($env:SystemRoot + '\\System32\\drivers\\etc\\hosts') -Pattern 'syn5scph' -Quiet)",
             // How Windows was installed: the switches people use to get past the Windows 11 checks,
@@ -197,14 +201,17 @@
         fonts: function (arg) {
             // arg = { base, list }: downloaded from this server, checked against the SHA-256 in
             // the manifest before anything is copied, so a file changed on the way is refused.
-            var list = '@(' + arg.list.map(function (f) { return "@{ f = '" + f.file + "'; n = '" + f.name.replace(/'/g, "''") + "'; h = '" + f.sha256 + "' }"; }).join(', ') + ')';
+            var list = '@(' + arg.list.map(function (f) { return "@{ f = '" + f.file + "'; n = '" + f.name.replace(/'/g, "''") + "'; h = '" + f.sha256 + "'; s = " + (+f.size || 0) + " }"; }).join(', ') + ')';
             return ["$ErrorActionPreference = 'SilentlyContinue'",
                 "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12",
                 "$base = '" + arg.base.replace(/'/g, "''") + "'; $list = " + list,
                 "$fk = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'; $dir = $env:SystemRoot + '\\Fonts'",
                 "$tmp = Join-Path $env:SystemRoot ('Temp\\scpfonts' + [guid]::NewGuid().ToString('N')); New-Item -ItemType Directory -Path $tmp -Force | Out-Null",
                 "$wc = New-Object Net.WebClient; $res = @{ installed = 0; skipped = 0; failed = @(); unverifiedTls = $false }",
-                "foreach ($x in $list) { if ((Get-ItemProperty $fk -Name $x.n -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $dir $x.f))) { $res.skipped++; continue }; $t = Join-Path $tmp $x.f; try { $wc.DownloadFile($base + $x.f, $t) } catch { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }; $res.unverifiedTls = $true; try { $wc.DownloadFile($base + $x.f, $t) } catch { } }; if ((Test-Path $t) -and ((Get-FileHash $t -Algorithm SHA256).Hash -eq $x.h)) { Copy-Item $t (Join-Path $dir $x.f) -Force; New-ItemProperty -Path $fk -Name $x.n -Value $x.f -PropertyType String -Force | Out-Null; $res.installed++ } else { $res.failed += $x.f } }",
+                // the same file already in Windows\Fonts under another name (installed by hand or another script) is left alone
+                "$sizes = @($list | ForEach-Object { $_.s }); $fhash = @{}",
+                "Get-ChildItem $dir -File -ErrorAction SilentlyContinue | Where-Object { $sizes -contains $_.Length } | ForEach-Object { $fhash[(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash] = $true }",
+                "foreach ($x in $list) { if ($fhash[$x.h] -or ((Get-ItemProperty $fk -Name $x.n -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $dir $x.f)))) { $res.skipped++; continue }; $t = Join-Path $tmp $x.f; try { $wc.DownloadFile($base + $x.f, $t) } catch { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }; $res.unverifiedTls = $true; try { $wc.DownloadFile($base + $x.f, $t) } catch { } }; if ((Test-Path $t) -and ((Get-FileHash $t -Algorithm SHA256).Hash -eq $x.h)) { Copy-Item $t (Join-Path $dir $x.f) -Force; New-ItemProperty -Path $fk -Name $x.n -Value $x.f -PropertyType String -Force | Out-Null; $res.installed++ } else { $res.failed += $x.f } }",
                 "Remove-Item $tmp -Recurse -Force",
                 "Write-Output ('SCP_FIX:' + (@{ action = 'fonts'; ok = ($res.failed.Count -eq 0); installed = $res.installed; skipped = $res.skipped; failed = @($res.failed); unverifiedTls = $res.unverifiedTls } | ConvertTo-Json -Compress))"].join('\r\n');
         }

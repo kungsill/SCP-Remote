@@ -54,6 +54,17 @@ test('fonts are installed only after their SHA-256 matches the manifest', () => 
     for (const lic of ['sarabun', 'kanit', 'prompt', 'ibmplexsansthai', 'notosansthai']) assert.ok(fs.existsSync(path.join(root, 'public/fonts/thai/licenses', lic + '-OFL.txt')), lic + ' licence');
 });
 
+test('a font already in Windows\\Fonts under another name (installed by hand) counts as there, by its SHA-256', () => {
+    const m = JSON.parse(fs.readFileSync(path.join(root, 'public/fonts/thai/manifest.json'), 'utf8'));
+    H.setManifest(m);
+    const script = H.healthScript();
+    assert.match(script, /\$miss = @\(\$want \| Where-Object \{ \(\$fnames -notcontains \$_\.n\) -and -not \$fhash\[\$_\.h\] \}/);
+    assert.ok(script.includes("h = '" + m.fonts[0].sha256 + "'; s = " + m.fonts[0].size + ' }'), 'hash and size travel with each name');
+    const fix = H.FIX.fonts({ base: 'https://x/fonts/thai/', list: m.fonts });
+    assert.match(fix, /foreach \(\$x in \$list\) \{ if \(\$fhash\[\$x\.h\] -or /, 'the installer leaves the same file alone too');
+    for (const line of script.split('\r\n')) assert.ok(!/^\s*[{}]\s*$/.test(line));
+});
+
 test('findings read the answer sensibly', () => {
     const base = { upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, diskType: 'SSD', diskHealth: 'Healthy', smart: 0, adapters: ['Ethernet'], ip: '192.168.2.10', gw: '192.168.2.1', gwOk: false, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true };
     const levels = d => H.findings(Object.assign({}, base, d)).filter(f => f.level === 'bad').map(f => f.title);

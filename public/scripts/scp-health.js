@@ -653,6 +653,121 @@
         var baht = out.reduce(function (s, x) { return s + (x.part && x.part.baht || 0); }, 0);
         return { tasks: out, now: out.filter(function (x) { return x.pri === 1; }).length, soon: out.filter(function (x) { return x.pri === 2; }).length, plan: out.filter(function (x) { return x.pri === 3; }).length, baht: baht, onsite: out.filter(function (x) { return x.onsite; }).length };
     }
+    // How to repair each kind of task, written for the technician: why it happens, the idea behind
+    // the repair, the steps, how to tell it worked, and what not to do. One entry per kind; the
+    // work order finds the kind from the task's title.
+    function g(cause, idea, steps, check, careful) { return { cause: cause, idea: idea, steps: steps, check: check, careful: careful }; }
+    var GUIDE = {
+        disk_replace: g(t('The disk is wearing out: sectors it can no longer read are being swapped for spares, and the spares run out.', 'ผิวจาน/เซลล์หน่วยความจำของดิสก์เสื่อม sector ที่อ่านไม่ได้ถูกย้ายไปใช้พื้นที่สำรอง เมื่อพื้นที่สำรองหมด ข้อมูลจะเริ่มหาย'),
+            t('Bad sectors only grow. Get the data off first, then replace: repairing a failing disk is not possible.', 'bad sector มีแต่เพิ่มขึ้น ซ่อมดิสก์ไม่ได้ ต้องเอาข้อมูลออกก่อน แล้วเปลี่ยนลูกใหม่'),
+            [t('Tell the user; stop saving work to that disk', 'แจ้งผู้ใช้ งดเซฟงานลงดิสก์ลูกนี้'), t('Copy the data off (files that cannot be read: note them)', 'ก๊อปข้อมูลออก (ไฟล์ไหนอ่านไม่ได้ให้จดไว้)'), t('Fit the new SSD; for C: reinstall Windows (or clone with Macrium/Clonezilla if the old disk still reads)', 'ใส่ SSD ใหม่ ถ้าเป็น C: ให้ลง Windows ใหม่ (หรือโคลนด้วย Macrium/Clonezilla ถ้าลูกเดิมยังอ่านได้)'), t('Put the data back, reinstall the hospital programs and the SCP-Remote agent', 'คืนข้อมูล ลงโปรแกรม รพ. และเอเจนต์ SCP-Remote')],
+            t('Check again in SCP-Remote: the new disk shows 95–100% with no bad sectors.', 'กดตรวจใหม่ใน SCP-Remote ดิสก์ใหม่ต้องได้ 95–100% และไม่มี bad sector'),
+            t('Do not run CHKDSK /R or defragment a dying disk first: the long reads can finish it off.', 'อย่ารัน CHKDSK /R หรือ Defrag กับดิสก์ที่ใกล้เสียก่อนสำรองข้อมูล การอ่านหนัก ๆ อาจทำให้เสียเร็วขึ้น')),
+        disk_watch: g(t('A few sectors could not be read and are waiting to be swapped for spares.', 'มี sector ที่อ่านไม่ได้จำนวนหนึ่ง รอดิสก์ย้ายไปพื้นที่สำรอง'),
+            t('A handful can stay stable for a long time; a count that grows means the disk is going.', 'ถ้าจำนวนคงที่อาจใช้ต่อได้นาน แต่ถ้าเพิ่มขึ้นเรื่อย ๆ แปลว่าดิสก์กำลังเสีย'),
+            [t('Back up the important files now', 'สำรองไฟล์สำคัญไว้ก่อน'), t('Compare the bad-sector count on the next morning checks', 'ดูจำนวน bad sector ในการตรวจเช้าวันถัด ๆ ไป'), t('If it grows, treat it as "replace the disk"', 'ถ้าเพิ่มขึ้น ให้ทำแบบงาน "เปลี่ยนดิสก์"')],
+            t('The disk-health trend line stays flat.', 'เส้นแนวโน้มสุขภาพดิสก์ไม่ลดลง'), t('Keep backups current until the disk is replaced.', 'สำรองข้อมูลให้เป็นปัจจุบันจนกว่าจะเปลี่ยนดิสก์')),
+        ssd_swap: g(t('A spinning disk reads ~100 MB/s and seeks slowly; Windows and programs wait on it.', 'ดิสก์จานหมุนอ่านได้ราว 100 MB/s และหาข้อมูลช้า Windows กับโปรแกรมต้องรอดิสก์'),
+            t('An SSD makes start-up and opening programs several times faster: the cheapest speed-up there is.', 'SSD ทำให้เปิดเครื่อง/เปิดโปรแกรมเร็วขึ้นหลายเท่า เป็นการอัปเกรดที่คุ้มที่สุด'),
+            [t('Fit a 2.5" SATA SSD (or M.2 if the board has a slot)', 'ใส่ SSD SATA 2.5" (หรือ M.2 ถ้าเมนบอร์ดมีช่อง)'), t('Clone the old disk to it (Macrium Reflect/Clonezilla) or reinstall Windows', 'โคลนจากลูกเดิม (Macrium Reflect/Clonezilla) หรือลง Windows ใหม่'), t('Keep the old HDD as a second disk for data if it is healthy', 'ถ้า HDD เดิมยังดี เก็บไว้เป็นลูกที่สองสำหรับข้อมูล')],
+            t('Start-up under a minute; the health check shows C: as SSD.', 'เปิดเครื่องไม่ถึง 1 นาที ผลตรวจขึ้น C: เป็น SSD'), t('Set SATA to AHCI before cloning; check the BIOS boots the new disk.', 'ตั้ง SATA เป็น AHCI ก่อนโคลน และตั้ง BIOS ให้บูตจากลูกใหม่')),
+        bsod: g(t('Windows stopped to protect itself: usually a driver, RAM or the disk.', 'Windows หยุดตัวเองเพื่อป้องกันความเสียหาย สาเหตุหลักคือไดรเวอร์ แรม หรือดิสก์'),
+            t('Find what changed or what is failing; the stop code and the dump file name the culprit.', 'หาสิ่งที่เปลี่ยนไปหรือชิ้นที่เสีย รหัส Stop code และไฟล์ dump จะบอกตัวการ'),
+            [t('Read the stop code: Event Viewer → System → BugCheck 1001, or C:\\Windows\\Minidump with BlueScreenView', 'ดูรหัสจอฟ้า: Event Viewer → System → BugCheck 1001 หรือเปิด C:\\Windows\\Minidump ด้วย BlueScreenView'), t('Driver named in it: update or roll it back', 'ถ้าระบุไดรเวอร์ ให้อัปเดตหรือย้อนเวอร์ชัน'), t('MEMORY_MANAGEMENT etc.: run Windows Memory Diagnostic, reseat or swap the RAM', 'ถ้าเป็น MEMORY_MANAGEMENT ฯลฯ ให้รัน Windows Memory Diagnostic ถอดแรมเสียบใหม่/สลับแถว'), t('Check the disk health and the PSU', 'ตรวจสุขภาพดิสก์และพาวเวอร์ซัพพลาย')],
+            t('No new BugCheck events for two weeks.', 'ไม่มี BugCheck ใหม่ภายใน 2 สัปดาห์'), t('Do not reinstall Windows before finding the cause: a bad RAM stick follows you.', 'อย่าเพิ่งลง Windows ใหม่ก่อนหาสาเหตุ ถ้าแรมเสีย ลงใหม่ก็ยังจอฟ้า')),
+        service: g(t('A Windows service that should run has stopped: crashed, or turned off by a program or a person.', 'บริการของ Windows ที่ควรทำงานหยุดอยู่ อาจล่มเอง หรือถูกโปรแกรม/คนปิด'),
+            t('Start it, then find out why it stopped so it stays up.', 'เปิดให้ทำงานก่อน แล้วหาสาเหตุไม่ให้หยุดอีก'),
+            [t('Press Start service here', 'กดปุ่มเปิดบริการในหน้านี้'), t('If it stops again: Event Viewer → System, Service Control Manager 7031/7034', 'ถ้าหยุดอีก ดู Event Viewer → System, Service Control Manager 7031/7034'), t('Check its Startup type is Automatic (services.msc)', 'ตรวจ Startup type เป็น Automatic (services.msc)')],
+            t('Next check: the service is Running.', 'ตรวจครั้งถัดไป บริการขึ้น Running'), t('Only the services on the fixed list are started from here.', 'ปุ่มนี้เปิดได้เฉพาะบริการในรายการที่กำหนดไว้เท่านั้น')),
+        network: g(t('No address from DHCP (169.254.x.x) or no link: cable, wall socket, switch port or DHCP.', 'ไม่ได้ IP จาก DHCP (169.254.x.x) หรือไม่มีสัญญาณแลน: สาย เต้ารับ พอร์ตสวิตช์ หรือ DHCP'),
+            t('Work from the computer outwards: link light, cable, port, then the server.', 'ไล่จากเครื่องออกไป: ไฟแลน สาย พอร์ต แล้วค่อยเซิร์ฟเวอร์'),
+            [t('Check the link light on the network card and the switch', 'ดูไฟ Link ที่การ์ดแลนและสวิตช์'), t('Swap the patch cable / try another switch port', 'เปลี่ยนสายแลน/ลองพอร์ตอื่น'), t('ipconfig /release then /renew', 'สั่ง ipconfig /release แล้ว /renew'), t('If others in the room are also off: the switch or DHCP', 'ถ้าเครื่องอื่นในห้องเดียวกันเป็นด้วย: ดูสวิตช์หรือ DHCP')],
+            t('ipconfig shows a 192.168.x.x address and the computer is online in SCP-Remote.', 'ipconfig ได้ IP 192.168.x.x และเครื่องออนไลน์ใน SCP-Remote'), t('This computer is offline to SCP-Remote until it is fixed: it is an on-site job.', 'ระหว่างนี้ SCP-Remote ติดต่อเครื่องไม่ได้ ต้องไปหน้าเครื่อง')),
+        dns: g(t('The computer cannot turn names into addresses: wrong DNS setting or a stale cache.', 'เครื่องแปลงชื่อเป็น IP ไม่ได้: ตั้ง DNS ผิด หรือแคชเก่าค้าง'),
+            t('Clear the cache first; if that fails, the DNS server setting is wrong.', 'ล้างแคชก่อน ถ้ายังไม่ได้แปลว่าตั้งค่า DNS ผิด'),
+            [t('Press Flush DNS here', 'กดปุ่มล้าง DNS'), t('Still failing: check the DNS server in the adapter settings (DHCP should give it)', 'ยังไม่ได้: ตรวจ DNS ในการตั้งค่าการ์ดแลน (ควรได้จาก DHCP)')],
+            t('Websites and the HOSxP server open by name.', 'เปิดเว็บและเซิร์ฟเวอร์ HOSxP ด้วยชื่อได้'), t('Do not hard-code a public DNS on hospital computers: internal names stop working.', 'อย่าตั้ง DNS สาธารณะ (8.8.8.8) ในเครื่อง รพ. ชื่อเครื่องภายในจะใช้ไม่ได้')),
+        spooler: g(t('The Windows print service is stopped, so nothing prints.', 'บริการพิมพ์ของ Windows (Print Spooler) หยุด จึงพิมพ์อะไรไม่ได้'),
+            t('Restart it; if it keeps stopping, a bad printer driver is crashing it.', 'เปิดใหม่ ถ้าหยุดซ้ำแปลว่ามีไดรเวอร์เครื่องพิมพ์ตัวที่ทำให้ล่ม'),
+            [t('Press Restart spooler here', 'กดปุ่มรีสตาร์ท Spooler'), t('Keeps stopping: remove printers/drivers not in use (printmanagement.msc)', 'ถ้าหยุดซ้ำ ลบเครื่องพิมพ์/ไดรเวอร์ที่ไม่ใช้ (printmanagement.msc)')],
+            t('Print a test page.', 'สั่งพิมพ์หน้าทดสอบ'), t('', '')),
+        print_stuck: g(t('A job that failed (printer off, wrong driver, paper out) blocks every job behind it.', 'งานที่พิมพ์ไม่ผ่าน (เครื่องพิมพ์ปิด ไดรเวอร์ผิด กระดาษหมด) ค้างหัวคิว งานหลังจากนั้นออกไม่ได้'),
+            t('Clear the queue and restart the spooler; then fix why the first job failed.', 'ล้างคิวและรีสตาร์ท Spooler แล้วแก้สาเหตุที่งานแรกพิมพ์ไม่ผ่าน'),
+            [t('Press Fix printing here (clears stuck jobs and restarts the spooler)', 'กดปุ่มแก้ปริ้นไม่ออก (ล้างงานค้าง + รีสตาร์ท Spooler)'), t('Check the printer is on, has paper and is the default', 'ตรวจเครื่องพิมพ์เปิดอยู่ มีกระดาษ เป็นค่าเริ่มต้น'), t('Very old jobs (months): someone printed to a printer that is gone; remove that printer', 'งานค้างหลายเดือน: มีคนสั่งพิมพ์ไปเครื่องที่ไม่มีแล้ว ให้ลบเครื่องพิมพ์นั้นออก')],
+            t('The queue is empty and a test page prints.', 'คิวว่าง และพิมพ์หน้าทดสอบออก'), t('Not on the SCPPrint server (test01): other computers print through it.', 'อย่ากดกับเครื่องที่เป็นเซิร์ฟเวอร์ SCPPrint (test01) เครื่องอื่นพิมพ์ผ่านเครื่องนั้น')),
+        scpprint: g(t('SCPPrint is installed but not running, so the computers that print through it cannot.', 'SCPPrint ติดตั้งไว้แต่ไม่ได้ทำงาน เครื่องที่พิมพ์ผ่านเครื่องนี้จะพิมพ์ไม่ได้'),
+            t('Start it and make it start with Windows.', 'เปิดให้ทำงาน และตั้งให้เปิดพร้อม Windows'),
+            [t('Open SCPPrint on that computer', 'เปิดโปรแกรม SCPPrint ที่เครื่องนั้น'), t('Check it is in Start-up (or its scheduled task is on)', 'ตรวจว่าอยู่ใน Start-up (หรือ Task Scheduler)')],
+            t('Next check: SCPPrint is running; a computer that prints through it prints.', 'ตรวจครั้งถัดไปขึ้นทำงานอยู่ และเครื่องที่พิมพ์ผ่านพิมพ์ได้'), t('', '')),
+        c_full: g(t('Drive C: is almost full: Windows slows down, updates fail, programs cannot save.', 'ไดรฟ์ C: ใกล้เต็ม Windows ช้า อัปเดตไม่ผ่าน โปรแกรมเซฟไม่ได้'),
+            t('Remove what is safe to remove first; then move data off C:.', 'ลบของที่ลบได้ปลอดภัยก่อน แล้วย้ายข้อมูลออกจาก C:'),
+            [t('Press Clean temp files here', 'กดปุ่มล้างไฟล์ชั่วคราว'), t('Disk Cleanup → Clean up system files', 'Disk Cleanup → Clean up system files'), t('Move Downloads/Desktop/photos to D: or the server', 'ย้าย Downloads/Desktop/รูปภาพ ไป D: หรือเซิร์ฟเวอร์'), t('Still short: a bigger SSD', 'ยังไม่พอ: เปลี่ยน SSD ที่ใหญ่ขึ้น')],
+            t('At least 15–20% free on C:.', 'C: ว่างอย่างน้อย 15–20%'), t('Do not delete files in Windows, Program Files or the user\'s documents without asking.', 'อย่าลบไฟล์ใน Windows, Program Files หรือเอกสารของผู้ใช้โดยไม่ถามก่อน')),
+        slow: g(t('The computer hangs or crashes programs: too little RAM, a slow disk, or one heavy program.', 'เครื่องค้าง/โปรแกรมเด้ง: แรมไม่พอ ดิสก์ช้า หรือมีโปรแกรมตัวหนึ่งกินเครื่อง'),
+            t('Find the bottleneck from the evidence (hangs, crashes, low-memory warnings, start-up time) and fix that one thing.', 'หาคอขวดจากหลักฐาน (ค้าง เด้ง เตือนแรมไม่พอ เวลาเปิดเครื่อง) แล้วแก้จุดนั้น'),
+            [t('Program named in the hangs/crashes: update or reinstall it', 'ถ้าระบุชื่อโปรแกรมที่ค้าง/เด้ง ให้อัปเดตหรือลงใหม่'), t('Low-memory warnings or RAM over 85%: add RAM', 'ถ้าเตือนแรมไม่พอหรือแรมเกิน 85%: เพิ่มแรม'), t('Slow start-up on a HDD: SSD', 'ถ้าเปิดเครื่องช้าและเป็น HDD: เปลี่ยน SSD'), t('Restart if it has been on for days', 'ถ้าเปิดค้างหลายวัน ให้รีสตาร์ท')],
+            t('A week later the check no longer marks it slow.', 'สัปดาห์ต่อมา ผลตรวจไม่ขึ้นว่าค้าง/ช้าแล้ว'), t('backgroundTaskHost/SearchApp crashing alone is Windows housekeeping: low priority.', 'ถ้าที่เด้งมีแค่ backgroundTaskHost/SearchApp เป็นงานเบื้องหลังของ Windows ความสำคัญต่ำ')),
+        ram: g(t('4 GB is not enough for Windows 10/11, a browser and HOSxP at once: Windows swaps to disk.', 'แรม 4 GB ไม่พอสำหรับ Windows 10/11 + เบราว์เซอร์ + HOSxP พร้อมกัน Windows ต้องสลับไปใช้ดิสก์แทน'),
+            t('Bring it to 8 GB with the same type of RAM, in matched pairs where possible.', 'เพิ่มเป็น 8 GB ใช้แรมชนิดเดียวกัน ใส่เป็นคู่ถ้าทำได้'),
+            [t('Check the type and free slots: CPU-Z (Memory/SPD) or the board\'s manual', 'ดูชนิดแรมและช่องว่าง: CPU-Z (แท็บ Memory/SPD) หรือคู่มือเมนบอร์ด'), t('DDR3 or DDR4, same speed; desktop (DIMM) or notebook (SO-DIMM)', 'DDR3 หรือ DDR4 ความเร็วเท่ากัน แบบตั้งโต๊ะ (DIMM) หรือโน้ตบุ๊ก (SO-DIMM)'), t('Power off, unplug, touch metal, fit, boot', 'ปิดเครื่อง ถอดปลั๊ก แตะโลหะคายไฟฟ้าสถิตก่อนจับ ใส่แรม แล้วเปิดเครื่อง')],
+            t('Task Manager shows 8 GB; RAM use under 70% at work.', 'Task Manager ขึ้น 8 GB และแรมใช้ไม่เกิน 70% ขณะทำงาน'), t('32-bit Windows uses only 4 GB: check it is 64-bit first.', 'Windows 32 บิตใช้แรมได้แค่ 4 GB ตรวจว่าเป็น 64 บิตก่อนซื้อ')),
+        drivers: g(t('A device has no driver or a broken one (yellow mark in Device Manager).', 'อุปกรณ์ไม่มีไดรเวอร์หรือไดรเวอร์เสีย (เครื่องหมายเหลืองใน Device Manager)'),
+            t('Install the maker\'s driver for that exact model.', 'ลงไดรเวอร์จากผู้ผลิตให้ตรงรุ่น'),
+            [t('Device Manager → the device → Properties → Details → Hardware Ids', 'Device Manager → อุปกรณ์ → Properties → Details → Hardware Ids'), t('Look it up in the driver library, or the maker\'s site by computer model', 'หาในคลังไดรเวอร์ หรือเว็บผู้ผลิตตามรุ่นเครื่อง'), t('Install, restart', 'ลงแล้วรีสตาร์ท')],
+            t('No yellow marks; next check shows no problem devices.', 'ไม่มีเครื่องหมายเหลือง ผลตรวจครั้งถัดไปไม่มีอุปกรณ์มีปัญหา'), t('Avoid "driver updater" programs: they install the wrong drivers and adware.', 'อย่าใช้โปรแกรมอัปเดตไดรเวอร์อัตโนมัติ มักลงผิดรุ่นและแถมโฆษณา')),
+        restart: g(t('Windows has run for weeks or has updates waiting: memory leaks build up and updates are half-done.', 'เปิดต่อเนื่องหลายสัปดาห์หรือมีอัปเดตรอ หน่วยความจำรั่วสะสม อัปเดตค้างครึ่งทาง'),
+            t('A restart clears it; schedule it so no one loses work.', 'รีสตาร์ทแก้ได้ แต่ต้องเลือกเวลาไม่ให้ใครงานหาย'),
+            [t('Ask the user to save and close', 'แจ้งผู้ใช้ให้เซฟงานและปิดโปรแกรม'), t('Restart (from SCP-Remote or at the computer)', 'สั่งรีสตาร์ท (จาก SCP-Remote หรือหน้าเครื่อง)')],
+            t('Uptime under a day; no pending restart.', 'เวลาเปิดเครื่องไม่ถึง 1 วัน และไม่มีอัปเดตรอรีสตาร์ท'), t('Not during clinic hours on a computer in use.', 'อย่ารีสตาร์ทเครื่องที่กำลังให้บริการผู้ป่วย')),
+        winupdate: g(t('No update installed for over two months: Windows Update is stuck, switched off or out of space.', 'ไม่มีอัปเดตเกิน 2 เดือน: Windows Update ค้าง ถูกปิด หรือพื้นที่ไม่พอ'),
+            t('Updates close security holes; find what is blocking them.', 'อัปเดตปิดช่องโหว่ความปลอดภัย ต้องหาว่าอะไรขวางไว้'),
+            [t('Settings → Windows Update → Check; read the error code', 'Settings → Windows Update → Check แล้วดูรหัส error'), t('Free space on C: (needs ~10 GB)', 'เคลียร์พื้นที่ C: (ต้องการราว 10 GB)'), t('Still stuck: Windows Update troubleshooter', 'ยังค้าง: รัน Windows Update Troubleshooter')],
+            t('"You\'re up to date"; next check shows a recent update.', 'ขึ้น "You\'re up to date" ผลตรวจครั้งถัดไปมีอัปเดตล่าสุด'), t('Windows that was set up with updates off on purpose: ask before turning them on.', 'เครื่องที่ตั้งใจปิดอัปเดตไว้ ให้ถามผู้ดูแลก่อนเปิด')),
+        syserrors: g(t('Many errors in the System log in a day: something keeps failing.', 'Error ใน System log มากผิดปกติใน 1 วัน แปลว่ามีบางอย่างล้มซ้ำ ๆ'),
+            t('Group by source: the one that repeats most is the cause.', 'จัดกลุ่มตาม Source ตัวที่ซ้ำมากที่สุดคือต้นเหตุ'),
+            [t('Event Viewer → Windows Logs → System → Filter: Error', 'Event Viewer → Windows Logs → System → Filter: Error'), t('Look up the most repeated Source/Event ID', 'ค้นหา Source/Event ID ที่ซ้ำมากที่สุด')],
+            t('The error count drops on the next check.', 'จำนวน Error ลดลงในการตรวจครั้งถัดไป'), t('', '')),
+        printer_paused: g(t('Someone paused the printer; jobs wait.', 'มีคนกด Pause เครื่องพิมพ์ไว้ งานจึงรอ'), t('Resume it.', 'สั่งให้ทำงานต่อ'), [t('Press Resume here', 'กดปุ่มให้ทำงานต่อ')], t('Jobs print.', 'งานพิมพ์ออก'), t('', '')),
+        printer_check: g(t('The printer reports offline, an error, a jam or no paper.', 'เครื่องพิมพ์รายงาน Offline/Error/กระดาษติด/กระดาษหมด'),
+            t('Most of these are physical: power, cable, paper, door.', 'ส่วนใหญ่เป็นเรื่องหน้าเครื่อง: ไฟ สาย กระดาษ ฝา'),
+            [t('Power on, check the USB/network cable', 'เปิดเครื่อง ตรวจสาย USB/แลน'), t('Clear jams, close doors, load paper', 'เอากระดาษติดออก ปิดฝา เติมกระดาษ'), t('Network printer: ping its IP; check it kept the same IP', 'เครื่องพิมพ์เครือข่าย: ping IP และตรวจว่า IP ไม่เปลี่ยน')],
+            t('Status Ready; a test page prints.', 'สถานะ Ready และพิมพ์หน้าทดสอบออก'), t('', '')),
+        toner: g(t('Toner is low.', 'หมึกใกล้หมด'), t('Order before it runs out.', 'สั่งก่อนหมดจริง'), [t('Note the model/cartridge code and order', 'จดรุ่นเครื่องพิมพ์/รหัสตลับ แล้วสั่งซื้อ')], t('', ''), t('', '')),
+        fonts: g(t('The hospital\'s Thai fonts (TH Sarabun New etc.) are missing: documents look wrong.', 'ไม่มีฟอนต์ไทยที่ รพ. ใช้ (TH Sarabun New ฯลฯ) เอกสารเพี้ยน'),
+            t('Install the checked set from this server.', 'ลงชุดฟอนต์ที่ตรวจแล้วจากเซิร์ฟเวอร์นี้'),
+            [t('Press Install Thai fonts here', 'กดปุ่มติดตั้งฟอนต์ไทย'), t('Ask the user to reopen Word', 'ให้ผู้ใช้ปิด-เปิด Word ใหม่')], t('Next check: no Thai fonts missing.', 'ตรวจครั้งถัดไปไม่ขาดฟอนต์ไทย'), t('', '')),
+        startup: g(t('Many programs start with Windows and slow start-up.', 'โปรแกรมเปิดพร้อมเครื่องเยอะ ทำให้เปิดเครื่องช้า'),
+            t('Keep only what the job needs at start-up.', 'เหลือไว้เฉพาะที่ต้องใช้ตอนเปิดเครื่อง'),
+            [t('Turn off the ones not needed in the health check list (same switch as Task Manager)', 'ปิดตัวที่ไม่จำเป็นในรายการผลตรวจ (สวิตช์เดียวกับ Task Manager)')],
+            t('Start-up gets quicker.', 'เปิดเครื่องเร็วขึ้น'), t('Leave antivirus, drivers, HOSxP, SCPPrint and the SCP-Remote agent on.', 'อย่าปิดแอนติไวรัส ไดรเวอร์ HOSxP SCPPrint และเอเจนต์ SCP-Remote')),
+        temp: g(t('Temporary files have piled up.', 'ไฟล์ชั่วคราวสะสม'), t('Safe to remove.', 'ลบได้ปลอดภัย'), [t('Press Clean temp files here', 'กดปุ่มล้างไฟล์ชั่วคราว')], t('Temp size drops.', 'ขนาดไฟล์ชั่วคราวลดลง'), t('', '')),
+        power: g(t('Power saver slows the processor.', 'โหมดประหยัดพลังงานทำให้ CPU ช้าลง'), t('Balanced keeps speed and still saves power when idle.', 'โหมด Balanced เร็วเต็มที่และยังประหยัดไฟตอนว่าง'), [t('Press Balanced here', 'กดปุ่ม Balanced')], t('Power plan shows Balanced.', 'โหมดพลังงานขึ้น Balanced'), t('', ''))
+    };
+    // which guide a task follows, from its title (works in either language)
+    var KINDS = [
+        [/^(Replace|เปลี่ยนดิสก์)(?! Windows)/, 'disk_replace'], [/^(Back up |สำรองข้อมูลจาก)/, 'disk_watch'], [/(Swap the Windows disk|เปลี่ยนดิสก์ Windows|Plan to replace|วางแผนเปลี่ยน)/, 'ssd_swap'],
+        [/(blue screens|จอฟ้า)/, 'bsod'], [/^(Start the service|เปิดบริการ)/, 'service'], [/(network connection|เครือข่าย)/, 'network'], [/DNS/, 'dns'],
+        [/(Restart printing|Print Spooler)/, 'spooler'], [/(stuck printing|งานพิมพ์ค้าง)/, 'print_stuck'], [/SCPPrint/, 'scpprint'], [/(drive C:|ไดรฟ์ C:)/, 'c_full'],
+        [/(slowness|ค้าง\/ช้า)/, 'slow'], [/(RAM|แรม)/, 'ram'], [/(drivers|ไดรเวอร์)/, 'drivers'], [/(Restart the computer|รีสตาร์ทเครื่อง)/, 'restart'],
+        [/Windows Update/, 'winupdate'], [/(system errors|Error ในระบบ)/, 'syserrors'], [/(Resume printer|ให้เครื่องพิมพ์ทำงานต่อ)/, 'printer_paused'],
+        [/(Check printer|ตรวจเครื่องพิมพ์)/, 'printer_check'], [/(toner|หมึก)/i, 'toner'], [/(Thai fonts|ฟอนต์ไทย)/, 'fonts'], [/(start-up|เปิดพร้อมเครื่อง)/, 'startup'],
+        [/(temporary files|ไฟล์ชั่วคราว)/i, 'temp'], [/(power plan|โหมดพลังงาน)/i, 'power']
+    ];
+    function guideFor(title) { for (var i = 0; i < KINDS.length; i++) if (KINDS[i][0].test(title)) return { kind: KINDS[i][1], g: GUIDE[KINDS[i][1]] }; return null; }
+    function guideBlock(x) {
+        var gd = guideFor(x.title);
+        if (!gd) return null;
+        var det = el('details', null, 'scp-health-guide');
+        det.appendChild(el('summary', '📖 ' + t('How to repair', 'วิธีซ่อม')));
+        var row = function (label, text) { if (text) { var p = el('p'); p.appendChild(el('b', label + ' ')); p.appendChild(document.createTextNode(text)); det.appendChild(p); } };
+        row(t('Cause:', 'สาเหตุ:'), gd.g.cause);
+        row(t('Principle:', 'หลักการ:'), gd.g.idea);
+        var ol = el('ol'); gd.g.steps.forEach(function (s) { ol.appendChild(el('li', s)); });
+        det.appendChild(el('b', t('Steps:', 'ขั้นตอน:'))); det.appendChild(ol);
+        row(t('Check it worked:', 'ตรวจผลหลังซ่อม:'), gd.g.check);
+        row(t('Careful:', 'ข้อควรระวัง:'), gd.g.careful);
+        return det;
+    }
     var PRI = { 1: ['🔴', t('Now', 'ด่วน')], 2: ['🟡', t('Soon', 'ควรทำเร็ว')], 3: ['🔵', t('Plan', 'วางแผน')] };
     function baht(n) { return n.toLocaleString('en-US') + t(' baht', ' บาท'); }
     function workOrderBlock(node, d) {
@@ -679,10 +794,24 @@
                 if (x.fix.cleanup) { root.ScpCleanup.run(node); return; }
                 fixOne(node, x.fix.action, x.fix.arg, d);
             }));
+            var gb = guideBlock(x);
+            if (gb) li.appendChild(gb);
             ol.appendChild(li);
         });
         box.appendChild(ol);
         return box;
+    }
+    function guidesHtml(tasks, esc) {
+        var seen = {}, out = '';
+        tasks.forEach(function (x) {
+            var gd = guideFor(x.title);
+            if (!gd || seen[gd.kind]) return;
+            seen[gd.kind] = true;
+            var p = function (label, text) { return text ? '<p><b>' + esc(label) + '</b> ' + esc(text) + '</p>' : ''; };
+            out += '<div class="guide"><h3>📖 ' + esc(x.title.replace(/:.*$/, '')) + '</h3>' + p(t('Cause:', 'สาเหตุ:'), gd.g.cause) + p(t('Principle:', 'หลักการ:'), gd.g.idea) +
+                '<p><b>' + esc(t('Steps:', 'ขั้นตอน:')) + '</b></p><ol>' + gd.g.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' + p(t('Check it worked:', 'ตรวจผลหลังซ่อม:'), gd.g.check) + p(t('Careful:', 'ข้อควรระวัง:'), gd.g.careful) + '</div>';
+        });
+        return out ? '<h2>' + esc(t('How to repair', 'วิธีซ่อม')) + '</h2>' + out : '';
     }
     function printWorkOrder(node, d, w) {
         var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
@@ -691,12 +820,12 @@
                 '</td><td>' + esc(x.onsite ? t('at the computer', 'หน้าเครื่อง') : t('remote', 'ทางไกล')) + '</td><td>' + (x.part ? esc(x.part.name) + (x.part.baht ? '<br>~' + esc(baht(x.part.baht)) : '') : '') + '</td><td class="box"></td></tr>';
         }).join('');
         var html = '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>' + esc(t('Work order ', 'ใบงานช่าง ') + (node.name || '')) + '</title><style>' +
-            'body{font-family:"TH Sarabun New","Sarabun",Tahoma,sans-serif;font-size:16pt;margin:16mm;color:#000}h1{font-size:22pt;margin:0}p{margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:10px}td,th{border:1px solid #444;padding:4px 6px;vertical-align:top;text-align:left}small{font-size:13pt;color:#333}td.box{width:16mm}.sign{margin-top:24px;display:flex;justify-content:space-between}' +
+            'body{font-family:"TH Sarabun New","Sarabun",Tahoma,sans-serif;font-size:16pt;margin:16mm;color:#000}h1{font-size:22pt;margin:0}p{margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:10px}td,th{border:1px solid #444;padding:4px 6px;vertical-align:top;text-align:left}small{font-size:13pt;color:#333}td.box{width:16mm}.sign{margin-top:24px;display:flex;justify-content:space-between}h2{font-size:18pt;margin:16px 0 4px}h3{font-size:16pt;margin:10px 0 2px}.guide{break-inside:avoid;border-top:1px solid #999;padding-top:4px}.guide p,.guide ol{margin:2px 0}' +
             '</style></head><body><h1>🧰 ' + esc(t('Work order', 'ใบงานช่าง')) + ' — ' + esc(node.name || '') + '</h1>' +
             '<p>' + esc(t('Checked ', 'ตรวจเมื่อ ')) + esc(new Date((results[node._id] || {}).at || Date.now()).toLocaleString(th ? 'th-TH' : undefined)) + ' · ' + esc(d.os || '') + (d.ip ? ' · IP ' + esc(d.ip) : '') + (d.user ? ' · ' + esc(t('user ', 'ผู้ใช้ ')) + esc(d.user) : '') + '</p>' +
             '<p>' + esc(PRI[1][1]) + ' ' + w.now + ' · ' + esc(PRI[2][1]) + ' ' + w.soon + ' · ' + esc(PRI[3][1]) + ' ' + w.plan + (w.baht ? ' · ' + esc(t('parts ~', 'ค่าอะไหล่ประมาณ ')) + esc(baht(w.baht)) : '') + '</p>' +
             '<table><tr><th>#</th><th>' + esc(t('Priority', 'ความด่วน')) + '</th><th>' + esc(t('Task', 'งาน')) + '</th><th>' + esc(t('Where', 'ทำที่')) + '</th><th>' + esc(t('Part', 'อะไหล่')) + '</th><th>' + esc(t('Done', 'เสร็จ')) + '</th></tr>' + rows + '</table>' +
-            '<div class="sign"><span>' + esc(t('Technician', 'ช่างผู้ดำเนินการ')) + ' ....................................</span><span>' + esc(t('Date', 'วันที่')) + ' ....................</span></div>' +
+            guidesHtml(w.tasks, esc) + '<div class="sign"><span>' + esc(t('Technician', 'ช่างผู้ดำเนินการ')) + ' ....................................</span><span>' + esc(t('Date', 'วันที่')) + ' ....................</span></div>' +
             '<script>window.onload=function(){window.print();}<\/script></body></html>';
         var win = root.open('', '_blank');
         if (!win) { root.alert(t('Allow pop-ups to print', 'กรุณาอนุญาตป๊อปอัปเพื่อพิมพ์')); return; }
@@ -1063,6 +1192,8 @@
                 var txt = el('div', null, 'scp-health-txt');
                 txt.appendChild(el('strong', PRI[x.pri][0] + ' ' + x.pc + ' — ' + x.title));
                 txt.appendChild(el('small', [x.why, x.steps.length ? '→ ' + x.steps.join(' → ') : '', x.part ? '🔧 ' + x.part.name + (x.part.baht ? ' ~' + baht(x.part.baht) : '') : '', x.onsite ? t('at the computer', 'ไปหน้าเครื่อง') : ''].filter(Boolean).join(' · ')));
+                var gb = guideBlock(x);
+                if (gb) txt.appendChild(gb);
                 row.appendChild(txt);
                 if (x.fix && x.node) row.appendChild(btn(x.fix.label, 'scp-health-btn', function () {
                     if (x.fix.cleanup) { root.ScpCleanup.run(x.node); return; }
@@ -1082,12 +1213,12 @@
         var parts = b.parts.map(function (p, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(p.name) + '</td><td class="n">' + p.n + '</td><td class="n">' + (p.baht ? esc(baht(p.baht)) : '-') + '</td><td><small>' + esc(p.pcs.join(', ')) + '</small></td></tr>'; }).join('');
         var rows = b.tasks.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + PRI[x.pri][0] + ' ' + esc(PRI[x.pri][1]) + '</td><td>' + esc(x.pc) + '</td><td><b>' + esc(x.title) + '</b>' + (x.why ? '<br><small>' + esc(x.why) + '</small>' : '') + '</td><td>' + esc(x.onsite ? t('at the computer', 'หน้าเครื่อง') : t('remote', 'ทางไกล')) + '</td><td class="box"></td></tr>'; }).join('');
         var html = '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>' + esc(t('Work waiting ', 'งานช่างค้าง ') + day) + '</title><style>' +
-            'body{font-family:"TH Sarabun New","Sarabun",Tahoma,sans-serif;font-size:15pt;margin:14mm;color:#000}h1{font-size:21pt;margin:0}h2{font-size:17pt;margin:14px 0 4px}p{margin:3px 0}table{width:100%;border-collapse:collapse}td,th{border:1px solid #444;padding:3px 6px;vertical-align:top;text-align:left}td.n{text-align:right}small{font-size:12pt;color:#333}td.box{width:14mm}.sign{margin-top:22px;display:flex;justify-content:space-between}' +
+            'body{font-family:"TH Sarabun New","Sarabun",Tahoma,sans-serif;font-size:15pt;margin:14mm;color:#000}h1{font-size:21pt;margin:0}h2{font-size:17pt;margin:14px 0 4px}p{margin:3px 0}table{width:100%;border-collapse:collapse}td,th{border:1px solid #444;padding:3px 6px;vertical-align:top;text-align:left}td.n{text-align:right}small{font-size:12pt;color:#333}td.box{width:14mm}.sign{margin-top:22px;display:flex;justify-content:space-between}h3{font-size:15pt;margin:8px 0 2px}.guide{break-inside:avoid;border-top:1px solid #999;padding-top:4px}.guide p,.guide ol{margin:2px 0}' +
             '</style></head><body><h1>🧰 ' + esc(t('Work waiting across the hospital', 'สรุปงานช่างค้างทั้งโรงพยาบาล')) + '</h1><p>' + esc(day) + ' · ' + esc(t('computers with work: ', 'เครื่องที่มีงาน ')) + b.pcs + ' / ' + b.checked + ' · ' + esc(t('tasks: ', 'งานทั้งหมด ')) + b.tasks.length + '</p>' +
             (b.parts.length ? '<h2>🔧 ' + esc(t('Parts to buy', 'รายการอะไหล่ที่ต้องจัดซื้อ')) + '</h2><table><tr><th>#</th><th>' + esc(t('Item', 'รายการ')) + '</th><th>' + esc(t('Qty', 'จำนวน')) + '</th><th>' + esc(t('Estimate', 'ราคาประมาณ')) + '</th><th>' + esc(t('For', 'สำหรับเครื่อง')) + '</th></tr>' + parts +
                 '<tr><td></td><td><b>' + esc(t('Total', 'รวม')) + '</b></td><td></td><td class="n"><b>' + esc(baht(b.baht)) + '</b></td><td><small>' + esc(t('estimate; toner priced by model', 'ราคาประมาณ หมึกคิดตามรุ่น')) + '</small></td></tr></table>' : '') +
             '<h2>' + esc(t('Tasks', 'รายการงาน')) + '</h2><table><tr><th>#</th><th>' + esc(t('Priority', 'ความด่วน')) + '</th><th>' + esc(t('Computer', 'เครื่อง')) + '</th><th>' + esc(t('Task', 'งาน')) + '</th><th>' + esc(t('Where', 'ทำที่')) + '</th><th>' + esc(t('Done', 'เสร็จ')) + '</th></tr>' + rows + '</table>' +
-            '<div class="sign"><span>' + esc(t('Prepared by', 'ผู้จัดทำ')) + ' ....................................</span><span>' + esc(t('Approved by', 'ผู้อนุมัติ')) + ' ....................................</span></div>' +
+            guidesHtml(b.tasks, esc) + '<div class="sign"><span>' + esc(t('Prepared by', 'ผู้จัดทำ')) + ' ....................................</span><span>' + esc(t('Approved by', 'ผู้อนุมัติ')) + ' ....................................</span></div>' +
             '<script>window.onload=function(){window.print();}<\/script></body></html>';
         var win = root.open('', '_blank');
         if (!win) { root.alert(t('Allow pop-ups to print', 'กรุณาอนุญาตป๊อปอัปเพื่อพิมพ์')); return; }
@@ -1181,5 +1312,5 @@
     // The server runs the same check every morning (hospital/morning-check.js) and hands the font list in itself.
     function setManifest(m) { manifest = m; }
 
-    root.ScpHealth = { setManifest: setManifest, daysUntilFull: daysUntilFull, slowVerdict: slowVerdict, section: section, receive: receive, check: check, fix: fix, openFleet: openFleet, openPrinters: openPrinters, openDisks: openDisks, diskVerdict: diskVerdict, workOrder: workOrder, backlog: backlog, openBacklog: openBacklog, openFonts: openFonts, findings: findings, healthScript: healthScript, FIX: FIX, results: results, load: load };
+    root.ScpHealth = { setManifest: setManifest, daysUntilFull: daysUntilFull, slowVerdict: slowVerdict, section: section, receive: receive, check: check, fix: fix, openFleet: openFleet, openPrinters: openPrinters, openDisks: openDisks, diskVerdict: diskVerdict, workOrder: workOrder, backlog: backlog, openBacklog: openBacklog, guideFor: guideFor, openFonts: openFonts, findings: findings, healthScript: healthScript, FIX: FIX, results: results, load: load };
 }(window));

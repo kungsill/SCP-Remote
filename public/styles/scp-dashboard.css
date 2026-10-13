@@ -2125,6 +2125,10 @@ body.scp-map-full-open {
 /* the technician's work order: what to do on this computer, most urgent first */
 .scp-health-parts { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 10px; padding: 8px 10px; border: 1px dashed var(--scp-line); border-radius: 12px; }
 .scp-health-parts small { color: var(--scp-muted, #64748b); }
+.scp-health-guide { margin-top: 6px; font-size: 13px; line-height: 1.5; }
+.scp-health-guide summary { cursor: pointer; font-weight: 700; color: var(--scp-brand, #b02a72); }
+.scp-health-guide p { margin: 4px 0; }
+.scp-health-guide ol { margin: 2px 0 4px; padding-left: 20px; }
 .scp-health-wo { margin: 6px 0 12px; padding: 10px 12px; border: 1px solid var(--scp-line); border-radius: 14px; background: var(--scp-surface); }
 .scp-health-wo-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .scp-health-wo-head h5 { margin: 0; font-size: 15px; }

@@ -226,3 +226,25 @@ test('work order: an ageing Windows HDD is one SSD task, not two', () => {
     assert.match(ssd[0].title, /^เปลี่ยนดิสก์ Windows เป็น SSD: WDC/);
     assert.equal(ssd[0].part.name, 'SSD 512GB');
 });
+
+test('every task in a work order comes with how to repair it: cause, principle, steps, check', () => {
+    const base = { upDays: 30, pendingReboot: true, lastUpdateDays: 200, ramPct: 92, ramGb: 4, cpu: 5, freeGb: 5, diskGb: 200, adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: false, netOk: false, spooler: 'Running', jobs: 2, oldestJobMin: 900, tempMb: 3000, fontsMissing: ['x'], thSarabun: false, bsod14d: 2, errors24h: 80, stoppedServices: ['Spooler'], badDevices: ['Video'], power: 'GUID (Power saver)', scpprint: { installed: true, running: false },
+        printers: [{ name: 'P1', status: 'Paused' }, { name: 'P2', status: 'Offline' }, { name: 'P3', status: 'TonerLow' }],
+        startup: Array.from({ length: 10 }, (_, i) => ({ on: true, name: 's' + i })), slow: { hangs7d: 9, crashes7d: 0, lowMem30d: 2, bootSec: 200 } };
+    const hdd = { n: 'WDC', type: 'HDD', bus: 'SATA', gb: 932, health: 'Healthy', smart: true, wear: 0, temp: 40, poh: 9000, rdErr: 0, realloc: 0, pending: 0, uncorr: 0, reported: 0, crc: 0, life: -1, below: 0, fail: false };
+    const many = [
+        Object.assign({}, base, { disks: [Object.assign({}, hdd, { sys: true }), Object.assign({}, hdd, { realloc: 900, pending: 50, uncorr: 20 }), Object.assign({}, hdd, { pending: 1 }), Object.assign({}, hdd, { poh: 60000 })] }),
+        Object.assign({}, base, { ip: '169.254.1.2', spooler: 'Stopped', disks: [Object.assign({}, hdd, { sys: true, fail: true })] })
+    ];
+    const kinds = new Set();
+    for (const d of many) for (const x of H.workOrder(d).tasks) {
+        const g = H.guideFor(x.title);
+        assert.ok(g, 'no guide for: ' + x.title);
+        assert.ok(g.g.cause && g.g.idea && g.g.steps.length, x.title);
+        kinds.add(g.kind);
+    }
+    assert.ok(kinds.size >= 20, 'most kinds reached: ' + [...kinds].join(','));
+    assert.equal(H.guideFor('เปลี่ยนดิสก์').kind, 'disk_replace');
+    assert.equal(H.guideFor('เปลี่ยนดิสก์ Windows (C:) เป็น SSD').kind, 'ssd_swap');
+    assert.equal(H.guideFor('ล้างงานพิมพ์ค้าง').kind, 'print_stuck', 'not mistaken for slowness');
+});

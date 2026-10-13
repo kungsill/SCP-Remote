@@ -70,3 +70,20 @@ test('the server keeps the results and who pressed which fix', () => {
     for (const op of ['healthSave', 'healthList', 'healthLog']) assert.ok(ops.includes("cmd.op === '" + op + "'"), op);
     assert.match(ops, /kind: 'health'/);
 });
+
+test('how Windows was installed: modified builds and bypassed checks are told apart', () => {
+    const base = { upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, diskType: 'SSD', adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true };
+    const normal = { bypass: [], moSetup: false, unattendBypass: false, brand: '', noDefender: false, noUpdate: false, updateDisabled: false, noEdge: false };
+    const win = ins => H.findings(Object.assign({}, base, { install: Object.assign({}, normal, ins) })).filter(f => f.cat === 'การติดตั้ง Windows');
+    assert.deepEqual(win({}).map(f => f.level), ['ok']);
+    assert.equal(win({ brand: 'tiny11' }).find(f => f.level === 'bad').title, 'น่าจะเป็น Windows ดัดแปลง');
+    assert.equal(win({ noDefender: true }).some(f => f.level === 'bad'), true, 'Defender removed');
+    const bypass = win({ bypass: ['BypassCPUCheck'], moSetup: true });
+    assert.equal(bypass.find(f => f.level === 'warn').title, 'ลงแบบข้ามเกณฑ์ Windows 11');
+    assert.match(bypass.find(f => f.level === 'warn').detail, /BypassCPUCheck, AllowUpgradesWithUnsupportedTPMOrCPU/);
+    assert.equal(win({ noEdge: true }).find(f => f.level === 'info').title, 'ไม่มี Microsoft Edge', 'Edge alone is only a hint');
+    // the brand test must not catch HP EliteDesk / EliteBook or Toshiba Satellite
+    const pattern = new RegExp(H.healthScript().match(/\$ident -match '([^']+)'/)[1], 'i');
+    for (const ok of ['HP EliteDesk 800 G3', 'HP EliteBook 840', 'Toshiba Satellite', 'Dell OptiPlex 7010']) assert.equal(pattern.test(ok), false, ok);
+    for (const bad of ['Windows 10 Lite', 'tiny11', 'Extreme TeamOS', 'Ghost Spectre']) assert.equal(pattern.test(bad), true, bad);
+});

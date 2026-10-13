@@ -101,7 +101,18 @@
             "$miss = @(" + psList(fontsWanted().map(function (f) { return f.name; })) + " | Where-Object { $fnames -notcontains $_ })",
             "$thsb = [bool]($fnames | Where-Object { $_ -match 'TH ?Sarabun' })",
             "$syn = [bool](Select-String -Path ($env:SystemRoot + '\\System32\\drivers\\etc\\hosts') -Pattern 'syn5scph' -Quiet)",
-            "$o = @{ v = 1; os = [string]$os.Caption; build = [string]$os.BuildNumber; user = $uname; upDays = $up; pendingReboot = [bool]$pend; lastUpdateDays = $lu; ramGb = $ramT; ramPct = $ramU; cpu = $cpu; freeGb = [math]::Round($c.FreeSpace / 1GB, 1); diskGb = [math]::Round($c.Size / 1GB, 1); diskType = [string]$pd.MediaType; diskHealth = [string]$pd.HealthStatus; smart = $smart; badDevices = $bad; errors24h = $ev; crashes14d = $crash; adapters = $ad; ip = $ip; gw = $gw; gwOk = $gwOk; dnsOk = $dnsOk; netOk = $netOk; spooler = [string]$sp.Status; printers = $prn; jobs = $pj.Count; oldestJobMin = $old; scpprint = $spp; stoppedServices = $svc; startup = @($st | Select-Object -First 40); top = $top; tempMb = $tmp; power = $pp; fontsMissing = $miss; thSarabun = $thsb; synapseHost = $syn }",
+            // How Windows was installed: the switches people use to get past the Windows 11 checks,
+            // and the marks a modified build (tiny11, Lite, TeamOS...) leaves. Only reads.
+            "$lab = Get-ItemProperty 'HKLM:\\SYSTEM\\Setup\\LabConfig' -ErrorAction SilentlyContinue; $labOn = @('BypassCPUCheck','BypassTPMCheck','BypassSecureBootCheck','BypassRAMCheck','BypassStorageCheck') | Where-Object { $lab -and $lab.$_ -eq 1 }",
+            "$moSet = [bool]((Get-ItemProperty 'HKLM:\\SYSTEM\\Setup\\MoSetup' -ErrorAction SilentlyContinue).AllowUpgradesWithUnsupportedTPMOrCPU -eq 1)",
+            "$unat = @(($env:SystemRoot + '\\Panther\\unattend.xml'), ($env:SystemRoot + '\\Panther\\Unattend\\unattend.xml'), ($env:SystemRoot + '\\System32\\Sysprep\\unattend.xml')) | Where-Object { Test-Path $_ } | Where-Object { Select-String -Path $_ -Pattern 'Bypass(CPU|TPM|SecureBoot|RAM)Check|AllowUpgradesWithUnsupported' -Quiet }",
+            "$cv = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion'; $oem = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OEMInformation' -ErrorAction SilentlyContinue",
+            "$ident = (@([string]$cv.RegisteredOwner, [string]$cv.RegisteredOrganization, [string]$cv.ProductName, [string]$oem.Manufacturer, [string]$oem.Model, [string]$oem.SupportURL) | Where-Object { $_ }) -join ' / '",
+            "$brand = if ($ident -match '\\b(tiny ?1[01]|nano ?1[01]|lite|teamos|team ?os|ghost ?spectre|xtreme|revi ?os|atlas ?os|superlite|modded)\\b') { $Matches[0] } else { '' }",
+            "$wd = Get-Service WinDefend -ErrorAction SilentlyContinue; $wu = Get-Service wuauserv -ErrorAction SilentlyContinue",
+            "$edge = (Test-Path (${env:ProgramFiles(x86)} + '\\Microsoft\\Edge\\Application\\msedge.exe')) -or (Test-Path ($env:ProgramFiles + '\\Microsoft\\Edge\\Application\\msedge.exe'))",
+            "$inst = @{ bypass = @($labOn); moSetup = $moSet; unattendBypass = (@($unat).Count -gt 0); brand = $brand; ident = $ident.Substring(0, [math]::Min(160, $ident.Length)); noDefender = (-not $wd); noUpdate = (-not $wu); updateDisabled = [bool]($wu -and $wu.StartType -eq 'Disabled'); noEdge = (-not $edge); installDate = [string]$cv.InstallDate }",
+            "$o = @{ v = 1; os = [string]$os.Caption; build = [string]$os.BuildNumber; user = $uname; upDays = $up; pendingReboot = [bool]$pend; lastUpdateDays = $lu; ramGb = $ramT; ramPct = $ramU; cpu = $cpu; freeGb = [math]::Round($c.FreeSpace / 1GB, 1); diskGb = [math]::Round($c.Size / 1GB, 1); diskType = [string]$pd.MediaType; diskHealth = [string]$pd.HealthStatus; smart = $smart; badDevices = $bad; errors24h = $ev; crashes14d = $crash; adapters = $ad; ip = $ip; gw = $gw; gwOk = $gwOk; dnsOk = $dnsOk; netOk = $netOk; spooler = [string]$sp.Status; printers = $prn; jobs = $pj.Count; oldestJobMin = $old; scpprint = $spp; stoppedServices = $svc; startup = @($st | Select-Object -First 40); top = $top; tempMb = $tmp; power = $pp; fontsMissing = $miss; thSarabun = $thsb; synapseHost = $syn; install = $inst }",
             "Write-Output ('SCP_HEALTH:' + ($o | ConvertTo-Json -Compress -Depth 4))"
         ]).join('\r\n');
     }
@@ -410,6 +421,23 @@
         var plan = (String(d.power || '').match(/\(([^)]+)\)/) || [])[1] || '';
         if (/saver|ประหยัด/i.test(plan)) add(SPD, 'warn', t('Power plan: ', 'โหมดพลังงาน: ') + plan, t('Power saver slows the processor; Balanced is better for work.', 'โหมดประหยัดพลังงานทำให้ CPU ช้า ควรใช้ Balanced'), [{ label: t('Set Balanced', 'ตั้งเป็น Balanced'), action: 'power_balanced' }]);
         if (/SSD/i.test(d.diskType)) add(SPD, 'ok', t('SSD drive', 'ใช้ SSD'), t('TRIM keeps an SSD as fast as new; Windows does it weekly, this does it now.', 'TRIM ช่วยให้ SSD เร็วเหมือนใหม่ (Windows ทำทุกสัปดาห์ กดเพื่อทำตอนนี้)'), [{ label: 'TRIM', action: 'trim' }]);
+        // how Windows was installed
+        var ins = d.install;
+        if (ins) {
+            var WIN = t('How Windows was installed', 'การติดตั้ง Windows');
+            var strong = [];
+            if (ins.brand) strong.push(t('named “', 'มีชื่อ “') + ins.brand + t('” in its system details', '” ในข้อมูลระบบ'));
+            if (ins.noDefender) strong.push(t('Windows Defender has been removed', 'ไม่มี Windows Defender ในเครื่อง (ถูกถอดออก)'));
+            if (ins.noUpdate) strong.push(t('Windows Update has been removed', 'ไม่มีบริการ Windows Update (ถูกถอดออก)'));
+            var bypass = (ins.bypass || []).slice();
+            if (ins.moSetup) bypass.push('AllowUpgradesWithUnsupportedTPMOrCPU');
+            if (ins.unattendBypass) bypass.push(t('setup answer file', 'ไฟล์ unattend ตอนติดตั้ง'));
+            if (strong.length) add(WIN, 'bad', t('Looks like a modified Windows build', 'น่าจะเป็น Windows ดัดแปลง'), strong.join(' · ') + t(' — reinstall from genuine Microsoft media; modified builds may hide malware and miss security updates.', ' — ควรลงใหม่ด้วย ISO แท้ของ Microsoft เพราะฉบับดัดแปลงอาจแฝงมัลแวร์และไม่ได้อัปเดตความปลอดภัย'));
+            if (bypass.length) add(WIN, 'warn', t('Installed past the Windows 11 checks', 'ลงแบบข้ามเกณฑ์ Windows 11'), bypass.join(', ') + t(' — works, but Microsoft does not promise updates; plan a replacement.', ' — ใช้งานได้ แต่ Microsoft ไม่รับประกันการอัปเดต ควรอยู่ในแผนเปลี่ยนเครื่อง'));
+            if (ins.updateDisabled) add(WIN, 'warn', t('Windows Update is disabled', 'ปิด Windows Update ไว้'), t('Security fixes will not arrive.', 'เครื่องจะไม่ได้แพตช์ความปลอดภัย'));
+            if (!strong.length && !bypass.length) add(WIN, 'ok', t('Installed the normal way', 'ติดตั้งแบบปกติ (ไม่พบร่องรอยดัดแปลงหรือข้ามเกณฑ์)'));
+            if (ins.noEdge && !strong.length) add(WIN, 'info', t('Microsoft Edge is not installed', 'ไม่มี Microsoft Edge'), t('Often removed by modified builds; on its own it may just have been uninstalled.', 'ฉบับดัดแปลงมักถอด Edge ออก แต่ถ้าเจอแค่ข้อนี้อาจเป็นการถอนการติดตั้งปกติ'));
+        }
         // hospital programs
         if (d.synapseHost === false) add(t('Hospital programs', 'โปรแกรม รพ.'), 'info', t('PACS (Synapse) name not set', 'ยังไม่ได้ตั้งชื่อเครื่อง PACS (Synapse)'), t('Needed only where X-ray images are viewed: http://syn5scph/synapse', 'จำเป็นเฉพาะเครื่องที่ดูภาพเอกซเรย์: http://syn5scph/synapse'), [{ label: t('Add', 'เพิ่ม'), action: 'synapse_hosts' }]);
         else if (d.synapseHost) add(t('Hospital programs', 'โปรแกรม รพ.'), 'ok', t('PACS (Synapse) reachable by name', 'ตั้งชื่อเครื่อง PACS (Synapse) แล้ว'));

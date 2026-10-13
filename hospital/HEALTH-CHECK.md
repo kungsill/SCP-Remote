@@ -17,6 +17,7 @@
 | เครื่องพิมพ์ | Print Spooler, งานพิมพ์ค้าง (นานกี่นาที), สถานะแต่ละเครื่อง (Offline / กระดาษติด / หมึกใกล้หมด / Paused), SCPPrint เปิดอยู่ไหม |
 | ความเร็ว | โปรแกรมเปิดพร้อมเครื่อง, ไฟล์ชั่วคราว, โหมดพลังงาน, SSD |
 | ฟอนต์ | ฟอนต์ไทยที่ยังไม่มี, TH Sarabun |
+| การติดตั้ง Windows | ลงแบบข้ามเกณฑ์ Windows 11 (LabConfig Bypass*, AllowUpgradesWithUnsupportedTPMOrCPU, ไฟล์ unattend), Windows ดัดแปลง (ชื่อ tiny11/Lite/TeamOS ฯลฯ ในข้อมูลระบบ, Defender หรือ Windows Update ถูกถอดออก), ปิด Windows Update, ไม่มี Edge (เป็นแค่ข้อสังเกต) |
 
 พร้อมรายการโปรแกรมที่ใช้แรมมากสุด 6 อันดับ
 

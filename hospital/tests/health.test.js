@@ -195,3 +195,34 @@ test('work order: being switched off at the wall is not a task (routine here)', 
     const base = { upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true };
     assert.equal(H.workOrder(Object.assign({}, base, { crashes14d: 12 })).tasks.length, 0);
 });
+
+test('hospital backlog: every work order together, urgent first, parts added up for the purchase request', () => {
+    const base = { upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true };
+    const hdd = { n: 'WDC', type: 'HDD', bus: 'SATA', gb: 932, health: 'Healthy', smart: true, wear: 0, temp: 40, poh: 9000, rdErr: 0, realloc: 0, pending: 0, uncorr: 0, reported: 0, crc: 0, life: -1, below: 0, fail: false, sys: true };
+    for (const k of Object.keys(H.results)) delete H.results[k];
+    H.results['node//a'] = { at: 1, data: Object.assign({}, base, { disks: [Object.assign({}, hdd, { poh: 50000, pending: 30, uncorr: 9 })] }) };
+    H.results['node//b'] = { at: 1, data: Object.assign({}, base, { ramGb: 4, disks: [hdd] }) };
+    H.results['node//c'] = { at: 1, data: Object.assign({}, base, { disks: [Object.assign({}, hdd, { type: 'SSD', life: 98 })] }) };
+    const b = H.backlog();
+    assert.equal(b.checked, 3);
+    assert.equal(b.pcs, 2, 'the healthy computer has no work');
+    assert.equal(b.tasks[0].pri, 1);
+    assert.equal(b.tasks[0].nodeid, 'node//a');
+    for (let i = 1; i < b.tasks.length; i++) assert.ok(b.tasks[i].pri >= b.tasks[i - 1].pri);
+    const ssd = b.parts.filter(p => /^SSD/.test(p.name)).reduce((n, p) => n + p.n, 0), ram = b.parts.find(p => /^RAM/.test(p.name));
+    assert.equal(ram.n, 1);
+    assert.equal(ssd, 2, 'one to replace the failing disk, one to swap the other spinning Windows disk: not a second one for the failing computer');
+    assert.equal(b.tasks.filter(x => x.nodeid === 'node//a' && x.part).length, 1);
+    assert.equal(b.baht, b.parts.reduce((s, p) => s + p.baht, 0));
+    for (const k of Object.keys(H.results)) delete H.results[k];
+});
+
+test('work order: an ageing Windows HDD is one SSD task, not two', () => {
+    const base = { upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true };
+    const old = { n: 'WDC WD10EZEX', type: 'HDD', bus: 'SATA', gb: 932, health: 'Healthy', smart: true, wear: 0, temp: 40, poh: 83000, rdErr: 0, realloc: 0, pending: 0, uncorr: 0, reported: 0, crc: 0, life: -1, below: 0, fail: false, sys: true };
+    const w = H.workOrder(Object.assign({}, base, { disks: [old] }));
+    const ssd = w.tasks.filter(x => x.part && /SSD/.test(x.part.name));
+    assert.equal(ssd.length, 1);
+    assert.match(ssd[0].title, /^เปลี่ยนดิสก์ Windows เป็น SSD: WDC/);
+    assert.equal(ssd[0].part.name, 'SSD 512GB');
+});

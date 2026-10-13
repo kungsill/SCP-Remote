@@ -394,7 +394,7 @@
     }
     function log(nodeid, action, r) {
         if (!root.ScpOperations) return;
-        root.ScpOperations.request('healthLog', { nodeid: nodeid, action: action, ok: !!(r && r.ok), result: r || null }).catch(function () { });
+        root.ScpOperations.request('healthLog', { nodeid: nodeid, fix: action, ok: !!(r && r.ok), result: r || null }).catch(function () { });
     }
 
     /* ---------- reading the answer ---------- */

@@ -267,12 +267,13 @@ exports.handle = async function (ctx, cmd) {
   // Who pressed which fix on which computer, and what it reported. The last 30 per computer.
   const ACTIONS = ['printer_fix', 'spooler_restart', 'printer_test', 'printer_resume', 'dns_flush', 'svc_start', 'trim', 'power_balanced', 'synapse_hosts', 'startup', 'fonts'];
   if (typeof cmd.nodeid !== 'string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
-  if (ACTIONS.indexOf(cmd.action) < 0) throw Error('INVALID_INPUT');
+  // The fix is in cmd.fix: cmd.action is the message's own channel name (scpops).
+  if (ACTIONS.indexOf(cmd.fix) < 0) throw Error('INVALID_INPUT');
   const key = 'scphealthlog/' + cmd.nodeid;
   const before = await get(key).catch(() => null);
   const resultText = cmd.result && typeof cmd.result === 'object' ? JSON.stringify(cmd.result) : '';
   const result = resultText && resultText.length <= 2000 ? JSON.parse(resultText) : (resultText ? { truncated: true } : null);
-  const entries = ((before && before.entries) || []).concat([{ at: Date.now(), action: cmd.action, ok: cmd.ok === true, result, by: user._id }]).slice(-30);
+  const entries = ((before && before.entries) || []).concat([{ at: Date.now(), action: cmd.fix, ok: cmd.ok === true, result, by: user._id }]).slice(-30);
   await save({ _id: key, type: 'scphealthlog', domain: domain.id, nodeid: cmd.nodeid, entries, updated: Date.now() });
   return { saved: 1 };
  }

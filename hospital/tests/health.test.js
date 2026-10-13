@@ -98,3 +98,12 @@ test('switching off without shutting down is only noted; a blue screen is a faul
     // Thai names survive any console code page: non-ASCII goes out as \u escapes
     assert.ok(script.includes("[regex]::Replace(($o | ConvertTo-Json -Compress -Depth 4), '[^\\x00-\\x7F]'"), 'non-ASCII is escaped');
 });
+
+test('the fix log never sends a field called "action" (it would replace the scpops channel name)', () => {
+    const src = fs.readFileSync(path.join(root, 'public/scripts/scp-health.js'), 'utf8');
+    const call = src.match(/request\('healthLog', \{[^}]*\}/)[0];
+    assert.doesNotMatch(call, /\baction:/);
+    assert.match(call, /fix: action/);
+    // the same trap for every request the health module makes
+    for (const m of src.matchAll(/ScpOperations\.request\('(\w+)', \{([^}]*)\}/g)) assert.doesNotMatch(m[2], /\baction\s*:/, m[1]);
+});

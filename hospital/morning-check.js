@@ -42,7 +42,7 @@ function loadHealth() {
 function snapshot(data, at) {
     const n = v => (typeof v === 'number' && isFinite(v)) ? v : null;
     const s = data.slow || {};
-    return { at, freeGb: n(data.freeGb), diskGb: n(data.diskGb), ramPct: n(data.ramPct), upDays: n(data.upDays), crashes14d: n(data.crashes14d), errors24h: n(data.errors24h), jobs: n(data.jobs), tempMb: n(data.tempMb),
+    return { at, freeGb: n(data.freeGb), diskGb: n(data.diskGb), ramPct: n(data.ramPct), upDays: n(data.upDays), crashes14d: n(data.crashes14d), bsod14d: n(data.bsod14d), errors24h: n(data.errors24h), jobs: n(data.jobs), tempMb: n(data.tempMb),
         hangs7d: n(s.hangs7d), appCrashes7d: n(s.crashes7d), lowMem30d: n(s.lowMem30d), bootSec: n(s.bootSec) };
 }
 
@@ -129,7 +129,8 @@ function CreateScpMorning(parent) {
     // Run the check now on every Windows computer that is on. Resolves with the summary.
     obj.run = function (reason) {
         if (obj.running) return obj.running.promise;
-        if (!obj.health) { try { obj.health = loadHealth(); } catch (e) { debug('cannot load scp-health.js: ' + e.message); return Promise.resolve(null); } }
+        // Loaded fresh every run, so a change to the dashboard's check applies here without a restart.
+        try { obj.health = loadHealth(); } catch (e) { debug('cannot load scp-health.js: ' + e.message); if (!obj.health) return Promise.resolve(null); }
         const list = windowsAgents();
         const ticket = 'scpmorning' + Date.now() + '_' + list.length;
         const job = { ticket, pending: {}, results: {}, names: {}, domains: {}, started: Date.now(), reason: reason || 'schedule' };

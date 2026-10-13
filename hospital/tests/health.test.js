@@ -87,3 +87,14 @@ test('how Windows was installed: noted, never counted as a problem (any Windows 
     for (const ok of ['HP EliteDesk 800 G3', 'HP EliteBook 840', 'Toshiba Satellite', 'Dell OptiPlex 7010']) assert.equal(pattern.test(ok), false, ok);
     for (const bad of ['Windows 10 Lite', 'tiny11', 'Extreme TeamOS', 'Ghost Spectre']) assert.equal(pattern.test(bad), true, bad);
 });
+
+test('switching off without shutting down is only noted; a blue screen is a fault', () => {
+    const base = { upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, diskType: 'SSD', adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true };
+    const sys = d => H.findings(Object.assign({}, base, d)).filter(f => f.cat === 'ระบบ');
+    assert.equal(sys({ crashes14d: 12 }).find(f => /Shut down/.test(f.title)).level, 'info');
+    assert.equal(sys({ crashes14d: 12, bsod14d: 2 }).find(f => /จอฟ้า/.test(f.title)).level, 'bad');
+    const script = H.healthScript();
+    assert.match(script, /ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = 41;/, 'not 41 and 6008 together');
+    // Thai names survive any console code page: non-ASCII goes out as \u escapes
+    assert.ok(script.includes("[regex]::Replace(($o | ConvertTo-Json -Compress -Depth 4), '[^\\x00-\\x7F]'"), 'non-ASCII is escaped');
+});

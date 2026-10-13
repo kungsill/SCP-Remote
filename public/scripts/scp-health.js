@@ -69,7 +69,10 @@
             "$smart = @(Get-CimInstance -Namespace root\\wmi -ClassName MSStorageDriver_FailurePredictStatus | Where-Object { $_.PredictFailure }).Count",
             "$bad = @(Get-CimInstance Win32_PnPEntity | Where-Object { $_.ConfigManagerErrorCode -ne 0 -and $_.ConfigManagerErrorCode -ne 22 } | Select-Object -First 6 | ForEach-Object { [string]$_.Name })",
             "$ev = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Level = 1, 2; StartTime = (Get-Date).AddDays(-1) } -MaxEvents 500).Count",
-            "$crash = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 41, 6008; StartTime = (Get-Date).AddDays(-14) } -MaxEvents 50).Count",
+            // One unexpected shutdown leaves both a 41 and a 6008, so only 41 is counted. Blue screens
+            // (BugCheck 1001) are counted on their own: power being cut is routine here, a crash is not.
+            "$crash = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = 41; StartTime = (Get-Date).AddDays(-14) } -MaxEvents 100).Count",
+            "$bsod = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting'; Id = 1001; StartTime = (Get-Date).AddDays(-14) } -MaxEvents 50).Count",
             "$ad = @(Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { [string]$_.Name })",
             "$ipc = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } | Select-Object -First 1",
             "$ip = [string]($ipc.IPv4Address | Select-Object -First 1).IPAddress; $gw = [string]($ipc.IPv4DefaultGateway | Select-Object -First 1).NextHop",
@@ -122,8 +125,9 @@
             "$wd = Get-Service WinDefend -ErrorAction SilentlyContinue; $wu = Get-Service wuauserv -ErrorAction SilentlyContinue",
             "$edge = (Test-Path (${env:ProgramFiles(x86)} + '\\Microsoft\\Edge\\Application\\msedge.exe')) -or (Test-Path ($env:ProgramFiles + '\\Microsoft\\Edge\\Application\\msedge.exe'))",
             "$inst = @{ bypass = @($labOn); moSetup = $moSet; unattendBypass = (@($unat).Count -gt 0); brand = $brand; ident = $ident.Substring(0, [math]::Min(160, $ident.Length)); noDefender = (-not $wd); noUpdate = (-not $wu); updateDisabled = [bool]($wu -and $wu.StartType -eq 'Disabled'); noEdge = (-not $edge); installDate = [string]$cv.InstallDate }",
-            "$o = @{ v = 1; os = [string]$os.Caption; build = [string]$os.BuildNumber; user = $uname; upDays = $up; pendingReboot = [bool]$pend; lastUpdateDays = $lu; ramGb = $ramT; ramPct = $ramU; cpu = $cpu; freeGb = [math]::Round($c.FreeSpace / 1GB, 1); diskGb = [math]::Round($c.Size / 1GB, 1); diskType = [string]$pd.MediaType; diskHealth = [string]$pd.HealthStatus; smart = $smart; badDevices = $bad; errors24h = $ev; crashes14d = $crash; adapters = $ad; ip = $ip; gw = $gw; gwOk = $gwOk; dnsOk = $dnsOk; netOk = $netOk; spooler = [string]$sp.Status; printers = $prn; jobs = $pj.Count; oldestJobMin = $old; scpprint = $spp; stoppedServices = $svc; startup = @($st | Select-Object -First 40); top = $top; tempMb = $tmp; power = $pp; fontsMissing = $miss; thSarabun = $thsb; synapseHost = $syn; install = $inst; slow = $slow }",
-            "Write-Output ('SCP_HEALTH:' + ($o | ConvertTo-Json -Compress -Depth 4))"
+            "$o = @{ v = 1; os = [string]$os.Caption; build = [string]$os.BuildNumber; user = $uname; upDays = $up; pendingReboot = [bool]$pend; lastUpdateDays = $lu; ramGb = $ramT; ramPct = $ramU; cpu = $cpu; freeGb = [math]::Round($c.FreeSpace / 1GB, 1); diskGb = [math]::Round($c.Size / 1GB, 1); diskType = [string]$pd.MediaType; diskHealth = [string]$pd.HealthStatus; smart = $smart; badDevices = $bad; errors24h = $ev; crashes14d = $crash; bsod14d = $bsod; adapters = $ad; ip = $ip; gw = $gw; gwOk = $gwOk; dnsOk = $dnsOk; netOk = $netOk; spooler = [string]$sp.Status; printers = $prn; jobs = $pj.Count; oldestJobMin = $old; scpprint = $spp; stoppedServices = $svc; startup = @($st | Select-Object -First 40); top = $top; tempMb = $tmp; power = $pp; fontsMissing = $miss; thSarabun = $thsb; synapseHost = $syn; install = $inst; slow = $slow }",
+            "$json = [regex]::Replace(($o | ConvertTo-Json -Compress -Depth 4), '[^\\x00-\\x7F]', { param($c) '\\u{0:x4}' -f [int][char]$c.Value })",
+            "Write-Output ('SCP_HEALTH:' + $json)"
         ]).join('\r\n');
     }
 
@@ -434,7 +438,10 @@
         if (d.pendingReboot) add(SYS, 'warn', t('Updates are waiting for a restart', 'มีอัปเดตรอรีสตาร์ท'));
         if (d.lastUpdateDays > 60) add(SYS, 'warn', t('Last update ', 'อัปเดตล่าสุด ') + d.lastUpdateDays + t(' days ago', ' วันก่อน'), t('Windows Update may be stuck.', 'Windows Update อาจค้าง ควรตรวจ'));
         else if (d.lastUpdateDays >= 0) add(SYS, 'ok', t('Last update ', 'อัปเดตล่าสุด ') + d.lastUpdateDays + t(' days ago', ' วันก่อน'));
-        if (d.crashes14d > 0) add(SYS, 'bad', t('Unexpected shutdowns: ', 'ดับ/ค้างผิดปกติ ') + d.crashes14d + t(' in 14 days', ' ครั้งใน 14 วัน'), t('Check power, UPS and heat; a blue screen also counts.', 'ตรวจไฟ/ปลั๊ก/UPS และความร้อน (รวมจอฟ้า)'));
+        // Power cut without shutting down is routine at the end of the day here, so it is only noted;
+        // a blue screen is a real fault.
+        if (d.bsod14d > 0) add(SYS, 'bad', t('Blue screens: ', 'จอฟ้า (Windows ล่ม) ') + d.bsod14d + t(' in 14 days', ' ครั้งใน 14 วัน'), t('Usually a driver, RAM or the disk: check drivers and run a memory test.', 'มักเกิดจากไดรเวอร์ แรม หรือดิสก์ — ตรวจไดรเวอร์และทดสอบแรม'));
+        if (d.crashes14d > 0) add(SYS, 'info', t('Switched off without shutting down: ', 'ปิดเครื่องโดยไม่ได้สั่ง Shut down ') + d.crashes14d + t(' times in 14 days', ' ครั้งใน 14 วัน'), t('Power cut, power button held, or the power strip switched off. Frequent cuts during working hours point to the UPS.', 'ไฟดับ กดปุ่มค้าง หรือปิดสวิตช์ปลั๊กพ่วง ถ้าเกิดบ่อยระหว่างเวลาทำงานให้ตรวจ UPS'));
         if (d.errors24h > 50) add(SYS, 'bad', t('System errors (24 h): ', 'Error ในระบบ 24 ชม.: ') + d.errors24h);
         else if (d.errors24h > 10) add(SYS, 'warn', t('System errors (24 h): ', 'Error ในระบบ 24 ชม.: ') + d.errors24h);
         (d.stoppedServices || []).forEach(function (s) { add(SYS, 'bad', t('Service stopped: ', 'บริการหยุดทำงาน: ') + s, '', [{ label: t('Start', 'เปิดบริการ'), action: 'svc_start', arg: s }]); });
@@ -684,7 +691,7 @@
         if (free.length > 1) row(t('Drive C: free', 'ที่ว่างไดรฟ์ C:'), free, full !== null && full < 60 ? '#dc2626' : '#168065',
             free[free.length - 1] + ' GB' + (full !== null ? (full < 60 ? t(' · full in ~', ' · จะเต็มในอีก ~') + full + t(' days', ' วัน') : '') : t(' · steady', ' · คงที่')));
         var crash = entries.map(function (e) { return e.crashes14d || 0; });
-        if (crash.some(function (v) { return v > 0; })) row(t('Unexpected shutdowns (14 d)', 'ดับ/ค้างผิดปกติ (14 วัน)'), crash, '#dc2626',
+        if (crash.some(function (v) { return v > 0; })) row(t('Switched off without shut-down (14 d)', 'ปิดโดยไม่ได้ Shut down (14 วัน)'), crash, '#d97706',
             crash[crash.length - 1] > crash[0] ? t('rising: check UPS / power', 'เพิ่มขึ้น: ตรวจ UPS / ไฟ') : '');
         var ram = entries.map(function (e) { return e.ramPct || 0; });
         row(t('Memory in use', 'แรมที่ใช้'), ram, '#568acc', ram[ram.length - 1] + '%');

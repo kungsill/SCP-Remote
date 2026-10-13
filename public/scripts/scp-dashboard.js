@@ -3933,6 +3933,34 @@
     }
 
     /* ---- Morning summary: one page for the start of the day ---- */
+    // The heading buttons arrive one feature at a time; sort them into labelled rows so the
+    // page reads as "look after computers / reports / budget" instead of a pile. Matched by
+    // label so a button added later still lands somewhere (anything unknown goes last).
+    function groupHeadingActions(actions) {
+        var groups = [
+            { label: thai ? '🧰 ดูแลเครื่อง' : '🧰 Care', order: [/งานช่างค้าง|Work waiting/, /ตรวจสุขภาพทุกเครื่อง|Health check all/, /สุขภาพดิสก์|Disk health/, /เครื่องพิมพ์ทั้ง|All printers/, /ฟอนต์ไทย|Thai fonts/, /แจ้งซ่อม|Repairs/, /คลังไดรเวอร์|Driver library/] },
+            { label: thai ? '📊 รายงาน' : '📊 Reports', order: [/สรุปประจำวัน|Daily summary/, /รายงานและชาร์ต|Reports & Print/, /ออกรายงานการใช้งาน|usage/i, /ออกรายการครุภัณฑ์|inventory|CSV/i, /QR/] },
+            { label: thai ? '💰 งบและประเมิน' : '💰 Budget', order: [/คลังราคากลาง|Reference prices/, /เกณฑ์ประเมิน|Criteria/, /ตรวจเครื่อง \(|Check type/] }
+        ];
+        var loose = Array.prototype.slice.call(actions.children);
+        var tools = element('div', 'scp-dash-action-tools');
+        loose.forEach(function (b) { if (/รีเฟรช|Refresh/i.test(b.textContent) || b.classList.contains('scp-dash-live')) tools.appendChild(b); });
+        var rows = groups.map(function (g) {
+            var row = element('div', 'scp-dash-action-group');
+            row.appendChild(element('span', 'scp-dash-action-label', g.label));
+            g.order.forEach(function (re) {
+                loose.forEach(function (b) { if (!b.parentNode || b.parentNode === actions) { if (re.test(b.textContent)) row.appendChild(b); } });
+            });
+            return row;
+        });
+        var rest = loose.filter(function (b) { return b.parentNode === actions; });
+        if (rest.length) { var other = element('div', 'scp-dash-action-group'); other.appendChild(element('span', 'scp-dash-action-label', thai ? 'อื่น ๆ' : 'Other')); rest.forEach(function (b) { other.appendChild(b); }); rows.push(other); }
+        actions.classList.add('grouped');
+        actions.appendChild(tools);
+        rows.forEach(function (r) { if (r.children.length > 1) actions.appendChild(r); });
+        var first = rows[0].children[1];
+        if (first && /งานช่างค้าง|Work waiting/.test(first.textContent)) first.classList.add('scp-dash-action-main');
+    }
     function openMorningSummary() {
         var list = allNodes();
         var online = list.filter(isOnline);
@@ -4392,6 +4420,7 @@
         var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);
             actions.appendChild(button(thai ? '🧰 งานช่างค้างทั้ง รพ.' : '🧰 Work waiting', 'scp-dash-refresh', function () { window.ScpHealth.openBacklog(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '💽 สุขภาพดิสก์ทั้ง รพ.' : '💽 Disk health', 'scp-dash-refresh', function () { window.ScpHealth.openDisks(allNodes(), overlayDialog); }));
+        groupHeadingActions(actions);
         heading.appendChild(actions);
         liveHint = element('p', 'scp-dash-live-hint');
         heading.appendChild(liveHint);

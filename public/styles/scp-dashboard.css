@@ -2158,3 +2158,12 @@ body.scp-map-full-open {
 @media (max-width: 700px) { .scp-health-trend-row { grid-template-columns: 1fr; } }
 .scp-health-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
 .scp-health-fleet-row.slow { border-color: #fca5a5; background: #fff7f7; }
+
+/* heading buttons sorted into labelled rows: care / reports / budget */
+.scp-dash-heading-actions.grouped { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; max-width: 640px; }
+.scp-dash-action-tools { display: flex; justify-content: flex-end; gap: 6px; }
+.scp-dash-action-tools:empty { display: none; }
+.scp-dash-action-group { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; padding: 6px 8px; border: 1px solid var(--scp-line); border-radius: 14px; background: var(--scp-surface); }
+.scp-dash-action-label { margin-right: auto; font-size: 13px; font-weight: 800; color: var(--scp-muted, #64748b); white-space: nowrap; }
+.scp-dash-action-main { background: #b02a72 !important; border-color: #b02a72 !important; color: #fff !important; font-weight: 700; }
+@media (max-width: 1150px) { .scp-dash-heading-actions.grouped { max-width: none; } .scp-dash-action-group { justify-content: flex-start; } .scp-dash-action-label { width: 100%; } }

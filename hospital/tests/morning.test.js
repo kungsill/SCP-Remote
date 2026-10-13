@@ -142,3 +142,20 @@ test('after a restart the morning check waits for the computers to reconnect', (
     assert.equal(m.tick(new Date(now.getTime() + 5 * 60 * 1000)), true, 'then it runs');
     assert.equal(runs, 1);
 });
+
+test('the morning summary lists disks to replace, weakest first, and keeps the disk health for the trend', () => {
+    const H = morning.loadHealth();
+    const base = { upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true };
+    const disk = { n: 'WDC WD10EZEX', type: 'HDD', bus: 'SATA', gb: 932, health: 'Healthy', smart: true, wear: 0, temp: 40, poh: 20000, rdErr: 0, realloc: 0, pending: 0, uncorr: 0, reported: 0, crc: 0, life: -1, below: 0, fail: false };
+    const sick = Object.assign({}, base, { disks: [Object.assign({}, disk, { pending: 12, uncorr: 4 })] });
+    const fine = Object.assign({}, base, { disks: [disk] });
+    const s = morning.summarize({ 'node//a': fine, 'node//b': sick }, { 'node//a': 'A', 'node//b': 'การเงิน-1' }, d => H.findings(d), Date.now(), H.diskVerdict);
+    assert.equal(s.disks, 1);
+    const at = s.text.split('\n').findIndex(l => /💽/.test(l));
+    assert.ok(at > 0);
+    assert.match(s.text.split('\n')[at + 1], /การเงิน-1: WDC WD10EZEX 932GB สุขภาพ \d+%/);
+    const snap = morning.snapshot(sick, 1, H.diskVerdict);
+    assert.equal(snap.badSectors, 16);
+    assert.equal(snap.diskPct, 64, "12 waiting (-22) and 4 unreadable (-14)");
+    assert.equal(morning.snapshot(base, 1, H.diskVerdict).diskPct, null, 'older results without disks');
+});

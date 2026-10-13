@@ -39,22 +39,27 @@ function loadHealth() {
 }
 
 // The few numbers worth drawing over time.
-function snapshot(data, at) {
+function snapshot(data, at, diskVerdict) {
     const n = v => (typeof v === 'number' && isFinite(v)) ? v : null;
     const s = data.slow || {};
+    // The weakest disk's health and the bad sectors on it, so a disk going downhill shows as a falling line.
+    const disks = (data.disks || []).filter(k => !/USB/i.test(k.bus)).map(k => ({ k, v: diskVerdict ? diskVerdict(k) : null })).filter(x => x.v);
+    const worst = disks.sort((a, b) => a.v.pct - b.v.pct)[0];
     return { at, freeGb: n(data.freeGb), diskGb: n(data.diskGb), ramPct: n(data.ramPct), upDays: n(data.upDays), crashes14d: n(data.crashes14d), bsod14d: n(data.bsod14d), errors24h: n(data.errors24h), jobs: n(data.jobs), tempMb: n(data.tempMb),
-        hangs7d: n(s.hangs7d), appCrashes7d: n(s.crashes7d), lowMem30d: n(s.lowMem30d), bootSec: n(s.bootSec) };
+        hangs7d: n(s.hangs7d), appCrashes7d: n(s.crashes7d), lowMem30d: n(s.lowMem30d), bootSec: n(s.bootSec),
+        diskPct: worst ? worst.v.pct : null, badSectors: worst ? disks.reduce((t, x) => t + x.v.badSectors, 0) : null };
 }
 
 // One line per computer with something red; amber only counted.
 // Slow or hanging computers lead the summary: that is what the hospital asked to hear first.
-function summarize(results, names, findings, when) {
-    const rows = [];
+function summarize(results, names, findings, when, diskVerdict) {
+    const rows = [], disks = [];
     let warnOnly = 0, ok = 0;
     for (const id of Object.keys(results)) {
         const list = findings(results[id]);
         const bad = list.filter(f => f.level === 'bad'), warn = list.filter(f => f.level === 'warn');
         const slow = list.find(f => f.slow);
+        if (diskVerdict) (results[id].disks || []).forEach(k => { if (/USB/i.test(k.bus)) return; const v = diskVerdict(k); if (v.level !== 'ok' && (v.level === 'bad' || v.badSectors)) disks.push({ name: names[id] || id, pct: v.pct, disk: k.n + ' ' + k.gb + 'GB', why: v.reasons.join(' · ') }); });
         if (bad.length) rows.push({ nodeid: id, name: names[id] || id, bad: bad.map(f => f.title), warn: warn.length, slow: slow ? slow.detail : null });
         else if (warn.length) warnOnly++;
         else ok++;
@@ -68,9 +73,15 @@ function summarize(results, names, findings, when) {
         slowRows.slice(0, 10).forEach(r => lines.push('• ' + r.name + ': ' + r.slow));
         if (slowRows.length > 10) lines.push('… และอีก ' + (slowRows.length - 10) + ' เครื่อง');
     }
+    if (disks.length) {
+        disks.sort((a, b) => a.pct - b.pct);
+        lines.push('💽 ดิสก์ควรเปลี่ยน/มี bad sector:');
+        disks.slice(0, 10).forEach(x => lines.push('• ' + x.name + ': ' + x.disk + ' สุขภาพ ' + x.pct + '%' + (x.why ? ' (' + x.why + ')' : '')));
+        if (disks.length > 10) lines.push('… และอีก ' + (disks.length - 10) + ' ลูก');
+    }
     other.slice(0, 15).forEach(r => lines.push('🔴 ' + r.name + ': ' + r.bad.slice(0, 3).join(' · ')));
     if (other.length > 15) lines.push('… และอีก ' + (other.length - 15) + ' เครื่อง (ดูในแดชบอร์ด)');
-    return { at: when, checked: Object.keys(results).length, ok, warn: warnOnly, slow: slowRows.length, problems: rows, text: lines.join('\n') };
+    return { at: when, checked: Object.keys(results).length, ok, warn: warnOnly, slow: slowRows.length, disks: disks.length, problems: rows, text: lines.join('\n') };
 }
 
 function post(url, body, headers) {
@@ -162,7 +173,7 @@ function CreateScpMorning(parent) {
                     const at = Date.now(), dom = domainId || job.domains[nodeid] || '';
                     setRow({ _id: 'scphealth/' + nodeid, type: 'scphealth', domain: dom, nodeid, data, updated: at, by: 'scp-morning' });
                     getRow('scphealthhist/' + nodeid).then(before => {
-                        const entries = ((before && before.entries) || []).concat([snapshot(data, at)]).slice(-HISTORY_KEEP);
+                        const entries = ((before && before.entries) || []).concat([snapshot(data, at, obj.health && obj.health.diskVerdict)]).slice(-HISTORY_KEEP);
                         return setRow({ _id: 'scphealthhist/' + nodeid, type: 'scphealthhist', domain: dom, nodeid, entries, updated: at });
                     });
                 }
@@ -180,7 +191,7 @@ function CreateScpMorning(parent) {
         const ids = Object.keys(job.results);
         Promise.all(ids.map(id => getRow(id))).then(nodes => {
             nodes.forEach((n, i) => { job.names[ids[i]] = (n && n.name) || ids[i].split('/').pop(); });
-            const summary = summarize(job.results, job.names, d => obj.health.findings(d), Date.now());
+            const summary = summarize(job.results, job.names, d => obj.health.findings(d), Date.now(), obj.health.diskVerdict);
             summary.noAnswer = Object.keys(job.pending).length;
             summary.reason = job.reason;
             const domains = Array.from(new Set(ids.map(id => job.domains[id] || '').concat([''])));

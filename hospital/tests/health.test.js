@@ -118,3 +118,47 @@ test('the fix log never sends a field called "action" (it would replace the scpo
     // the same trap for every request the health module makes
     for (const m of src.matchAll(/ScpOperations\.request\('(\w+)', \{([^}]*)\}/g)) assert.doesNotMatch(m[2], /\baction\s*:/, m[1]);
 });
+
+test('disk health: one percentage per disk, bad sectors cost the most, a failing disk is capped at 10%', () => {
+    // read from real disks (the server PC, 2026-10-13)
+    const samsung = { n: 'Samsung SSD 870 QVO 2TB', type: 'SSD', bus: 'SATA', gb: 1863, health: 'Healthy', smart: true, wear: 0, temp: -1, poh: 6891, rdErr: -1, realloc: 0, pending: -1, uncorr: -1, reported: 0, crc: 0, life: 99, lifeId: 177, below: 0, fail: false };
+    const oldHdd = { n: 'WDC WD10EZEX-08M2NA0', type: 'HDD', bus: 'SATA', gb: 932, health: 'Healthy', smart: true, wear: 0, temp: 50, poh: 50075, rdErr: 0, realloc: 0, pending: 0, uncorr: 0, reported: -1, crc: 0, life: -1, lifeId: 0, below: 0, fail: false };
+    const nvme = { n: 'Lexar SSD NM620 512GB', type: 'SSD', bus: 'NVMe', gb: 477, health: 'Healthy', smart: false, wear: 0, temp: 44, poh: -1, rdErr: -1, realloc: -1, pending: -1, uncorr: -1, reported: -1, crc: -1, life: -1, lifeId: 0, below: 0, fail: false };
+    assert.deepEqual([H.diskVerdict(samsung).pct, H.diskVerdict(samsung).level], [99, 'ok']);
+    assert.deepEqual([H.diskVerdict(nvme).pct, H.diskVerdict(nvme).level], [100, 'ok']);
+    const old = H.diskVerdict(oldHdd);
+    assert.equal(old.pct, 80, '50,000 hours on: 20 off for age');
+    assert.equal(old.badSectors, 0);
+    assert.equal(old.years, 5.7);
+    // the same disk with sectors waiting to be moved and some unreadable
+    const sick = H.diskVerdict(Object.assign({}, oldHdd, { realloc: 120, pending: 8, uncorr: 3 }));
+    assert.equal(sick.badSectors, 131);
+    assert.equal(sick.level, 'bad');
+    assert.ok(sick.pct < 40, String(sick.pct));
+    assert.match(sick.reasons[0], /bad sector 131/);
+    // a few moved sectors on a young disk: still usable, but flagged
+    const few = H.diskVerdict(Object.assign({}, samsung, { realloc: 2 }));
+    assert.equal(few.level, 'warn');
+    assert.equal(H.diskVerdict(Object.assign({}, samsung, { fail: true })).pct, 10);
+    assert.equal(H.diskVerdict(Object.assign({}, samsung, { below: 1 })).level, 'bad', 'an attribute at its threshold');
+    assert.equal(H.diskVerdict(Object.assign({}, samsung, { life: 35 })).level, 'bad', 'SSD worn out');
+    // seen on a real disk behind a RAID port: SMART 187 at 5,026 is not 'fine'
+    const reads = H.diskVerdict(Object.assign({}, oldHdd, { poh: 12000, reported: 5026 }));
+    assert.deepEqual([reads.pct, reads.level], [70, 'warn']);
+    assert.match(reads.reasons.join(' '), /อ่านข้อมูลพลาด 5026 ครั้ง/);
+    assert.match(old.reasons.join(' '), /อายุมาก/, 'an old disk says why it lost points');
+    // shown per disk in the findings, worst first in the hospital list
+    const f = H.findings({ upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true, disks: [samsung, Object.assign({}, oldHdd, { pending: 8 })] });
+    const disk = f.filter(x => /สุขภาพดิสก์/.test(x.title));
+    assert.equal(disk.length, 2);
+    assert.match(disk[1].title, /^สุขภาพดิสก์ \d+% — WDC/);
+    assert.match(disk[1].detail, /รอย้าย 8/);
+});
+
+test('the disk probe reads every disk, one statement per line', () => {
+    const script = H.healthScript();
+    assert.match(script, /MSStorageDriver_FailurePredictData/);
+    assert.match(script, /Get-StorageReliabilityCounter/);
+    assert.match(script, /disks = \$disks/);
+    for (const line of script.split('\r\n')) assert.ok(!/^\s*[{}]\s*$/.test(line));
+});

@@ -67,6 +67,14 @@
             "$c = Get-CimInstance Win32_LogicalDisk -Filter \"DeviceID='C:'\"",
             "$part = Get-Partition -DriveLetter C | Select-Object -First 1; $pd = Get-PhysicalDisk | Where-Object { [string]$_.DeviceId -eq [string]$part.DiskNumber } | Select-Object -First 1",
             "$smart = @(Get-CimInstance -Namespace root\\wmi -ClassName MSStorageDriver_FailurePredictStatus | Where-Object { $_.PredictFailure }).Count",
+            // Every physical disk, not just C:: Windows' own counters plus the raw SMART table
+            // (reallocated / pending / uncorrectable sectors, hours on, temperature, SSD life left).
+            "$dd = @(Get-CimInstance Win32_DiskDrive); $fpd = @(Get-CimInstance -Namespace root\\wmi -ClassName MSStorageDriver_FailurePredictData); $fpt = @(Get-CimInstance -Namespace root\\wmi -ClassName MSStorageDriver_FailurePredictThresholds); $fps = @(Get-CimInstance -Namespace root\\wmi -ClassName MSStorageDriver_FailurePredictStatus)",
+            "function ScpSmart($pnp) { $d = $fpd | Where-Object { $_.InstanceName -like ($pnp + '*') } | Select-Object -First 1; if (-not $d) { return $null }; $v = $d.VendorSpecific; $th = @{}; $t = $fpt | Where-Object { $_.InstanceName -eq $d.InstanceName } | Select-Object -First 1; if ($t) { $tv = $t.VendorSpecific; for ($i = 2; $i -lt 362; $i += 12) { if ($tv[$i]) { $th[[int]$tv[$i]] = [int]$tv[$i + 1] } } }; $r = @{}; for ($i = 2; $i -lt 362; $i += 12) { $id = [int]$v[$i]; if ($id -eq 0) { continue }; $raw = [long]0; for ($b = 5; $b -ge 0; $b--) { $raw = $raw * 256 + [int]$v[$i + 5 + $b] }; $r[$id] = @([int]$v[$i + 3], [int]$v[$i + 4], $raw, [int]$th[$id]) }; return $r }",
+            "function ScpRaw($s, $id) { if ($s -and $s.ContainsKey($id)) { [long]$s[$id][2] } else { -1 } }",
+            "function ScpLife($s) { foreach ($id in 231, 233, 177, 202, 169) { if ($s -and $s.ContainsKey($id) -and $s[$id][0] -le 100 -and $s[$id][0] -gt 0) { return @($s[$id][0], $id) } }; return @(-1, 0) }",
+            "$cdisk = (Get-Partition -DriveLetter C | Select-Object -First 1).DiskNumber",
+            "$disks = @(Get-PhysicalDisk | Sort-Object { [int]$_.DeviceId } | ForEach-Object { $p = $_; $w = $dd | Where-Object { $_.Index -eq [int]$p.DeviceId } | Select-Object -First 1; $rc = $p | Get-StorageReliabilityCounter; $s = if ($w) { ScpSmart $w.PNPDeviceID } else { $null }; $lf = ScpLife $s; $below = if ($s) { @($s.Keys | Where-Object { $s[$_][3] -gt 0 -and $s[$_][3] -lt 254 -and $s[$_][0] -le $s[$_][3] }).Count } else { 0 }; $fail = [bool]($w -and ($fps | Where-Object { $_.InstanceName -like ($w.PNPDeviceID + '*') -and $_.PredictFailure })); $tmp194 = ScpRaw $s 194; $tmp190 = ScpRaw $s 190; @{ n = [string]$p.FriendlyName; type = [string]$p.MediaType; bus = [string]$p.BusType; gb = [math]::Round($p.Size / 1GB); health = [string]$p.HealthStatus; sys = [bool]([string]$p.DeviceId -eq [string]$cdisk); smart = [bool]$s; wear = if ($rc.Wear -ne $null) { [int]$rc.Wear } else { -1 }; temp = if ($rc.Temperature) { [int]$rc.Temperature } elseif ($tmp194 -ge 0) { [int]($tmp194 -band 255) } elseif ($tmp190 -ge 0) { [int]($tmp190 -band 255) } else { -1 }; poh = if ($rc.PowerOnHours) { [int]$rc.PowerOnHours } elseif ((ScpRaw $s 9) -ge 0) { [int]((ScpRaw $s 9) -band 0xFFFFFFFF) } else { -1 }; rdErr = if ($rc.ReadErrorsUncorrected -ne $null) { [int]$rc.ReadErrorsUncorrected } else { -1 }; realloc = ScpRaw $s 5; pending = ScpRaw $s 197; uncorr = ScpRaw $s 198; reported = ScpRaw $s 187; crc = ScpRaw $s 199; life = $lf[0]; lifeId = $lf[1]; below = $below; fail = $fail } })",
             "$bad = @(Get-CimInstance Win32_PnPEntity | Where-Object { $_.ConfigManagerErrorCode -ne 0 -and $_.ConfigManagerErrorCode -ne 22 } | Select-Object -First 6 | ForEach-Object { [string]$_.Name })",
             "$ev = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Level = 1, 2; StartTime = (Get-Date).AddDays(-1) } -MaxEvents 500).Count",
             // One unexpected shutdown leaves both a 41 and a 6008, so only 41 is counted. Blue screens
@@ -129,7 +137,7 @@
             "$wd = Get-Service WinDefend -ErrorAction SilentlyContinue; $wu = Get-Service wuauserv -ErrorAction SilentlyContinue",
             "$edge = (Test-Path (${env:ProgramFiles(x86)} + '\\Microsoft\\Edge\\Application\\msedge.exe')) -or (Test-Path ($env:ProgramFiles + '\\Microsoft\\Edge\\Application\\msedge.exe'))",
             "$inst = @{ bypass = @($labOn); moSetup = $moSet; unattendBypass = (@($unat).Count -gt 0); brand = $brand; ident = $ident.Substring(0, [math]::Min(160, $ident.Length)); noDefender = (-not $wd); noUpdate = (-not $wu); updateDisabled = [bool]($wu -and $wu.StartType -eq 'Disabled'); noEdge = (-not $edge); installDate = [string]$cv.InstallDate }",
-            "$o = @{ v = 1; os = [string]$os.Caption; build = [string]$os.BuildNumber; user = $uname; upDays = $up; pendingReboot = [bool]$pend; lastUpdateDays = $lu; ramGb = $ramT; ramPct = $ramU; cpu = $cpu; freeGb = [math]::Round($c.FreeSpace / 1GB, 1); diskGb = [math]::Round($c.Size / 1GB, 1); diskType = [string]$pd.MediaType; diskHealth = [string]$pd.HealthStatus; smart = $smart; badDevices = $bad; errors24h = $ev; crashes14d = $crash; bsod14d = $bsod; adapters = $ad; ip = $ip; gw = $gw; gwOk = $gwOk; dnsOk = $dnsOk; netOk = $netOk; spooler = [string]$sp.Status; printers = $prn; jobs = $pj.Count; oldestJobMin = $old; scpprint = $spp; stoppedServices = $svc; startup = @($st | Select-Object -First 40); top = $top; tempMb = $tmp; power = $pp; fontsMissing = $miss; thSarabun = $thsb; synapseHost = $syn; install = $inst; slow = $slow }",
+            "$o = @{ v = 1; os = [string]$os.Caption; build = [string]$os.BuildNumber; user = $uname; upDays = $up; pendingReboot = [bool]$pend; lastUpdateDays = $lu; ramGb = $ramT; ramPct = $ramU; cpu = $cpu; freeGb = [math]::Round($c.FreeSpace / 1GB, 1); diskGb = [math]::Round($c.Size / 1GB, 1); diskType = [string]$pd.MediaType; diskHealth = [string]$pd.HealthStatus; smart = $smart; disks = $disks;badDevices = $bad; errors24h = $ev; crashes14d = $crash; bsod14d = $bsod; adapters = $ad; ip = $ip; gw = $gw; gwOk = $gwOk; dnsOk = $dnsOk; netOk = $netOk; spooler = [string]$sp.Status; printers = $prn; jobs = $pj.Count; oldestJobMin = $old; scpprint = $spp; stoppedServices = $svc; startup = @($st | Select-Object -First 40); top = $top; tempMb = $tmp; power = $pp; fontsMissing = $miss; thSarabun = $thsb; synapseHost = $syn; install = $inst; slow = $slow }",
             "$json = [regex]::Replace(($o | ConvertTo-Json -Compress -Depth 4), '[^\\x00-\\x7F]', { param($c) '\\u{0:x4}' -f [int][char]$c.Value })",
             "Write-Output ('SCP_HEALTH:' + $json)"
         ]).join('\r\n');
@@ -269,7 +277,6 @@
         if (!f || f.finished) return;
         f.finished = true;
         clearTimeout(f.timer);
-        save(f.got.map(function (nodeid) { return { nodeid: nodeid, data: results[nodeid].data }; }));
         if (f.done) f.done(f);
     }
 
@@ -352,7 +359,9 @@
                 jobs[m.nodeid] = { state: 'failed', text: /COMMAND_BUSY/.test(text) ? t('The computer is busy with another command', 'เครื่องกำลังทำคำสั่งอื่นอยู่') : t('No result', 'ไม่ได้ผลตรวจ') };
             }
             if (fleet && fleet.ticket === id) {
-                if (fleet.pending[m.nodeid]) { delete fleet.pending[m.nodeid]; if (results[m.nodeid] && jobs[m.nodeid].state === 'done') fleet.got.push(m.nodeid); else fleet.failed++; }
+                // Saved as each computer answers, not when the last one does: leaving the page
+                // while one computer is slow used to throw away every other answer.
+                if (fleet.pending[m.nodeid]) { delete fleet.pending[m.nodeid]; if (results[m.nodeid] && jobs[m.nodeid].state === 'done') { fleet.got.push(m.nodeid); save([{ nodeid: m.nodeid, data: results[m.nodeid].data }]); } else fleet.failed++; }
                 if (fleet.onProgress) fleet.onProgress(fleet);
                 if (!Object.keys(fleet.pending).length) finishFleet();
             } else {
@@ -428,6 +437,48 @@
         return { reasons: reasons, advice: advice };
     }
     // Minutes as something a person reads: 45 min, 6 hours, 782 days.
+    // How healthy one disk is, as a single percentage the staff can compare.
+    // Start from what is left of its life: an SSD reports that itself (SMART 231/233/177/202/169,
+    // or Windows' wear counter); a spinning disk is counted down after 30,000 hours on (~3.5 years
+    // running all day). Bad sectors then take it down: ones already swapped for spares (5), ones
+    // waiting to be swapped (197) and ones that could not be read at all (198) cost more each.
+    // Windows or SMART saying it is about to fail caps it at 10%.
+    function diskVerdict(k) {
+        var n = function (v) { return typeof v === 'number' && v > 0 ? v : 0; };
+        var ssd = /SSD/i.test(k.type) || /NVMe/i.test(k.bus);
+        var life = 100, reasons = [];
+        if (ssd && k.life > 0) life = k.life;
+        if (ssd && k.wear > 0) life = Math.min(life, 100 - k.wear);
+        if (!ssd && k.poh > 30000) life -= Math.min(30, Math.floor((k.poh - 30000) / 1000));
+        var pct = life;
+        if (n(k.realloc)) pct -= Math.min(30, 5 + Math.floor(k.realloc / 10));
+        if (n(k.pending)) pct -= Math.min(30, 10 + k.pending);
+        if (n(k.uncorr)) pct -= Math.min(30, 10 + k.uncorr);
+        if (n(k.reported)) pct -= Math.min(30, 5 + k.reported);
+        if (n(k.rdErr)) pct -= Math.min(15, 2 + k.rdErr);
+        if (/Warning/i.test(k.health)) pct = Math.min(pct, 50);
+        var failing = !!k.fail || n(k.below) > 0 || /Unhealthy/i.test(k.health);
+        if (failing) pct = Math.min(pct, 10);
+        pct = Math.max(0, Math.min(100, Math.round(pct)));
+        var badSectors = n(k.realloc) + n(k.pending) + n(k.uncorr);
+        var hot = k.temp >= (ssd ? 70 : 55);
+        if (badSectors) reasons.push(t('bad sectors ', 'bad sector ') + badSectors + ' (' + [n(k.realloc) ? t('moved ', 'ย้ายแล้ว ') + k.realloc : '', n(k.pending) ? t('waiting ', 'รอย้าย ') + k.pending : '', n(k.uncorr) ? t('unreadable ', 'อ่านไม่ได้ ') + k.uncorr : ''].filter(Boolean).join(', ') + ')');
+        if (failing) reasons.push(t('Windows/SMART predicts failure', 'Windows/SMART เตือนว่าใกล้เสีย'));
+        if (n(k.reported) || n(k.rdErr)) reasons.push(t('read errors ', 'อ่านข้อมูลพลาด ') + Math.max(n(k.reported), n(k.rdErr)) + t(' times', ' ครั้ง'));
+        if (!ssd && k.poh > 30000) reasons.push(t('old: spinning disks often fail after ~5 years', 'อายุมาก: ดิสก์จานหมุนมักเริ่มเสียหลัง ~5 ปี'));
+        if (n(k.crc)) reasons.push(t('cable errors ', 'สายข้อมูลมีปัญหา ') + k.crc + t(' (check the SATA cable)', ' ครั้ง (ลองเปลี่ยนสาย SATA)'));
+        if (hot) reasons.push(t('hot ', 'ร้อน ') + k.temp + '°C');
+        var level = (failing || pct < 40) ? 'bad' : (pct < 80 || badSectors > 0 || n(k.reported) > 0 || hot) ? 'warn' : 'ok';
+        return { pct: pct, level: level, ssd: ssd, badSectors: badSectors, years: k.poh > 0 ? Math.round(k.poh / 876) / 10 : null, known: !!k.smart || k.wear >= 0, reasons: reasons };
+    }
+    function diskLine(k, v) {
+        var parts = [v.badSectors ? '' : t('no bad sectors', 'ไม่มี bad sector')];
+        if (v.years != null) parts.push(t('on for ', 'เปิดใช้มาแล้ว ') + v.years + t(' years', ' ปี'));
+        if (k.temp > 0) parts.push(k.temp + '°C');
+        if (v.ssd && (k.life > 0 || k.wear > 0)) parts.push(t('SSD life left ', 'อายุ SSD เหลือ ') + (k.life > 0 ? k.life : 100 - k.wear) + '%');
+        if (!v.known) parts.push(t('SMART not readable: estimate from Windows only', 'อ่าน SMART ไม่ได้ ประเมินจาก Windows อย่างเดียว'));
+        return v.reasons.concat(parts.filter(Boolean)).join(' · ');
+    }
     function age(min) {
         if (min < 120) return min + t(' min', ' นาที');
         if (min < 2880) return Math.round(min / 60) + t(' hours', ' ชั่วโมง');
@@ -468,7 +519,12 @@
         if (freePct < 10) add(HW, 'bad', t('Drive C: ', 'ไดรฟ์ C: เหลือ ') + d.freeGb + ' GB (' + freePct + '%)', '', cleanFix);
         else if (freePct < 20) add(HW, 'warn', t('Drive C: ', 'ไดรฟ์ C: เหลือ ') + d.freeGb + ' GB (' + freePct + '%)', '', cleanFix);
         else add(HW, 'ok', t('Drive C: ', 'ไดรฟ์ C: เหลือ ') + d.freeGb + ' GB (' + freePct + '%)');
-        if (d.smart > 0 || (d.diskHealth && !/^Healthy$/i.test(d.diskHealth) && !/Unknown/i.test(d.diskHealth))) add(HW, 'bad', t('Disk is failing', 'ดิสก์เริ่มเสีย'), t('Back up now and replace it.', 'สำรองข้อมูลด่วนแล้วเปลี่ยนดิสก์'));
+        (d.disks || []).forEach(function (k) {
+            var v = diskVerdict(k), name = (k.sys ? 'C: ' : '') + k.n + ' ' + k.gb + 'GB ' + (v.ssd ? 'SSD' : 'HDD');
+            var advice = v.level === 'bad' ? t(' Back up now and replace this disk.', ' สำรองข้อมูลด่วนแล้วเปลี่ยนดิสก์') : v.badSectors ? t(' Back up and watch whether the count grows.', ' สำรองข้อมูลไว้ และดูว่าจำนวนเพิ่มขึ้นไหม') : '';
+            add(HW, v.level, t('Disk health ', 'สุขภาพดิสก์ ') + v.pct + '% — ' + name, diskLine(k, v) + advice);
+        });
+        if (!d.disks && (d.smart > 0 || (d.diskHealth && !/^Healthy$/i.test(d.diskHealth) && !/Unknown/i.test(d.diskHealth)))) add(HW, 'bad', t('Disk is failing', 'ดิสก์เริ่มเสีย'), t('Back up now and replace it.', 'สำรองข้อมูลด่วนแล้วเปลี่ยนดิสก์'));
         if (/HDD/i.test(d.diskType)) add(HW, 'warn', t('Spinning hard disk (HDD)', 'ใช้ฮาร์ดดิสก์จานหมุน (HDD)'), t('An SSD (~1,500 baht) makes it start and open programs several times faster.', 'เปลี่ยนเป็น SSD (~1,500 บาท) เปิดเครื่องและโปรแกรมเร็วขึ้นหลายเท่า'));
         if ((d.badDevices || []).length) add(HW, 'warn', t('Devices with problems: ', 'อุปกรณ์มีปัญหา: ') + d.badDevices.length, d.badDevices.join(', '));
         // network
@@ -706,6 +762,12 @@
         var crash = entries.map(function (e) { return e.crashes14d || 0; });
         if (crash.some(function (v) { return v > 0; })) row(t('Switched off without shut-down (14 d)', 'ปิดโดยไม่ได้ Shut down (14 วัน)'), crash, '#d97706',
             crash[crash.length - 1] > crash[0] ? t('rising: check UPS / power', 'เพิ่มขึ้น: ตรวจ UPS / ไฟ') : '');
+        var dp = entries.filter(function (e) { return typeof e.diskPct === 'number'; });
+        if (dp.length > 1) {
+            var bs = dp.map(function (e) { return e.badSectors || 0; }), grew = bs[bs.length - 1] > bs[0];
+            row(t('Disk health', 'สุขภาพดิสก์'), dp.map(function (e) { return e.diskPct; }), grew || dp[dp.length - 1].diskPct < 80 ? '#dc2626' : '#168065',
+                dp[dp.length - 1].diskPct + '%' + (grew ? t(' · bad sectors growing: replace soon', ' · bad sector เพิ่มขึ้น: ควรเปลี่ยนเร็ว ๆ นี้') : ''));
+        }
         var ram = entries.map(function (e) { return e.ramPct || 0; });
         row(t('Memory in use', 'แรมที่ใช้'), ram, '#568acc', ram[ram.length - 1] + '%');
         return box;
@@ -823,6 +885,61 @@
         load().then(paintList, paintList);
     }
 
+    // Every disk in the hospital from the last checks, weakest first, so the ones to replace
+    // (or to back up before they go) are at the top. Computers checked before disk health
+    // existed show up after their next check.
+    function openDisks(nodes, overlay) {
+        var d = overlay(t('💽 Disk health across the hospital', '💽 สุขภาพดิสก์ทั้งโรงพยาบาล'));
+        var body = el('div', null, 'scp-extra-body'), chips = el('div', null, 'scp-health-chips'), status = el('p', null, 'scp-health-hint'), table = el('div', null, 'scp-health-fleet');
+        var tools = el('div', null, 'scp-health-chips');
+        body.appendChild(tools); body.appendChild(chips); body.appendChild(status); body.appendChild(table); d.box.appendChild(body);
+        var filter = 'problem';
+        var online_ = (nodes || []).filter(function (n) { return online(n) && windowsAgent(n); });
+        var runBtn = btn(t('Check disks now (', 'ตรวจใหม่ตอนนี้ (') + online_.length + t(' online)', ' เครื่องที่ออนไลน์)'), 'scp-health-btn primary', function () {
+            runBtn.disabled = true;
+            var job = checkAll(online_, function () { runBtn.disabled = false; paintList(); });
+            if (job) job.onProgress = function (f) { status.textContent = t('Answered ', 'ได้คำตอบ ') + f.got.length + ' / ' + f.total + '…'; paintList(true); };
+        });
+        tools.appendChild(runBtn);
+        function rows() {
+            var out = [], waiting = 0;
+            Object.keys(results).forEach(function (id) {
+                var r = results[id], n = nodeById(id);
+                if (!r.data.disks) { waiting++; return; }
+                r.data.disks.forEach(function (k) {
+                    if (/USB/i.test(k.bus)) return; // a flash drive left in is not the computer's disk
+                    out.push({ node: n, nodeid: id, pc: (n && n.name) || id.split('/').pop(), k: k, v: diskVerdict(k), at: r.at });
+                });
+            });
+            out.waiting = waiting;
+            return out;
+        }
+        function paintList(keepStatus) {
+            var all = rows();
+            chips.textContent = '';
+            [['problem', t('Needs attention', 'ควรดู/ควรเปลี่ยน'), function (r) { return r.v.level !== 'ok'; }], ['bad', t('Bad sectors', 'มี bad sector'), function (r) { return r.v.badSectors > 0; }], ['hdd', t('Spinning HDD', 'ยังเป็น HDD'), function (r) { return !r.v.ssd; }], ['all', t('All', 'ทั้งหมด'), function () { return true; }]].forEach(function (c) {
+                chips.appendChild(btn(c[1] + ' (' + all.filter(c[2]).length + ')', 'scp-health-btn' + (filter === c[0] ? ' primary' : ''), function () { filter = c[0]; paintList(); }));
+                if (filter === c[0]) all.show = all.filter(c[2]);
+            });
+            table.textContent = '';
+            var shown = (all.show || all).sort(function (a, b) { return a.v.pct - b.v.pct || String(a.pc).localeCompare(String(b.pc)); });
+            if (!keepStatus) status.textContent = t('From each computer\'s last health check · ', 'จากผลตรวจล่าสุดของแต่ละเครื่อง · ') + all.length + t(' disks', ' ลูก') + (all.waiting ? t(' · ', ' · ') + all.waiting + t(' computers still need a new check to read their disks', ' เครื่องยังไม่มีข้อมูลดิสก์ (กดตรวจใหม่)') : '');
+            if (!shown.length) table.appendChild(el('p', t('Nothing here.', 'ไม่มีรายการ'), 'scp-health-hint'));
+            shown.forEach(function (r) {
+                var row = el('div', null, 'scp-health-row ' + r.v.level);
+                row.appendChild(el('span', null, 'scp-health-dot'));
+                var txt = el('div', null, 'scp-health-txt');
+                txt.appendChild(el('strong', r.v.pct + '% · ' + r.pc + ' — ' + r.k.n + ' ' + r.k.gb + 'GB ' + (r.v.ssd ? 'SSD' : 'HDD') + (r.k.sys ? ' (C:)' : '')));
+                txt.appendChild(el('small', diskLine(r.k, r.v) + ' · ' + new Date(r.at).toLocaleString(th ? 'th-TH' : undefined, { dateStyle: 'short', timeStyle: 'short' })));
+                row.appendChild(txt);
+                if (r.node) row.appendChild(btn(t('Details', 'ดูเครื่อง'), 'scp-health-btn', function () { d.close(); root.showComputerDetailModal(r.node); }));
+                table.appendChild(row);
+            });
+        }
+        status.textContent = t('Loading…', 'กำลังโหลด…');
+        load().then(function () { paintList(); }, function () { paintList(); });
+    }
+
     function openFonts(nodes, overlay) {
         var list = (nodes || []).filter(function (n) { return online(n) && windowsAgent(n); });
         if (!list.length) { root.alert(t('No Windows computer is online right now', 'ตอนนี้ไม่มีเครื่อง Windows ที่ออนไลน์')); return; }
@@ -851,5 +968,5 @@
     // The server runs the same check every morning (hospital/morning-check.js) and hands the font list in itself.
     function setManifest(m) { manifest = m; }
 
-    root.ScpHealth = { setManifest: setManifest, daysUntilFull: daysUntilFull, slowVerdict: slowVerdict, section: section, receive: receive, check: check, fix: fix, openFleet: openFleet, openPrinters: openPrinters, openFonts: openFonts, findings: findings, healthScript: healthScript, FIX: FIX, results: results, load: load };
+    root.ScpHealth = { setManifest: setManifest, daysUntilFull: daysUntilFull, slowVerdict: slowVerdict, section: section, receive: receive, check: check, fix: fix, openFleet: openFleet, openPrinters: openPrinters, openDisks: openDisks, diskVerdict: diskVerdict, openFonts: openFonts, findings: findings, healthScript: healthScript, FIX: FIX, results: results, load: load };
 }(window));

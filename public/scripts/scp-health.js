@@ -436,7 +436,6 @@
         if (!advice.length) advice.push(t('look at the programs listed', 'ตรวจโปรแกรมที่ระบุ'));
         return { reasons: reasons, advice: advice };
     }
-    // Minutes as something a person reads: 45 min, 6 hours, 782 days.
     // How healthy one disk is, as a single percentage the staff can compare.
     // Start from what is left of its life: an SSD reports that itself (SMART 231/233/177/202/169,
     // or Windows' wear counter); a spinning disk is counted down after 30,000 hours on (~3.5 years
@@ -485,6 +484,7 @@
         if (!v.known) parts.push(t('SMART not readable: estimate from Windows only', 'อ่าน SMART ไม่ได้ ประเมินจาก Windows อย่างเดียว'));
         return v.reasons.concat(parts.filter(Boolean)).join(' · ');
     }
+    // Minutes as something a person reads: 45 min, 6 hours, 782 days.
     function age(min) {
         if (min < 120) return min + t(' min', ' นาที');
         if (min < 2880) return Math.round(min / 60) + t(' hours', ' ชั่วโมง');
@@ -596,6 +596,111 @@
         return out;
     }
 
+    /* ---------- the technician's work order: what to do on this computer, most urgent first ---------- */
+    // The findings say what is wrong; this says what to do about it, in the order to do it, with
+    // the part and a rough price when one is needed, and whether it can be done from here or
+    // someone has to go to the computer. 1 = now (data at risk or people cannot work),
+    // 2 = soon, 3 = plan it (upgrade or tidy-up).
+    var PRICE = { ssd: 1500, ram8: 1200 };
+    function workOrder(d) {
+        var out = [];
+        var task = function (pri, title, why, o) { out.push(Object.assign({ pri: pri, title: title, why: why || '', steps: [], fix: null, part: null, onsite: false }, o || {})); };
+        var own = ownDisks(d.disks), sysHdd = false;
+        own.forEach(function (k, i) {
+            var v = diskVerdict(k), name = (own.length > 1 ? t('disk ', 'ลูกที่ ') + (i + 1) + ' ' : '') + k.n + ' ' + k.gb + 'GB' + (k.sys ? ' (C:)' : '');
+            if (k.sys && !v.ssd) sysHdd = true;
+            if (v.level === 'bad') task(1, t('Replace ', 'เปลี่ยนดิสก์ ') + name, t('Health ', 'สุขภาพ ') + v.pct + '% · ' + v.reasons.join(' · '), {
+                steps: [t('Back up the data on it today', 'สำรองข้อมูลในลูกนี้ออกวันนี้'), k.sys ? t('Fit an SSD and reinstall or clone Windows', 'ใส่ SSD ใหม่ แล้วลง Windows ใหม่หรือโคลนจากลูกเดิม') : t('Fit a new disk and copy the data back', 'ใส่ดิสก์ใหม่ แล้วคืนข้อมูลกลับ')],
+                part: { name: 'SSD ' + (k.gb > 300 ? '512GB' : '256GB'), baht: PRICE.ssd }, onsite: true });
+            else if (v.badSectors) task(2, t('Back up ', 'สำรองข้อมูลจาก') + name + t(' and watch it', ' แล้วเฝ้าดู'), v.reasons.join(' · '), { steps: [t('Copy important files off it', 'ก๊อปไฟล์สำคัญออก'), t('If bad sectors grow on the next check, replace it', 'ถ้า bad sector เพิ่มในการตรวจครั้งหน้า ให้เปลี่ยน')] });
+            else if (v.level === 'warn') task(3, t('Plan to replace ', 'วางแผนเปลี่ยน ') + name, t('Health ', 'สุขภาพ ') + v.pct + '% · ' + v.reasons.join(' · '), { part: { name: 'SSD', baht: PRICE.ssd }, onsite: true });
+        });
+        if (!d.disks && (d.smart > 0 || (d.diskHealth && !/^Healthy$|Unknown/i.test(d.diskHealth)))) task(1, t('Replace the disk', 'เปลี่ยนดิสก์'), t('Windows says the disk is failing', 'Windows แจ้งว่าดิสก์ใกล้เสีย'), { part: { name: 'SSD', baht: PRICE.ssd }, onsite: true });
+        if (d.bsod14d > 0) task(1, t('Find the cause of the blue screens', 'หาสาเหตุจอฟ้า'), d.bsod14d + t(' in 14 days', ' ครั้งใน 14 วัน'), { steps: [t('Update or roll back the newest driver', 'อัปเดต/ย้อนไดรเวอร์ตัวล่าสุด'), t('Run Windows Memory Diagnostic', 'รัน Windows Memory Diagnostic ทดสอบแรม'), t('Check the disk health above', 'ดูสุขภาพดิสก์ด้านบน')], onsite: true });
+        (d.stoppedServices || []).forEach(function (s) { task(1, t('Start the service ', 'เปิดบริการ ') + s, t('It is set to start but is stopped', 'ตั้งให้ทำงานแต่หยุดอยู่'), { fix: { label: t('Start', 'เปิดบริการ'), action: 'svc_start', arg: s } }); });
+        if (/^169\.254\./.test(d.ip || '') || !(d.adapters || []).length) task(1, t('Fix the network connection', 'แก้การเชื่อมต่อเครือข่าย'), d.ip ? t('Self-assigned IP ', 'ได้ IP อัตโนมัติ ') + d.ip : t('No network adapter connected', 'ไม่พบการ์ดแลนที่เชื่อมต่อ'), { steps: [t('Check the cable and the switch port', 'ตรวจสายแลนและพอร์ตสวิตช์')], onsite: true });
+        else if (d.dnsOk === false) task(1, t('Fix name lookups (DNS)', 'แก้ DNS'), t('Web and server names do not resolve', 'แปลงชื่อเว็บ/เซิร์ฟเวอร์ไม่ได้'), { fix: { label: t('Flush DNS', 'ล้าง DNS'), action: 'dns_flush' } });
+        if (d.spooler && d.spooler !== 'Running') task(1, t('Restart printing', 'เปิด Print Spooler'), 'Print Spooler ' + d.spooler, { fix: { label: t('Restart spooler', 'รีสตาร์ท Spooler'), action: 'spooler_restart' } });
+        else if (d.jobs > 0 && d.oldestJobMin >= 5) task(1, t('Clear stuck printing', 'ล้างงานพิมพ์ค้าง'), d.jobs + t(' jobs, oldest ', ' งาน นานสุด ') + age(d.oldestJobMin), { fix: { label: t('Fix printing', 'แก้ปริ้นไม่ออก'), action: 'printer_fix' } });
+        if (d.scpprint && d.scpprint.installed && !d.scpprint.running) task(1, t('Start SCPPrint', 'เปิด SCPPrint'), t('Other computers print through it', 'เครื่องอื่นปริ้นผ่านเครื่องนี้'), { onsite: true });
+        var freePct = d.diskGb ? Math.round(d.freeGb / d.diskGb * 100) : 100;
+        if (freePct < 20) task(freePct < 10 ? 1 : 2, t('Free up drive C:', 'เคลียร์พื้นที่ไดรฟ์ C:'), t('Free ', 'เหลือ ') + d.freeGb + ' GB (' + freePct + '%)', { fix: root.ScpCleanup ? { label: t('Clean temp files', 'ล้างไฟล์ชั่วคราว'), cleanup: true } : null });
+        var sv = slowVerdict(d);
+        if (sv) task(1, t('Sort out the slowness', 'แก้เครื่องค้าง/ช้า'), sv.reasons.join(' · '), { steps: sv.advice });
+        if (d.ramGb && d.ramGb <= 4.5) task(sv || d.ramPct >= 80 ? 2 : 3, t('Add RAM to 8 GB', 'เพิ่มแรมเป็น 8 GB'), t('Has ', 'มี ') + d.ramGb + t(' GB, ', ' GB ใช้อยู่ ') + d.ramPct + '%', { part: { name: 'RAM 8GB', baht: PRICE.ram8 }, onsite: true });
+        if (sysHdd || (!d.disks && /HDD/i.test(d.diskType))) task(sv ? 2 : 3, t('Swap the Windows disk for an SSD', 'เปลี่ยนดิสก์ Windows (C:) เป็น SSD'), t('A spinning disk is the slowest part of this computer', 'ดิสก์จานหมุนคือส่วนที่ช้าที่สุดของเครื่อง'), { part: { name: 'SSD 256GB', baht: PRICE.ssd }, onsite: true });
+        if ((d.badDevices || []).length) task(2, t('Install missing drivers', 'ลงไดรเวอร์ที่ขาด/มีปัญหา'), d.badDevices.join(', '), { steps: [t('Look in the driver library', 'ดูใน คลังไดรเวอร์'), t('or the maker\'s site by model', 'หรือเว็บผู้ผลิตตามรุ่นเครื่อง')] });
+        if (d.upDays >= 14 || d.pendingReboot) task(2, t('Restart the computer', 'รีสตาร์ทเครื่อง'), [d.upDays >= 14 ? t('on for ', 'เปิดต่อเนื่อง ') + Math.floor(d.upDays) + t(' days', ' วัน') : '', d.pendingReboot ? t('updates are waiting', 'มีอัปเดตรอรีสตาร์ท') : ''].filter(Boolean).join(' · '), { steps: [t('Ask the user first, at a quiet time', 'แจ้งผู้ใช้ก่อน ทำช่วงว่าง')] });
+        if (d.lastUpdateDays > 60) task(2, t('Check Windows Update', 'ตรวจ Windows Update'), t('Last update ', 'อัปเดตล่าสุด ') + d.lastUpdateDays + t(' days ago', ' วันก่อน'));
+        if (d.errors24h > 50) task(2, t('Look into system errors', 'ตรวจ Error ในระบบ'), d.errors24h + t(' in 24 h (Event Viewer → System)', ' ครั้งใน 24 ชม. (Event Viewer → System)'));
+        (d.printers || []).forEach(function (p) {
+            var st = String(p.status || '');
+            if (/Paused/i.test(st)) task(2, t('Resume printer ', 'ให้เครื่องพิมพ์ทำงานต่อ: ') + p.name, st, { fix: { label: t('Resume', 'ให้ทำงานต่อ'), action: 'printer_resume', arg: p.name } });
+            else if (/Offline|NotAvailable|Error|Jam|PaperOut|DoorOpen|NoToner/i.test(st)) task(2, t('Check printer ', 'ตรวจเครื่องพิมพ์ ') + p.name, st, { steps: [t('Power, cable/network, paper, door', 'ไฟ สาย/เน็ต กระดาษ ฝาเครื่อง')], onsite: true });
+            else if (/TonerLow/i.test(st)) task(3, t('Order toner for ', 'เตรียมหมึกให้ ') + p.name, st, { part: { name: t('Toner for ', 'หมึก ') + p.name, baht: 0 } });
+        });
+        // Switching off at the wall at the end of the day is routine here: a note in the findings, never a task.
+        if ((d.fontsMissing || []).length || d.thSarabun === false) task(3, t('Install Thai fonts', 'ลงฟอนต์ไทย'), (d.fontsMissing || []).length + t(' styles missing', ' แบบที่ยังไม่มี'), { fix: { label: t('Install Thai fonts', 'ติดตั้งฟอนต์ไทย'), action: 'fonts' } });
+        var on = (d.startup || []).filter(function (s) { return s.on; }).length;
+        if (on > 8) task(3, t('Trim start-up programs', 'ลดโปรแกรมเปิดพร้อมเครื่อง'), on + t(' start with Windows', ' ตัว'), { steps: [t('Turn off the ones not needed (list in the health check)', 'ปิดตัวที่ไม่จำเป็น (รายการอยู่ในผลตรวจ)')] });
+        if (d.tempMb >= 2000 && freePct >= 20) task(3, t('Clean temporary files', 'ล้างไฟล์ชั่วคราว'), (d.tempMb / 1024).toFixed(1) + ' GB', { fix: root.ScpCleanup ? { label: t('Clean temp files', 'ล้างไฟล์ชั่วคราว'), cleanup: true } : null });
+        if (/saver|ประหยัด/i.test(String(d.power || ''))) task(3, t('Set power plan to Balanced', 'ตั้งโหมดพลังงานเป็น Balanced'), String(d.power || '').replace(/^.*\(|\).*$/g, ''), { fix: { label: 'Balanced', action: 'power_balanced' } });
+        out.forEach(function (x, i) { x.order = i; });
+        // within a priority the order above stands: data at risk before people who cannot work before the rest
+        out.sort(function (a, b) { return a.pri - b.pri || a.order - b.order; });
+        var baht = out.reduce(function (s, x) { return s + (x.part && x.part.baht || 0); }, 0);
+        return { tasks: out, now: out.filter(function (x) { return x.pri === 1; }).length, soon: out.filter(function (x) { return x.pri === 2; }).length, plan: out.filter(function (x) { return x.pri === 3; }).length, baht: baht, onsite: out.filter(function (x) { return x.onsite; }).length };
+    }
+    var PRI = { 1: ['🔴', t('Now', 'ด่วน')], 2: ['🟡', t('Soon', 'ควรทำเร็ว')], 3: ['🔵', t('Plan', 'วางแผน')] };
+    function baht(n) { return n.toLocaleString('en-US') + t(' baht', ' บาท'); }
+    function workOrderBlock(node, d) {
+        var w = workOrder(d);
+        var box = el('div', null, 'scp-health-wo');
+        var head = el('div', null, 'scp-health-wo-head');
+        head.appendChild(el('h5', '🧰 ' + t('Work order', 'ใบงานช่าง')));
+        if (w.tasks.length) head.appendChild(btn('🖨️ ' + t('Print', 'พิมพ์ใบงาน'), 'scp-health-btn', function () { printWorkOrder(node, d, w); }));
+        box.appendChild(head);
+        if (!w.tasks.length) { box.appendChild(el('p', t('✓ Nothing to do on this computer', '✓ เครื่องนี้ไม่มีงานค้าง'), 'scp-health-sum')); return box; }
+        box.appendChild(el('p', [PRI[1][0] + ' ' + PRI[1][1] + ' ' + w.now, PRI[2][0] + ' ' + PRI[2][1] + ' ' + w.soon, PRI[3][0] + ' ' + PRI[3][1] + ' ' + w.plan].join('   ') +
+            (w.onsite ? t(' · at the computer: ', ' · ต้องไปหน้าเครื่อง ') + w.onsite : '') + (w.baht ? t(' · parts ~', ' · ค่าอะไหล่ประมาณ ') + baht(w.baht) : ''), 'scp-health-hint'));
+        var ol = el('ol', null, 'scp-health-wo-list');
+        w.tasks.forEach(function (x) {
+            var li = el('li', null, 'scp-health-wo-item p' + x.pri);
+            var top = el('div', null, 'scp-health-wo-top');
+            top.appendChild(el('strong', PRI[x.pri][0] + ' ' + x.title));
+            top.appendChild(el('span', x.onsite ? t('at the computer', 'ไปหน้าเครื่อง') : t('from here', 'ทำจากที่นี่ได้'), 'scp-health-wo-where' + (x.onsite ? ' onsite' : '')));
+            li.appendChild(top);
+            if (x.why) li.appendChild(el('small', x.why));
+            if (x.steps.length) li.appendChild(el('small', '→ ' + x.steps.join(' → ')));
+            if (x.part) li.appendChild(el('small', '🔧 ' + x.part.name + (x.part.baht ? t(' · ~', ' · ประมาณ ') + baht(x.part.baht) : '')));
+            if (x.fix) li.appendChild(btn(x.fix.label, 'scp-health-btn', function () {
+                if (x.fix.cleanup) { root.ScpCleanup.run(node); return; }
+                fixOne(node, x.fix.action, x.fix.arg, d);
+            }));
+            ol.appendChild(li);
+        });
+        box.appendChild(ol);
+        return box;
+    }
+    function printWorkOrder(node, d, w) {
+        var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+        var rows = w.tasks.map(function (x, i) {
+            return '<tr><td>' + (i + 1) + '</td><td>' + PRI[x.pri][0] + ' ' + esc(PRI[x.pri][1]) + '</td><td><b>' + esc(x.title) + '</b>' + (x.why ? '<br><small>' + esc(x.why) + '</small>' : '') + (x.steps.length ? '<br><small>→ ' + esc(x.steps.join(' → ')) + '</small>' : '') +
+                '</td><td>' + esc(x.onsite ? t('at the computer', 'หน้าเครื่อง') : t('remote', 'ทางไกล')) + '</td><td>' + (x.part ? esc(x.part.name) + (x.part.baht ? '<br>~' + esc(baht(x.part.baht)) : '') : '') + '</td><td class="box"></td></tr>';
+        }).join('');
+        var html = '<!doctype html><html lang="th"><head><meta charset="utf-8"><title>' + esc(t('Work order ', 'ใบงานช่าง ') + (node.name || '')) + '</title><style>' +
+            'body{font-family:"TH Sarabun New","Sarabun",Tahoma,sans-serif;font-size:16pt;margin:16mm;color:#000}h1{font-size:22pt;margin:0}p{margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:10px}td,th{border:1px solid #444;padding:4px 6px;vertical-align:top;text-align:left}small{font-size:13pt;color:#333}td.box{width:16mm}.sign{margin-top:24px;display:flex;justify-content:space-between}' +
+            '</style></head><body><h1>🧰 ' + esc(t('Work order', 'ใบงานช่าง')) + ' — ' + esc(node.name || '') + '</h1>' +
+            '<p>' + esc(t('Checked ', 'ตรวจเมื่อ ')) + esc(new Date((results[node._id] || {}).at || Date.now()).toLocaleString(th ? 'th-TH' : undefined)) + ' · ' + esc(d.os || '') + (d.ip ? ' · IP ' + esc(d.ip) : '') + (d.user ? ' · ' + esc(t('user ', 'ผู้ใช้ ')) + esc(d.user) : '') + '</p>' +
+            '<p>' + esc(PRI[1][1]) + ' ' + w.now + ' · ' + esc(PRI[2][1]) + ' ' + w.soon + ' · ' + esc(PRI[3][1]) + ' ' + w.plan + (w.baht ? ' · ' + esc(t('parts ~', 'ค่าอะไหล่ประมาณ ')) + esc(baht(w.baht)) : '') + '</p>' +
+            '<table><tr><th>#</th><th>' + esc(t('Priority', 'ความด่วน')) + '</th><th>' + esc(t('Task', 'งาน')) + '</th><th>' + esc(t('Where', 'ทำที่')) + '</th><th>' + esc(t('Part', 'อะไหล่')) + '</th><th>' + esc(t('Done', 'เสร็จ')) + '</th></tr>' + rows + '</table>' +
+            '<div class="sign"><span>' + esc(t('Technician', 'ช่างผู้ดำเนินการ')) + ' ....................................</span><span>' + esc(t('Date', 'วันที่')) + ' ....................</span></div>' +
+            '<script>window.onload=function(){window.print();}<\/script></body></html>';
+        var win = root.open('', '_blank');
+        if (!win) { root.alert(t('Allow pop-ups to print', 'กรุณาอนุญาตป๊อปอัปเพื่อพิมพ์')); return; }
+        win.document.open(); win.document.write(html); win.document.close();
+    }
+
     /* ---------- the section in the computer's details ---------- */
     var notes = {};
     function note(nodeid, text, tone) { notes[nodeid] = { text: text, tone: tone, at: Date.now() }; paint(nodeid); }
@@ -637,6 +742,7 @@
         list.forEach(function (f) { if (cats.indexOf(f.cat) < 0) cats.push(f.cat); });
         var bad = list.filter(function (f) { return f.level === 'bad'; }).length, warn = list.filter(function (f) { return f.level === 'warn'; }).length;
         box.appendChild(el('p', bad || warn ? ('🔴 ' + bad + '  🟡 ' + warn) : t('✓ Nothing needs attention', '✓ ไม่พบปัญหา'), 'scp-health-sum'));
+        box.appendChild(workOrderBlock(node, d));
         var trend = trendBlock(node._id);
         if (trend) box.appendChild(trend);
         cats.forEach(function (cat) {
@@ -981,5 +1087,5 @@
     // The server runs the same check every morning (hospital/morning-check.js) and hands the font list in itself.
     function setManifest(m) { manifest = m; }
 
-    root.ScpHealth = { setManifest: setManifest, daysUntilFull: daysUntilFull, slowVerdict: slowVerdict, section: section, receive: receive, check: check, fix: fix, openFleet: openFleet, openPrinters: openPrinters, openDisks: openDisks, diskVerdict: diskVerdict, openFonts: openFonts, findings: findings, healthScript: healthScript, FIX: FIX, results: results, load: load };
+    root.ScpHealth = { setManifest: setManifest, daysUntilFull: daysUntilFull, slowVerdict: slowVerdict, section: section, receive: receive, check: check, fix: fix, openFleet: openFleet, openPrinters: openPrinters, openDisks: openDisks, diskVerdict: diskVerdict, workOrder: workOrder, openFonts: openFonts, findings: findings, healthScript: healthScript, FIX: FIX, results: results, load: load };
 }(window));

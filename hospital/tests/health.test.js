@@ -165,3 +165,33 @@ test('the disk probe reads every disk, one statement per line', () => {
     assert.match(script, /disks = \$disks/);
     for (const line of script.split('\r\n')) assert.ok(!/^\s*[{}]\s*$/.test(line));
 });
+
+test('work order: what to do, most urgent first, with the part and where it is done', () => {
+    const base = { upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true };
+    const ssd = { n: 'Kingston SA400', type: 'SSD', bus: 'SATA', gb: 224, health: 'Healthy', smart: true, wear: 0, temp: 35, poh: 9000, rdErr: 0, realloc: 0, pending: 0, uncorr: 0, reported: 0, crc: 0, life: 97, below: 0, fail: false, sys: true };
+    const dying = { n: 'TOSHIBA DT01ACA100', type: 'HDD', bus: 'SATA', gb: 932, health: 'Healthy', smart: true, wear: 0, temp: 33, poh: 49000, rdErr: 16, realloc: 65544, pending: 16, uncorr: 0, reported: 45, crc: 0, life: -1, below: 0, fail: false, sys: false };
+    assert.equal(H.workOrder(Object.assign({}, base, { disks: [ssd] })).tasks.length, 0, 'a healthy computer has nothing to do');
+    // like ER ฟาง: a dying data disk, 4 GB of RAM in use, stuck printing, fonts missing
+    const w = H.workOrder(Object.assign({}, base, { disks: [ssd, dying], ramGb: 4, ramPct: 88, jobs: 3, oldestJobMin: 90, fontsMissing: ['THBaijam (TrueType)'] }));
+    const titles = w.tasks.map(x => x.title);
+    assert.match(titles[0], /^เปลี่ยนดิสก์ ลูกที่ 2 TOSHIBA/, 'the dying disk first: data is at risk');
+    assert.equal(w.tasks[0].pri, 1);
+    assert.equal(w.tasks[0].onsite, true);
+    assert.equal(w.tasks[0].part.baht, 1500);
+    assert.ok(titles.indexOf('ล้างงานพิมพ์ค้าง') > 0);
+    assert.equal(w.tasks.find(x => x.title === 'ล้างงานพิมพ์ค้าง').fix.action, 'printer_fix', 'done from the dashboard');
+    assert.equal(w.tasks.find(x => /แรม/.test(x.title)).pri, 2, 'RAM nearly full on 4 GB: soon');
+    assert.equal(w.tasks[w.tasks.length - 1].title, 'ลงฟอนต์ไทย', 'fonts last');
+    assert.deepEqual([w.now, w.soon, w.plan], [2, 1, 1]);
+    assert.equal(w.baht, 1500 + 1200);
+    // priorities never go backwards down the list
+    for (let i = 1; i < w.tasks.length; i++) assert.ok(w.tasks[i].pri >= w.tasks[i - 1].pri);
+    // a spinning Windows disk on a slow computer: swap it soon, not just "plan"
+    const slow = H.workOrder(Object.assign({}, base, { disks: [Object.assign({}, dying, { sys: true, realloc: 0, pending: 0, reported: 0, rdErr: 0, poh: 9000 })], slow: { hangs7d: 9, crashes7d: 0, lowMem30d: 0, bootSec: 60 } }));
+    assert.equal(slow.tasks.find(x => /SSD/.test(x.title)).pri, 2);
+});
+
+test('work order: being switched off at the wall is not a task (routine here)', () => {
+    const base = { upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true };
+    assert.equal(H.workOrder(Object.assign({}, base, { crashes14d: 12 })).tasks.length, 0);
+});

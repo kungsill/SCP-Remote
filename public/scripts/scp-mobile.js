@@ -106,6 +106,27 @@
         location.href = siteRoot() + node.link;
     }
 
+    const fixNotes = {};
+    async function fixPrinting(n, button, out) {
+        if (!confirm(t('แก้ปริ้นไม่ออกที่เครื่อง ', 'Fix printing on ') + n.name + '?\n\n' +
+            t('งานพิมพ์ที่ค้างในคิวจะถูกลบ แล้ว Print Spooler จะเริ่มใหม่ (ไม่กี่วินาที) งานที่ค้างต้องสั่งพิมพ์ใหม่',
+                'Waiting print jobs are deleted and the print spooler restarts (a few seconds). Those documents need printing again.'))) return;
+        button.disabled = true;
+        out.textContent = fixNotes[n.id] = t('กำลังแก้… (รอเครื่องตอบ)', 'Working… (waiting for the computer)');
+        let text;
+        try {
+            const r = await fetch(siteRoot() + 'm-fix', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-SCP-Request': '1' }, body: JSON.stringify({ nodeid: n.id, action: 'printer' }) });
+            const body = await r.json().catch(() => ({}));
+            if (r.ok && body.ok) text = t('✓ แก้แล้ว · งานค้าง ', '✓ Done · jobs waiting ') + body.before + ' → ' + body.after + ' · Spooler ' + body.spooler;
+            else if (r.ok) text = t('✗ Spooler ยังไม่ทำงาน (', '✗ Spooler not running (') + body.spooler + ')';
+            else text = '✗ ' + ({ ACCESS_DENIED: t('ไม่มีสิทธิ์สั่งงานเครื่องนี้', 'No permission on this computer'), NOT_ONLINE: t('เครื่องไม่ได้เปิดอยู่', 'The computer is not on'),
+                NO_ANSWER: t('เครื่องไม่ตอบใน 90 วินาที', 'No answer in 90 seconds'), COMMAND_BUSY: t('เครื่องกำลังทำคำสั่งอื่น ลองใหม่อีกครั้ง', 'Busy with another command; try again'),
+                NOT_SIGNED_IN: t('ต้องเข้าสู่ระบบใหม่', 'Please sign in again') }[body.error] || (t('ทำไม่สำเร็จ ', 'Failed ') + (body.error || r.status)));
+        } catch (e) { text = t('✗ ติดต่อเซิร์ฟเวอร์ไม่ได้', '✗ Could not reach the server'); }
+        out.textContent = fixNotes[n.id] = text;
+        button.disabled = false;
+    }
+
     function render() {
         $('totalCount').textContent = data.nodes.length;
         $('onlineCount').textContent = data.nodes.filter(n => n.online).length;
@@ -151,6 +172,15 @@
             b.disabled = !n.online;
             b.onclick = () => open(n);
             card.appendChild(b);
+            // The call IT gets most: "it won't print". Clears stuck jobs and restarts the spooler
+            // without opening the remote screen; the server checks the Run Commands right.
+            if (n.online && n.canFix) {
+                const fix = el('button', t('🖨️ แก้ปริ้นไม่ออก', '🖨️ Fix printing'), 'secondary');
+                const out = el('small', fixNotes[n.id] || '', 'fix-result');
+                fix.onclick = () => fixPrinting(n, fix, out);
+                card.appendChild(fix);
+                card.appendChild(out);
+            }
             canvas.appendChild(card);
         });
     }

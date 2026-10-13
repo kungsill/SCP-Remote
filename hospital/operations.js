@@ -276,6 +276,33 @@ exports.handle = async function (ctx, cmd) {
   await save({ _id: key, type: 'scphealthlog', domain: domain.id, nodeid: cmd.nodeid, entries, updated: Date.now() });
   return { saved: 1 };
  }
+ if (cmd.op === 'healthHistory') {
+  // A few numbers from each morning check, for trend lines (disk filling up, crashes rising).
+  if (typeof cmd.nodeid !== 'string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
+  const row = await get('scphealthhist/' + cmd.nodeid).catch(() => null);
+  return (row && row.entries) || [];
+ }
+ if (cmd.op === 'morningSummary') {
+  // The last morning check: how many were checked and which computers had something red.
+  const row = await get('scpmorning/' + domain.id).catch(() => null);
+  if (!row) return null;
+  const problems = [];
+  for (const p of (row.problems || [])) if (p && await access(p.nodeid)) problems.push(p);
+  const m = parent.parent && parent.parent.scpMorning;
+  const s = (parent.parent && parent.parent.config && parent.parent.config.settings) || {};
+  return { at: row.at, checked: row.checked, ok: row.ok, warn: row.warn, noAnswer: row.noAnswer || 0, problems, running: !!(m && m.running),
+   schedule: s.scpmorningcheck === 'off' || s.scpmorningcheck === false ? 'off' : (typeof s.scpmorningcheck === 'string' ? s.scpmorningcheck : '07:30'),
+   delivery: { webhook: !!s.scpalertwebhook, telegram: !!(s.scptelegram && s.scptelegram.token) } };
+ }
+ if (cmd.op === 'morningRun') {
+  // Run the morning check now (administrators): read only, on every Windows computer that is on.
+  if (!admin) throw Error('ACCESS_DENIED');
+  const m = parent.parent && parent.parent.scpMorning;
+  if (!m) throw Error('NOT_AVAILABLE');
+  const running = !!m.running;
+  m.run('manual');
+  return { started: !running, running: true };
+ }
  if (cmd.op === 'careStart') {
   // Safe auto-care was sent to these computers. Kept so the result survives a reload and
   // shows who started it; the agent's reply (meshagent.js) fills in the result.

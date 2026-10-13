@@ -452,6 +452,8 @@
         list.forEach(function (f) { if (cats.indexOf(f.cat) < 0) cats.push(f.cat); });
         var bad = list.filter(function (f) { return f.level === 'bad'; }).length, warn = list.filter(function (f) { return f.level === 'warn'; }).length;
         box.appendChild(el('p', bad || warn ? ('🔴 ' + bad + '  🟡 ' + warn) : t('✓ Nothing needs attention', '✓ ไม่พบปัญหา'), 'scp-health-sum'));
+        var trend = trendBlock(node._id);
+        if (trend) box.appendChild(trend);
         cats.forEach(function (cat) {
             var group = el('div', null, 'scp-health-group');
             group.appendChild(el('h5', cat));
@@ -532,18 +534,104 @@
         fix(node, action, arg, opts);
     }
 
+    /* ---------- trends: a few numbers from every morning check ---------- */
+    var history = {};
+    function loadHistory(nodeid) {
+        var h = history[nodeid];
+        if (h && (h.loading || Date.now() - h.at < 300000)) return;
+        history[nodeid] = { loading: true, at: Date.now(), entries: h ? h.entries : [] };
+        if (!root.ScpOperations) return;
+        root.ScpOperations.request('healthHistory', { nodeid: nodeid }).then(function (rows) {
+            history[nodeid] = { at: Date.now(), entries: Array.isArray(rows) ? rows : [] };
+            paint(nodeid);
+        }).catch(function () { history[nodeid] = { at: Date.now(), entries: [] }; });
+    }
+    // Days until drive C: is full, from the line through the last weeks of free space; null if not shrinking.
+    function daysUntilFull(entries) {
+        var pts = entries.filter(function (e) { return typeof e.freeGb === 'number'; }).slice(-30);
+        if (pts.length < 5 || pts[pts.length - 1].at - pts[0].at < 3 * 86400000) return null;
+        var n = pts.length, sx = 0, sy = 0, sxx = 0, sxy = 0;
+        pts.forEach(function (p) { var x = (p.at - pts[0].at) / 86400000; sx += x; sy += p.freeGb; sxx += x * x; sxy += x * p.freeGb; });
+        var slope = (n * sxy - sx * sy) / (n * sxx - sx * sx || 1);
+        if (!(slope < -0.05)) return null; // losing less than 50 MB a day: not worth a warning
+        return Math.max(0, Math.round(pts[n - 1].freeGb / -slope));
+    }
+    function spark(values, color) {
+        var w = 160, h = 34, max = Math.max.apply(null, values.concat([1])), min = Math.min.apply(null, values.concat([0]));
+        var ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h); svg.setAttribute('class', 'scp-health-spark');
+        var line = document.createElementNS(ns, 'polyline');
+        line.setAttribute('points', values.map(function (v, i) { return (values.length < 2 ? w / 2 : i * w / (values.length - 1)).toFixed(1) + ',' + (h - 3 - (v - min) / ((max - min) || 1) * (h - 6)).toFixed(1); }).join(' '));
+        line.setAttribute('fill', 'none'); line.setAttribute('stroke', color); line.setAttribute('stroke-width', '2');
+        svg.appendChild(line);
+        return svg;
+    }
+    function trendBlock(nodeid) {
+        loadHistory(nodeid);
+        var entries = (history[nodeid] && history[nodeid].entries) || [];
+        if (entries.length < 2) return null;
+        var box = el('div', null, 'scp-health-trend');
+        box.appendChild(el('h5', t('Trend (morning checks, ', 'แนวโน้ม (จากการตรวจเช้า ') + entries.length + t(' days)', ' วัน)')));
+        var row = function (label, values, color, note) {
+            var r = el('div', null, 'scp-health-trend-row');
+            r.appendChild(el('span', label));
+            r.appendChild(spark(values, color));
+            r.appendChild(el('small', note || ''));
+            box.appendChild(r);
+        };
+        var free = entries.map(function (e) { return e.freeGb; }).filter(function (v) { return typeof v === 'number'; });
+        var full = daysUntilFull(entries);
+        if (free.length > 1) row(t('Drive C: free', 'ที่ว่างไดรฟ์ C:'), free, full !== null && full < 60 ? '#dc2626' : '#168065',
+            free[free.length - 1] + ' GB' + (full !== null ? (full < 60 ? t(' · full in ~', ' · จะเต็มในอีก ~') + full + t(' days', ' วัน') : '') : t(' · steady', ' · คงที่')));
+        var crash = entries.map(function (e) { return e.crashes14d || 0; });
+        if (crash.some(function (v) { return v > 0; })) row(t('Unexpected shutdowns (14 d)', 'ดับ/ค้างผิดปกติ (14 วัน)'), crash, '#dc2626',
+            crash[crash.length - 1] > crash[0] ? t('rising: check UPS / power', 'เพิ่มขึ้น: ตรวจ UPS / ไฟ') : '');
+        var ram = entries.map(function (e) { return e.ramPct || 0; });
+        row(t('Memory in use', 'แรมที่ใช้'), ram, '#568acc', ram[ram.length - 1] + '%');
+        return box;
+    }
+
     /* ---------- the fleet: check every computer, install fonts everywhere ---------- */
     function openFleet(nodes, overlay) {
         var list = (nodes || []).filter(function (n) { return online(n) && windowsAgent(n); });
-        if (!list.length) { root.alert(t('No Windows computer is online right now', 'ตอนนี้ไม่มีเครื่อง Windows ที่ออนไลน์')); return; }
-        if (!root.confirm(t('Run the health check on ', 'ตรวจสุขภาพ ') + list.length + t(' online computers? Read only.', ' เครื่องที่ออนไลน์? (อ่านอย่างเดียว ไม่เปลี่ยนแปลงอะไร)'))) return;
         var d = overlay(t('🩺 Health check — all computers', '🩺 ตรวจสุขภาพทุกเครื่อง'));
-        var body = el('div', null, 'scp-extra-body'), status = el('p'), table = el('div', null, 'scp-health-fleet');
-        body.appendChild(status); body.appendChild(table); d.box.appendChild(body);
-        var job = checkAll(list, function (f) { status.textContent = t('Done: ', 'เสร็จแล้ว: ') + f.got.length + ' / ' + f.total + (f.failed ? t(' · no answer ', ' · ไม่ตอบ ') + f.failed : ''); show(); });
-        if (!job) return;
-        job.onProgress = function (f) { status.textContent = t('Answered ', 'ได้คำตอบ ') + f.got.length + ' / ' + f.total + '…'; show(); };
-        job.onProgress(job);
+        var body = el('div', null, 'scp-extra-body'), morning = el('div', null, 'scp-health-morning'), status = el('p'), table = el('div', null, 'scp-health-fleet');
+        var runBtn = btn(t('Check now (', 'ตรวจใหม่ตอนนี้ (') + list.length + t(' online)', ' เครื่องที่ออนไลน์)'), 'scp-health-btn primary', function () { runBtn.disabled = true; start(); });
+        runBtn.disabled = !list.length;
+        body.appendChild(morning); body.appendChild(runBtn); body.appendChild(status); body.appendChild(table); d.box.appendChild(body);
+        // the last morning check, run by the server on its own
+        if (root.ScpOperations) root.ScpOperations.request('morningSummary').then(function (m) {
+            morning.textContent = '';
+            if (!m) { morning.appendChild(el('p', t('No morning check yet. The server checks every computer that is on at ', 'ยังไม่มีผลตรวจเช้า เซิร์ฟเวอร์จะตรวจทุกเครื่องที่เปิดอยู่เองทุกวันเวลา ') + '07:30', 'scp-health-hint')); return; }
+            morning.appendChild(el('h4', t('Morning check ', 'ตรวจเช้า ') + new Date(m.at).toLocaleString(th ? 'th-TH' : undefined, { dateStyle: 'medium', timeStyle: 'short' })));
+            morning.appendChild(el('p', t('Checked ', 'ตรวจ ') + m.checked + t(' · fine ', ' เครื่อง · ปกติ ') + m.ok + t(' · worth a look ', ' · ควรดู ') + m.warn + t(' · with problems ', ' · มีปัญหา ') + m.problems.length + (m.noAnswer ? t(' · no answer ', ' · ไม่ตอบ ') + m.noAnswer : ''), 'scp-health-sum'));
+            m.problems.forEach(function (p) {
+                var row = el('button', null, 'scp-health-fleet-row'); row.type = 'button';
+                row.appendChild(el('strong', p.name)); row.appendChild(el('span', '🔴 ' + p.bad.length, 'scp-health-fleet-count'));
+                row.appendChild(el('small', p.bad.slice(0, 3).join(' · ')));
+                row.onclick = function () { var n = nodeById(p.nodeid); if (n && root.showComputerDetailModal) { d.close(); root.showComputerDetailModal(n); } };
+                morning.appendChild(row);
+            });
+            var where = m.schedule === 'off' ? t('Automatic morning check is off.', 'ปิดการตรวจเช้าอัตโนมัติอยู่') :
+                t('Runs daily at ', 'ตรวจอัตโนมัติทุกวันเวลา ') + m.schedule + ' · ' + (m.delivery.telegram || m.delivery.webhook ? t('summary sent to ', 'ส่งสรุปไปที่ ') + [m.delivery.telegram ? 'Telegram' : '', m.delivery.webhook ? 'webhook' : ''].filter(Boolean).join(' + ') : t('summary kept on the server (no Telegram / webhook set)', 'สรุปเก็บไว้ในเซิร์ฟเวอร์ (ยังไม่ได้ตั้ง Telegram / webhook)'));
+            morning.appendChild(el('p', where, 'scp-health-hint'));
+            // administrators: run the server's morning check now (kept in the history, summary sent if set)
+            var now = btn(m.running ? t('Morning check running…', 'กำลังตรวจเช้า…') : t('Run the morning check now', 'สั่งตรวจเช้าตอนนี้ (บันทึกประวัติ + ส่งสรุป)'), 'scp-health-btn', function () {
+                now.disabled = true;
+                root.ScpOperations.request('morningRun').then(function () { now.textContent = t('Started: results in a few minutes', 'เริ่มแล้ว ผลจะขึ้นในไม่กี่นาที (เปิดหน้านี้ใหม่)'); })
+                    .catch(function (e) { now.textContent = /ACCESS_DENIED/.test(e && e.message) ? t('Administrators only', 'เฉพาะผู้ดูแลระบบ') : t('Could not start', 'เริ่มไม่ได้'); });
+            });
+            now.disabled = !!m.running;
+            morning.appendChild(now);
+        }).catch(function () { morning.appendChild(el('p', t('Morning check results need a server restart.', 'ผลตรวจเช้าต้องรีสตาร์ทเซิร์ฟเวอร์ก่อน'), 'scp-health-hint')); });
+        var job = null;
+        function start() {
+            table.textContent = '';
+            job = checkAll(list, function (f) { status.textContent = t('Done: ', 'เสร็จแล้ว: ') + f.got.length + ' / ' + f.total + (f.failed ? t(' · no answer ', ' · ไม่ตอบ ') + f.failed : ''); show(); });
+            if (!job) return;
+            job.onProgress = function (f) { status.textContent = t('Answered ', 'ได้คำตอบ ') + f.got.length + ' / ' + f.total + '…'; show(); };
+            job.onProgress(job);
+        }
         function show() {
             table.textContent = '';
             var rows = job.got.map(function (id) {
@@ -561,6 +649,58 @@
             });
         }
     }
+    /* ---------- every printer in the hospital, from the last check of each computer ---------- */
+    function openPrinters(nodes, overlay) {
+        var d = overlay(t('🖨️ Printers across the hospital', '🖨️ เครื่องพิมพ์ทั้งโรงพยาบาล'));
+        var body = el('div', null, 'scp-extra-body'), chips = el('div', null, 'scp-health-chips'), status = el('p', null, 'scp-health-hint'), table = el('div', null, 'scp-health-fleet');
+        body.appendChild(chips); body.appendChild(status); body.appendChild(table); d.box.appendChild(body);
+        var filter = 'problem';
+        var VIRTUAL = /PDF|OneNote|XPS|Fax|Evernote|Writer/i;
+        function rows() {
+            var out = [];
+            Object.keys(results).forEach(function (id) {
+                var r = results[id], dd = r.data, n = nodeById(id);
+                (dd.printers || []).forEach(function (p) {
+                    if (VIRTUAL.test(p.name) || /^(PORTPROMPT|nul|FILE|XPS)/i.test(p.port)) return;
+                    var st = String(p.status || 'Normal');
+                    var level = /Error|Offline|Jam|PaperOut|NotAvailable|NoToner|DoorOpen/i.test(st) ? 'bad' : /TonerLow|Paused|PaperProblem|UserIntervention/i.test(st) ? 'warn' : 'ok';
+                    if (dd.spooler && dd.spooler !== 'Running') level = 'bad';
+                    out.push({ node: n, nodeid: id, pc: (n && n.name) || id.split('/').pop(), p: p, st: st, level: level, at: r.at, jobs: dd.jobs || 0, oldest: dd.oldestJobMin || 0, scpprint: dd.scpprint });
+                });
+                if (dd.jobs > 0 && dd.oldestJobMin >= 5) out.push({ node: n, nodeid: id, pc: (n && n.name) || id.split('/').pop(), p: { name: t('Stuck print jobs', 'งานพิมพ์ค้าง'), port: '' }, st: dd.jobs + t(' jobs, oldest ', ' งาน นานสุด ') + dd.oldestJobMin + t(' min', ' นาที'), level: 'bad', at: r.at, stuck: true });
+                if (dd.scpprint && dd.scpprint.installed && !dd.scpprint.running) out.push({ node: n, nodeid: id, pc: (n && n.name) || id.split('/').pop(), p: { name: 'SCPPrint', port: '' }, st: t('installed but not running: others cannot print through it', 'ติดตั้งไว้แต่ไม่ได้เปิด เครื่องอื่นปริ้นผ่านไม่ได้'), level: 'bad', at: r.at });
+            });
+            return out;
+        }
+        function paintList() {
+            var all = rows();
+            chips.textContent = '';
+            [['problem', t('Needs attention', 'มีปัญหา'), function (r) { return r.level !== 'ok'; }], ['toner', t('Toner low', 'หมึกใกล้หมด'), function (r) { return /Toner/i.test(r.st); }], ['all', t('All', 'ทั้งหมด'), function () { return true; }]].forEach(function (c) {
+                var b = btn(c[1] + ' (' + all.filter(c[2]).length + ')', 'scp-health-btn' + (filter === c[0] ? ' primary' : ''), function () { filter = c[0]; paintList(); });
+                chips.appendChild(b);
+                if (filter === c[0]) c.match = c[2];
+                if (filter === c[0]) all.show = all.filter(c[2]);
+            });
+            table.textContent = '';
+            var shown = (all.show || all).sort(function (a, b) { return rank(a.level) - rank(b.level) || String(a.pc).localeCompare(String(b.pc)); });
+            status.textContent = t('From each computer\'s last health check · ', 'จากผลตรวจล่าสุดของแต่ละเครื่อง · ') + Object.keys(results).length + t(' computers checked', ' เครื่องที่มีผลตรวจ');
+            if (!shown.length) table.appendChild(el('p', t('Nothing here.', 'ไม่มีรายการ'), 'scp-health-hint'));
+            shown.forEach(function (r) {
+                var row = el('div', null, 'scp-health-row ' + r.level);
+                row.appendChild(el('span', null, 'scp-health-dot'));
+                var txt = el('div', null, 'scp-health-txt');
+                txt.appendChild(el('strong', (r.p.def ? '★ ' : '') + r.p.name));
+                txt.appendChild(el('small', r.pc + ' · ' + r.st + (r.p.port ? ' · ' + r.p.port : '') + (r.p.shared ? t(' · shared', ' · แชร์อยู่') : '') + ' · ' + new Date(r.at).toLocaleString(th ? 'th-TH' : undefined, { dateStyle: 'short', timeStyle: 'short' })));
+                row.appendChild(txt);
+                if (r.node && (r.stuck || r.level === 'bad') && !/SCPPrint/.test(r.p.name)) row.appendChild(btn(t('Fix printing', 'แก้ปริ้นไม่ออก'), 'scp-health-btn', function () { fixOne(r.node, 'printer_fix', null, results[r.nodeid] && results[r.nodeid].data); }));
+                if (r.node) row.appendChild(btn(t('Details', 'ดูเครื่อง'), 'scp-health-btn', function () { d.close(); root.showComputerDetailModal(r.node); }));
+                table.appendChild(row);
+            });
+        }
+        status.textContent = t('Loading…', 'กำลังโหลด…');
+        load().then(paintList, paintList);
+    }
+
     function openFonts(nodes, overlay) {
         var list = (nodes || []).filter(function (n) { return online(n) && windowsAgent(n); });
         if (!list.length) { root.alert(t('No Windows computer is online right now', 'ตอนนี้ไม่มีเครื่อง Windows ที่ออนไลน์')); return; }
@@ -576,8 +716,8 @@
     }
 
     function load() {
-        if (!root.ScpOperations) return;
-        root.ScpOperations.request('healthList').then(function (map) {
+        if (!root.ScpOperations) return Promise.resolve();
+        return root.ScpOperations.request('healthList').then(function (map) {
             Object.keys(map || {}).forEach(function (id) {
                 var row = map[id];
                 if (row && row.data && (!results[id] || results[id].at < row.updated)) results[id] = { data: row.data, at: row.updated };
@@ -586,5 +726,8 @@
         }).catch(function () { });
     }
 
-    root.ScpHealth = { section: section, receive: receive, check: check, fix: fix, openFleet: openFleet, openFonts: openFonts, findings: findings, healthScript: healthScript, FIX: FIX, results: results, load: load };
+    // The server runs the same check every morning (hospital/morning-check.js) and hands the font list in itself.
+    function setManifest(m) { manifest = m; }
+
+    root.ScpHealth = { setManifest: setManifest, daysUntilFull: daysUntilFull, section: section, receive: receive, check: check, fix: fix, openFleet: openFleet, openPrinters: openPrinters, openFonts: openFonts, findings: findings, healthScript: healthScript, FIX: FIX, results: results, load: load };
 }(window));

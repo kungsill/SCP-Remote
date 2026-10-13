@@ -142,12 +142,79 @@ exports.data = function (web, req, res) {
                 // Same reading of "online" the app uses: an agent websocket that finished
                 // authenticating, not merely a record that once connected.
                 online: !!(web.wsagents[n._id] && web.wsagents[n._id].authenticated === 2),
+                // Windows and on: the printing fix can be offered (it still checks rights when pressed)
+                canFix: isWindowsAgent(web.wsagents[n._id]),
                 position: positions.find(p => p.nodeid === n._id) || null
             }));
             res.setHeader('Cache-Control', 'no-store');
             res.json({ rooms: rooms, nodes: nodes });
         });
     });
+};
+
+// "Printing does not work" from the phone: clears stuck print jobs and restarts the print
+// spooler on one computer, the same command as the dashboard's button (scp-health.js), and
+// waits for the computer's answer. It needs the same right MeshCentral's own Run Commands
+// needs on that computer. The custom header keeps another site from making a signed-in
+// browser press it (a cross-site form cannot set it). Who pressed it is kept in the
+// computer's history next to the dashboard's fixes.
+const MESHRIGHT_REMOTECOMMAND = 0x00020000;
+const pendingFix = new Map();
+let fixScript = null;
+function isWindowsAgent(agent) {
+    const id = agent && agent.authenticated === 2 && agent.agentInfo && agent.agentInfo.agentId;
+    return !!id && ((id > 0 && id < 5) || (id > 41 && id < 44));
+}
+function readJson(req, max) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.setEncoding('utf8');
+        req.on('data', chunk => { body += chunk; if (body.length > max) { reject(Error('TOO_LARGE')); req.destroy(); } });
+        req.on('end', () => { try { resolve(JSON.parse(body || '{}')); } catch (e) { reject(Error('INVALID_INPUT')); } });
+        req.on('error', reject);
+    });
+}
+exports.fix = function (web, req, res) {
+    const user = signedInUser(web, req);
+    if (user == null) { res.status(401).json({ error: 'NOT_SIGNED_IN' }); return; }
+    if (req.get('X-SCP-Request') !== '1') { res.status(403).json({ error: 'BAD_REQUEST' }); return; }
+    readJson(req, 2048).then(body => {
+        if (typeof body.nodeid !== 'string' || body.action !== 'printer') { res.status(400).json({ error: 'INVALID_INPUT' }); return; }
+        const domainid = (user._id.split('/')[1]) || '';
+        const domain = (web.parent && web.parent.config && web.parent.config.domains && web.parent.config.domains[domainid]) || { id: domainid };
+        web.GetNodeWithRights(domain, user, body.nodeid, function (node, rights, visible) {
+            if (!node || !visible || ((rights & MESHRIGHT_REMOTECOMMAND) === 0)) { res.status(403).json({ error: 'ACCESS_DENIED' }); return; }
+            const agent = web.wsagents[body.nodeid];
+            if (!isWindowsAgent(agent)) { res.status(409).json({ error: 'NOT_ONLINE' }); return; }
+            if (!fixScript) { fixScript = require('./morning-check').loadHealth().FIX.printer_fix(); }
+            const ticket = 'scpmfix' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+            const timer = setTimeout(() => { if (pendingFix.delete(ticket)) res.status(504).json({ error: 'NO_ANSWER' }); }, 90000);
+            pendingFix.set(ticket, { res, timer, web, nodeid: body.nodeid, domain: domainid, user: user._id });
+            try { agent.send(JSON.stringify({ action: 'runcommands', type: 2, cmds: fixScript, runAsUser: 0, reply: true, responseid: ticket })); }
+            catch (e) { clearTimeout(timer); pendingFix.delete(ticket); res.status(500).json({ error: 'SEND_FAILED' }); }
+        });
+    }).catch(e => { res.status(400).json({ error: e.message || 'INVALID_INPUT' }); });
+};
+// Called from meshagent.js with the computer's answer.
+exports.receive = function (nodeid, command) {
+    const job = command && pendingFix.get(command.responseid);
+    if (!job || job.nodeid !== nodeid || command.progress === true) return false;
+    pendingFix.delete(command.responseid);
+    clearTimeout(job.timer);
+    const m = String(command.result || '').match(/SCP_FIX:(\{[^\r\n]*\})/);
+    let r = null;
+    try { r = m ? JSON.parse(m[1]) : null; } catch (e) { r = null; }
+    const busy = /COMMAND_BUSY/.test(String(command.result || ''));
+    const key = 'scphealthlog/' + nodeid;
+    job.web.db.Get(key, function (err, rows) {
+        const before = (!err && rows && rows[0]) || null;
+        const entries = ((before && before.entries) || []).concat([{ at: Date.now(), action: 'printer_fix', ok: !!(r && r.ok), result: r, by: job.user, from: 'mobile' }]).slice(-30);
+        job.web.db.Set({ _id: key, type: 'scphealthlog', domain: job.domain, nodeid, entries, updated: Date.now() }, function () { });
+    });
+    job.res.setHeader('Cache-Control', 'no-store');
+    if (r) job.res.json({ ok: !!r.ok, before: r.before, after: r.after, spooler: r.spooler });
+    else job.res.status(busy ? 409 : 502).json({ error: busy ? 'COMMAND_BUSY' : 'NO_RESULT' });
+    return true;
 };
 
 // Wired from webserver.js so that file gains one line rather than this whole module. It has to
@@ -157,6 +224,7 @@ exports.attach = function (web, app, url) {
     app.get(url, function (req, res, next) { exports.root(web, req, res, next, url); });
     app.get(url + 'm', function (req, res) { exports.page(web, req, res, url); });
     app.get(url + 'm-data', function (req, res) { exports.data(web, req, res); });
+    app.post(url + 'm-fix', function (req, res) { exports.fix(web, req, res); });
 };
 
 // Exposed for the tests, which check the shape without standing a server up.

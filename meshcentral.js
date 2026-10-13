@@ -1970,6 +1970,11 @@ function CreateMeshCentralServer(config, args) {
                     // reads nothing and sends nothing. Wrapped so a fault here can never stop boot.
                     try { obj.scpAlerts = require('./hospital/alerts.js').CreateScpAlerts(obj); obj.scpAlerts.start(); } catch (ex) { }
 
+                    // SCP-Remote: the morning health check (read only) on every Windows computer that is on,
+                    // 07:30 by default (settings.scpmorningcheck, "off" to stop). Its summary stays on this
+                    // server unless settings.scpalertwebhook or settings.scptelegram says where to send it.
+                    try { obj.scpMorning = require('./hospital/morning-check.js').CreateScpMorning(obj); obj.scpMorning.start(); } catch (ex) { }
+
                     // Start the web server and if needed, the redirection web server.
                     obj.webserver = require('./webserver.js').CreateWebServer(obj, obj.db, obj.args, obj.certificates, obj.StartEx5);
                     if (obj.redirserver != null) { obj.redirserver.hookMainWebServer(obj.certificates); }

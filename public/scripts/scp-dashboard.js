@@ -4383,6 +4383,7 @@
         actions.appendChild(button(thai ? '🔍 ตรวจเครื่อง (ชนิด / Windows แท้)' : '🔍 Check type / genuine Windows', 'scp-dash-refresh', probeChassis));
         if (window.ScpHealth) {
             actions.appendChild(button(thai ? '🩺 ตรวจสุขภาพทุกเครื่อง' : '🩺 Health check all', 'scp-dash-refresh', function () { window.ScpHealth.openFleet(allNodes(), overlayDialog); }));
+            actions.appendChild(button(thai ? '🖨️ เครื่องพิมพ์ทั้ง รพ.' : '🖨️ All printers', 'scp-dash-refresh', function () { window.ScpHealth.openPrinters(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '🔤 ติดตั้งฟอนต์ไทย' : '🔤 Install Thai fonts', 'scp-dash-refresh', function () { window.ScpHealth.openFonts(allNodes(), overlayDialog); }));
         }
         actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));

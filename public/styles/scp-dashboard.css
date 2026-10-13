@@ -2122,3 +2122,11 @@ body.scp-map-full-open {
 .scp-health-fleet-row small { grid-column: 1 / -1; color: var(--scp-muted); }
 .scp-health-fleet-row:hover { background: var(--scp-soft); }
 @media (max-width: 700px) { .scp-health-row { flex-wrap: wrap; } .scp-health-row .scp-health-btn { margin-left: 20px; } }
+.scp-health-trend { margin: 8px 0 4px; padding: 8px 10px; border: 1px dashed var(--scp-line); border-radius: 12px; }
+.scp-health-trend h5 { margin: 0 0 6px; font-size: 12px; color: var(--scp-muted); }
+.scp-health-trend-row { display: grid; grid-template-columns: 150px 160px 1fr; align-items: center; gap: 10px; font-size: 12px; padding: 2px 0; }
+.scp-health-spark { width: 160px; height: 34px; }
+.scp-health-morning { margin-bottom: 12px; display: grid; gap: 6px; }
+.scp-health-morning h4 { margin: 0; }
+@media (max-width: 700px) { .scp-health-trend-row { grid-template-columns: 1fr; } }
+.scp-health-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }

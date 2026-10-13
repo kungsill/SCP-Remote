@@ -1235,6 +1235,14 @@ module.exports.CreateMeshAgent = function (parent, db, ws, req, args, domain) {
                         if(command.type==='runcommands'&&typeof command.responseid==='string'&&/^scpclean-[0-9]+-[0-9]+$/.test(command.responseid)){
                             db.Set({_id:'scpcleanup/'+obj.dbNodeKey,type:'scpcleanup',domain:obj.domain.id,nodeid:obj.dbNodeKey,ticket:command.responseid,progress:command.progress===true,result:String(command.result||'').slice(-4000),updated:Date.now()});
                         }
+                        // "Printing does not work" pressed on the phone page (hospital/mobile.js).
+                        if (command.type === 'runcommands' && typeof command.responseid === 'string' && command.responseid.indexOf('scpmfix') === 0) {
+                            try { require('./hospital/mobile').receive(obj.dbNodeKey, command); } catch (ex) { }
+                        }
+                        // The morning health check sent by the server itself (hospital/morning-check.js).
+                        if (command.type === 'runcommands' && typeof command.responseid === 'string' && command.responseid.indexOf('scpmorning') === 0) {
+                            try { if (parent.parent.scpMorning) { parent.parent.scpMorning.receive(obj.dbNodeKey, obj.domain.id, command); } } catch (ex) { }
+                        }
                         // Safe auto-care: keep the answer (and who started it) so a reload does not lose it.
                         if (command.type === 'runcommands' && command.progress !== true && typeof command.responseid === 'string' && /^scpcare[0-9]+_[0-9]+$/.test(command.responseid)) {
                             (function (nodeKey, domainId, ticket, text) {

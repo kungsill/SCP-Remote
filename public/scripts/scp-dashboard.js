@@ -797,13 +797,15 @@
     // the answers to our own questions, and always hand the message on afterwards so the
     // rest of the page behaves exactly as before.
     function listen() {
-        if (listening || !window.meshserver) return;
+        // The server connection may not exist yet when the dashboard first draws (straight after a
+        // reload); try again shortly rather than never listening.
+        if (!listening && !window.meshserver) { setTimeout(listen, 500); return; }
+        if (listening) return;
         listening = true;
         var original = window.meshserver.onMessage;
         window.meshserver.onMessage = function (server, message) {
             try {
                 if (chassisReceive(message)) { /* the type check answered its own request */ }
-                else if (window.ScpHealth && window.ScpHealth.receive(message)) { /* the health check or a fix answered */ }
                 else if (window.ScpCare && window.ScpCare.receive(message)) { /* care answered its own request */ }
                 else if (window.ScpServices && window.ScpServices.receive(message)) { /* services answered its own request */ }
                 else if (window.ScpPrograms && window.ScpPrograms.receive(message)) { /* it answered its own question */ }

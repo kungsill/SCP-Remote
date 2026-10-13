@@ -211,18 +211,32 @@
     }
 
     /* ---------- running the check ---------- */
+    // A computer runs one command at a time and answers "busy" to a second one. So each computer
+    // has a queue here: a check or a fix waits for the one before it to answer (or time out).
+    var queue = {}, active = {};
+    function enqueue(nodeid, run) { (queue[nodeid] = queue[nodeid] || []).push(run); next(nodeid); }
+    function next(nodeid) {
+        if (active[nodeid] || !queue[nodeid] || !queue[nodeid].length) return;
+        active[nodeid] = true;
+        queue[nodeid].shift()();
+    }
+    function finished(nodeid) { active[nodeid] = false; next(nodeid); }
+    function waiting(nodeid) { return !!active[nodeid] || !!(queue[nodeid] && queue[nodeid].length); }
+
     function check(node) {
         if (!online(node) || !windowsAgent(node)) return;
         if (jobs[node._id] && jobs[node._id].state === 'working') return;
         var ticket = 'scphealth' + Date.now() + '_' + (++seq);
         jobs[node._id] = { state: 'working', ticket: ticket, started: Date.now() };
         paint(node._id);
-        loadManifest().catch(function () { }).then(function () {
-            try { send([node._id], ticket, healthScript()); } catch (e) { jobs[node._id] = { state: 'failed', text: t('Could not send', 'ส่งคำสั่งไม่ได้') }; paint(node._id); return; }
-            jobs[node._id].timer = setTimeout(function () {
-                var j = jobs[node._id];
-                if (j && j.ticket === ticket && j.state === 'working') { j.state = 'failed'; j.text = t('No answer within 2 minutes', 'ไม่ได้คำตอบภายใน 2 นาที'); paint(node._id); }
-            }, 120000);
+        enqueue(node._id, function () {
+            loadManifest().catch(function () { }).then(function () {
+                try { send([node._id], ticket, healthScript()); } catch (e) { jobs[node._id] = { state: 'failed', text: t('Could not send', 'ส่งคำสั่งไม่ได้') }; paint(node._id); finished(node._id); return; }
+                jobs[node._id].timer = setTimeout(function () {
+                    var j = jobs[node._id];
+                    if (j && j.ticket === ticket && j.state === 'working') { j.state = 'failed'; j.text = t('No answer within 2 minutes', 'ไม่ได้คำตอบภายใน 2 นาที'); paint(node._id); finished(node._id); }
+                }, 120000);
+            });
         });
     }
 
@@ -274,13 +288,17 @@
         var go = function () {
             var cmds;
             try { cmds = FIX[action](arg); } catch (e) { return; }
-            var ticket = 'scphfix' + Date.now() + '_' + (++seq);
-            fixes[ticket] = { nodeid: node._id, action: action, arg: arg, label: opts.label || FIX_LABEL[action], timer: setTimeout(function () {
-                var f = fixes[ticket];
-                if (f) { delete fixes[ticket]; note(node._id, t('No answer yet: ', 'ยังไม่ได้คำตอบ: ') + f.label, 'warn'); }
-            }, 180000) };
-            note(node._id, t('Working: ', 'กำลังทำ: ') + (opts.label || FIX_LABEL[action]) + '…', 'busy');
-            try { send([node._id], ticket, cmds); } catch (e) { note(node._id, t('Could not send', 'ส่งคำสั่งไม่ได้'), 'bad'); }
+            var label = opts.label || FIX_LABEL[action];
+            if (waiting(node._id)) note(node._id, t('Queued (the computer is busy): ', 'รอคิว (เครื่องกำลังทำคำสั่งก่อนหน้า): ') + label, 'busy');
+            enqueue(node._id, function () {
+                var ticket = 'scphfix' + Date.now() + '_' + (++seq);
+                fixes[ticket] = { nodeid: node._id, action: action, arg: arg, label: label, timer: setTimeout(function () {
+                    var f = fixes[ticket];
+                    if (f) { delete fixes[ticket]; note(node._id, t('No answer yet: ', 'ยังไม่ได้คำตอบ: ') + f.label, 'warn'); finished(node._id); }
+                }, 180000) };
+                note(node._id, t('Working: ', 'กำลังทำ: ') + label + '…', 'busy');
+                try { send([node._id], ticket, cmds); } catch (e) { delete fixes[ticket]; note(node._id, t('Could not send', 'ส่งคำสั่งไม่ได้'), 'bad'); finished(node._id); }
+            });
         };
         if (action === 'fonts' && !arg) {
             loadManifest().then(function (m) {
@@ -326,8 +344,9 @@
                 if (fleet.pending[m.nodeid]) { delete fleet.pending[m.nodeid]; if (results[m.nodeid] && jobs[m.nodeid].state === 'done') fleet.got.push(m.nodeid); else fleet.failed++; }
                 if (fleet.onProgress) fleet.onProgress(fleet);
                 if (!Object.keys(fleet.pending).length) finishFleet();
-            } else if (results[m.nodeid] && jobs[m.nodeid].state === 'done') {
-                save([{ nodeid: m.nodeid, data: results[m.nodeid].data }]);
+            } else {
+                if (results[m.nodeid] && jobs[m.nodeid].state === 'done') save([{ nodeid: m.nodeid, data: results[m.nodeid].data }]);
+                finished(m.nodeid); // the computer is free for the next queued command
             }
             paint(m.nodeid);
             return true;
@@ -351,9 +370,10 @@
             delete fixes[id];
             note(f.nodeid, describe(f, r, text), r && r.ok ? 'ok' : 'bad');
             log(f.nodeid, f.action, r);
-            // look again, so the list shows what the fix changed
+            // look again, so the list shows what the fix changed (queued behind any fix still waiting)
             var n = nodeById(f.nodeid);
-            if (n && f.action !== 'printer_test') setTimeout(function () { check(n); }, 1500);
+            if (n && f.action !== 'printer_test' && !(queue[f.nodeid] && queue[f.nodeid].length)) check(n);
+            finished(f.nodeid);
             return true;
         }
         return false;

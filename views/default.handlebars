@@ -72,13 +72,13 @@
     <script defer src="{{{domainurl}}}scripts/scp-report.js?v=20261012-fiscal"></script>
     <script defer src="{{{domainurl}}}scripts/scp-care-center.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-care.js"></script>
-    <script defer src="{{{domainurl}}}scripts/scp-health.js?v=20261013-slowfirst"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-health.js?v=20261013-queue"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-operations.css" />
     <script defer src="{{{domainurl}}}scripts/scp-price-reference.js?v=20261012-fiscal"></script>
     <script defer src="{{{domainurl}}}scripts/scp-assess.js?v=20261013-ryzen"></script>
     <script defer src="{{{domainurl}}}scripts/scp-map.js?v=20261013-sign"></script>
     <script defer src="{{{domainurl}}}scripts/scp-map-anime.js?v=20261013-sign"></script>
-    <script defer src="{{{domainurl}}}scripts/scp-dashboard.js?v=20261013-morning"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-dashboard.js?v=20261013-listen"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-transfer.css" />
     <script defer src="{{{domainurl}}}scripts/scp-transfer.js"></script>
 <script defer src="{{{domainurl}}}scripts/scp-recording.js?v=20260922-2"></script>
@@ -2683,6 +2683,7 @@
         function onMessage(server, message) {
             if (window.ScpMonitor && ScpMonitor.receive(message)) return;
             if (window.ScpCleanup && ScpCleanup.receive(message)) return;
+            if (window.ScpHealth && ScpHealth.receive(message)) return;
             switch (message.action) {
                 case 'scpops': if(window.ScpOperations) ScpOperations.receive(message); break;
                 case 'trace': {

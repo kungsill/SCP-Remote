@@ -3945,21 +3945,51 @@
         var loose = Array.prototype.slice.call(actions.children);
         var tools = element('div', 'scp-dash-action-tools');
         loose.forEach(function (b) { if (/รีเฟรช|Refresh/i.test(b.textContent) || b.classList.contains('scp-dash-live')) tools.appendChild(b); });
+        // each group is one button that drops its list down: one short row instead of a wall of buttons
+        function menu(label) {
+            var wrap = element('div', 'scp-dash-action-group');
+            var toggle = button(label + ' ▾', 'scp-dash-refresh scp-dash-action-toggle', function (e) {
+                e.stopPropagation();
+                var open = !wrap.classList.contains('open');
+                Array.prototype.forEach.call(actions.querySelectorAll('.scp-dash-action-group.open'), function (g) { g.classList.remove('open'); });
+                wrap.classList.toggle('open', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (open) {
+                    // fixed to the window so the scrolling page around it cannot clip it
+                    var r = toggle.getBoundingClientRect(), narrow = window.innerWidth < 700;
+                    list.style.top = Math.round(r.bottom + 6) + 'px';
+                    list.style.left = narrow ? Math.max(8, Math.round(r.left)) + 'px' : 'auto';
+                    list.style.right = narrow ? 'auto' : Math.max(8, Math.round(window.innerWidth - r.right)) + 'px';
+                    list.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 20) + 'px';
+                }
+            });
+            toggle.setAttribute('aria-haspopup', 'true');
+            toggle.setAttribute('aria-expanded', 'false');
+            var list = element('div', 'scp-dash-action-menu');
+            list.addEventListener('click', function () { wrap.classList.remove('open'); toggle.setAttribute('aria-expanded', 'false'); });
+            wrap.appendChild(toggle); wrap.appendChild(list);
+            wrap.list = list;
+            return wrap;
+        }
         var rows = groups.map(function (g) {
-            var row = element('div', 'scp-dash-action-group');
-            row.appendChild(element('span', 'scp-dash-action-label', g.label));
+            var row = menu(g.label);
             g.order.forEach(function (re) {
-                loose.forEach(function (b) { if (!b.parentNode || b.parentNode === actions) { if (re.test(b.textContent)) row.appendChild(b); } });
+                loose.forEach(function (b) { if (b.parentNode === actions && re.test(b.textContent)) row.list.appendChild(b); });
             });
             return row;
         });
         var rest = loose.filter(function (b) { return b.parentNode === actions; });
-        if (rest.length) { var other = element('div', 'scp-dash-action-group'); other.appendChild(element('span', 'scp-dash-action-label', thai ? 'อื่น ๆ' : 'Other')); rest.forEach(function (b) { other.appendChild(b); }); rows.push(other); }
+        if (rest.length) { var other = menu(thai ? 'อื่น ๆ' : 'Other'); rest.forEach(function (b) { other.list.appendChild(b); }); rows.push(other); }
         actions.classList.add('grouped');
+        rows.forEach(function (r) { if (r.list.children.length) actions.appendChild(r); });
         actions.appendChild(tools);
-        rows.forEach(function (r) { if (r.children.length > 1) actions.appendChild(r); });
-        var first = rows[0].children[1];
+        var first = rows[0].list.children[0];
         if (first && /งานช่างค้าง|Work waiting/.test(first.textContent)) first.classList.add('scp-dash-action-main');
+        document.addEventListener('click', function () { Array.prototype.forEach.call(actions.querySelectorAll('.scp-dash-action-group.open'), function (g) { g.classList.remove('open'); }); });
+        function closeAll() { Array.prototype.forEach.call(actions.querySelectorAll('.scp-dash-action-group.open'), function (g) { g.classList.remove('open'); }); }
+        window.addEventListener('resize', closeAll);
+        document.addEventListener('scroll', closeAll, true);
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') Array.prototype.forEach.call(actions.querySelectorAll('.scp-dash-action-group.open'), function (g) { g.classList.remove('open'); }); });
     }
     function openMorningSummary() {
         var list = allNodes();

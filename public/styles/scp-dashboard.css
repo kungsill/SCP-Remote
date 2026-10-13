@@ -2159,11 +2159,16 @@ body.scp-map-full-open {
 .scp-health-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
 .scp-health-fleet-row.slow { border-color: #fca5a5; background: #fff7f7; }
 
-/* heading buttons sorted into labelled rows: care / reports / budget */
-.scp-dash-heading-actions.grouped { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 8px; max-width: 640px; }
-.scp-dash-action-tools { display: flex; justify-content: flex-end; gap: 6px; }
+/* heading buttons: one drop-down per group (care / reports / budget) in a single short row */
+.scp-dash-heading-actions.grouped { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; align-content: flex-start; }
+.scp-dash-action-tools { display: flex; gap: 6px; }
 .scp-dash-action-tools:empty { display: none; }
-.scp-dash-action-group { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; padding: 6px 8px; border: 1px solid var(--scp-line); border-radius: 14px; background: var(--scp-surface); }
-.scp-dash-action-label { margin-right: auto; font-size: 13px; font-weight: 800; color: var(--scp-muted, #64748b); white-space: nowrap; }
+.scp-dash-action-group { position: relative; }
+.scp-dash-action-toggle { font-weight: 700; }
+.scp-dash-action-group.open > .scp-dash-action-toggle { background: #b02a72; border-color: #b02a72; color: #fff; }
+.scp-dash-action-menu { display: none; position: fixed; z-index: 1000; overflow-y: auto; min-width: 250px; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid var(--scp-line); border-radius: 14px; background: var(--scp-surface, #fff); box-shadow: 0 12px 32px rgba(0, 0, 0, .14); }
+.scp-dash-action-group.open > .scp-dash-action-menu { display: flex; }
+.scp-dash-action-menu > button { width: 100%; text-align: left; justify-content: flex-start; }
+.scp-dash-action-menu > button[hidden] { display: none; }
 .scp-dash-action-main { background: #b02a72 !important; border-color: #b02a72 !important; color: #fff !important; font-weight: 700; }
-@media (max-width: 1150px) { .scp-dash-heading-actions.grouped { max-width: none; } .scp-dash-action-group { justify-content: flex-start; } .scp-dash-action-label { width: 100%; } }
+@media (max-width: 1150px) { .scp-dash-heading-actions.grouped { justify-content: flex-start; } }

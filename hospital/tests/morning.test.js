@@ -75,6 +75,8 @@ test('disk trend: days until full from the morning checks', () => {
     assert.equal(window.ScpHealth.daysUntilFull(shrinking.slice(0, 3)), null, 'too few points to say');
 });
 
+// Wait for something asynchronous to happen, not for a fixed time: a busy machine is slow.
+async function waitFor(check) { for (let i = 0; i < 200 && !check(); i++) await new Promise(r => setTimeout(r, 10)); }
 function fakeRes() {
     const res = { code: 200, body: null, headers: {}, status(c) { res.code = c; return res; }, json(b) { res.body = b; return res; }, setHeader(k, v) { res.headers[k] = v; } };
     return res;
@@ -95,12 +97,12 @@ test('fix printing from the phone: needs the header, the Run Commands right, and
     assert.equal(res.code, 403);
     // without the right
     web.rights = 0x8; res = fakeRes(); mobile.fix(web, fakeReq({ nodeid: 'node//pc1', action: 'printer' }, { 'X-SCP-Request': '1' }), res);
-    await new Promise(r => setTimeout(r, 20));
+    await waitFor(() => res.body);
     assert.equal(res.body.error, 'ACCESS_DENIED');
     assert.equal(pc.sent.length, 0);
     // with it
     web.rights = 0x00020000; res = fakeRes(); mobile.fix(web, fakeReq({ nodeid: 'node//pc1', action: 'printer' }, { 'X-SCP-Request': '1' }), res);
-    await new Promise(r => setTimeout(r, 20));
+    await waitFor(() => pc.sent.length);
     assert.equal(pc.sent.length, 1);
     assert.match(pc.sent[0].cmds, /spool\\\\PRINTERS|spool\\PRINTERS/);
     const ok = mobile.receive('node//pc1', { responseid: pc.sent[0].responseid, result: 'SCP_FIX:{"action":"printer_fix","ok":true,"before":4,"after":0,"spooler":"Running"}' });

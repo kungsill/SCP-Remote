@@ -151,7 +151,10 @@ test('disk health: one percentage per disk, bad sectors cost the most, a failing
     const f = H.findings({ upDays: 1, lastUpdateDays: 3, ramPct: 40, ramGb: 8, cpu: 5, freeGb: 50, diskGb: 200, adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true, disks: [samsung, Object.assign({}, oldHdd, { pending: 8 })] });
     const disk = f.filter(x => /สุขภาพดิสก์/.test(x.title));
     assert.equal(disk.length, 2);
-    assert.match(disk[1].title, /^สุขภาพดิสก์ \d+% — WDC/);
+    assert.match(disk[1].title, /^สุขภาพดิสก์ \d+% — ลูกที่ 2\/2 WDC/);
+    const count = f.find(x => /^ดิสก์ในเครื่องนี้/.test(x.title));
+    assert.equal(count.title, 'ดิสก์ในเครื่องนี้ 2 ลูก (SSD 1 · HDD 1)');
+    assert.match(count.detail, /^1\. Samsung SSD 870 QVO 2TB 1863GB SSD · 2\. WDC/);
     assert.match(disk[1].detail, /รอย้าย 8/);
 });
 

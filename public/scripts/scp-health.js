@@ -471,6 +471,12 @@
         var level = (failing || pct < 40) ? 'bad' : (pct < 80 || badSectors > 0 || n(k.reported) > 0 || hot) ? 'warn' : 'ok';
         return { pct: pct, level: level, ssd: ssd, badSectors: badSectors, years: k.poh > 0 ? Math.round(k.poh / 876) / 10 : null, known: !!k.smart || k.wear >= 0, reasons: reasons };
     }
+    // The computer's own disks: a flash drive left in is not one of them.
+    function ownDisks(disks) { return (disks || []).filter(function (k) { return !/USB/i.test(k.bus); }); }
+    function diskMix(own) {
+        var ssd = own.filter(function (k) { return diskVerdict(k).ssd; }).length, hdd = own.length - ssd;
+        return [ssd ? 'SSD ' + ssd : '', hdd ? 'HDD ' + hdd : ''].filter(Boolean).join(' · ');
+    }
     function diskLine(k, v) {
         var parts = [v.badSectors ? '' : t('no bad sectors', 'ไม่มี bad sector')];
         if (v.years != null) parts.push(t('on for ', 'เปิดใช้มาแล้ว ') + v.years + t(' years', ' ปี'));
@@ -519,8 +525,11 @@
         if (freePct < 10) add(HW, 'bad', t('Drive C: ', 'ไดรฟ์ C: เหลือ ') + d.freeGb + ' GB (' + freePct + '%)', '', cleanFix);
         else if (freePct < 20) add(HW, 'warn', t('Drive C: ', 'ไดรฟ์ C: เหลือ ') + d.freeGb + ' GB (' + freePct + '%)', '', cleanFix);
         else add(HW, 'ok', t('Drive C: ', 'ไดรฟ์ C: เหลือ ') + d.freeGb + ' GB (' + freePct + '%)');
-        (d.disks || []).forEach(function (k) {
-            var v = diskVerdict(k), name = (k.sys ? 'C: ' : '') + k.n + ' ' + k.gb + 'GB ' + (v.ssd ? 'SSD' : 'HDD');
+        var own = ownDisks(d.disks);
+        if (own.length) add(HW, 'ok', t('Disks in this computer: ', 'ดิสก์ในเครื่องนี้ ') + own.length + t('', ' ลูก') + ' (' + diskMix(own) + ')',
+            own.map(function (k, i) { return (i + 1) + '. ' + (k.sys ? 'C: ' : '') + k.n + ' ' + k.gb + 'GB ' + (diskVerdict(k).ssd ? 'SSD' : 'HDD'); }).join(' · '));
+        own.forEach(function (k, i) {
+            var v = diskVerdict(k), name = (own.length > 1 ? t('disk ', 'ลูกที่ ') + (i + 1) + '/' + own.length + ' ' : '') + (k.sys ? 'C: ' : '') + k.n + ' ' + k.gb + 'GB ' + (v.ssd ? 'SSD' : 'HDD');
             var advice = v.level === 'bad' ? t(' Back up now and replace this disk.', ' สำรองข้อมูลด่วนแล้วเปลี่ยนดิสก์') : v.badSectors ? t(' Back up and watch whether the count grows.', ' สำรองข้อมูลไว้ และดูว่าจำนวนเพิ่มขึ้นไหม') : '';
             add(HW, v.level, t('Disk health ', 'สุขภาพดิสก์ ') + v.pct + '% — ' + name, diskLine(k, v) + advice);
         });
@@ -902,34 +911,38 @@
         });
         tools.appendChild(runBtn);
         function rows() {
-            var out = [], waiting = 0;
+            var out = [], waiting = 0, perPc = {};
             Object.keys(results).forEach(function (id) {
                 var r = results[id], n = nodeById(id);
                 if (!r.data.disks) { waiting++; return; }
-                r.data.disks.forEach(function (k) {
-                    if (/USB/i.test(k.bus)) return; // a flash drive left in is not the computer's disk
-                    out.push({ node: n, nodeid: id, pc: (n && n.name) || id.split('/').pop(), k: k, v: diskVerdict(k), at: r.at });
+                var own = ownDisks(r.data.disks);
+                perPc[own.length] = (perPc[own.length] || 0) + 1;
+                own.forEach(function (k, i) {
+                    out.push({ node: n, nodeid: id, pc: (n && n.name) || id.split('/').pop(), k: k, v: diskVerdict(k), at: r.at, idx: i + 1, count: own.length, mix: diskMix(own) });
                 });
             });
             out.waiting = waiting;
+            out.perPc = perPc;
             return out;
         }
         function paintList(keepStatus) {
             var all = rows();
             chips.textContent = '';
-            [['problem', t('Needs attention', 'ควรดู/ควรเปลี่ยน'), function (r) { return r.v.level !== 'ok'; }], ['bad', t('Bad sectors', 'มี bad sector'), function (r) { return r.v.badSectors > 0; }], ['hdd', t('Spinning HDD', 'ยังเป็น HDD'), function (r) { return !r.v.ssd; }], ['all', t('All', 'ทั้งหมด'), function () { return true; }]].forEach(function (c) {
+            [['problem', t('Needs attention', 'ควรดู/ควรเปลี่ยน'), function (r) { return r.v.level !== 'ok'; }], ['bad', t('Bad sectors', 'มี bad sector'), function (r) { return r.v.badSectors > 0; }], ['hdd', t('Spinning HDD', 'ยังเป็น HDD'), function (r) { return !r.v.ssd; }], ['many', t('2+ disks', 'เครื่องที่มีหลายลูก'), function (r) { return r.count > 1; }], ['all', t('All', 'ทั้งหมด'), function () { return true; }]].forEach(function (c) {
                 chips.appendChild(btn(c[1] + ' (' + all.filter(c[2]).length + ')', 'scp-health-btn' + (filter === c[0] ? ' primary' : ''), function () { filter = c[0]; paintList(); }));
                 if (filter === c[0]) all.show = all.filter(c[2]);
             });
             table.textContent = '';
             var shown = (all.show || all).sort(function (a, b) { return a.v.pct - b.v.pct || String(a.pc).localeCompare(String(b.pc)); });
-            if (!keepStatus) status.textContent = t('From each computer\'s last health check · ', 'จากผลตรวจล่าสุดของแต่ละเครื่อง · ') + all.length + t(' disks', ' ลูก') + (all.waiting ? t(' · ', ' · ') + all.waiting + t(' computers still need a new check to read their disks', ' เครื่องยังไม่มีข้อมูลดิสก์ (กดตรวจใหม่)') : '');
+            var pcs = Object.keys(all.perPc).reduce(function (s, c) { return s + all.perPc[c]; }, 0);
+            var spread = Object.keys(all.perPc).sort().map(function (c) { return t('', 'มี ') + c + t(' disk(s): ', ' ลูก ') + all.perPc[c] + t(' PCs', ' เครื่อง'); }).join(', ');
+            if (!keepStatus) status.textContent = t('From each computer\'s last health check · ', 'จากผลตรวจล่าสุดของแต่ละเครื่อง · ') + pcs + t(' computers, ', ' เครื่อง ') + all.length + t(' disks', ' ลูก') + (spread ? ' (' + spread + ')' : '') + (all.waiting ? t(' · ', ' · ') + all.waiting + t(' computers still need a new check to read their disks', ' เครื่องยังไม่มีข้อมูลดิสก์ (กดตรวจใหม่)') : '');
             if (!shown.length) table.appendChild(el('p', t('Nothing here.', 'ไม่มีรายการ'), 'scp-health-hint'));
             shown.forEach(function (r) {
                 var row = el('div', null, 'scp-health-row ' + r.v.level);
                 row.appendChild(el('span', null, 'scp-health-dot'));
                 var txt = el('div', null, 'scp-health-txt');
-                txt.appendChild(el('strong', r.v.pct + '% · ' + r.pc + ' — ' + r.k.n + ' ' + r.k.gb + 'GB ' + (r.v.ssd ? 'SSD' : 'HDD') + (r.k.sys ? ' (C:)' : '')));
+                txt.appendChild(el('strong', r.v.pct + '% · ' + r.pc + t(' [', ' [ดิสก์ ') + r.count + t(' disk(s): ', ' ลูก: ') + r.mix + (r.count > 1 ? t(', this is no. ', ', นี่คือลูกที่ ') + r.idx : '') + '] — ' + r.k.n + ' ' + r.k.gb + 'GB ' + (r.v.ssd ? 'SSD' : 'HDD') + (r.k.sys ? ' (C:)' : '')));
                 txt.appendChild(el('small', diskLine(r.k, r.v) + ' · ' + new Date(r.at).toLocaleString(th ? 'th-TH' : undefined, { dateStyle: 'short', timeStyle: 'short' })));
                 row.appendChild(txt);
                 if (r.node) row.appendChild(btn(t('Details', 'ดูเครื่อง'), 'scp-health-btn', function () { d.close(); root.showComputerDetailModal(r.node); }));

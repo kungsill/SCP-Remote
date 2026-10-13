@@ -265,7 +265,7 @@ exports.handle = async function (ctx, cmd) {
  }
  if (cmd.op === 'healthLog') {
   // Who pressed which fix on which computer, and what it reported. The last 30 per computer.
-  const ACTIONS = ['printer_fix', 'spooler_restart', 'printer_test', 'printer_resume', 'dns_flush', 'svc_start', 'trim', 'power_balanced', 'startup', 'fonts'];
+  const ACTIONS = ['printer_fix', 'spooler_restart', 'printer_test', 'printer_resume', 'dns_flush', 'svc_start', 'trim', 'power_balanced', 'synapse_hosts', 'startup', 'fonts'];
   if (typeof cmd.nodeid !== 'string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
   if (ACTIONS.indexOf(cmd.action) < 0) throw Error('INVALID_INPUT');
   const key = 'scphealthlog/' + cmd.nodeid;

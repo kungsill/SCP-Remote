@@ -100,7 +100,8 @@
             "$fk = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'; $fnames = @($fk.PSObject.Properties | ForEach-Object { $_.Name })",
             "$miss = @(" + psList(fontsWanted().map(function (f) { return f.name; })) + " | Where-Object { $fnames -notcontains $_ })",
             "$thsb = [bool]($fnames | Where-Object { $_ -match 'TH ?Sarabun' })",
-            "$o = @{ v = 1; os = [string]$os.Caption; build = [string]$os.BuildNumber; user = $uname; upDays = $up; pendingReboot = [bool]$pend; lastUpdateDays = $lu; ramGb = $ramT; ramPct = $ramU; cpu = $cpu; freeGb = [math]::Round($c.FreeSpace / 1GB, 1); diskGb = [math]::Round($c.Size / 1GB, 1); diskType = [string]$pd.MediaType; diskHealth = [string]$pd.HealthStatus; smart = $smart; badDevices = $bad; errors24h = $ev; crashes14d = $crash; adapters = $ad; ip = $ip; gw = $gw; gwOk = $gwOk; dnsOk = $dnsOk; netOk = $netOk; spooler = [string]$sp.Status; printers = $prn; jobs = $pj.Count; oldestJobMin = $old; scpprint = $spp; stoppedServices = $svc; startup = @($st | Select-Object -First 40); top = $top; tempMb = $tmp; power = $pp; fontsMissing = $miss; thSarabun = $thsb }",
+            "$syn = [bool](Select-String -Path ($env:SystemRoot + '\\System32\\drivers\\etc\\hosts') -Pattern 'syn5scph' -Quiet)",
+            "$o = @{ v = 1; os = [string]$os.Caption; build = [string]$os.BuildNumber; user = $uname; upDays = $up; pendingReboot = [bool]$pend; lastUpdateDays = $lu; ramGb = $ramT; ramPct = $ramU; cpu = $cpu; freeGb = [math]::Round($c.FreeSpace / 1GB, 1); diskGb = [math]::Round($c.Size / 1GB, 1); diskType = [string]$pd.MediaType; diskHealth = [string]$pd.HealthStatus; smart = $smart; badDevices = $bad; errors24h = $ev; crashes14d = $crash; adapters = $ad; ip = $ip; gw = $gw; gwOk = $gwOk; dnsOk = $dnsOk; netOk = $netOk; spooler = [string]$sp.Status; printers = $prn; jobs = $pj.Count; oldestJobMin = $old; scpprint = $spp; stoppedServices = $svc; startup = @($st | Select-Object -First 40); top = $top; tempMb = $tmp; power = $pp; fontsMissing = $miss; thSarabun = $thsb; synapseHost = $syn }",
             "Write-Output ('SCP_HEALTH:' + ($o | ConvertTo-Json -Compress -Depth 4))"
         ]).join('\r\n');
     }
@@ -149,6 +150,11 @@
         power_balanced: function () {
             return ["$ErrorActionPreference = 'SilentlyContinue'", "powercfg /setactive SCHEME_BALANCED", "$pp = [string](powercfg /getactivescheme)",
                 out('power_balanced', "ok = ($pp -match '381b4222-f694-41f0-9685-ff5bb260df2e'); plan = $pp")].join('\r\n');
+        },
+        synapse_hosts: function () {
+            return ["$ErrorActionPreference = 'SilentlyContinue'", "$h = $env:SystemRoot + '\\System32\\drivers\\etc\\hosts'",
+                "if (-not (Select-String -Path $h -Pattern '\\ssyn5scph(\\s|$)' -Quiet)) { Add-Content -Path $h -Value ([Environment]::NewLine + '192.168.30.83' + [char]9 + 'syn5scph') -Encoding ASCII }",
+                "$ok = [bool](Select-String -Path $h -Pattern 'syn5scph' -Quiet)", out('synapse_hosts', 'ok = $ok')].join('\r\n');
         },
         startup: function (arg) {
             // arg = { scope, name, on }; the scope picks one of five fixed registry paths
@@ -236,6 +242,7 @@
         svc_start: t('start the service', 'เปิดบริการ'),
         trim: t('TRIM the SSD (tells it which space is free, keeps it fast)', 'สั่ง TRIM ให้ SSD (บอกพื้นที่ว่าง ช่วยให้เร็วเหมือนใหม่)'),
         power_balanced: t('switch the power plan to Balanced', 'ตั้งโหมดพลังงานเป็น Balanced'),
+        synapse_hosts: t('add the PACS name syn5scph (192.168.30.83) to the hosts file', 'เพิ่มชื่อเครื่อง PACS syn5scph (192.168.30.83) ในไฟล์ hosts'),
         startup: t('change the start-up program', 'เปลี่ยนการเปิดพร้อมเครื่อง'),
         fonts: t('install Thai fonts', 'ติดตั้งฟอนต์ไทย')
     };
@@ -403,11 +410,14 @@
         var plan = (String(d.power || '').match(/\(([^)]+)\)/) || [])[1] || '';
         if (/saver|ประหยัด/i.test(plan)) add(SPD, 'warn', t('Power plan: ', 'โหมดพลังงาน: ') + plan, t('Power saver slows the processor; Balanced is better for work.', 'โหมดประหยัดพลังงานทำให้ CPU ช้า ควรใช้ Balanced'), [{ label: t('Set Balanced', 'ตั้งเป็น Balanced'), action: 'power_balanced' }]);
         if (/SSD/i.test(d.diskType)) add(SPD, 'ok', t('SSD drive', 'ใช้ SSD'), t('TRIM keeps an SSD as fast as new; Windows does it weekly, this does it now.', 'TRIM ช่วยให้ SSD เร็วเหมือนใหม่ (Windows ทำทุกสัปดาห์ กดเพื่อทำตอนนี้)'), [{ label: 'TRIM', action: 'trim' }]);
+        // hospital programs
+        if (d.synapseHost === false) add(t('Hospital programs', 'โปรแกรม รพ.'), 'info', t('PACS (Synapse) name not set', 'ยังไม่ได้ตั้งชื่อเครื่อง PACS (Synapse)'), t('Needed only where X-ray images are viewed: http://syn5scph/synapse', 'จำเป็นเฉพาะเครื่องที่ดูภาพเอกซเรย์: http://syn5scph/synapse'), [{ label: t('Add', 'เพิ่ม'), action: 'synapse_hosts' }]);
+        else if (d.synapseHost) add(t('Hospital programs', 'โปรแกรม รพ.'), 'ok', t('PACS (Synapse) reachable by name', 'ตั้งชื่อเครื่อง PACS (Synapse) แล้ว'));
         // fonts
         var miss = d.fontsMissing || [];
         if (miss.length) add(FNT, 'warn', t('Thai fonts missing: ', 'ยังไม่มีฟอนต์ไทย ') + miss.length + t(' styles', ' แบบ'), miss.slice(0, 6).join(', ').replace(/ \(TrueType\)/g, '') + (miss.length > 6 ? '…' : ''), [{ label: t('Install Thai fonts', 'ติดตั้งฟอนต์ไทย'), action: 'fonts' }]);
-        else if (fontsWanted().length) add(FNT, 'ok', t('Thai fonts installed (Sarabun, Kanit, Prompt…)', 'มีฟอนต์ไทยครบ (Sarabun, Kanit, Prompt…)'));
-        if (!d.thSarabun) add(FNT, 'warn', t('TH Sarabun (government documents) not installed', 'ยังไม่มีฟอนต์ TH Sarabun (ใช้ในหนังสือราชการ)'), t('Sarabun above is its successor; put TH Sarabun New files in public/fonts/thai to deploy them too.', 'Sarabun ด้านบนคือรุ่นใหม่ของฟอนต์นี้ ถ้าต้องการ TH Sarabun New ให้นำไฟล์มาใส่ public/fonts/thai'));
+        else if (fontsWanted().length) add(FNT, 'ok', t('Thai fonts installed (TH Sarabun New, national fonts, Sarabun…)', 'มีฟอนต์ไทยครบ (TH Sarabun New, ฟอนต์แห่งชาติ, Sarabun…)'));
+        if (!d.thSarabun) add(FNT, 'warn', t('TH Sarabun (government documents) not installed', 'ยังไม่มีฟอนต์ TH Sarabun (ใช้ในหนังสือราชการ)'), t('Included in Install Thai fonts: TH Sarabun New, TH SarabunIT9, TH SarabunPSK.', 'มีในปุ่มติดตั้งฟอนต์ไทย: TH Sarabun New, TH SarabunIT๙, TH SarabunPSK'), miss.length ? [] : [{ label: t('Install Thai fonts', 'ติดตั้งฟอนต์ไทย'), action: 'fonts' }]);
         return out;
     }
 
@@ -529,7 +539,7 @@
                 opts.note += '\n\n⚠️ ' + t('This computer shares printers with others (SCPPrint / shared printer): their waiting jobs are cleared too.', 'เครื่องนี้แชร์เครื่องพิมพ์ให้เครื่องอื่น (SCPPrint / แชร์ปริ้นเตอร์) งานที่รอของเครื่องอื่นจะถูกล้างด้วย');
         }
         if (action === 'printer_test') opts.label = t('test page on ', 'พิมพ์หน้าทดสอบที่ ') + arg;
-        if (action === 'fonts') opts.note = t('Copies Thai fonts (Sarabun, Kanit, Prompt, IBM Plex Sans Thai, Noto Sans Thai; free licence) from this server into Windows\\Fonts. Each file is checked against its SHA-256 first. Fonts already there are skipped.', 'คัดลอกฟอนต์ไทย (Sarabun, Kanit, Prompt, IBM Plex Sans Thai, Noto Sans Thai — ใช้ฟรีถูกลิขสิทธิ์) จากเซิร์ฟเวอร์นี้ไปที่ Windows\\Fonts ตรวจ SHA-256 ทุกไฟล์ก่อนติดตั้ง ตัวที่มีอยู่แล้วจะข้าม');
+        if (action === 'fonts') opts.note = t('Copies Thai fonts (TH Sarabun New, TH SarabunIT9, TH SarabunPSK, the 13 national fonts, Sarabun, Kanit, Prompt, IBM Plex Sans Thai, Noto Sans Thai; all free to use) from this server into Windows\\Fonts. Each file is checked against its SHA-256 first. Fonts already there are skipped.', 'คัดลอกฟอนต์ไทย (TH Sarabun New, TH SarabunIT๙, TH SarabunPSK, ฟอนต์แห่งชาติ 13 แบบ, Sarabun, Kanit, Prompt, IBM Plex Sans Thai, Noto Sans Thai — ใช้ฟรีถูกกฎหมาย) จากเซิร์ฟเวอร์นี้ไปที่ Windows\\Fonts ตรวจ SHA-256 ทุกไฟล์ก่อนติดตั้ง ตัวที่มีอยู่แล้วจะข้าม');
         if (action === 'trim') opts.note = t('Safe and quick on an SSD; nothing is deleted.', 'ปลอดภัย ใช้เวลาไม่นาน ไม่ลบไฟล์ใด');
         fix(node, action, arg, opts);
     }
@@ -705,7 +715,7 @@
         var list = (nodes || []).filter(function (n) { return online(n) && windowsAgent(n); });
         if (!list.length) { root.alert(t('No Windows computer is online right now', 'ตอนนี้ไม่มีเครื่อง Windows ที่ออนไลน์')); return; }
         loadManifest().then(function (m) {
-            if (!root.confirm(t('Install ', 'ติดตั้งฟอนต์ไทย ') + m.fonts.length + t(' Thai font styles on ', ' แบบ (Sarabun, Kanit, Prompt, IBM Plex Sans Thai, Noto Sans Thai) ให้ ') + list.length + t(' online computers?\n\nFree licence (SIL OFL). Each file is checked by SHA-256. Fonts already installed are skipped. Programs that are open need reopening to see them.', ' เครื่องที่ออนไลน์?\n\nใช้ฟรีถูกลิขสิทธิ์ (SIL OFL) ตรวจ SHA-256 ทุกไฟล์ ตัวที่มีแล้วจะข้าม โปรแกรมที่เปิดอยู่ต้องปิดเปิดใหม่จึงจะเห็นฟอนต์'))) return;
+            if (!root.confirm(t('Install ', 'ติดตั้งฟอนต์ไทย ') + m.fonts.length + t(' Thai font styles on ', ' แบบ (TH Sarabun New / IT๙ / PSK, ฟอนต์แห่งชาติ 13 แบบ, Sarabun, Kanit, Prompt ฯลฯ) ให้ ') + list.length + t(' online computers?\n\nFree licence (SIL OFL). Each file is checked by SHA-256. Fonts already installed are skipped. Programs that are open need reopening to see them.', ' เครื่องที่ออนไลน์?\n\nใช้ฟรีถูกลิขสิทธิ์ (SIL OFL) ตรวจ SHA-256 ทุกไฟล์ ตัวที่มีแล้วจะข้าม โปรแกรมที่เปิดอยู่ต้องปิดเปิดใหม่จึงจะเห็นฟอนต์'))) return;
             var d = overlay(t('🔤 Installing Thai fonts', '🔤 ติดตั้งฟอนต์ไทย'));
             var status = el('p'); d.box.appendChild(status);
             status.textContent = t('Sending…', 'กำลังส่ง…');

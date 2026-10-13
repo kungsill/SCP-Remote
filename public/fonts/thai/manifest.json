@@ -1,6 +1,6 @@
 {
  "version": 1,
- "source": "Google Fonts (github.com/google/fonts), SIL Open Font License 1.1",
+ "source": "Google Fonts (github.com/google/fonts, SIL OFL 1.1) and the Thai national fonts (SIPA 13 fonts, TH Sarabun New, TH SarabunIT9; free for government use)",
  "fonts": [
   {
    "file": "IBMPlexSansThai-Bold.ttf",
@@ -115,6 +115,354 @@
    "name": "Sarabun SemiBold (TrueType)",
    "sha256": "C0BB057D86E4A12097D701AC0953597E315788D47A446F5B63A6604AB21DCEBA",
    "size": 90200
+  },
+  {
+   "file": "SIPA-TH-Baijam-Bold-Italic.ttf",
+   "name": "THBaijam-BoldItalic (TrueType)",
+   "sha256": "0C03A35F0A6FB0EAA08C4C33385888AD43850342EF2EB5125DEE43CA8C264DB4",
+   "size": 91904
+  },
+  {
+   "file": "SIPA-TH-Baijam-Bold.ttf",
+   "name": "THBaijam-Bold (TrueType)",
+   "sha256": "E7DE464D9344DF098D8E704C5C265EB192B9BE7780151BE84AB7C3B22A771500",
+   "size": 89448
+  },
+  {
+   "file": "SIPA-TH-Baijam-Italic.ttf",
+   "name": "THBaijam-Italic (TrueType)",
+   "sha256": "2B6F59CB4486567DA39A35D721486AEEACF882E86541F174E251937A7A811FBC",
+   "size": 91796
+  },
+  {
+   "file": "SIPA-TH-Baijam.ttf",
+   "name": "THBaijam (TrueType)",
+   "sha256": "E6BD291DC2C02CBB2383B4BA6037146E67D62963A37EEA03BBE40491E034A034",
+   "size": 89024
+  },
+  {
+   "file": "SIPA-TH-Chakra-Petch-Bold-Italic.ttf",
+   "name": "THChakraPetch-BoldItalic (TrueType)",
+   "sha256": "4B8FCBA1F229CD6D89CEF7BF52344B96FC92970F8B3FA569FA6450BDFB8C7B7F",
+   "size": 87484
+  },
+  {
+   "file": "SIPA-TH-Chakra-Petch-Bold.ttf",
+   "name": "THChakraPetch-Bold (TrueType)",
+   "sha256": "4AEE6B09F5E3B4EA8B7D7935ECC6DC47D66C8D3B63855530173AB62E15B17E44",
+   "size": 71308
+  },
+  {
+   "file": "SIPA-TH-Chakra-Petch-Italic.ttf",
+   "name": "THChakraPetch-Italic (TrueType)",
+   "sha256": "518EC53ED8AF250898ED16CDA21CF057E23CDF8E06881B295A9C03F3B928CD80",
+   "size": 75792
+  },
+  {
+   "file": "SIPA-TH-Chakra-Petch.ttf",
+   "name": "THChakraPetch (TrueType)",
+   "sha256": "498E6AA92DFE03FB27455A877AF7E5F61BA36FD7C7CD4A5A73C0644DEFF3DEDD",
+   "size": 72836
+  },
+  {
+   "file": "SIPA-TH-Charm-of-AU.ttf",
+   "name": "THCharmofAU (TrueType)",
+   "sha256": "D11CDC3055FF82B0381689E9A24BA295D5302EA0D3432B06F7B67CDB61045750",
+   "size": 275288
+  },
+  {
+   "file": "SIPA-TH-Charmonman-Bold.ttf",
+   "name": "TH Charmonman Bold (TrueType)",
+   "sha256": "46B0477640532B03738AAD11B638974AE44FAF8ED785E560CD38AFCE3B91396B",
+   "size": 245720
+  },
+  {
+   "file": "SIPA-TH-Charmonman.ttf",
+   "name": "TH Charmonman (TrueType)",
+   "sha256": "25B4CB7B253C10E53292BC770AC198D37965A913F6B8AC76D4D50038D4167607",
+   "size": 247692
+  },
+  {
+   "file": "SIPA-TH-Fahkwang-Bold-Italic.ttf",
+   "name": "THFahkwang-BoldItalic (TrueType)",
+   "sha256": "628C3F7A756DBC0391CE5AF66F2DD69F99E8DCA4987F870D475D2E25B0796F1B",
+   "size": 114452
+  },
+  {
+   "file": "SIPA-TH-Fahkwang-Bold.ttf",
+   "name": "THFahkwang-Bold (TrueType)",
+   "sha256": "3C02EAD3B77E5EB15D6E50E30A9F4DC5A3C11AE38BDFD4ADD7B5AA2D72CDB6ED",
+   "size": 146364
+  },
+  {
+   "file": "SIPA-TH-Fahkwang-Italic.ttf",
+   "name": "THFahkwang-Italic (TrueType)",
+   "sha256": "FA64F2E8D095814C1107BE5CAED276DC063F7E098CC9072F6CF7342CA989FF9B",
+   "size": 147188
+  },
+  {
+   "file": "SIPA-TH-Fahkwang.ttf",
+   "name": "THFahkwang (TrueType)",
+   "sha256": "B25F4B34712ABB513825A9FBF2BF9FE3502E841591EB0230386390FC49088806",
+   "size": 144572
+  },
+  {
+   "file": "SIPA-TH-K2D-July8-Bold-Italic.ttf",
+   "name": "THK2DJuly8-BoldItalic (TrueType)",
+   "sha256": "4F8A1314C4BF06ECE10EF7FDF47B1D7F1AB884376D821C544395EF303614E60E",
+   "size": 87996
+  },
+  {
+   "file": "SIPA-TH-K2D-July8-Bold.ttf",
+   "name": "THK2DJuly8-Bold (TrueType)",
+   "sha256": "16FBCE0D8E1A376CD7AAA5EE60E30BDA9C8AEFB9653B1D8B802CD0F44682D259",
+   "size": 105668
+  },
+  {
+   "file": "SIPA-TH-K2D-July8-Italic.ttf",
+   "name": "THK2DJuly8-Italic (TrueType)",
+   "sha256": "68E6832A2744CBCD1898AD144AF91A453696E3A907F07D405EBEED6E83360FDF",
+   "size": 89680
+  },
+  {
+   "file": "SIPA-TH-K2D-July8.ttf",
+   "name": "THK2DJuly8 (TrueType)",
+   "sha256": "192DF259261B2CD010D065F7907BC64D854DD850CC61E2F5D0C0AE9E579C97CD",
+   "size": 87012
+  },
+  {
+   "file": "SIPA-TH-KoHo-Bold-Italic.ttf",
+   "name": "THKoHo-BoldItalic (TrueType)",
+   "sha256": "CCC46F90054AD1B442E29501DCFB3F2853FF7107D922957C7E69A588F8C4DA7A",
+   "size": 97756
+  },
+  {
+   "file": "SIPA-TH-KoHo-Bold.ttf",
+   "name": "THKoHo-Bold (TrueType)",
+   "sha256": "DF6074C4F07AF44706078DBA485D2A0A7EF336460CF1D21992640599539A4E3E",
+   "size": 108384
+  },
+  {
+   "file": "SIPA-TH-KoHo-Italic.ttf",
+   "name": "THKoHo-Italic (TrueType)",
+   "sha256": "287EB3C69DE930CB8CF007BA53B3556E83F65058533B61923E402A16C9C77794",
+   "size": 99836
+  },
+  {
+   "file": "SIPA-TH-KoHo.ttf",
+   "name": "THKoHo (TrueType)",
+   "sha256": "759D2DF74D1EA8FBE1FC295A0D16228794449F23442F4E33D5D32175A25FF07F",
+   "size": 97204
+  },
+  {
+   "file": "SIPA-TH-Kodchasal-Bold-Italic.ttf",
+   "name": "THKodchasal-BoldItalic (TrueType)",
+   "sha256": "B136DF1EC39F6FDB0AA3CF1ECC25D01C99DD020162CED73BD6FFE4AB22B29FB7",
+   "size": 104800
+  },
+  {
+   "file": "SIPA-TH-Kodchasal-Bold.ttf",
+   "name": "THKodchasal-Bold (TrueType)",
+   "sha256": "BF70A6371DA23043161FF9C97D1DC25747707D29BE9C09CA423ABF2324C98D02",
+   "size": 113604
+  },
+  {
+   "file": "SIPA-TH-Kodchasal-Italic.ttf",
+   "name": "THKodchasal-Italic (TrueType)",
+   "sha256": "128EEC6B1355BD1B83F200489A43292C7C55893C0532E19B2B06DF140738CE9C",
+   "size": 103796
+  },
+  {
+   "file": "SIPA-TH-Kodchasal.ttf",
+   "name": "THKodchasal (TrueType)",
+   "sha256": "5CEB42C3D461D87F8B90294A3AD1BD89F3DA76EDA49F135818DCC8EDAC934CB9",
+   "size": 100196
+  },
+  {
+   "file": "SIPA-TH-Krub-Bold-Italic.ttf",
+   "name": "TH Krub Bold Italic (TrueType)",
+   "sha256": "09FF5C1F4E19810B55658250C9A8C8449F9AB63A931338E5044271744DB91321",
+   "size": 133776
+  },
+  {
+   "file": "SIPA-TH-Krub-Bold.ttf",
+   "name": "TH Krub Bold (TrueType)",
+   "sha256": "D6D701FDF72D0679AD016B339F77B367627243AD2024FD978820D808EDDADF5C",
+   "size": 153212
+  },
+  {
+   "file": "SIPA-TH-Krub-Italic.ttf",
+   "name": "TH Krub Italic (TrueType)",
+   "sha256": "11233808ACE0DFE292D12DCE4AF91E85B897CFB45FCB04D2706B964C140D8C3E",
+   "size": 132884
+  },
+  {
+   "file": "SIPA-TH-Krub.ttf",
+   "name": "TH Krub (TrueType)",
+   "sha256": "8FAFBC46D67E950F391010AE388C98016853631611214AF7A67A4634E1520BA3",
+   "size": 170680
+  },
+  {
+   "file": "SIPA-TH-Mali-Grade6-Bold-Italic.ttf",
+   "name": "THMaliGrade6-BoldItalic (TrueType)",
+   "sha256": "834E2600DB99CE630433AA2B2811BFAF62B95036FC9C29512FD3F71BFDECAE22",
+   "size": 153732
+  },
+  {
+   "file": "SIPA-TH-Mali-Grade6-Bold.ttf",
+   "name": "THMaliGrade6-Bold (TrueType)",
+   "sha256": "FC8CECAD1B094830C1A4F419687913CDBC7B98BFFD1C1B21B0AD601D5702DA2A",
+   "size": 173528
+  },
+  {
+   "file": "SIPA-TH-Mali-Grade6-Italic.ttf",
+   "name": "THMaliGrade6-Italic (TrueType)",
+   "sha256": "913DEFFB47C12705D8AAB8E5986688069D6136F166647241ABB40849069215EB",
+   "size": 120616
+  },
+  {
+   "file": "SIPA-TH-Mali-Grade6.ttf",
+   "name": "THMaliGrade6 (TrueType)",
+   "sha256": "3494DA866877AEF996ADC0A8262F550CE52FCC35A2BDD2D5A3063A3CE49353C3",
+   "size": 178952
+  },
+  {
+   "file": "SIPA-TH-Niramit-AS-Bold-Italic.ttf",
+   "name": "THNiramitAS-BoldItalic (TrueType)",
+   "sha256": "B3BD90A80C41A5A392E2FBC4FC65B379558AB43FBE0C611D5CAB1F2654DAB23E",
+   "size": 102072
+  },
+  {
+   "file": "SIPA-TH-Niramit-AS-Bold.ttf",
+   "name": "THNiramitAS-Bold (TrueType)",
+   "sha256": "7E4D21C1CFD1FC769F64AA011BD3B3394702B318FC94664165ADB4943049F0C6",
+   "size": 114684
+  },
+  {
+   "file": "SIPA-TH-Niramit-AS-Italic.ttf",
+   "name": "THNiramitAS-Italic (TrueType)",
+   "sha256": "861B5959267AF082FA4950B639FD9F9E382C000BE242FFB0ADEC33B66D21B984",
+   "size": 96472
+  },
+  {
+   "file": "SIPA-TH-Niramit-AS-IT9-Bold-Italic.ttf",
+   "name": "THNiramitIT9-BoldItalic (TrueType)",
+   "sha256": "DCDBE3C5B4E6BCB5AA44F40D04FEE43645170C94FF796B9561C28D490978AA9E",
+   "size": 100288
+  },
+  {
+   "file": "SIPA-TH-Niramit-AS.ttf",
+   "name": "THNiramitAS (TrueType)",
+   "sha256": "2A2AC2EB947D5B4CA82C322680FE78D6BA042BE1305B60113AB64548213D6DBF",
+   "size": 93520
+  },
+  {
+   "file": "SIPA-TH-NiramitIT9-Bold.ttf",
+   "name": "THNiramitIT9-Bold (TrueType)",
+   "sha256": "BD7E6DE072A7FCC122EE4F8ADCCCFFE6F4918ADD42901BF732BCD28FE6B7E068",
+   "size": 100840
+  },
+  {
+   "file": "SIPA-TH-NiramitIT9-Italic.ttf",
+   "name": "THNiramitIT9-Italic (TrueType)",
+   "sha256": "E48036ED2E729DF1C097FD8E1CD44CAD5DBDEF67393BEB34AABF00FAECE800BD",
+   "size": 95176
+  },
+  {
+   "file": "SIPA-TH-NiramitIT9.ttf",
+   "name": "THNiramitIT9 (TrueType)",
+   "sha256": "519576F0BCE464B3E3C11BFC9121481741BB51CE612B863631390B031F2AFABD",
+   "size": 92244
+  },
+  {
+   "file": "SIPA-TH-Srisakdi-Bold.ttf",
+   "name": "THSrisakdi-Bold (TrueType)",
+   "sha256": "F8C371ECBDEE5AE729721F5211DA530610D543AB36DAFBEAAC2744338065C063",
+   "size": 147288
+  },
+  {
+   "file": "SIPA-TH-Srisakdi.ttf",
+   "name": "THSrisakdi (TrueType)",
+   "sha256": "F5700482ED0C7B0E3119514879AC63313D4D1899D9AF2FCF9044D0C3D186F4BE",
+   "size": 149648
+  },
+  {
+   "file": "SIPA-THSarabun-Bold-Italic.ttf",
+   "name": "TH SarabunPSK Bold Italic (TrueType)",
+   "sha256": "8A8731B6BED21F1A0B6788162239D4390974E1AD379462235D55A6377E8B1689",
+   "size": 117644
+  },
+  {
+   "file": "SIPA-THSarabun-Bold.ttf",
+   "name": "THSarabunPSK-Bold (TrueType)",
+   "sha256": "969FE7493A68F136DAB33F51FABCBCAA44FE040582BEC1A575E707F1850EB06C",
+   "size": 117744
+  },
+  {
+   "file": "SIPA-THSarabun-BoldItalic.ttf",
+   "name": "THSarabunPSK-BoldItalic (TrueType)",
+   "sha256": "D52E0C8A058AFC18F45C50B90F48DE5954A46C0868AC826932BA5248B128FFC0",
+   "size": 102916
+  },
+  {
+   "file": "SIPA-THSarabun-Italic.ttf",
+   "name": "THSarabunPSK-Italic (TrueType)",
+   "sha256": "9FD6E9672F5A78EDF186591B8A9F376B8C27D0AAC37875F818670A075995CEC9",
+   "size": 103136
+  },
+  {
+   "file": "SIPA-THSarabun.ttf",
+   "name": "THSarabunPSK (TrueType)",
+   "sha256": "2936EA292BF2B82C572ED50837DC4A04170076B561BBFC5A9306037A989B470A",
+   "size": 98764
+  },
+  {
+   "file": "SIPA-THSarabunIT9-Bold.ttf",
+   "name": "THSarabunIT9-Bold (TrueType)",
+   "sha256": "B888A24016EEDEA974C4D7C8A9D0121D9F98771BD37B25A1601069BCA7F20D37",
+   "size": 104688
+  },
+  {
+   "file": "SIPA-THSarabunIT9-BoldItalic.ttf",
+   "name": "THSarabunIT9-BoldItalic (TrueType)",
+   "sha256": "8C3390C524CA8EC3CB5D32CED4E1B51ABBC7FB4465E4D19E1D5C14894749FB3B",
+   "size": 101488
+  },
+  {
+   "file": "SIPA-THSarabunIT9-Italic.ttf",
+   "name": "THSarabunIT9-Italic (TrueType)",
+   "sha256": "3930A6F8C95311512FF8DF45275D1380EE351F331410E2CCCE9151D58CDF67A6",
+   "size": 101708
+  },
+  {
+   "file": "SIPA-THSarabunIT9.ttf",
+   "name": "THSarabunIT9 (TrueType)",
+   "sha256": "D39887E71F9D17B7C02C1DCE28E99F40F9F1CC04DE2ABB8A9081C146A9258B06",
+   "size": 97312
+  },
+  {
+   "file": "SIPA-THSarabunNew-Bold.ttf",
+   "name": "TH Sarabun New Bold (TrueType)",
+   "sha256": "51FE212AF014EE66A8A10D168C543953743125BECC61BF649993E6DF1BBC89E6",
+   "size": 366464
+  },
+  {
+   "file": "SIPA-THSarabunNew-BoldItalic.ttf",
+   "name": "TH Sarabun New Bold Italic (TrueType)",
+   "sha256": "FADC7CA763697A15CCE080FE81825B20B908F3BF7C51DA4F19689E74E63565B7",
+   "size": 118364
+  },
+  {
+   "file": "SIPA-THSarabunNew-Italic.ttf",
+   "name": "TH Sarabun New Italic (TrueType)",
+   "sha256": "59258E1B84364EC6295E438D87248A2D6BD1408AE9384C7258C1287E7A5D80FB",
+   "size": 116800
+  },
+  {
+   "file": "SIPA-THSarabunNew.ttf",
+   "name": "TH Sarabun New (TrueType)",
+   "sha256": "5F313DF437C7B80E1A8EF2AFAD821279C21010D49A71A9FA571D171DE5376858",
+   "size": 479628
   }
  ]
 }

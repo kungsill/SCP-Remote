@@ -38,11 +38,20 @@
 
 ## ฟอนต์ไทย
 
-อยู่ที่ `public/fonts/thai/` (สำเนาต้นฉบับที่ `F:\SCP-addons\fonts`) — Sarabun 7 แบบ, Kanit 4, Prompt 4, IBM Plex Sans Thai 3, Noto Sans Thai 1 รวม 19 ไฟล์ จาก Google Fonts ใช้ฟรีภายใต้ SIL Open Font License (ไฟล์สัญญาอยู่ใน `licenses/`)
+อยู่ที่ `public/fonts/thai/` (สำเนาต้นฉบับที่ `F:\SCP-addons\fonts`) รวม **77 ไฟล์**:
+
+- **ฟอนต์ราชการ/แห่งชาติ** (จาก `H:\ไฟล์คอม\fontthai`, ไฟล์ขึ้นต้น `SIPA-`): TH Sarabun New, TH SarabunIT๙, TH SarabunPSK, TH Niramit AS / IT๙ และฟอนต์แห่งชาติ 13 แบบของ SIPA — ใช้และแจกจ่ายได้ฟรี
+- **Google Fonts** (SIL Open Font License): Sarabun 7 แบบ, Kanit 4, Prompt 4, IBM Plex Sans Thai 3, Noto Sans Thai 1
+
+ไฟล์สัญญาและที่มาอยู่ใน `licenses/`
 
 เครื่องลูกดาวน์โหลดจากเซิร์ฟเวอร์นี้ ตรวจ SHA-256 ตาม `manifest.json` ก่อนคัดลอกเข้า `C:\Windows\Fonts` ถ้าไฟล์ไม่ตรงจะไม่ติดตั้ง ตัวที่มีอยู่แล้วจะข้าม โปรแกรมที่เปิดอยู่ต้องปิดเปิดใหม่จึงจะเห็นฟอนต์ ถ้าเข้าเว็บด้วย IP ที่ใบรับรองไม่ตรง เครื่องลูกจะยอมรับใบรับรองนั้นเฉพาะการโหลดฟอนต์ เพราะความถูกต้องของไฟล์ยืนยันด้วย SHA-256 อยู่แล้ว
 
-**เพิ่มฟอนต์เอง** (เช่น TH Sarabun New / TH SarabunIT๙ ที่ใช้ในหนังสือราชการ): วางไฟล์ .ttf ใน `public/fonts/thai/` แล้วสร้าง `manifest.json` ใหม่ (ชื่อ, SHA-256, ชื่อในรีจิสทรีแบบ `TH Sarabun New (TrueType)`)
+**เพิ่มฟอนต์เอง**: วางไฟล์ .ttf (ชื่อไฟล์ภาษาอังกฤษ) ใน `public/fonts/thai/` แล้วเพิ่มใน `manifest.json` (ชื่อไฟล์, SHA-256, ชื่อในรีจิสทรีแบบ `TH Sarabun New (TrueType)` เป็นตัวอักษรอังกฤษ เพราะคำสั่งส่งผ่าน PowerShell ทางอินพุตมาตรฐาน)
+
+## โปรแกรม รพ.
+
+- **PACS (Synapse)**: ตรวจว่าไฟล์ hosts มีชื่อ `syn5scph` (192.168.30.83) หรือยัง — แสดงเป็นสีเทา ไม่นับเป็นปัญหา เพราะไม่ใช่ทุกเครื่องต้องดูภาพเอกซเรย์ ปุ่ม **เพิ่ม** ทำแบบเดียวกับ `H:\ไฟล์คอม\worklist_Addhost.bat` แต่กดซ้ำไม่เพิ่มบรรทัดซ้ำ
 
 ## ข้อมูลที่เก็บ
 

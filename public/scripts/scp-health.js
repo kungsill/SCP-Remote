@@ -432,9 +432,11 @@
             var bypass = (ins.bypass || []).slice();
             if (ins.moSetup) bypass.push('AllowUpgradesWithUnsupportedTPMOrCPU');
             if (ins.unattendBypass) bypass.push(t('setup answer file', 'ไฟล์ unattend ตอนติดตั้ง'));
-            if (strong.length) add(WIN, 'bad', t('Looks like a modified Windows build', 'น่าจะเป็น Windows ดัดแปลง'), strong.join(' · ') + t(' — reinstall from genuine Microsoft media; modified builds may hide malware and miss security updates.', ' — ควรลงใหม่ด้วย ISO แท้ของ Microsoft เพราะฉบับดัดแปลงอาจแฝงมัลแวร์และไม่ได้อัปเดตความปลอดภัย'));
-            if (bypass.length) add(WIN, 'warn', t('Installed past the Windows 11 checks', 'ลงแบบข้ามเกณฑ์ Windows 11'), bypass.join(', ') + t(' — works, but Microsoft does not promise updates; plan a replacement.', ' — ใช้งานได้ แต่ Microsoft ไม่รับประกันการอัปเดต ควรอยู่ในแผนเปลี่ยนเครื่อง'));
-            if (ins.updateDisabled) add(WIN, 'warn', t('Windows Update is disabled', 'ปิด Windows Update ไว้'), t('Security fixes will not arrive.', 'เครื่องจะไม่ได้แพตช์ความปลอดภัย'));
+            // The hospital's rule: any Windows counts as working Windows, modified or not. These are
+            // kept as plain notes (grey, never counted as problems) for when security is planned.
+            if (strong.length) add(WIN, 'info', t('Modified Windows build', 'Windows ฉบับดัดแปลง'), strong.join(' · '));
+            if (bypass.length) add(WIN, 'info', t('Installed past the Windows 11 checks', 'ลงแบบข้ามเกณฑ์ Windows 11'), bypass.join(', '));
+            if (ins.updateDisabled) add(WIN, 'info', t('Windows Update is disabled', 'ปิด Windows Update ไว้'));
             if (!strong.length && !bypass.length) add(WIN, 'ok', t('Installed the normal way', 'ติดตั้งแบบปกติ (ไม่พบร่องรอยดัดแปลงหรือข้ามเกณฑ์)'));
             if (ins.noEdge && !strong.length) add(WIN, 'info', t('Microsoft Edge is not installed', 'ไม่มี Microsoft Edge'), t('Often removed by modified builds; on its own it may just have been uninstalled.', 'ฉบับดัดแปลงมักถอด Edge ออก แต่ถ้าเจอแค่ข้อนี้อาจเป็นการถอนการติดตั้งปกติ'));
         }

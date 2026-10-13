@@ -716,14 +716,16 @@
             table.textContent = '';
             var rows = job.got.map(function (id) {
                 var fl = findings(results[id].data);
-                return { id: id, node: nodeById(id), bad: fl.filter(function (x) { return x.level === 'bad'; }), warn: fl.filter(function (x) { return x.level === 'warn'; }) };
-            }).sort(function (a, b) { return b.bad.length - a.bad.length || b.warn.length - a.warn.length; });
+                var slow = fl.filter(function (x) { return x.slow; })[0];
+                return { id: id, node: nodeById(id), slow: slow, bad: fl.filter(function (x) { return x.level === 'bad'; }), warn: fl.filter(function (x) { return x.level === 'warn'; }) };
+            // slow or hanging computers first, as the hospital asked; then by how much is wrong
+            }).sort(function (a, b) { return (b.slow ? 1 : 0) - (a.slow ? 1 : 0) || b.bad.length - a.bad.length || b.warn.length - a.warn.length; });
             rows.forEach(function (r) {
-                var row = el('button', null, 'scp-health-fleet-row');
+                var row = el('button', null, 'scp-health-fleet-row' + (r.slow ? ' slow' : ''));
                 row.type = 'button';
-                row.appendChild(el('strong', (r.node && r.node.name) || r.id));
+                row.appendChild(el('strong', (r.slow ? '🐢 ' : '') + ((r.node && r.node.name) || r.id)));
                 row.appendChild(el('span', '🔴 ' + r.bad.length + '  🟡 ' + r.warn.length, 'scp-health-fleet-count'));
-                row.appendChild(el('small', r.bad.concat(r.warn).slice(0, 3).map(function (x) { return x.title; }).join(' · ') || t('All good', 'ปกติดี')));
+                row.appendChild(el('small', r.slow ? r.slow.detail : (r.bad.concat(r.warn).slice(0, 3).map(function (x) { return x.title; }).join(' · ') || t('All good', 'ปกติดี'))));
                 row.onclick = function () { if (r.node && root.showComputerDetailModal) { d.close(); root.showComputerDetailModal(r.node); } };
                 table.appendChild(row);
             });

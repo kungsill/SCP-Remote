@@ -2130,3 +2130,4 @@ body.scp-map-full-open {
 .scp-health-morning h4 { margin: 0; }
 @media (max-width: 700px) { .scp-health-trend-row { grid-template-columns: 1fr; } }
 .scp-health-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.scp-health-fleet-row.slow { border-color: #fca5a5; background: #fff7f7; }

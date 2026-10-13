@@ -1648,7 +1648,12 @@
         if (liveOn) { list.forEach(function (node) { if (isOnline(node) && roomShown(roomOf(node))) { watchable[node._id] = true; } }); }
         Object.keys(tiles).forEach(function (nodeid) { if (!watchable[nodeid]) { stopTile(nodeid); } });
 
-        if (!list.length) { body.appendChild(element('div', 'scp-dash-empty', t('empty'))); return; }
+        if (!list.length) {
+            var empty = element('div', 'scp-dash-empty', t('empty'));
+            if (!allNodes().length) { empty.appendChild(element('br')); empty.appendChild(button(thai ? '➕ เพิ่มเครื่องแรก (ติดตั้งเอเจนต์)' : '➕ Add the first computer (install the agent)', 'scp-dash-refresh scp-dash-action-main scp-add-first', addComputer)); }
+            body.appendChild(empty);
+            return;
+        }
 
         // Group first, so the buttons can be drawn and the rest of the page can follow
         // what they say. Start from the groups themselves so a room with no computer in
@@ -3933,12 +3938,47 @@
     }
 
     /* ---- Morning summary: one page for the start of the day ---- */
+    // Add a computer: open MeshCentral's own "add agent" dialog (download links for every system)
+    // without making anyone find the device group page first. A brand-new server has no device
+    // group at all, so one called "new computers" is made for them; with several groups, ask
+    // which (the "new computers" one first). Computers can be moved to their department later.
+    function agentGroups() {
+        var m = window.meshes || {};
+        return Object.keys(m).map(function (k) { return m[k]; }).filter(function (g) { return g && g.mtype == 2 && !g.deleted; });
+    }
+    function addComputer() {
+        if (typeof window.addAgentToMesh !== 'function' || !window.meshserver) return;
+        var open = function (g) { setTimeout(function () { window.addAgentToMesh(g._id); }, 60); };
+        var groups = agentGroups();
+        if (!groups.length) {
+            window.meshserver.send({ action: 'createmesh', meshtype: 2, meshname: thai ? 'เครื่องใหม่' : 'New computers', desc: thai ? 'เครื่องที่เพิ่งติดตั้งเอเจนต์ ย้ายไปกลุ่มแผนกทีหลังได้' : 'Freshly installed computers; move them to their department later' });
+            var tries = 0, wait = setInterval(function () {
+                var g = agentGroups()[0];
+                if (g) { clearInterval(wait); open(g); }
+                else if (++tries > 40) { clearInterval(wait); window.alert(thai ? 'สร้างกลุ่มอุปกรณ์ไม่สำเร็จ บัญชีนี้อาจไม่มีสิทธิ์สร้างกลุ่ม' : 'Could not create a device group: this account may not be allowed to.'); }
+            }, 250);
+            return;
+        }
+        if (groups.length === 1) { open(groups[0]); return; }
+        var fresh = function (g) { return /เครื่องใหม่|new computers/i.test(g.name || ''); };
+        groups.sort(function (a, b) { return (fresh(b) ? 1 : 0) - (fresh(a) ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'th'); });
+        var d = overlayDialog(thai ? '➕ เพิ่มเครื่อง: เลือกกลุ่มที่จะให้เครื่องขึ้น' : '➕ Add a computer: choose its group');
+        var body = element('div', 'scp-extra-body');
+        body.appendChild(element('p', 'scp-health-hint', thai ? 'เลือกกลุ่ม แล้วดาวน์โหลดตัวติดตั้งไปรันที่เครื่องลูก เครื่องจะขึ้นในกลุ่มนั้น (ย้ายกลุ่มทีหลังได้)' : 'Pick a group, then run the downloaded installer on the computer. It appears in that group (it can be moved later).'));
+        var list = element('div', 'scp-add-computer-groups');
+        groups.forEach(function (g) {
+            list.appendChild(button((g.name || g._id) + (fresh(g) ? (thai ? '  (แนะนำ)' : '  (suggested)') : ''), 'scp-dash-refresh' + (fresh(g) ? ' scp-dash-action-main' : ''), function () { d.close(); open(g); }));
+        });
+        body.appendChild(list);
+        d.box.appendChild(body);
+    }
     // Line icons in the same style as the left menu, in place of emoji (which Windows draws as
     // small coloured squares in this font). Matched by label, like the grouping below.
     var HEADING_ICONS = [
         [/ดูแลเครื่อง|^Care/, 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z'],
         [/รายงาน ▾|Reports ▾/, 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
         [/งบและประเมิน|Budget/, 'M3 7h18v12H3zM3 7l3-3h12l3 3M16 13h2'],
+        [/เพิ่มเครื่อง|Add a computer/, 'M3 5h18v11H3zM8 20h8M12 16v4M12 7.5v6M9 10.5h6'],
         [/งานช่างค้าง|Work waiting/, 'M9 4h6v3H9zM7 5H5v16h14V5h-2M9 13l2 2 4-4'],
         [/ตรวจสุขภาพทุกเครื่อง|Health check all/, 'M3 12h4l2-5 4 10 2-5h6'],
         [/สุขภาพดิสก์|Disk health/, 'M4 5h16v14H4zM4 13h16M8 16h.01M12 16h4'],
@@ -3981,7 +4021,7 @@
     // label so a button added later still lands somewhere (anything unknown goes last).
     function groupHeadingActions(actions) {
         var groups = [
-            { label: thai ? '🧰 ดูแลเครื่อง' : '🧰 Care', order: [/งานช่างค้าง|Work waiting/, /ตรวจสุขภาพทุกเครื่อง|Health check all/, /สุขภาพดิสก์|Disk health/, /เครื่องพิมพ์ทั้ง|All printers/, /ฟอนต์ไทย|Thai fonts/, /แจ้งซ่อม|Repairs/, /คลังไดรเวอร์|Driver library/] },
+            { label: thai ? '🧰 ดูแลเครื่อง' : '🧰 Care', order: [/เพิ่มเครื่อง|Add a computer/, /งานช่างค้าง|Work waiting/, /ตรวจสุขภาพทุกเครื่อง|Health check all/, /สุขภาพดิสก์|Disk health/, /เครื่องพิมพ์ทั้ง|All printers/, /ฟอนต์ไทย|Thai fonts/, /แจ้งซ่อม|Repairs/, /คลังไดรเวอร์|Driver library/] },
             { label: thai ? '📊 รายงาน' : '📊 Reports', order: [/สรุปประจำวัน|Daily summary/, /รายงานและชาร์ต|Reports & Print/, /ออกรายงานการใช้งาน|usage/i, /ออกรายการครุภัณฑ์|inventory|CSV/i, /QR/] },
             { label: thai ? '💰 งบและประเมิน' : '💰 Budget', order: [/คลังราคากลาง|Reference prices/, /แผนงบประมาณ|budget plan/i, /เกณฑ์ประเมิน|Criteria/, /ตรวจเครื่อง \(|Check type/] }
         ];
@@ -4027,8 +4067,7 @@
         rows.forEach(function (r) { if (r.list.children.length) actions.appendChild(r); });
         actions.appendChild(tools);
         decorateHeadingIcons(actions);
-        var first = rows[0].list.children[0];
-        if (first && /งานช่างค้าง|Work waiting/.test(first.textContent)) first.classList.add('scp-dash-action-main');
+        Array.prototype.forEach.call(rows[0].list.children, function (b) { if (/งานช่างค้าง|Work waiting/.test(b.textContent)) b.classList.add('scp-dash-action-main'); });
         document.addEventListener('click', function () { Array.prototype.forEach.call(actions.querySelectorAll('.scp-dash-action-group.open'), function (g) { g.classList.remove('open'); }); });
         function closeAll() { Array.prototype.forEach.call(actions.querySelectorAll('.scp-dash-action-group.open'), function (g) { g.classList.remove('open'); }); }
         window.addEventListener('resize', closeAll);
@@ -4480,7 +4519,7 @@
         actions.appendChild(button(thai ? 'เกณฑ์ประเมิน' : 'Criteria', 'scp-dash-refresh', function () { if (window.ScpOperations) window.ScpOperations.openCriteria(); }));
         actions.appendChild(button(t('exportCsv'), 'scp-dash-refresh', exportInventory));
         actions.appendChild(button(t('exportUsage'), 'scp-dash-refresh', exportUsage));
-        actions.appendChild(button(t('refresh'), 'scp-dash-refresh', render));
+        actions.appendChild(button(t('refresh'), 'scp-dash-refresh', function () { render(); if (!allNodes().length) { addComputer(); } }));
         if (window.ScpReport) { actions.appendChild(button(thai ? 'รายงานและชาร์ต (พิมพ์)' : 'Reports & Print', 'scp-dash-refresh', function () { window.ScpReport.open(); })); }
         actions.appendChild(button(thai ? '📰 สรุปประจำวัน' : '📰 Daily summary', 'scp-dash-refresh', openMorningSummary));
         actions.appendChild(button(thai ? '🏷️ QR ติดเครื่อง' : '🏷️ QR stickers', 'scp-dash-refresh', openQrSheet));
@@ -4492,6 +4531,7 @@
         }
         actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));
         var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);
+            actions.appendChild(button(thai ? '➕ เพิ่มเครื่อง (ติดตั้งเอเจนต์)' : '➕ Add a computer', 'scp-dash-refresh', addComputer));
             actions.appendChild(button(thai ? '🧰 งานช่างค้างทั้ง รพ.' : '🧰 Work waiting', 'scp-dash-refresh', function () { window.ScpHealth.openBacklog(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '💽 สุขภาพดิสก์ทั้ง รพ.' : '💽 Disk health', 'scp-dash-refresh', function () { window.ScpHealth.openDisks(allNodes(), overlayDialog); }));
         groupHeadingActions(actions);
@@ -4547,7 +4587,7 @@
         }
         loadRoomFilter();
         window.addEventListener('resize', fitHeight);
-        window.ScpDashboard = { show: show, showDashboard: showDashboard, showMap: showMap, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
+        window.ScpDashboard = { addComputer: addComputer, show: show, showDashboard: showDashboard, showMap: showMap, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
             exportInventory: exportInventory, nodes: allNodes, specLine: specLine, disksOf: disksOf,
             hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway,
             hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf,

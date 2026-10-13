@@ -782,7 +782,7 @@
                     if (dd.spooler && dd.spooler !== 'Running') level = 'bad';
                     out.push({ node: n, nodeid: id, pc: (n && n.name) || id.split('/').pop(), p: p, st: st, level: level, at: r.at, jobs: dd.jobs || 0, oldest: dd.oldestJobMin || 0, scpprint: dd.scpprint });
                 });
-                if (dd.jobs > 0 && dd.oldestJobMin >= 5) out.push({ node: n, nodeid: id, pc: (n && n.name) || id.split('/').pop(), p: { name: t('Stuck print jobs', 'งานพิมพ์ค้าง'), port: '' }, st: dd.jobs + t(' jobs, oldest ', ' งาน นานสุด ') + dd.oldestJobMin + t(' min', ' นาที'), level: 'bad', at: r.at, stuck: true });
+                if (dd.jobs > 0 && dd.oldestJobMin >= 5) out.push({ node: n, nodeid: id, pc: (n && n.name) || id.split('/').pop(), p: { name: t('Stuck print jobs', 'งานพิมพ์ค้าง'), port: '' }, st: dd.jobs + t(' jobs, oldest ', ' งาน นานสุด ') + age(dd.oldestJobMin), level: 'bad', at: r.at, stuck: true });
                 if (dd.scpprint && dd.scpprint.installed && !dd.scpprint.running) out.push({ node: n, nodeid: id, pc: (n && n.name) || id.split('/').pop(), p: { name: 'SCPPrint', port: '' }, st: t('installed but not running: others cannot print through it', 'ติดตั้งไว้แต่ไม่ได้เปิด เครื่องอื่นปริ้นผ่านไม่ได้'), level: 'bad', at: r.at });
             });
             return out;

@@ -2172,3 +2172,9 @@ body.scp-map-full-open {
 .scp-dash-action-menu > button[hidden] { display: none; }
 .scp-dash-action-main { background: #b02a72 !important; border-color: #b02a72 !important; color: #fff !important; font-weight: 700; }
 @media (max-width: 1150px) { .scp-dash-heading-actions.grouped { justify-content: flex-start; } }
+
+/* line icons on the heading buttons (same stroke style as the left menu) */
+.scp-dash-heading-actions.grouped button { display: inline-flex; align-items: center; gap: 8px; }
+.scp-dash-icon { width: 18px; height: 18px; flex: 0 0 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.scp-dash-action-menu .scp-dash-icon { color: #b02a72; }
+.scp-dash-action-menu .scp-dash-action-main .scp-dash-icon, .scp-dash-action-group.open > .scp-dash-action-toggle .scp-dash-icon { color: #fff; }

@@ -3933,6 +3933,49 @@
     }
 
     /* ---- Morning summary: one page for the start of the day ---- */
+    // Line icons in the same style as the left menu, in place of emoji (which Windows draws as
+    // small coloured squares in this font). Matched by label, like the grouping below.
+    var HEADING_ICONS = [
+        [/ดูแลเครื่อง|^Care/, 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z'],
+        [/รายงาน ▾|Reports ▾/, 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
+        [/งบและประเมิน|Budget/, 'M3 7h18v12H3zM3 7l3-3h12l3 3M16 13h2'],
+        [/งานช่างค้าง|Work waiting/, 'M9 4h6v3H9zM7 5H5v16h14V5h-2M9 13l2 2 4-4'],
+        [/ตรวจสุขภาพทุกเครื่อง|Health check all/, 'M3 12h4l2-5 4 10 2-5h6'],
+        [/สุขภาพดิสก์|Disk health/, 'M4 5h16v14H4zM4 13h16M8 16h.01M12 16h4'],
+        [/เครื่องพิมพ์ทั้ง|All printers/, 'M7 8V3h10v5M6 17H4v-7h16v7h-2M7 14h10v7H7z'],
+        [/ฟอนต์ไทย|Thai fonts/, 'M4 19l5-14 5 14M6 14h6M15 13a3 3 0 1 1 6 0v6M21 16h-3a3 3 0 0 1 0-3'],
+        [/แจ้งซ่อม|Repairs/, 'M5 4h14v16H5zM9 9h6M9 13h6M9 17h3'],
+        [/คลังไดรเวอร์|Driver library/, 'M7 7h10v10H7zM10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4'],
+        [/สรุปประจำวัน|Daily summary/, 'M4 5h16v14H4zM8 3v4M16 3v4M4 10h16M8 14h3'],
+        [/รายงานและชาร์ต|Reports & Print/, 'M12 3v9h9A9 9 0 1 1 12 3zM15 3a6 6 0 0 1 6 6h-6z'],
+        [/ออกรายงานการใช้งาน|usage/i, 'M12 4v10M8 10l4 4 4-4M4 18h16'],
+        [/ออกรายการครุภัณฑ์|inventory|CSV/i, 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5'],
+        [/QR/, 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2'],
+        [/แผนงบประมาณ|budget plan/i, 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h6'],
+        [/คลังราคากลาง|Reference prices/, 'M3 12l9-9h8v8l-9 9zM15 8h.01'],
+        [/เกณฑ์ประเมิน|Criteria/, 'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2'],
+        [/ตรวจเครื่อง \(|Check type/, 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zM16 16l5 5'],
+        [/รีเฟรช|Refresh/i, 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7']
+    ];
+    function headingIcon(d) {
+        var ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg'), p = document.createElementNS(ns, 'path');
+        svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('class', 'scp-dash-icon');
+        p.setAttribute('d', d); svg.appendChild(p);
+        return svg;
+    }
+    function decorateHeadingIcons(root) {
+        Array.prototype.forEach.call(root.querySelectorAll('button'), function (b) {
+            if (b.querySelector('svg.scp-dash-icon')) return;
+            var label = b.textContent.replace(/^[☀-➿️‍\s]+|^(?:\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDD00-\uDFFF])+[️\s]*/g, '').trim();
+            for (var i = 0; i < HEADING_ICONS.length; i++) {
+                if (!HEADING_ICONS[i][0].test(b.textContent)) continue;
+                b.textContent = '';
+                b.appendChild(headingIcon(HEADING_ICONS[i][1]));
+                b.appendChild(element('span', '', label));
+                return;
+            }
+        });
+    }
     // The heading buttons arrive one feature at a time; sort them into labelled rows so the
     // page reads as "look after computers / reports / budget" instead of a pile. Matched by
     // label so a button added later still lands somewhere (anything unknown goes last).
@@ -3940,7 +3983,7 @@
         var groups = [
             { label: thai ? '🧰 ดูแลเครื่อง' : '🧰 Care', order: [/งานช่างค้าง|Work waiting/, /ตรวจสุขภาพทุกเครื่อง|Health check all/, /สุขภาพดิสก์|Disk health/, /เครื่องพิมพ์ทั้ง|All printers/, /ฟอนต์ไทย|Thai fonts/, /แจ้งซ่อม|Repairs/, /คลังไดรเวอร์|Driver library/] },
             { label: thai ? '📊 รายงาน' : '📊 Reports', order: [/สรุปประจำวัน|Daily summary/, /รายงานและชาร์ต|Reports & Print/, /ออกรายงานการใช้งาน|usage/i, /ออกรายการครุภัณฑ์|inventory|CSV/i, /QR/] },
-            { label: thai ? '💰 งบและประเมิน' : '💰 Budget', order: [/คลังราคากลาง|Reference prices/, /เกณฑ์ประเมิน|Criteria/, /ตรวจเครื่อง \(|Check type/] }
+            { label: thai ? '💰 งบและประเมิน' : '💰 Budget', order: [/คลังราคากลาง|Reference prices/, /แผนงบประมาณ|budget plan/i, /เกณฑ์ประเมิน|Criteria/, /ตรวจเครื่อง \(|Check type/] }
         ];
         var loose = Array.prototype.slice.call(actions.children);
         var tools = element('div', 'scp-dash-action-tools');
@@ -3983,6 +4026,7 @@
         actions.classList.add('grouped');
         rows.forEach(function (r) { if (r.list.children.length) actions.appendChild(r); });
         actions.appendChild(tools);
+        decorateHeadingIcons(actions);
         var first = rows[0].list.children[0];
         if (first && /งานช่างค้าง|Work waiting/.test(first.textContent)) first.classList.add('scp-dash-action-main');
         document.addEventListener('click', function () { Array.prototype.forEach.call(actions.querySelectorAll('.scp-dash-action-group.open'), function (g) { g.classList.remove('open'); }); });

@@ -308,3 +308,28 @@ test('plans count in Thai fiscal years, which start on 1 October', () => {
     assert.ok(local.devices[0].replacementYear >= thisFY - 543, 'no plan year falls before the current fiscal year');
     assert.ok(Object.keys(local.devices[0].survival).includes(String(thisFY - 543)));
 });
+
+test('AMD Ryzen 2000: only the Zen+ desktop chips run Windows 11', () => {
+    const cases = {
+        'AMD Ryzen 5 2600 Six-Core Processor': true,
+        'AMD Ryzen 7 2700X Eight-Core Processor': true,
+        'AMD Ryzen 3 2300X Quad-Core Processor': true,
+        'AMD Ryzen 5 2400G with Radeon Vega Graphics': false,
+        'AMD Ryzen 3 2200G with Radeon Vega Graphics': false,
+        'AMD Ryzen 5 PRO 2400GE w/ Radeon Vega Graphics': false,
+        'AMD Ryzen 5 2500U with Radeon Vega Mobile Gfx': false,
+        'AMD Ryzen 7 2700U with Radeon Vega Mobile Gfx': false,
+        'AMD Ryzen 5 1600 Six-Core Processor': false,
+        'AMD Ryzen 5 3500U with Radeon Vega Mobile Gfx': true,
+        'AMD Ryzen 5 3400G with Radeon Vega Graphics': true
+    };
+    for (const [name, ok] of Object.entries(cases)) {
+        assert.equal(assess.evaluateCpu(name).supported, ok, name);
+    }
+    const window = { ScpPriceReference: require('../../public/scripts/scp-price-reference') };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../public/scripts/scp-assess.js'), 'utf8'), { window });
+    for (const [name, ok] of Object.entries(cases)) {
+        const n = { _id: 'x', name: 'x', hardware: assessmentHardware(name, 8, 'Windows 10 Pro') };
+        assert.equal(window.ScpFleetAssess.assessDevice(n).cpuEval.supported, ok, 'browser: ' + name);
+    }
+});

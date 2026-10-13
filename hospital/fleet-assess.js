@@ -81,6 +81,14 @@ function evaluateCpu(cpuName) {
         if (/2200G|2400G|A\d-\d+|FX-\d+/i.test(name)) {
             return { supported: false, brand: 'AMD', gen: 'Zen 1', reason: 'AMD Ryzen G-series รุ่นแรก (สถาปัตยกรรม Zen 14nm ไม่ผ่านเกณฑ์)' };
         }
+        // The 2000-numbered laptop chips (2300U, 2500U, 2700U, 2800H...) are Raven Ridge, Zen 1 like
+        // the 2200G/2400G, and are not on Microsoft's list; neither is any Ryzen 1000.
+        if (/Ryzen\s+[3579]\s+(PRO\s+)?2\d{3}(U|H)\b/i.test(name)) {
+            return { supported: false, brand: 'AMD', gen: 'Zen 1', reason: 'AMD Ryzen 2000 รุ่นโน้ตบุ๊ก (U/H) เป็น Zen รุ่นแรก ไม่อยู่ในรายชื่อที่ Microsoft รองรับ' };
+        }
+        if (/Ryzen\s+[3579]\s+(PRO\s+)?1\d{3}/i.test(name)) {
+            return { supported: false, brand: 'AMD', gen: 'Zen 1', reason: 'AMD Ryzen 1000 (Zen รุ่นแรก) ไม่ผ่านเกณฑ์ Windows 11' };
+        }
         // Modern Ryzen 200 Series (Ryzen 5 220, Ryzen 7 250 w/ Radeon 740M/760M) - Zen 4, launched 2024/2025 (พ.ศ. 2568)
         if (/Ryzen\s+[3579]\s+2\d{2}\b/i.test(name) || /740M|760M|780M|840M|880M/i.test(name)) {
             return { supported: true, brand: 'AMD', gen: 'Zen 4', reason: 'AMD Ryzen 200 Series (ปี 2568 / สถาปัตยกรรม Zen 4 รองรับอย่างเป็นทางการ)' };

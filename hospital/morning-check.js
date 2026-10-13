@@ -194,6 +194,8 @@ function CreateScpMorning(parent) {
         const w = when();
         if (!w) return false;
         now = now || new Date();
+        // Just started: give the computers a few minutes to reconnect, or the check reaches only a few.
+        if (obj.startedAt && now.getTime() - obj.startedAt < 5 * 60 * 1000) return false;
         const day = now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate();
         if (obj.lastDay === day) return false;
         if (now.getHours() * 60 + now.getMinutes() < w.h * 60 + w.m) return false;
@@ -206,6 +208,7 @@ function CreateScpMorning(parent) {
 
     obj.start = function () {
         if (obj.timer) return;
+        obj.startedAt = Date.now();
         obj.timer = setInterval(() => { try { obj.tick(); } catch (e) { /* never let a tick throw */ } }, 60 * 1000);
         if (obj.timer.unref) obj.timer.unref();
     };

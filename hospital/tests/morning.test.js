@@ -130,3 +130,15 @@ test('slow or hanging computers are named first, with what to do', () => {
     assert.match(s.text.split('\n')[1], /เครื่องค้าง\/ช้า/);
     assert.match(s.text.split('\n')[2], /ห้องบัตร-2: .*HOSxPXE4/);
 });
+
+test('after a restart the morning check waits for the computers to reconnect', () => {
+    const m = morning.CreateScpMorning({ db: fakeDb(), config: { settings: {} }, webserver: { wsagents: {} } });
+    let runs = 0; m.run = () => { runs++; };
+    m.start(); m.stop();
+    const now = new Date(m.startedAt);
+    now.setHours(8, 0, 0, 0);
+    m.startedAt = now.getTime() - 60 * 1000; // started a minute ago, inside the morning window
+    assert.equal(m.tick(now), false, 'not in the first minutes');
+    assert.equal(m.tick(new Date(now.getTime() + 5 * 60 * 1000)), true, 'then it runs');
+    assert.equal(runs, 1);
+});

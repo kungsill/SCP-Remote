@@ -420,6 +420,12 @@
         if (!advice.length) advice.push(t('look at the programs listed', 'ตรวจโปรแกรมที่ระบุ'));
         return { reasons: reasons, advice: advice };
     }
+    // Minutes as something a person reads: 45 min, 6 hours, 782 days.
+    function age(min) {
+        if (min < 120) return min + t(' min', ' นาที');
+        if (min < 2880) return Math.round(min / 60) + t(' hours', ' ชั่วโมง');
+        return Math.round(min / 1440) + t(' days', ' วัน');
+    }
     function findings(d) {
         var out = [], add = function (cat, level, title, detail, fixes) { out.push({ cat: cat, level: level, title: title, detail: detail || '', fixes: fixes || [] }); };
         var SYS = t('System', 'ระบบ'), HW = t('Hardware', 'ฮาร์ดแวร์'), NET = t('Network', 'เครือข่าย'), PRN = t('Printers', 'เครื่องพิมพ์'), SPD = t('Speed and upkeep', 'ความเร็วและการดูแล'), FNT = t('Fonts', 'ฟอนต์');
@@ -469,7 +475,7 @@
         if (d.spooler && d.spooler !== 'Running') add(PRN, 'bad', t('Print spooler is ', 'Print Spooler ') + d.spooler, '', [{ label: t('Restart spooler', 'รีสตาร์ท Spooler'), action: 'spooler_restart' }]);
         if (d.jobs > 0) {
             var stuck = d.oldestJobMin >= 5;
-            add(PRN, stuck ? 'bad' : 'warn', t('Print jobs waiting: ', 'งานพิมพ์รอคิว ') + d.jobs + (d.oldestJobMin ? t(' (oldest ', ' (นานสุด ') + d.oldestJobMin + t(' min)', ' นาที)') : ''),
+            add(PRN, stuck ? 'bad' : 'warn', t('Print jobs waiting: ', 'งานพิมพ์รอคิว ') + d.jobs + (d.oldestJobMin ? t(' (oldest ', ' (นานสุด ') + age(d.oldestJobMin) + ')' : ''),
                 stuck ? t('Jobs this old are stuck.', 'งานค้างนานขนาดนี้คือค้างแล้ว') : '', [{ label: t('Fix printing', 'แก้ปริ้นไม่ออก'), action: 'printer_fix' }]);
         } else if (d.spooler === 'Running') add(PRN, 'ok', t('Print queue empty', 'ไม่มีงานพิมพ์ค้าง'));
         (d.printers || []).forEach(function (p) {

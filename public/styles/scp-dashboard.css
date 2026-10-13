@@ -2129,6 +2129,14 @@ body.scp-map-full-open {
 .scp-health-guide summary { cursor: pointer; font-weight: 700; color: var(--scp-brand, #b02a72); }
 .scp-health-guide p { margin: 4px 0; }
 .scp-health-guide ol { margin: 2px 0 4px; padding-left: 20px; }
+.scp-health-wo-sum { margin: 6px 0 8px; font-size: 15px; font-weight: 700; }
+.scp-health-wo-ok { margin: 6px 0 2px; font-size: 16px; font-weight: 700; color: #168065; }
+.scp-health-wo-top strong { font-size: 15px; flex: 1 1 auto; }
+.scp-health-wo-top .scp-health-btn { margin: 0; }
+.scp-health-wo-later, .scp-health-all { margin-top: 8px; }
+.scp-health-wo-later > summary, .scp-health-all > summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.scp-health-all > summary { color: var(--scp-muted, #64748b); }
+.scp-health-wo-all { padding-left: 0; list-style: none; }
 .scp-health-wo { margin: 6px 0 12px; padding: 10px 12px; border: 1px solid var(--scp-line); border-radius: 14px; background: var(--scp-surface); }
 .scp-health-wo-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .scp-health-wo-head h5 { margin: 0; font-size: 15px; }
@@ -2138,7 +2146,7 @@ body.scp-map-full-open {
 .scp-health-wo-item.p2 { border-left-color: #f59e0b; }
 .scp-health-wo-item small { display: block; color: var(--scp-muted, #64748b); line-height: 1.45; }
 .scp-health-wo-item .scp-health-btn { margin-top: 4px; }
-.scp-health-wo-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.scp-health-wo-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .scp-health-wo-where { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: #fce7f3; color: #9d174d; white-space: nowrap; }
 .scp-health-wo-where.onsite { background: #fef3c7; color: #92400e; }
 .scp-health-trend { margin: 8px 0 4px; padding: 8px 10px; border: 1px dashed var(--scp-line); border-radius: 12px; }

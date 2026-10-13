@@ -756,17 +756,32 @@
     function guideFor(title) { for (var i = 0; i < KINDS.length; i++) if (KINDS[i][0].test(title)) return { kind: KINDS[i][1], g: GUIDE[KINDS[i][1]] }; return null; }
     function guideBlock(x) {
         var gd = guideFor(x.title);
-        if (!gd) return null;
         var det = el('details', null, 'scp-health-guide');
-        det.appendChild(el('summary', '📖 ' + t('How to repair', 'วิธีซ่อม')));
+        det.appendChild(el('summary', t('How to repair', 'วิธีซ่อม')));
         var row = function (label, text) { if (text) { var p = el('p'); p.appendChild(el('b', label + ' ')); p.appendChild(document.createTextNode(text)); det.appendChild(p); } };
-        row(t('Cause:', 'สาเหตุ:'), gd.g.cause);
-        row(t('Principle:', 'หลักการ:'), gd.g.idea);
-        var ol = el('ol'); gd.g.steps.forEach(function (s) { ol.appendChild(el('li', s)); });
-        det.appendChild(el('b', t('Steps:', 'ขั้นตอน:'))); det.appendChild(ol);
-        row(t('Check it worked:', 'ตรวจผลหลังซ่อม:'), gd.g.check);
-        row(t('Careful:', 'ข้อควรระวัง:'), gd.g.careful);
-        return det;
+        // this computer first, then the general guide
+        row(t('Found:', 'ที่พบ:'), x.why);
+        if (x.part) row(t('Part:', 'อะไหล่:'), x.part.name + (x.part.baht ? t(' · ~', ' · ประมาณ ') + baht(x.part.baht) : ''));
+        if (gd) { row(t('Cause:', 'สาเหตุ:'), gd.g.cause); row(t('Principle:', 'หลักการ:'), gd.g.idea); }
+        var steps = x.steps.concat(gd ? gd.g.steps.filter(function (s) { return x.steps.indexOf(s) < 0; }) : []);
+        if (steps.length) { var ol = el('ol'); steps.forEach(function (s) { ol.appendChild(el('li', s)); }); det.appendChild(el('b', t('Steps:', 'ขั้นตอน:'))); det.appendChild(ol); }
+        if (gd) { row(t('Check it worked:', 'ตรวจผลหลังซ่อม:'), gd.g.check); row(t('Careful:', 'ข้อควรระวัง:'), gd.g.careful); }
+        return det.childNodes.length > 1 ? det : null;
+    }
+    // One task as one line: what to do, and the button when it can be done from here.
+    function taskLine(x, node, d, withPc) {
+        var li = el('li', null, 'scp-health-wo-item p' + x.pri);
+        var top = el('div', null, 'scp-health-wo-top');
+        top.appendChild(el('strong', PRI[x.pri][0] + ' ' + (withPc ? x.pc + ' — ' : '') + x.title));
+        if (x.fix && node) top.appendChild(btn(x.fix.label, 'scp-health-btn primary', function () {
+            if (x.fix.cleanup) { root.ScpCleanup.run(node); return; }
+            fixOne(node, x.fix.action, x.fix.arg, d);
+        }));
+        else if (x.onsite) top.appendChild(el('span', '🚶 ' + t('at the computer', 'ไปหน้าเครื่อง'), 'scp-health-wo-where onsite'));
+        li.appendChild(top);
+        var gb = guideBlock(x);
+        if (gb) li.appendChild(gb);
+        return li;
     }
     var PRI = { 1: ['🔴', t('Now', 'ด่วน')], 2: ['🟡', t('Soon', 'ควรทำเร็ว')], 3: ['🔵', t('Plan', 'วางแผน')] };
     function baht(n) { return n.toLocaleString('en-US') + t(' baht', ' บาท'); }
@@ -774,31 +789,25 @@
         var w = workOrder(d);
         var box = el('div', null, 'scp-health-wo');
         var head = el('div', null, 'scp-health-wo-head');
-        head.appendChild(el('h5', '🧰 ' + t('Work order', 'ใบงานช่าง')));
-        if (w.tasks.length) head.appendChild(btn('🖨️ ' + t('Print', 'พิมพ์ใบงาน'), 'scp-health-btn', function () { printWorkOrder(node, d, w); }));
+        head.appendChild(el('h5', '🧰 ' + t('What this computer needs', 'เครื่องนี้ต้องทำอะไร')));
+        if (w.tasks.length) head.appendChild(btn('🖨️ ' + t('Print', 'พิมพ์'), 'scp-health-btn', function () { printWorkOrder(node, d, w); }));
         box.appendChild(head);
-        if (!w.tasks.length) { box.appendChild(el('p', t('✓ Nothing to do on this computer', '✓ เครื่องนี้ไม่มีงานค้าง'), 'scp-health-sum')); return box; }
-        box.appendChild(el('p', [PRI[1][0] + ' ' + PRI[1][1] + ' ' + w.now, PRI[2][0] + ' ' + PRI[2][1] + ' ' + w.soon, PRI[3][0] + ' ' + PRI[3][1] + ' ' + w.plan].join('   ') +
-            (w.onsite ? t(' · at the computer: ', ' · ต้องไปหน้าเครื่อง ') + w.onsite : '') + (w.baht ? t(' · parts ~', ' · ค่าอะไหล่ประมาณ ') + baht(w.baht) : ''), 'scp-health-hint'));
+        if (!w.tasks.length) { box.appendChild(el('p', '✅ ' + t('All good — nothing to do', 'เครื่องปกติ ไม่มีงานต้องทำ'), 'scp-health-wo-ok')); return box; }
+        box.appendChild(el('p', [w.now ? PRI[1][0] + ' ' + PRI[1][1] + ' ' + w.now : '', w.soon ? PRI[2][0] + ' ' + PRI[2][1] + ' ' + w.soon : '', w.plan ? PRI[3][0] + ' ' + PRI[3][1] + ' ' + w.plan : '', w.baht ? '🔧 ' + t('parts ~', 'อะไหล่ ~') + baht(w.baht) : ''].filter(Boolean).join('   '), 'scp-health-wo-sum'));
         var ol = el('ol', null, 'scp-health-wo-list');
-        w.tasks.forEach(function (x) {
-            var li = el('li', null, 'scp-health-wo-item p' + x.pri);
-            var top = el('div', null, 'scp-health-wo-top');
-            top.appendChild(el('strong', PRI[x.pri][0] + ' ' + x.title));
-            top.appendChild(el('span', x.onsite ? t('at the computer', 'ไปหน้าเครื่อง') : t('from here', 'ทำจากที่นี่ได้'), 'scp-health-wo-where' + (x.onsite ? ' onsite' : '')));
-            li.appendChild(top);
-            if (x.why) li.appendChild(el('small', x.why));
-            if (x.steps.length) li.appendChild(el('small', '→ ' + x.steps.join(' → ')));
-            if (x.part) li.appendChild(el('small', '🔧 ' + x.part.name + (x.part.baht ? t(' · ~', ' · ประมาณ ') + baht(x.part.baht) : '')));
-            if (x.fix) li.appendChild(btn(x.fix.label, 'scp-health-btn', function () {
-                if (x.fix.cleanup) { root.ScpCleanup.run(node); return; }
-                fixOne(node, x.fix.action, x.fix.arg, d);
-            }));
-            var gb = guideBlock(x);
-            if (gb) li.appendChild(gb);
-            ol.appendChild(li);
-        });
-        box.appendChild(ol);
+        w.tasks.filter(function (x) { return x.pri < 3; }).forEach(function (x) { ol.appendChild(taskLine(x, node, d)); });
+        if (ol.childNodes.length) box.appendChild(ol);
+        var later = w.tasks.filter(function (x) { return x.pri === 3; });
+        if (later.length) {
+            // planning is for later: folded away unless it is all there is
+            var more = el('details', null, 'scp-health-wo-later');
+            more.open = !ol.childNodes.length;
+            more.appendChild(el('summary', PRI[3][0] + ' ' + t('For later (', 'งานวางแผน / ทำทีหลัง (') + later.length + ')'));
+            var ol2 = el('ol', null, 'scp-health-wo-list');
+            later.forEach(function (x) { ol2.appendChild(taskLine(x, node, d)); });
+            more.appendChild(ol2);
+            box.appendChild(more);
+        }
         return box;
     }
     function guidesHtml(tasks, esc) {
@@ -872,8 +881,12 @@
         var list = findings(d), cats = [];
         list.forEach(function (f) { if (cats.indexOf(f.cat) < 0) cats.push(f.cat); });
         var bad = list.filter(function (f) { return f.level === 'bad'; }).length, warn = list.filter(function (f) { return f.level === 'warn'; }).length;
-        box.appendChild(el('p', bad || warn ? ('🔴 ' + bad + '  🟡 ' + warn) : t('✓ Nothing needs attention', '✓ ไม่พบปัญหา'), 'scp-health-sum'));
         box.appendChild(workOrderBlock(node, d));
+        // everything the check read, folded under the work order: the work order is what people read
+        var all = el('details', null, 'scp-health-all');
+        all.appendChild(el('summary', t('Full check results', 'ผลตรวจละเอียดทั้งหมด') + (bad || warn ? '  (🔴 ' + bad + '  🟡 ' + warn + ')' : '')));
+        box.appendChild(all);
+        box = all;
         var trend = trendBlock(node._id);
         if (trend) box.appendChild(trend);
         cats.forEach(function (cat) {
@@ -1166,13 +1179,13 @@
         tools.appendChild(btn('🖨️ ' + t('Print list & parts', 'พิมพ์สรุปงาน + รายการอะไหล่'), 'scp-health-btn', function () { if (b) printBacklog(b); }));
         function paintAll() {
             b = backlog();
-            status.textContent = t('From each computer\'s last check · ', 'จากผลตรวจล่าสุด · ') + b.checked + t(' computers checked, ', ' เครื่องที่มีผลตรวจ มีงาน ') + b.pcs + t(' have work · ', ' เครื่อง · ') +
-                PRI[1][0] + ' ' + b.tasks.filter(function (x) { return x.pri === 1; }).length + '  ' + PRI[2][0] + ' ' + b.tasks.filter(function (x) { return x.pri === 2; }).length + '  ' + PRI[3][0] + ' ' + b.tasks.filter(function (x) { return x.pri === 3; }).length +
-                t(' · trips to a computer: ', ' · ต้องไปหน้าเครื่อง ') + b.tasks.filter(function (x) { return x.onsite; }).length + t('', ' งาน');
+            status.textContent = b.pcs + t(' of ', ' จาก ') + b.checked + t(' computers have work · ', ' เครื่องมีงาน · ') + PRI[1][0] + ' ' + PRI[1][1] + ' ' + b.tasks.filter(function (x) { return x.pri === 1; }).length + t(' tasks', ' งาน');
             partsBox.textContent = '';
             if (b.parts.length) {
-                partsBox.appendChild(el('strong', '🔧 ' + t('Parts to buy', 'อะไหล่ที่ต้องซื้อ') + (b.baht ? t(' · ~', ' · ประมาณ ') + baht(b.baht) : '')));
-                b.parts.forEach(function (p) { partsBox.appendChild(el('small', p.name + ' × ' + p.n + (p.baht ? ' · ~' + baht(p.baht) : '') + ' — ' + p.pcs.join(', '))); });
+                var pd = el('details');
+                pd.appendChild(el('summary', '🔧 ' + t('Parts to buy', 'อะไหล่ที่ต้องซื้อ') + (b.baht ? t(' · ~', ' · ประมาณ ') + baht(b.baht) : '') + ' — ' + b.parts.map(function (p) { return p.name + ' × ' + p.n; }).join(', ')));
+                b.parts.forEach(function (p) { pd.appendChild(el('small', p.name + ' × ' + p.n + (p.baht ? ' · ~' + baht(p.baht) : '') + ' — ' + p.pcs.join(', '))); });
+                partsBox.appendChild(pd);
             }
             paintList();
         }
@@ -1186,22 +1199,13 @@
             });
             table.textContent = '';
             if (!shown.length) table.appendChild(el('p', t('Nothing here.', 'ไม่มีงานในหมวดนี้'), 'scp-health-hint'));
+            var ol = el('ol', null, 'scp-health-wo-list scp-health-wo-all');
             shown.slice(0, 300).forEach(function (x) {
-                var row = el('div', null, 'scp-health-row ' + (x.pri === 1 ? 'bad' : x.pri === 2 ? 'warn' : 'ok'));
-                row.appendChild(el('span', null, 'scp-health-dot'));
-                var txt = el('div', null, 'scp-health-txt');
-                txt.appendChild(el('strong', PRI[x.pri][0] + ' ' + x.pc + ' — ' + x.title));
-                txt.appendChild(el('small', [x.why, x.steps.length ? '→ ' + x.steps.join(' → ') : '', x.part ? '🔧 ' + x.part.name + (x.part.baht ? ' ~' + baht(x.part.baht) : '') : '', x.onsite ? t('at the computer', 'ไปหน้าเครื่อง') : ''].filter(Boolean).join(' · ')));
-                var gb = guideBlock(x);
-                if (gb) txt.appendChild(gb);
-                row.appendChild(txt);
-                if (x.fix && x.node) row.appendChild(btn(x.fix.label, 'scp-health-btn', function () {
-                    if (x.fix.cleanup) { root.ScpCleanup.run(x.node); return; }
-                    fixOne(x.node, x.fix.action, x.fix.arg, results[x.nodeid] && results[x.nodeid].data);
-                }));
-                if (x.node) row.appendChild(btn(t('Details', 'ดูเครื่อง'), 'scp-health-btn', function () { d.close(); root.showComputerDetailModal(x.node); }));
-                table.appendChild(row);
+                var li = taskLine(x, x.node, results[x.nodeid] && results[x.nodeid].data, true);
+                if (x.node) li.querySelector('.scp-health-wo-top').appendChild(btn(t('Details', 'ดูเครื่อง'), 'scp-health-btn', function () { d.close(); root.showComputerDetailModal(x.node); }));
+                ol.appendChild(li);
             });
+            table.appendChild(ol);
             if (shown.length > 300) table.appendChild(el('p', t('Showing the first 300.', 'แสดง 300 รายการแรก'), 'scp-health-hint'));
         }
         status.textContent = t('Loading…', 'กำลังโหลด…');

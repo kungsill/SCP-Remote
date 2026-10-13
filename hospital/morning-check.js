@@ -41,26 +41,36 @@ function loadHealth() {
 // The few numbers worth drawing over time.
 function snapshot(data, at) {
     const n = v => (typeof v === 'number' && isFinite(v)) ? v : null;
-    return { at, freeGb: n(data.freeGb), diskGb: n(data.diskGb), ramPct: n(data.ramPct), upDays: n(data.upDays), crashes14d: n(data.crashes14d), errors24h: n(data.errors24h), jobs: n(data.jobs), tempMb: n(data.tempMb) };
+    const s = data.slow || {};
+    return { at, freeGb: n(data.freeGb), diskGb: n(data.diskGb), ramPct: n(data.ramPct), upDays: n(data.upDays), crashes14d: n(data.crashes14d), errors24h: n(data.errors24h), jobs: n(data.jobs), tempMb: n(data.tempMb),
+        hangs7d: n(s.hangs7d), appCrashes7d: n(s.crashes7d), lowMem30d: n(s.lowMem30d), bootSec: n(s.bootSec) };
 }
 
 // One line per computer with something red; amber only counted.
+// Slow or hanging computers lead the summary: that is what the hospital asked to hear first.
 function summarize(results, names, findings, when) {
     const rows = [];
     let warnOnly = 0, ok = 0;
     for (const id of Object.keys(results)) {
         const list = findings(results[id]);
         const bad = list.filter(f => f.level === 'bad'), warn = list.filter(f => f.level === 'warn');
-        if (bad.length) rows.push({ nodeid: id, name: names[id] || id, bad: bad.map(f => f.title), warn: warn.length });
+        const slow = list.find(f => f.slow);
+        if (bad.length) rows.push({ nodeid: id, name: names[id] || id, bad: bad.map(f => f.title), warn: warn.length, slow: slow ? slow.detail : null });
         else if (warn.length) warnOnly++;
         else ok++;
     }
-    rows.sort((a, b) => b.bad.length - a.bad.length || String(a.name).localeCompare(String(b.name)));
+    rows.sort((a, b) => (b.slow ? 1 : 0) - (a.slow ? 1 : 0) || b.bad.length - a.bad.length || String(a.name).localeCompare(String(b.name)));
+    const slowRows = rows.filter(r => r.slow), other = rows.filter(r => !r.slow);
     const day = new Date(when).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
-    const lines = ['🩺 ตรวจเช้า ' + day + ' · ตรวจ ' + Object.keys(results).length + ' เครื่อง · ปกติ ' + ok + ' · ควรดู ' + warnOnly + ' · มีปัญหา ' + rows.length];
-    rows.slice(0, 15).forEach(r => lines.push('🔴 ' + r.name + ': ' + r.bad.slice(0, 3).join(' · ')));
-    if (rows.length > 15) lines.push('… และอีก ' + (rows.length - 15) + ' เครื่อง (ดูในแดชบอร์ด)');
-    return { at: when, checked: Object.keys(results).length, ok, warn: warnOnly, problems: rows, text: lines.join('\n') };
+    const lines = ['🩺 ตรวจเช้า ' + day + ' · ตรวจ ' + Object.keys(results).length + ' เครื่อง · ปกติ ' + ok + ' · ควรดู ' + warnOnly + ' · มีปัญหา ' + rows.length + (slowRows.length ? ' · ค้าง/ช้า ' + slowRows.length : '')];
+    if (slowRows.length) {
+        lines.push('🐢 เครื่องค้าง/ช้า:');
+        slowRows.slice(0, 10).forEach(r => lines.push('• ' + r.name + ': ' + r.slow));
+        if (slowRows.length > 10) lines.push('… และอีก ' + (slowRows.length - 10) + ' เครื่อง');
+    }
+    other.slice(0, 15).forEach(r => lines.push('🔴 ' + r.name + ': ' + r.bad.slice(0, 3).join(' · ')));
+    if (other.length > 15) lines.push('… และอีก ' + (other.length - 15) + ' เครื่อง (ดูในแดชบอร์ด)');
+    return { at: when, checked: Object.keys(results).length, ok, warn: warnOnly, slow: slowRows.length, problems: rows, text: lines.join('\n') };
 }
 
 function post(url, body, headers) {

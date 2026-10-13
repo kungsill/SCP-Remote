@@ -95,6 +95,16 @@
             "$prof = if ($sid) { [string](Get-CimInstance Win32_UserProfile | Where-Object { $_.SID -eq $sid } | Select-Object -First 1).LocalPath } else { '' }",
             "if ($prof) { $st += @(ScpDir (Join-Path $prof 'AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup') 'FolderUser' " + SCOPES.FolderUser + ") }",
             "$top = @(Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 6 | ForEach-Object { @{ name = [string]$_.ProcessName; mb = [int]($_.WorkingSet64 / 1MB) } })",
+            // Is it slow or hanging? What Windows itself recorded: programs that stopped responding,
+            // programs that crashed, low-memory warnings and how long the last start-up took.
+            "$hangEv = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Hang'; Id = 1002; StartTime = (Get-Date).AddDays(-7) } -MaxEvents 300 -ErrorAction SilentlyContinue)",
+            "$hangApps = @($hangEv | ForEach-Object { [string]$_.Properties[0].Value } | Group-Object | Sort-Object Count -Descending | Select-Object -First 3 | ForEach-Object { @{ name = $_.Name; n = $_.Count } })",
+            "$crashEv = @(Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = 'Application Error'; Id = 1000; StartTime = (Get-Date).AddDays(-7) } -MaxEvents 300 -ErrorAction SilentlyContinue)",
+            "$crashApps = @($crashEv | ForEach-Object { [string]$_.Properties[0].Value } | Group-Object | Sort-Object Count -Descending | Select-Object -First 3 | ForEach-Object { @{ name = $_.Name; n = $_.Count } })",
+            "$lowMem = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Resource-Exhaustion-Detector'; Id = 2004; StartTime = (Get-Date).AddDays(-30) } -MaxEvents 100 -ErrorAction SilentlyContinue).Count",
+            "$bootEv = Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-Diagnostics-Performance/Operational'; Id = 100 } -MaxEvents 1 -ErrorAction SilentlyContinue",
+            "$bootSec = if ($bootEv) { [int](([xml]$bootEv.ToXml()).Event.EventData.Data | Where-Object { $_.Name -eq 'BootTime' } | ForEach-Object { [double]$_.'#text' / 1000 }) } else { -1 }",
+            "$slow = @{ hangs7d = $hangEv.Count; hangApps = $hangApps; crashes7d = $crashEv.Count; crashApps = $crashApps; lowMem30d = $lowMem; bootSec = $bootSec }",
             "$tmp = [int]((@(Get-ChildItem -Path ($env:SystemRoot + '\\Temp'), 'C:\\Users\\*\\AppData\\Local\\Temp' -File -Recurse -Force -ErrorAction SilentlyContinue) | Measure-Object Length -Sum).Sum / 1MB)",
             "$pp = [string](powercfg /getactivescheme)",
             "$fk = Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'; $fnames = @($fk.PSObject.Properties | ForEach-Object { $_.Name })",
@@ -112,7 +122,7 @@
             "$wd = Get-Service WinDefend -ErrorAction SilentlyContinue; $wu = Get-Service wuauserv -ErrorAction SilentlyContinue",
             "$edge = (Test-Path (${env:ProgramFiles(x86)} + '\\Microsoft\\Edge\\Application\\msedge.exe')) -or (Test-Path ($env:ProgramFiles + '\\Microsoft\\Edge\\Application\\msedge.exe'))",
             "$inst = @{ bypass = @($labOn); moSetup = $moSet; unattendBypass = (@($unat).Count -gt 0); brand = $brand; ident = $ident.Substring(0, [math]::Min(160, $ident.Length)); noDefender = (-not $wd); noUpdate = (-not $wu); updateDisabled = [bool]($wu -and $wu.StartType -eq 'Disabled'); noEdge = (-not $edge); installDate = [string]$cv.InstallDate }",
-            "$o = @{ v = 1; os = [string]$os.Caption; build = [string]$os.BuildNumber; user = $uname; upDays = $up; pendingReboot = [bool]$pend; lastUpdateDays = $lu; ramGb = $ramT; ramPct = $ramU; cpu = $cpu; freeGb = [math]::Round($c.FreeSpace / 1GB, 1); diskGb = [math]::Round($c.Size / 1GB, 1); diskType = [string]$pd.MediaType; diskHealth = [string]$pd.HealthStatus; smart = $smart; badDevices = $bad; errors24h = $ev; crashes14d = $crash; adapters = $ad; ip = $ip; gw = $gw; gwOk = $gwOk; dnsOk = $dnsOk; netOk = $netOk; spooler = [string]$sp.Status; printers = $prn; jobs = $pj.Count; oldestJobMin = $old; scpprint = $spp; stoppedServices = $svc; startup = @($st | Select-Object -First 40); top = $top; tempMb = $tmp; power = $pp; fontsMissing = $miss; thSarabun = $thsb; synapseHost = $syn; install = $inst }",
+            "$o = @{ v = 1; os = [string]$os.Caption; build = [string]$os.BuildNumber; user = $uname; upDays = $up; pendingReboot = [bool]$pend; lastUpdateDays = $lu; ramGb = $ramT; ramPct = $ramU; cpu = $cpu; freeGb = [math]::Round($c.FreeSpace / 1GB, 1); diskGb = [math]::Round($c.Size / 1GB, 1); diskType = [string]$pd.MediaType; diskHealth = [string]$pd.HealthStatus; smart = $smart; badDevices = $bad; errors24h = $ev; crashes14d = $crash; adapters = $ad; ip = $ip; gw = $gw; gwOk = $gwOk; dnsOk = $dnsOk; netOk = $netOk; spooler = [string]$sp.Status; printers = $prn; jobs = $pj.Count; oldestJobMin = $old; scpprint = $spp; stoppedServices = $svc; startup = @($st | Select-Object -First 40); top = $top; tempMb = $tmp; power = $pp; fontsMissing = $miss; thSarabun = $thsb; synapseHost = $syn; install = $inst; slow = $slow }",
             "Write-Output ('SCP_HEALTH:' + ($o | ConvertTo-Json -Compress -Depth 4))"
         ]).join('\r\n');
     }
@@ -364,9 +374,39 @@
     }
 
     /* ---------- reading the answer ---------- */
+    // Slow or hanging, from what Windows recorded; null when it keeps up. The reasons say what was
+    // seen, the advice what usually fixes it on this kind of computer.
+    function slowVerdict(d) {
+        var s = d && d.slow;
+        if (!s) return null;
+        var reasons = [], advice = [];
+        var apps = function (list) { return (list || []).map(function (a) { return a.name.replace(/\.exe$/i, '') + ' ' + a.n; }).join(', '); };
+        if (s.hangs7d >= 5) reasons.push(t('programs stopped responding ', 'โปรแกรมค้าง (Not Responding) ') + s.hangs7d + t(' times in 7 days', ' ครั้งใน 7 วัน') + (s.hangApps && s.hangApps.length ? ' (' + apps(s.hangApps) + ')' : ''));
+        if (s.crashes7d >= 5) reasons.push(t('programs crashed ', 'โปรแกรมเด้งปิดเอง ') + s.crashes7d + t(' times in 7 days', ' ครั้งใน 7 วัน') + (s.crashApps && s.crashApps.length ? ' (' + apps(s.crashApps) + ')' : ''));
+        if (s.lowMem30d >= 1) reasons.push(t('Windows warned of low memory ', 'Windows เตือนหน่วยความจำไม่พอ ') + s.lowMem30d + t(' times in 30 days', ' ครั้งใน 30 วัน'));
+        if (d.ramPct >= 90) reasons.push(t('memory ', 'แรมถูกใช้ ') + d.ramPct + '%');
+        if (s.bootSec >= 120) reasons.push(t('start-up took ', 'เปิดเครื่องใช้เวลา ') + Math.round(s.bootSec / 60 * 10) / 10 + t(' min', ' นาที'));
+        if (!reasons.length) return null;
+        if (d.ramGb && d.ramGb <= 4.5) advice.push(t('add RAM to 8 GB (~1,200 baht)', 'เพิ่มแรมเป็น 8 GB (~1,200 บาท)'));
+        else if (d.ramGb && d.ramGb <= 8.5 && (d.ramPct >= 85 || s.lowMem30d >= 1)) advice.push(t('add RAM to 16 GB', 'เพิ่มแรมเป็น 16 GB'));
+        if (/HDD/i.test(d.diskType)) advice.push(t('replace the HDD with an SSD (~1,500 baht)', 'เปลี่ยน HDD เป็น SSD (~1,500 บาท)'));
+        var big = (d.top || []).filter(function (p) { return p.mb >= 1500 && !/Memory Compression|System|MsMpEng/i.test(p.name); })[0];
+        if (big) advice.push(t('check ', 'ตรวจโปรแกรม ') + big.name + ' (' + big.mb + ' MB)');
+        if (d.upDays >= 7) advice.push(t('restart it', 'รีสตาร์ทเครื่อง'));
+        if (!advice.length) advice.push(t('look at the programs listed', 'ตรวจโปรแกรมที่ระบุ'));
+        return { reasons: reasons, advice: advice };
+    }
     function findings(d) {
         var out = [], add = function (cat, level, title, detail, fixes) { out.push({ cat: cat, level: level, title: title, detail: detail || '', fixes: fixes || [] }); };
         var SYS = t('System', 'ระบบ'), HW = t('Hardware', 'ฮาร์ดแวร์'), NET = t('Network', 'เครือข่าย'), PRN = t('Printers', 'เครื่องพิมพ์'), SPD = t('Speed and upkeep', 'ความเร็วและการดูแล'), FNT = t('Fonts', 'ฟอนต์');
+        // Slow or hanging comes first: it is what the people using the computer feel, and the
+        // hospital wants to hear about it before anything else. A computer that cannot take
+        // Windows 11 stays on Windows 10; what matters is whether it still keeps up.
+        var sv = slowVerdict(d);
+        if (sv) {
+            var f = { cat: t('Slow / hanging', 'ค้าง / ช้า'), level: 'bad', slow: true, title: t('This computer is slow or hangs', 'เครื่องนี้ค้าง/ช้า'), detail: sv.reasons.join(' · ') + (sv.advice.length ? t(' → ', ' → แนะนำ: ') + sv.advice.join(', ') : ''), fixes: [] };
+            out.push(f);
+        }
         // system
         if (d.upDays >= 14) add(SYS, 'bad', t('On for ', 'เปิดต่อเนื่อง ') + Math.floor(d.upDays) + t(' days', ' วัน'), t('A restart clears memory leaks and finishes updates.', 'ควรรีสตาร์ท ช่วยคืนหน่วยความจำและให้อัปเดตทำงานครบ'));
         else if (d.upDays >= 7) add(SYS, 'warn', t('On for ', 'เปิดต่อเนื่อง ') + Math.floor(d.upDays) + t(' days', ' วัน'), t('Restart when convenient.', 'ควรรีสตาร์ทเมื่อสะดวก'));
@@ -644,11 +684,11 @@
             morning.textContent = '';
             if (!m) { morning.appendChild(el('p', t('No morning check yet. The server checks every computer that is on at ', 'ยังไม่มีผลตรวจเช้า เซิร์ฟเวอร์จะตรวจทุกเครื่องที่เปิดอยู่เองทุกวันเวลา ') + '07:30', 'scp-health-hint')); return; }
             morning.appendChild(el('h4', t('Morning check ', 'ตรวจเช้า ') + new Date(m.at).toLocaleString(th ? 'th-TH' : undefined, { dateStyle: 'medium', timeStyle: 'short' })));
-            morning.appendChild(el('p', t('Checked ', 'ตรวจ ') + m.checked + t(' · fine ', ' เครื่อง · ปกติ ') + m.ok + t(' · worth a look ', ' · ควรดู ') + m.warn + t(' · with problems ', ' · มีปัญหา ') + m.problems.length + (m.noAnswer ? t(' · no answer ', ' · ไม่ตอบ ') + m.noAnswer : ''), 'scp-health-sum'));
+            morning.appendChild(el('p', t('Checked ', 'ตรวจ ') + m.checked + t(' · fine ', ' เครื่อง · ปกติ ') + m.ok + t(' · worth a look ', ' · ควรดู ') + m.warn + t(' · with problems ', ' · มีปัญหา ') + m.problems.length + (m.slow ? t(' · slow/hanging ', ' · 🐢 ค้าง/ช้า ') + m.slow : '') + (m.noAnswer ? t(' · no answer ', ' · ไม่ตอบ ') + m.noAnswer : ''), 'scp-health-sum'));
             m.problems.forEach(function (p) {
                 var row = el('button', null, 'scp-health-fleet-row'); row.type = 'button';
-                row.appendChild(el('strong', p.name)); row.appendChild(el('span', '🔴 ' + p.bad.length, 'scp-health-fleet-count'));
-                row.appendChild(el('small', p.bad.slice(0, 3).join(' · ')));
+                row.appendChild(el('strong', (p.slow ? '🐢 ' : '') + p.name)); row.appendChild(el('span', '🔴 ' + p.bad.length, 'scp-health-fleet-count'));
+                row.appendChild(el('small', p.slow || p.bad.slice(0, 3).join(' · ')));
                 row.onclick = function () { var n = nodeById(p.nodeid); if (n && root.showComputerDetailModal) { d.close(); root.showComputerDetailModal(n); } };
                 morning.appendChild(row);
             });
@@ -769,5 +809,5 @@
     // The server runs the same check every morning (hospital/morning-check.js) and hands the font list in itself.
     function setManifest(m) { manifest = m; }
 
-    root.ScpHealth = { setManifest: setManifest, daysUntilFull: daysUntilFull, section: section, receive: receive, check: check, fix: fix, openFleet: openFleet, openPrinters: openPrinters, openFonts: openFonts, findings: findings, healthScript: healthScript, FIX: FIX, results: results, load: load };
+    root.ScpHealth = { setManifest: setManifest, daysUntilFull: daysUntilFull, slowVerdict: slowVerdict, section: section, receive: receive, check: check, fix: fix, openFleet: openFleet, openPrinters: openPrinters, openFonts: openFonts, findings: findings, healthScript: healthScript, FIX: FIX, results: results, load: load };
 }(window));

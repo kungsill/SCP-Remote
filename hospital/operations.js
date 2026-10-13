@@ -290,7 +290,7 @@ exports.handle = async function (ctx, cmd) {
   for (const p of (row.problems || [])) if (p && await access(p.nodeid)) problems.push(p);
   const m = parent.parent && parent.parent.scpMorning;
   const s = (parent.parent && parent.parent.config && parent.parent.config.settings) || {};
-  return { at: row.at, checked: row.checked, ok: row.ok, warn: row.warn, noAnswer: row.noAnswer || 0, problems, running: !!(m && m.running),
+  return { at: row.at, checked: row.checked, ok: row.ok, warn: row.warn, slow: row.slow || 0, noAnswer: row.noAnswer || 0, problems, running: !!(m && m.running),
    schedule: s.scpmorningcheck === 'off' || s.scpmorningcheck === false ? 'off' : (typeof s.scpmorningcheck === 'string' ? s.scpmorningcheck : '07:30'),
    delivery: { webhook: !!s.scpalertwebhook, telegram: !!(s.scptelegram && s.scptelegram.token) } };
  }

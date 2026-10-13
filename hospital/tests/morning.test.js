@@ -110,3 +110,21 @@ test('fix printing from the phone: needs the header, the Run Commands right, and
     assert.equal(log.entries[0].by, 'user//it');
     assert.equal(log.entries[0].from, 'mobile');
 });
+
+test('slow or hanging computers are named first, with what to do', () => {
+    const H = morning.loadHealth();
+    const base = { upDays: 2, lastUpdateDays: 3, ramPct: 60, ramGb: 4, cpu: 10, freeGb: 50, diskGb: 200, diskType: 'HDD', adapters: ['e'], ip: '10.0.0.2', gw: '10.0.0.1', gwOk: true, dnsOk: true, netOk: true, spooler: 'Running', jobs: 0, printers: [], startup: [], tempMb: 10, fontsMissing: [], thSarabun: true, top: [] };
+    const fine = Object.assign({}, base, { slow: { hangs7d: 2, crashes7d: 0, lowMem30d: 0, bootSec: 40, hangApps: [] } });
+    assert.equal(H.slowVerdict(fine), null, 'two hangs a week is not "slow"');
+    const slow = Object.assign({}, base, { slow: { hangs7d: 12, crashes7d: 0, lowMem30d: 3, bootSec: 200, hangApps: [{ name: 'HOSxPXE4.exe', n: 9 }] } });
+    const v = H.slowVerdict(slow);
+    assert.match(v.reasons.join(' '), /HOSxPXE4 9/);
+    assert.match(v.advice.join(' '), /เพิ่มแรมเป็น 8 GB/);
+    assert.match(v.advice.join(' '), /SSD/);
+    assert.equal(H.findings(slow)[0].slow, true, 'it is the first finding');
+    const s = morning.summarize({ 'node//a': fine, 'node//b': slow, 'node//c': Object.assign({}, base, { upDays: 30 }) }, { 'node//a': 'A', 'node//b': 'ห้องบัตร-2', 'node//c': 'C' }, d => H.findings(d), Date.now());
+    assert.equal(s.slow, 1);
+    assert.equal(s.problems[0].name, 'ห้องบัตร-2', 'slow computer leads');
+    assert.match(s.text.split('\n')[1], /เครื่องค้าง\/ช้า/);
+    assert.match(s.text.split('\n')[2], /ห้องบัตร-2: .*HOSxPXE4/);
+});

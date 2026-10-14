@@ -1,3 +1,9 @@
+# SCP-Remote
+
+ระบบสนับสนุนงาน IT โรงพยาบาลสีชมพู พัฒนาต่อยอดจาก MeshCentral
+
+ดูวิธีติดตั้ง การใช้งาน และการดูแลระบบใน [คู่มือ SCP-Remote](hospital/README.md)
+
 # MeshCentral
 
 > **SCP-Remote hospital edition:** คู่มือเริ่มใช้งาน ตั้งค่าเครือข่ายภายใน และภาษาไทย/English อยู่ที่ [hospital/README.md](hospital/README.md). Upstream documentation and credits are retained below.

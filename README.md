@@ -1,90 +1,91 @@
 # SCP-Remote
 
-ระบบสนับสนุนงาน IT โรงพยาบาลสีชมพู พัฒนาต่อยอดจาก MeshCentral
+ระบบจัดการและช่วยเหลือคอมพิวเตอร์สำหรับ **โรงพยาบาลสีชมพู** รวมงานรีโมต ตรวจสถานะ แจ้งซ่อม ประเมินครุภัณฑ์ และวางแผนงบประมาณไว้ในที่เดียว
 
-ดูวิธีติดตั้ง การใช้งาน และการดูแลระบบใน [คู่มือ SCP-Remote](hospital/README.md)
+พัฒนาและดูแล SCP-Remote โดย **[kungsill](https://github.com/kungsill)**
 
-# MeshCentral
+## ความสามารถหลัก
 
-> **SCP-Remote hospital edition:** คู่มือเริ่มใช้งาน ตั้งค่าเครือข่ายภายใน และภาษาไทย/English อยู่ที่ [hospital/README.md](hospital/README.md). Upstream documentation and credits are retained below.
+- **แดชบอร์ดและผังโรงพยาบาล** — ดูเครื่องตามห้องหรือแผนก ค้นชื่อเครื่องและ IP ตรวจสถานะออนไลน์ และดูภาพรวมการใช้งาน
+- **รีโมตช่วยเหลือ** — ควบคุมหน้าจอ ใช้เทอร์มินัล และรับ–ส่งไฟล์ตามสิทธิ์ มีขั้นตอนขออนุญาตสำหรับการเข้าถึงตามการตั้งค่า
+- **งานซ่อมและประวัติรายเครื่อง** — แจ้งปัญหา มอบหมายผู้รับผิดชอบ ติดตามสถานะ และบันทึกผลซ่อม
+- **ใบประมาณการซ่อมกลาง** — เพิ่มอุปกรณ์ อะไหล่ และค่าแรง ผูกกับใบแจ้งซ่อม เปิดต่อจากเครื่องอื่น และพิมพ์รายงานได้
+- **ประเมินสภาพและงบประมาณ** — ตรวจความพร้อม Windows 11, RAM, ดิสก์ และอายุเครื่อง พร้อมประมาณการอัปเกรดหรือซื้อทดแทน
+- **คลังราคากลางคอมพิวเตอร์** — ค้นรายการ PC, All-in-One, Notebook และอุปกรณ์อื่น อ่านสเปกและ PDF ต้นฉบับ ส่งออก CSV และพิมพ์ได้
+- **เครื่องมือฝ่าย IT** — ตรวจสุขภาพเครื่อง ดูแลไดรเวอร์ เครื่องพิมพ์ ไฟล์ชั่วคราว และสถานะไฟล์สำรอง
+- **เว็บมือถือและโปรแกรม Windows** — หน้าเลือกเครื่องสำหรับมือถือ รองรับภาษาไทย / English และโหมดสว่าง / มืด พร้อมโปรแกรมรีโมตสำหรับเจ้าหน้าที่
 
-## Table of Contents
+## เริ่มใช้งาน
 
-[About](#about)
-[Social Media](#social-media)
-[Documentation](#documentation)
-[Video Tutorials](#video-tutorials)
-[Community Meetings](#community-meetings)
-[Feedback](#feedback)
-[Unofficial Chatrooms](#unofficial-chatrooms)
-[Archive PDFs](#archive-pdfs)
-[License](#license)
+ต้องมี **Node.js 20 ขึ้นไป** และ npm เปิด Terminal หรือ PowerShell ในโฟลเดอร์โครงการแล้วรัน:
 
-## About
-MeshCentral is a full computer management web site. With MeshCentral, you can run your own web server to remotely manage and control computers on a local network or anywhere on the internet. Once you get the server started, create device group and download and install an agent on each computer you want to manage. A minute later, the new computer will show up on the web site and you can take control of it. MeshCentral includes full web-based remote desktop, terminal and file management capability.
+```powershell
+git clone https://github.com/kungsill/SCP-Remote.git
+cd SCP-Remote
+npm ci
+npm run build:hospital
+npm run start:hospital
+```
 
-For more information, [visit MeshCentral.com](https://meshcentral.com).
+เปิด **https://127.0.0.1:8443** เพื่อเริ่มใช้งานบนเครื่องเซิร์ฟเวอร์ ค่าเริ่มต้นสำหรับการติดตั้งใหม่จำกัดการเข้าถึงไว้ที่เครื่องเดียว อ่านขั้นตอนตั้งชื่อหรือ IP เซิร์ฟเวอร์ วงเครือข่าย และ HTTPS ใน [คู่มือติดตั้งและตั้งค่า](hospital/README.md) ก่อนเปิดให้เครื่องอื่นเชื่อมต่อ
 
-## Social Media
-[YouTube](https://www.youtube.com/channel/UCJWz607A8EVlkilzcrb-GKg/videos)
-[Reddit](https://www.reddit.com/r/MeshCentral/)
-[BlogSpot](https://meshcentral2.blogspot.com/)
-[LinkedIn](https://www.linkedin.com/groups/13067101/)
+ไฟล์ตั้งค่าและข้อมูลขณะทำงานอยู่ใน `.local/scp-remote/` แยกจากโค้ดใน Git การเริ่มระบบจะรักษาไฟล์ตั้งค่าที่มีอยู่แล้ว
 
-## Documentation
-[New Searchable Documentation](https://ylianst.github.io/MeshCentral/) is available here and contains information every administrator should know including usage, the server configuration file, databases, TLS offloading, Let's Encrypt, IP Filtering, Email setup, embedding, server port aliasing, reverse proxy setup, multi factor authentication, branding & terms of use, HashiCorp Vault support, and SSO.
+### บริการ Windows
 
-The [Design and Architecture Guide](https://meshcentral.com/docs/MeshCentral2DesignArchitecture.pdf) is a short document that includes information on the design overview, dependencies, source code descriptions of each file, certificates, TLS security, the agent to server handshake, browser to agent relay and WebRTC and the messenger service.
+เมื่อตั้งค่าเซิร์ฟเวอร์เรียบร้อยแล้ว เปิด PowerShell ด้วยสิทธิ์ผู้ดูแลระบบ:
 
-## Video Tutorials
-You can watch many tutorial videos on the [MeshCentral YouTube Channel](https://www.youtube.com/channel/UCJWz607A8EVlkilzcrb-GKg/videos). Two videos to get started involve installation and basic usages.
+```powershell
+npm run service:install
+```
 
-Installing MeshCentral on Windows, Linux and macOS.  
-[![MeshCentral - Installation](https://img.youtube.com/vi/GsQbWZmRRAU/mqdefault.jpg)](https://www.youtube.com/watch?v=GsQbWZmRRAU)
+คำสั่งดูแลบริการที่ติดตั้งไว้แล้ว:
 
-Basic Usages including installing the agent and remote desktop, terminal and file access.  
-[![MeshCentral - Basics](https://img.youtube.com/vi/D9Q7M7PdTg0/mqdefault.jpg)](https://www.youtube.com/watch?v=D9Q7M7PdTg0)
+```powershell
+npm run service:stop
+npm run service:start
+npm run service:restart
+```
 
-MeshCentral support for two-factor authentication.  
-[![MeshCentral - Two Factor Authentication](https://img.youtube.com/vi/luLZKcma9l0/mqdefault.jpg)](https://www.youtube.com/watch?v=luLZKcma9l0)
+## การใช้งานประจำวัน
 
-How to setup MeshCentral with the NGINX reverse proxy.  
-[![MeshCentral - NGINX Reverse Proxy](https://img.youtube.com/vi/YSmiLyKSX2I/mqdefault.jpg)](https://www.youtube.com/watch?v=YSmiLyKSX2I)
+1. สร้างกลุ่มอุปกรณ์ตามห้องหรือแผนก แล้วติดตั้งเอเจนต์จากกลุ่มนั้นบนเครื่องลูก
+2. เปิดแดชบอร์ดเพื่อค้นเครื่อง ดูสถานะ หรือขอรีโมตช่วยเหลือ
+3. เข้า **แจ้งซ่อม / ตรวจระบบ** เพื่อบันทึกปัญหาและติดตามใบงาน
+4. เปิดรายละเอียดใบแจ้งซ่อม → **ประมาณการซ่อม / อะไหล่ / พิมพ์** เพื่อจัดทำประมาณการ แล้วกด **บันทึกกลาง / ผูกใบแจ้งซ่อม**
+5. เปิดหน้าประเมินหรือคลังราคากลางเพื่อวางแผนงบ และพิมพ์รายงานพร้อมรายละเอียด
 
-Installing and using the MeshCentral Android agent.  
-[![MeshCentral - Android](https://img.youtube.com/vi/wi1HYdW00Bk/mqdefault.jpg)](https://www.youtube.com/watch?v=wi1HYdW00Bk)
+คลังราคาแยกประกาศจริงออกจากฉบับร่างที่ใช้วางแผนงบ 2570 เลือกดูปีงบ 2551–2570 ได้ แต่ต้นฉบับเกณฑ์ทั่วไปปี 2551–2552 และ 2554 ยังยืนยันไม่ครบ ดูขอบเขตข้อมูลและแหล่งอ้างอิงใน [คู่มือคลังราคา](hospital/REFERENCE-PRICE-ARCHIVE.md)
 
-Using MeshCentral Router to port map TCP connections.  
-[![MeshCentral - Basics](https://img.youtube.com/vi/BubeVRmbCRM/mqdefault.jpg)](https://www.youtube.com/watch?v=BubeVRmbCRM)
+## คู่มือเพิ่มเติม
 
-## Community Meetings
-Join our monthly community meetings to stay updated with the latest MeshCentral developments, ask questions, and connect with other users and developers.
+| เรื่อง | เอกสาร |
+| --- | --- |
+| ติดตั้งและตั้งค่าเซิร์ฟเวอร์ | [คู่มือ SCP-Remote](hospital/README.md) |
+| แจ้งซ่อม คลังไดรเวอร์ และตรวจสำรอง | [ศูนย์งาน IT](hospital/IT-OPERATIONS.md) |
+| ติดตั้งบนเครื่องลูก | [ชุดติดตั้งเครื่องลูก](hospital/client-setup/README.md) |
+| โปรแกรมรีโมตสำหรับเจ้าหน้าที่ | [SCP-Remote Desktop](hospital/DESKTOP-APP.md) |
+| คลังราคากลางและประมาณการซ่อม | [คู่มือคลังราคา](hospital/REFERENCE-PRICE-ARCHIVE.md) |
+| ประเมินและวางแผนงบ 2570 | [ราคาสำหรับวางแผนงบ](hospital/REFERENCE-PRICES-2570.md) |
+| รับช่วงดูแลและย้ายเซิร์ฟเวอร์ | [รับช่วงดูแล](hospital/HANDOVER.md) · [ย้ายเซิร์ฟเวอร์](hospital/MOVING-THE-SERVER.md) |
+| สถานะงานพัฒนา | [งานที่ทำแล้วและงานค้าง](hospital/WORK-IN-PROGRESS.md) |
 
-- [Watch past meeting recordings](https://videos.evoludata.com/w/p/tUnLpw6z1LCASuATa7wnCo)
-- [Learn more about our monthly meetings](https://github.com/Ylianst/MeshCentral/wiki/Community-Monthly-Meetings)
+## สำหรับผู้พัฒนา
 
-## Feedback
-If you encounter a problem or have a suggestion to improve the product, you may file an [issue report](https://github.com/Ylianst/MeshCentral/issues/)
+```powershell
+npm run build:hospital
+npm run test:hospital
+npm run check:hospital
+```
 
-If you are filing a problem report, you should include:
-* The version of the software you are using
-* The operating system and version
-* The observed output
-* The expected output
-* Any troubleshooting you took to resolve the issue yourself
-* Any other similar reports
+หลังแก้ template หรือคำแปล ให้สร้างหน้าเว็บใหม่ด้วย `build:hospital` ก่อนเริ่มบริการ ส่วน `check:hospital` ใช้ตรวจเว็บเมื่อเซิร์ฟเวอร์ทำงานอยู่
 
-If you are having issues with the following other products, you should file a report on their respective issue pages
-[MeshAgent](https://github.com/Ylianst/MeshAgent/issues)
-[MeshRouter](https://github.com/Ylianst/MeshCentralRouter/issues)
+แจ้งปัญหาหรือเสนอความสามารถของ SCP-Remote ได้ที่ [Issues ของโครงการ](https://github.com/kungsill/SCP-Remote/issues) พร้อมรายละเอียดปัญหา รุ่นที่ใช้งาน และขั้นตอนที่ทำให้พบปัญหา
 
-## Unofficial chatrooms
-- Discord Server: https://discord.gg/8wHC6ASWAc
-- Telegram Channel: https://t.me/meshcentral
+## เครดิตและสัญญาอนุญาต
 
-## Archive PDFs
-[User's Guide](https://meshcentral.com/docs/MeshCentral2UserGuide.pdf)
-[Installation Guide](https://meshcentral.com/docs/MeshCentral2InstallGuide.pdf)
+SCP-Remote พัฒนาต่อยอดจาก **[MeshCentral](https://github.com/Ylianst/MeshCentral)** โดย **[Ylianst](https://github.com/Ylianst)** และผู้ร่วมพัฒนา MeshCentral ขอบคุณสำหรับระบบรีโมต เอเจนต์ และพื้นฐานการจัดการอุปกรณ์
 
-## License
-This software is licensed under [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+- โค้ดใช้สัญญาอนุญาต **Apache License 2.0** ตาม [LICENSE](LICENSE) โดยคงประกาศลิขสิทธิ์และสัญญาอนุญาตของต้นฉบับ
+- เอกสารของระบบพื้นฐาน: [MeshCentral Documentation](https://ylianst.github.io/MeshCentral/)
+- ฟอนต์และส่วนประกอบภายนอกใช้สัญญาอนุญาตของแต่ละรายการ ดู [ใบอนุญาตฟอนต์](public/fonts/thai/licenses/) และไฟล์ในแพ็กเกจที่เกี่ยวข้อง

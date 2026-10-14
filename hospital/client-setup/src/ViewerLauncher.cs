@@ -9,7 +9,7 @@ namespace ScpRemoteViewer
         [STAThread]
         static void Main()
         {
-            string url = "https://192.168.2.25:8445/";
+            string url = "https://192.168.2.25:8443/";
             
             string[] candidates = new string[] {
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"Microsoft\Edge\Application\msedge.exe"),

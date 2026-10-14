@@ -3252,6 +3252,14 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
                     return;
                 }
 
+                // A successful form login can render here directly, bypassing GET /
+                // middleware. Apply the same hospital landing choice before rendering.
+                if (domain.id === '') {
+                    var scpContinue = false;
+                    require('./hospital/mobile').root(obj, dbGetFunc.req, dbGetFunc.res, function () { scpContinue = true; }, domain.url);
+                    if (!scpContinue) return;
+                }
+
                 var viewmode = 1;
                 if (dbGetFunc.req.session.viewmode) {
                     viewmode = dbGetFunc.req.session.viewmode;

@@ -73,7 +73,7 @@
             <div id=deskarea3x style="max-height:calc(100vh - 52px);height:calc(100vh - 56px);">
                 <div id=DeskFocus oncontextmenu="return false" onmousedown=dmousedown(event) onmouseup=dmouseup(event) onmousemove=dmousemove(event)></div>
                 <div id=DeskParent>
-                    <canvas id=Desk width=640 height=480 oncontextmenu="return false" onmousedown=dmousedown(event) onmouseup=dmouseup(event) onmousemove=dmousemove(event) onmousewheel=dmousewheel(event)></canvas>
+                    <canvas id=Desk width=640 height=480 style="image-rendering:auto!important;-webkit-font-smoothing:antialiased" oncontextmenu="return false" onmousedown=dmousedown(event) onmouseup=dmouseup(event) onmousemove=dmousemove(event) onmousewheel=dmousewheel(event)></canvas>
                 </div>
                 <div id=p11DeskConsoleMsg style="display:none;text-align:left;cursor:pointer;position:absolute;left:30px;top:17px;color:yellow;background-color:rgba(0,0,0,0.6);padding:10px;border-radius:5px" onclick=clearConsoleMsg()></div>
             </div>
@@ -331,7 +331,12 @@
         var t = null;
         try { t = localStorage.getItem('desktopsettings'); } catch (ex) { }
         if (t != null) { try { desktopsettings = JSON.parse(t); } catch (ex) { } }
-        if (((features2 & 1) == 0) && (desktopsettings.quality > 60)) { desktopsettings.quality = 60; }
+        // SCP-Remote: Hospital LAN - Always force 100% full quality & 1024 full scaling from the start
+        desktopsettings.quality = 100;
+        desktopsettings.scaling = 1024;
+        desktopsettings.agentencoding = 4;
+        desktopsettings.framerate = 50;
+        try { localStorage.setItem('desktopsettings', JSON.stringify(desktopsettings)); } catch (ex) { }
 
         // Terminal
         var terminal = null;
@@ -433,12 +438,13 @@
                 QS('Desk').width = '100%';
                 QS('DeskParent').overflow = 'hidden';
             } else if (deskAspectRatio == 1) {
-                // Zoomed mode
+                // Zoomed mode (1:1 actual size)
                 QS('Desk')['margin-top'] = '0px';
                 //QS('Desk')['margin-left'] = '0px';
                 QS('Desk').height = deskH + 'px';
                 QS('Desk').width = deskW + 'px';
-                QS('DeskParent').overflow = 'scroll';
+                QS('DeskParent').overflow = 'auto';
+                if (Q('Desk')) { Q('Desk').style.setProperty('image-rendering', 'auto', 'important'); }
             } else {
                 // Fixed aspect ratio
                 if ((parentH / parentW) > (deskH / deskW)) {
@@ -462,6 +468,7 @@
                 }
                 QS('Desk')['margin-top'] = null;
                 QS('DeskParent').overflow = 'hidden';
+                if (Q('Desk')) { Q('Desk').style.setProperty('image-rendering', 'auto', 'important'); }
             }
         }
 
@@ -752,6 +759,10 @@
                 case 3:
                     if (desktop && (desktop.serverIsRecording == true)) { QV('deskRecordIcon', true); }
                     desktop.startTime = new Date();
+                    if (desktop && desktop.m && desktop.m.SendCompressionLevel) {
+                        desktop.m.SendCompressionLevel(4, 100, 1024, 50);
+                        if (desktop.m.SendRefresh) { desktop.m.SendRefresh(); }
+                    }
                     if (updateSessionTimer == null) { updateSessionTimer = setInterval(updateSessionTime, 1000); }
                     break;
                 default:
@@ -824,13 +835,13 @@
         }
 
         function applyDesktopSettings() {
-            var r = '', ops = (features2 & 1) ? [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 5, 1] : [60, 50, 40, 30, 20, 10, 5, 1]
+            var r = '', ops = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 5, 1];
             for (var i in ops) { r += '<option value=' + ops[i] + '>' + ops[i] + '%</option>'; }
             QH('d7bitmapquality', r);
             d7desktopmode.value = desktopsettings.encoding;
             d7showfocus.checked = desktopsettings.showfocus;
             d7showcursor.checked = desktopsettings.showmouse;
-            d7bitmapquality.value = 40; // Default value
+            d7bitmapquality.value = 100; // Default value
             if (ops.indexOf(parseInt(desktopsettings.quality)) >= 0) { d7bitmapquality.value = desktopsettings.quality; }
             d7bitmapscaling.value = desktopsettings.scaling;
             if (desktopsettings.framerate) { d7framelimiter.value = desktopsettings.framerate; } else { d7framelimiter.value = 100; }

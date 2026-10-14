@@ -7,7 +7,8 @@
     "publishedAt": "2026-05-11",
     "status": "official",
     "scope": "replace-first-11",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 11
   },
   {
     "id": "mdes-10282",
@@ -17,7 +18,8 @@
     "publishedAt": "2025-12-01",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 70
   },
   {
     "id": "mdes-6650",
@@ -27,7 +29,8 @@
     "publishedAt": "2023-03-13",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 75
   },
   {
     "id": "mdes-5121",
@@ -37,7 +40,8 @@
     "publishedAt": "2021-12-30",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 73
   },
   {
     "id": "mdes-2564",
@@ -47,7 +51,8 @@
     "publishedAt": "2020-05-12",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 73
   },
   {
     "id": "mdes-1598",
@@ -57,7 +62,8 @@
     "publishedAt": "2019-03-15",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 72
   },
   {
     "id": "mdes-1597",
@@ -67,7 +73,8 @@
     "publishedAt": "2018-05-23",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 72
   },
   {
     "id": "mdes-1596",
@@ -77,7 +84,8 @@
     "publishedAt": "2017-04-21",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 69
   },
   {
     "id": "mdes-1595",
@@ -87,7 +95,8 @@
     "publishedAt": "2016-03-11",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 69
   },
   {
     "id": "mdes-1594",
@@ -97,7 +106,8 @@
     "publishedAt": "2015-08-25",
     "status": "official",
     "scope": "supplement",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 4
   },
   {
     "id": "mdes-1593",
@@ -107,7 +117,8 @@
     "publishedAt": "2015-02-18",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 64
   },
   {
     "id": "mdes-1592",
@@ -117,7 +128,8 @@
     "publishedAt": "2014-02-21",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 61
   },
   {
     "id": "mdes-1591",
@@ -127,7 +139,8 @@
     "publishedAt": "2013-03-29",
     "status": "official",
     "scope": "supplement",
-    "unnumbered": true
+    "unnumbered": true,
+    "expectedItems": 4
   },
   {
     "id": "mdes-1590",
@@ -137,7 +150,8 @@
     "publishedAt": "2013-03-08",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 58
   },
   {
     "id": "ict-2553",
@@ -147,7 +161,8 @@
     "publishedAt": "2010-02-11",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 49
   },
   {
     "id": "ict-2554",
@@ -157,7 +172,8 @@
     "publishedAt": "2011-05-11",
     "status": "official",
     "scope": "gis",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 22
   },
   {
     "id": "ict-2555",
@@ -167,7 +183,8 @@
     "publishedAt": "2012-02-10",
     "status": "official",
     "scope": "full",
-    "unnumbered": false
+    "unnumbered": false,
+    "expectedItems": 57
   },
   {
     "id": "draft-2570",
@@ -177,6 +194,7 @@
     "publishedAt": null,
     "planningFiscalYearBE": 2570,
     "status": "draft",
-    "scope": "full"
+    "scope": "full",
+    "expectedItems": 70
   }
 ]

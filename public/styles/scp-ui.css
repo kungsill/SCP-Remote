@@ -41,12 +41,12 @@
 .scp-ui :is(button, input, select, textarea) { font-family: "IBM Plex Sans Thai", Sarabun, sans-serif; }
 .scp-ui :is(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid #d1428c !important; outline-offset: 3px; }
 .scp-ui #masthead {
-    background: rgba(255, 255, 255, 0.9) !important;
+    background: var(--scp-surface) !important;
     backdrop-filter: blur(20px) saturate(1.8);
     -webkit-backdrop-filter: blur(20px) saturate(1.8);
     color: var(--scp-ink);
     border-bottom: 1px solid var(--scp-line);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 4px 20px rgba(74, 17, 52, 0.04);
+    box-shadow: var(--scp-shadow);
     box-sizing: border-box;
 }
 .scp-ui #masthead .title { color: var(--scp-ink); font-size: 26px; font-weight: 700; padding: 13px 0 0 20px; height: auto; letter-spacing: -0.03em; }
@@ -65,7 +65,7 @@
 .scp-workspace-heading h2 { font-size: 29px; font-weight: 700; line-height: 1.35; margin: 4px 0 7px; letter-spacing: -.6px; color: var(--scp-ink); }
 .scp-workspace-heading p { color: var(--scp-muted); margin: 0; font-size: 14px; }
 .scp-workspace #page_leftbar {
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--scp-surface);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     color: var(--scp-muted);

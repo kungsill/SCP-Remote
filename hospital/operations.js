@@ -12,6 +12,7 @@ exports.handle = async function (ctx, cmd) {
  const save = row => new Promise((resolve,reject)=>db.Set(row,e=>e?reject(e):resolve()));
  const access = id => new Promise(resolve=>parent.GetNodeWithRights(domain,user,id,(node,rights,visible)=>resolve(!!(node&&visible&&rights))));
  const admin = user.siteadmin === 4294967295;
+ if (cmd.op === 'getTicketEstimate' || cmd.op === 'saveTicketEstimate') return require('./ticket-estimates').handle(ctx, cmd, {get, save, access, queues});
  if (cmd.op==='backups' || cmd.op==='verifyBackup') {
   if (!admin || domain.id!=='') throw Error('ACCESS_DENIED');
   return cmd.op==='backups' ? backup.status(parent.parent) : backup.verify(parent.parent);

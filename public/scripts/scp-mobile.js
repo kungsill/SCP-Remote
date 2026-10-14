@@ -13,7 +13,7 @@
     const $ = id => document.getElementById(id);
     let lang = 'th';
     try { lang = localStorage.getItem('scpMobileLanguage') || 'th'; } catch (ex) { }
-    let data = { rooms: [], nodes: [] }, room = '', query = '', map = false, busy = false, loaded = false;
+    let data = { rooms: [], nodes: [] }, room = '', query = '', map = false, onlineOnly = false, busy = false, loaded = false, lastUpdated = null;
 
     // Something to look at while the first list is on its way. A phone on mobile data can sit
     // on an empty page long enough to look broken.
@@ -30,6 +30,8 @@
 
     const t = (th, en) => (lang === 'th' ? th : en);
     function el(tag, text, cls) { const n = document.createElement(tag); if (text) n.textContent = text; if (cls) n.className = cls; return n; }
+    function icon(name) { return $('icon-' + name).content.firstElementChild.cloneNode(true); }
+    function updatedStatus() { if (lastUpdated) $('status').textContent = t('อัปเดตล่าสุด ', 'Updated ') + lastUpdated.toLocaleTimeString(lang === 'th' ? 'th-TH' : 'en-GB'); }
 
     const messages = {
         NOT_SIGNED_IN: ['เซสชันหมดอายุ กำลังพากลับไปหน้าเข้าสู่ระบบ…', 'Session expired. Returning to the login page…'],
@@ -42,18 +44,20 @@
     function labels() {
         document.documentElement.lang = lang;
         $('language').value = lang;
-        [['totalLabel', 'เครื่องทั้งหมด', 'Total devices'],
+        [['totalLabel', 'ทั้งหมด', 'Devices'],
         ['onlineLabel', 'ออนไลน์', 'Online'],
-        ['roomsLabel', 'ห้อง / หน่วยงาน', 'Rooms'],
-        ['roomTitle', 'ห้อง / หน่วยงาน', 'Rooms / departments'],
-        ['heading', 'เลือกเครื่องที่ต้องการรีโมต', 'Choose a device'],
-        ['hint', 'ค้นหาตามชื่อเครื่องหรือ IP แล้วส่งคำขออนุญาต', 'Find a device by name or IP, then request access'],
+        ['roomsLabel', 'หน่วยงาน', 'Departments'],
+        ['roomTitle', 'หน่วยงาน', 'Departments'],
+        ['heading', 'เลือกเครื่องเพื่อรีโมต', 'Choose a device'],
+        ['hint', 'ค้นหาเครื่อง เลือกหน่วยงาน แล้วขอเชื่อมต่อ', 'Find a device, choose a department, and request access'],
+        ['devicesTitle', 'รายชื่อเครื่อง', 'Devices'],
+        ['onlineOnlyLabel', 'ออนไลน์เท่านั้น', 'Online only'],
         ['refresh', 'รีเฟรช', 'Refresh'],
         ['listView', 'รายชื่อ', 'List'],
         ['mapView', 'ผังห้อง', 'Room map'],
         ['full', 'เว็บเต็ม', 'Full site'],
         ['consentNote', 'ทุกครั้งต้องได้รับอนุญาตจากเครื่องปลายทาง', 'Every connection needs permission on the remote computer']
-        ].forEach(([id, th, en]) => { const n = $(id); if (n) n.textContent = t(th, en); });
+        ].forEach(([id, th, en]) => { const n = $(id); if (n) { const label = n.querySelector('[data-label]') || n; label.textContent = t(th, en); if (n.tagName === 'BUTTON') { n.title = t(th, en); n.setAttribute('aria-label', t(th, en)); } } });
         // The gear is a link, so its label belongs on the title and the accessible name rather
         // than in the page text, where it would print next to the icon.
         const settings = $('settings');
@@ -68,28 +72,33 @@
             settings.href = siteRoot() + '?m=0&mobile=0';
         }
         $('search').placeholder = t('ค้นหาชื่อเครื่อง หรือ IP', 'Search device name or IP');
+        $('search').setAttribute('aria-label', $('search').placeholder);
+        document.querySelector('.view-switch').setAttribute('aria-label', t('มุมมอง', 'View'));
         $('footer').textContent = t('SCP-Remote · Hospital IT', 'SCP-Remote · Hospital IT');
+        if (!$('status').classList.contains('is-error')) updatedStatus();
     }
 
     async function refresh() {
         if (busy) return;
-        busy = true; $('refresh').disabled = true;
+        busy = true; $('refresh').disabled = true; $('refresh').classList.add('is-loading');
         try {
             const r = await fetch('m-data', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
-            if (r.status === 401) { $('status').textContent = error('NOT_SIGNED_IN'); setTimeout(() => { location.href = siteRoot(); }, 1500); return; }
+            if (r.status === 401) { $('status').textContent = error('NOT_SIGNED_IN'); $('status').classList.add('is-error'); setTimeout(() => { location.href = siteRoot(); }, 1500); return; }
             const body = await r.json();
             if (body.error) throw Error(body.error);
             data = body;
             loaded = true;
-            $('status').textContent = t('อัปเดตล่าสุด ', 'Updated ') + new Date().toLocaleTimeString(lang === 'th' ? 'th-TH' : 'en-GB');
+            lastUpdated = new Date(); updatedStatus();
+            $('status').classList.remove('is-error');
             render();
         } catch (e) {
             // A failed refresh must not blank a list that is still on screen and still useful.
             $('status').textContent = error(e && e.message ? e.message : 'OFFLINE_FETCH');
+            $('status').classList.add('is-error');
             // But if the first one failed there is no list, and leaving the placeholders up
             // would go on promising a page that is not coming.
             if (!loaded) { $('devices').textContent = ''; $('devices').appendChild(el('p', t('ยังโหลดรายชื่อเครื่องไม่ได้ กดรีเฟรชเพื่อลองใหม่', 'The device list has not loaded. Press refresh to try again.'))); }
-        } finally { busy = false; $('refresh').disabled = false; }
+        } finally { busy = false; $('refresh').disabled = false; $('refresh').classList.remove('is-loading'); }
     }
 
     // This page is served at <root>m, and the desktop view lives at <root> itself. A bare
@@ -134,19 +143,24 @@
 
         // The count beside a ward is what tells you at a glance where the machines actually are.
         $('rooms').textContent = '';
+        $('roomSelect').textContent = '';
         [{ id: '', name: t('ทุกห้อง', 'All rooms') }].concat(data.rooms).forEach(r => {
             const b = el('button');
             b.appendChild(el('b', r.name));
             const n = r.id ? data.nodes.filter(x => x.room === r.id).length : data.nodes.length;
+            const choice = el('option', r.name + ' (' + n + ')'); choice.value = r.id; $('roomSelect').appendChild(choice);
             b.appendChild(el('span', String(n), 'count'));
             b.classList.toggle('active', room === r.id);
-            b.onclick = () => { room = r.id; render(); };
+            b.setAttribute('aria-pressed', String(room === r.id));
+            b.onclick = () => { room = r.id; renderFiltered(); };
             $('rooms').appendChild(b);
         });
+        $('roomSelect').value = room;
 
         const nodes = data.nodes.slice()
             .sort((a, b) => Number(b.online) - Number(a.online) || String(a.name).localeCompare(String(b.name)))
-            .filter(n => (!room || n.room === room) && (!query || (n.name + ' ' + n.ip).toLowerCase().includes(query)));
+            .filter(n => (!room || n.room === room) && (!onlineOnly || n.online) && (!query || (n.name + ' ' + n.ip).toLowerCase().includes(query)));
+        $('resultCount').textContent = nodes.length + t(' เครื่อง', nodes.length === 1 ? ' device' : ' devices');
 
         const canvas = $('devices');
         canvas.textContent = '';
@@ -157,35 +171,50 @@
         $('mapNote').textContent = t('ตำแหน่งที่ผู้ดูแลกำหนดจะแสดงตามผัง เครื่องที่ยังไม่ได้กำหนดจะต่อท้าย',
             'Configured positions follow the room map. Unplaced devices appear afterwards.');
 
-        if (map && !room) { canvas.appendChild(el('p', t('เลือกห้องด้านบนเพื่อดูผัง', 'Choose a room above to see its map'))); return; }
-        if (!nodes.length) { canvas.appendChild(el('p', t('ไม่พบเครื่องในรายการนี้', 'No matching devices'))); return; }
+        if (map && !room) { canvas.appendChild(el('p', t('เลือกหน่วยงานด้านบนเพื่อดูผัง', 'Choose a department above to see its map'), 'empty-state')); return; }
+        if (!nodes.length) { canvas.appendChild(el('p', t('ไม่พบเครื่อง ลองเปลี่ยนคำค้นหาหรือตัวกรอง', 'No matching devices. Try another search or filter.'), 'empty-state')); return; }
 
         nodes.forEach(n => {
             const card = el('article', null, n.online ? 'device' : 'device is-offline');
             if (map && n.position) { card.style.gridColumn = String(n.position.x + 1); card.style.gridRow = String(n.position.y + 1); }
-            card.appendChild(el('span', n.online ? t('ออนไลน์', 'Online') : t('ออฟไลน์', 'Offline'), n.online ? 'online' : 'offline'));
-            card.appendChild(el('h3', n.name));
+            const top = el('div', null, 'device-top'), mark = el('div', null, 'device-icon'), identity = el('div', null, 'device-identity');
+            mark.appendChild(icon('computer')); top.appendChild(mark);
+            identity.appendChild(el('h3', n.name));
             const r = data.rooms.find(x => x.id === n.room);
-            card.appendChild(el('p', r ? r.name : ''));
-            card.appendChild(el('code', n.ip || t('ยังไม่มี IP', 'IP not reported')));
+            identity.appendChild(el('p', r ? r.name : t('ยังไม่ระบุหน่วยงาน', 'No department'))); top.appendChild(identity);
+            top.appendChild(el('span', n.online ? t('ออนไลน์', 'Online') : t('ออฟไลน์', 'Offline'), n.online ? 'online' : 'offline')); card.appendChild(top);
+            const address = el('div', null, 'device-address'); address.appendChild(el('span', 'IP')); address.appendChild(el('code', n.ip || t('ยังไม่มี IP', 'IP not reported'))); card.appendChild(address);
+            const actions = el('div', null, 'device-actions');
             const b = el('button', t('ขอรีโมต', 'Request access'), 'primary');
+            b.appendChild(icon('arrow'));
             b.disabled = !n.online;
             b.onclick = () => open(n);
-            card.appendChild(b);
+            actions.appendChild(b);
             // The call IT gets most: "it won't print". Clears stuck jobs and restarts the spooler
             // without opening the remote screen; the server checks the Run Commands right.
             if (n.online && n.canFix) {
-                const fix = el('button', t('🖨️ แก้ปริ้นไม่ออก', '🖨️ Fix printing'), 'secondary');
+                const fix = el('button', null, 'secondary'); fix.title = t('แก้ปริ้นไม่ออก', 'Fix printing'); fix.setAttribute('aria-label', fix.title); fix.appendChild(icon('printer'));
+                fix.appendChild(el('span', t('แก้ปริ้น', 'Fix printing')));
                 const out = el('small', fixNotes[n.id] || '', 'fix-result');
+                out.setAttribute('role', 'status');
                 fix.onclick = () => fixPrinting(n, fix, out);
-                card.appendChild(fix);
+                actions.appendChild(fix); card.appendChild(actions);
                 card.appendChild(out);
-            }
+            } else card.appendChild(actions);
             canvas.appendChild(card);
         });
     }
 
-    $('search').oninput = e => { query = e.target.value.trim().toLowerCase(); render(); };
+    function renderFiltered() {
+        render();
+        // A filter used halfway down a long fleet should reveal its first result.
+        const heading = document.querySelector('.list-heading');
+        const edge = header.getBoundingClientRect().height + document.querySelector('.filter-panel').getBoundingClientRect().height + 12;
+        if (window.scrollY > 0 && heading.getBoundingClientRect().top < edge) window.scrollBy(0, heading.getBoundingClientRect().top - edge);
+    }
+    $('search').oninput = e => { query = e.target.value.trim().toLowerCase(); renderFiltered(); };
+    $('onlineOnly').onchange = e => { onlineOnly = e.target.checked; renderFiltered(); };
+    $('roomSelect').onchange = e => { room = e.target.value; renderFiltered(); };
     $('refresh').onclick = refresh;
     $('listView').onclick = () => { map = false; render(); };
     $('mapView').onclick = () => { map = true; render(); };
@@ -194,6 +223,13 @@
         try { localStorage.setItem('scpMobileLanguage', lang); } catch (ex) { }
         labels(); render();
     };
+
+    // Keep sticky filters below the real header, including safe-area and text scaling.
+    const header = document.querySelector('body > header');
+    const fitHeader = () => document.documentElement.style.setProperty('--header-height', header.getBoundingClientRect().height + 'px');
+    fitHeader();
+    if (window.ResizeObserver) new ResizeObserver(fitHeader).observe(header);
+    else window.addEventListener('resize', fitHeader);
 
     labels();
     skeleton();

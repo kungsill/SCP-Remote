@@ -1767,6 +1767,9 @@
             render(); fitHeight();
         }));
         assessSec.appendChild(assessToolbar);
+        assessToolbar.appendChild(button(thai ? 'คลังราคากลาง / ประมาณการซ่อม' : 'Reference prices / Repair estimate', 'scp-dash-refresh', function () {
+            if (window.ScpPriceArchive) window.ScpPriceArchive.open();
+        }));
         // Scope both counts and rows to the same devices, including room/search filters.
         var shownIds = new Set(list.map(function (n) { return n._id || n.id; }));
         var assessedDevices = (fleetAssess.devices || []).filter(function (d) {
@@ -4517,6 +4520,7 @@
         liveToggle.hidden = true;
         actions.appendChild(liveToggle);
         actions.appendChild(button(thai ? 'เกณฑ์ประเมิน' : 'Criteria', 'scp-dash-refresh', function () { if (window.ScpOperations) window.ScpOperations.openCriteria(); }));
+        actions.appendChild(button(thai ? 'คลังราคากลาง / ประมาณการซ่อม' : 'Reference prices / Repair estimate', 'scp-dash-refresh', function () { if (window.ScpPriceArchive) window.ScpPriceArchive.open(); }));
         actions.appendChild(button(t('exportCsv'), 'scp-dash-refresh', exportInventory));
         actions.appendChild(button(t('exportUsage'), 'scp-dash-refresh', exportUsage));
         actions.appendChild(button(t('refresh'), 'scp-dash-refresh', function () { render(); if (!allNodes().length) { addComputer(); } }));
@@ -4527,13 +4531,13 @@
         if (window.ScpHealth) {
             actions.appendChild(button(thai ? '🩺 ตรวจสุขภาพทุกเครื่อง' : '🩺 Health check all', 'scp-dash-refresh', function () { window.ScpHealth.openFleet(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '🖨️ เครื่องพิมพ์ทั้ง รพ.' : '🖨️ All printers', 'scp-dash-refresh', function () { window.ScpHealth.openPrinters(allNodes(), overlayDialog); }));
+            actions.appendChild(button(thai ? '➕ เพิ่มเครื่อง (ติดตั้งเอเจนต์)' : '➕ Add a computer', 'scp-dash-refresh', addComputer));
+            actions.appendChild(button(thai ? '🧰 งานช่างค้างทั้ง รพ.' : '🧰 Work waiting', 'scp-dash-refresh', function () { window.ScpHealth.openBacklog(allNodes(), overlayDialog); }));
+            actions.appendChild(button(thai ? '💽 สุขภาพดิสก์ทั้ง รพ.' : '💽 Disk health', 'scp-dash-refresh', function () { window.ScpHealth.openDisks(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '🔤 ติดตั้งฟอนต์ไทย' : '🔤 Install Thai fonts', 'scp-dash-refresh', function () { window.ScpHealth.openFonts(allNodes(), overlayDialog); }));
         }
         actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));
         var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);
-            actions.appendChild(button(thai ? '➕ เพิ่มเครื่อง (ติดตั้งเอเจนต์)' : '➕ Add a computer', 'scp-dash-refresh', addComputer));
-            actions.appendChild(button(thai ? '🧰 งานช่างค้างทั้ง รพ.' : '🧰 Work waiting', 'scp-dash-refresh', function () { window.ScpHealth.openBacklog(allNodes(), overlayDialog); }));
-            actions.appendChild(button(thai ? '💽 สุขภาพดิสก์ทั้ง รพ.' : '💽 Disk health', 'scp-dash-refresh', function () { window.ScpHealth.openDisks(allNodes(), overlayDialog); }));
         groupHeadingActions(actions);
         heading.appendChild(actions);
         liveHint = element('p', 'scp-dash-live-hint');

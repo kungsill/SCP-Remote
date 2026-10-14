@@ -4,6 +4,19 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const mobile = require('../mobile');
+const landing = require('../../public/scripts/scp-mobile-landing');
+
+test('first-login legacy pages return to the app while device links and full-site links keep their target', () => {
+    assert.equal(landing.landingUrl('https://hospital.example/', '/'), 'https://hospital.example/m');
+    assert.equal(landing.landingUrl('https://hospital.example/?mobile=1&hide=16', '/'), 'https://hospital.example/m');
+    assert.equal(landing.landingUrl('https://hospital.example/sub/?m=1', '/sub/'), 'https://hospital.example/sub/m');
+    const remote = new URL(landing.landingUrl('https://hospital.example/?node=abc&viewmode=11&mobile=1', '/'));
+    assert.equal(remote.searchParams.get('node'), 'abc');
+    assert.equal(remote.searchParams.get('viewmode'), '11');
+    assert.equal(remote.searchParams.get('mobile'), '0');
+    assert.equal(new URL(landing.landingUrl('https://hospital.example/?m=0&mobile=1', '/')).searchParams.get('m'), '0');
+    assert.equal(landing.landingUrl('https://hospital.example/', 'https://other.example/'), null);
+});
 
 // /m reads the fleet through the signed-in user's own session. The danger it has to stay away
 // from is the Desktop App's /scp-client-api, which authenticates with a per-installation token

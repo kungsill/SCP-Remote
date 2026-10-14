@@ -1,5 +1,49 @@
 # งานที่ค้างอยู่
 
+## ตรวจภาพรวมและแก้รายการประมาณการถูกตัด — Codex, 13 ตุลาคม 2569
+
+- ผลตรวจครบพร้อมจุดที่ยังควรแก้: `AUDIT-2026-10-13.md` แดชบอร์ดเว็บเต็มบนจอ 390px ยังมีความกว้างเอกสาร 495px; การ์ดสรุปยังใช้พื้นขาวกับข้อความสีสว่างใน night mode ทั้งสองจุดยังไม่ได้แก้ในรอบตรวจ
+- พบและแก้ข้อผิดพลาดใบประมาณการเกิน 200 รายการถูกตัดตอนเปิดกลับ เปลี่ยนจาก `saved.lines.slice(0,200)` เป็นอ่านคืนครบ เพิ่ม regression test เปิดกลับและแก้ไขใบ 201 รายการ ข้อมูลและยอดเงินคงครบ
+- เทสต์ทั้งหมด **545 ผ่าน**, build, HTTP checks, Chrome และ PDF QA ผ่าน ใช้สคริปต์ราคาเวอร์ชัน `20261013-preserve`
+- ตรวจสำรองวันที่ 13 ต.ค. 02:23 ทั้ง F:/EX และ H: พบสำเนาตรงกันด้วย SHA-256 และ ZIP integrity ผ่าน ยังไม่ได้ทำ restore จริง
+- หน้าเว็บหลักผ่าน Cloudflare Access สำหรับ request ไม่มี session; admin ยังไม่มี 2FA และ config ยังไม่กำหนด trustedProxy ควรทบทวนการตั้งค่าตามการใช้งานผ่านโดเมน ไม่ได้เปลี่ยน config หรือ restart ในรอบตรวจ
+
+
+## แก้ชื่อ SCP-Remote จางในหัวแดชบอร์ด — Codex, 13 ตุลาคม 2569
+
+- สาเหตุคือ `scp-ui.css` กำหนดพื้น `#masthead` เป็นขาวตายตัว แต่สีชื่อเว็บ/คำบรรยายเปลี่ยนเป็นสีสว่างตาม night mode จึงกลืนกับพื้น แก้พื้นหัวเว็บและเมนูด้านข้างให้ใช้ `--scp-surface` ตามธีม และเงาหัวเว็บใช้ `--scp-shadow`
+- ตรวจ Chrome ด้วย DOM หัวเว็บจาก `default.handlebars` ทั้งโหมดสว่าง, `.night`, `data-bs-theme=dark` ที่ 320/390/1440px รวมกรณีชื่อเว็บถูกห่อด้วย `<font color=#fff>` ความต่างสีชื่อเว็บโหมดมืดจากกรณีจำลองเดิม 1.05:1 เป็น 14.60:1; โหมดสว่าง 17.05:1 คำบรรยายผ่าน 4.5:1 ทั้งสองโหมด
+- เพิ่มเวอร์ชัน `scp-ui.css?v=20261013-contrast` ใน template หลัก/ทางเลือก/มือถือ/หน้าเข้าสู่ระบบ แล้ว build ไทย/อังกฤษและ HTTP checks ผ่าน ภาพ QA อยู่ `.local/ui-review/header-contrast/` ไม่ต้อง restart
+
+
+## ปรับมือถือเพิ่มเติมครบ 4 จุด — Codex, 13 ตุลาคม 2569
+
+- ลดส่วนหัวและแผงตัวเลขสรุปบนมือถือ ย่อคำแนะนำที่ซ้ำกับช่องค้นหา เปลี่ยนตัวกรองหน่วยงานเป็น dropdown บนจอไม่เกิน 800px ภาพจำลอง 390×844 เห็นการ์ดเครื่อง 2 ใบเต็มแม้มีชื่อไทยยาว
+- ขยายชื่อหน่วยงานเป็น 13px, IP เป็น 14px, สถานะและข้อความประกอบเป็นอย่างน้อย 12px, ช่องค้นหา 16px ปุ่มแก้ปริ้นมีไอคอนพร้อมคำว่า “แก้ปริ้น” / “Fix printing” อยู่ข้างปุ่มรีโมต
+- แถบค้นหาและตัวเลือกหน่วยงานใช้ sticky ใต้ header วัดความสูง header จริงด้วย ResizeObserver เพื่อรองรับ safe area และการเปลี่ยนขนาดจอ เมื่อกรองจากกลางรายชื่อจะเลื่อนให้เห็นผลลัพธ์แรก การรีเฟรชอัตโนมัติไม่เลื่อนหน้า
+- ตรวจ Chrome 320–1440px ทั้ง light/dark, dropdown หน่วยงาน, การค้นหา/กรองออนไลน์/ภาษา/ผัง, ตัวอักษร, การเลื่อนรายการจำลอง 20 เครื่อง และยกเลิกคำสั่งแก้ปริ้นโดยไม่มี POST ผ่าน เทสต์มือถือ 55 ข้อและ HTTP checks ผ่าน
+- ภาพ QA: `.local/ui-review/mobile-compact/` เวอร์ชัน CSS/JS `20261013-compact` ทั้งคู่ โหลดหน้าใหม่ใช้ได้โดยไม่ restart
+
+
+## ปรับหน้ามือถือให้ทันสมัย — Codex, 13 ตุลาคม 2569
+
+- ออกแบบหน้า `/m` ใหม่: พื้นโทนกลาง, ชมพูโรงพยาบาลเฉพาะจุดสำคัญ, แถบหัวกระชับ, ตัวเลขสรุปในแผงเดียว, ช่องค้นหาชัดเจน, ตัวกรองหน่วยงาน, ปุ่มสลับรายชื่อ/ผัง และไอคอน SVG ชุดเดียวกัน
+- ใช้ IBM Plex Sans Thai จากไฟล์ฟอนต์ที่มีในเครื่อง ไม่มีการเรียก CDN ชื่อเครื่อง/หน่วยงาน/สถานะอ่านรวมในบรรทัดหัวการ์ด IP แยกชัด เครื่องออฟไลน์ไม่จางทั้งใบ ปุ่มรีโมตที่ใช้ไม่ได้ยังปิดอยู่
+- เพิ่มกรองออนไลน์เท่านั้น จำนวนผลลัพธ์ตรงกับตัวกรอง โดยตัวเลขฝูงยังแสดงทั้งชุด ปุ่มแก้ปริ้นเป็นไอคอนข้างปุ่มรีโมต มีชื่อสำหรับการอ่านหน้าจอและยังใช้การยืนยัน/สิทธิ์เดิม
+- ตรวจ Chrome จำลองความกว้าง 320, 360, 390, 430, 768, 1440 ทั้ง light/dark: ไม่มีการล้นจอแม้ชื่อเครื่องไทยยาว ทดสอบค้น IP, หน่วยงาน, กรองออนไลน์, ภาษา, ผัง และลิงก์รีโมตครบ ไม่ได้ส่งคำสั่งเครื่องลูกจริง
+- เทสต์มือถือ 55 ข้อ, syntax และ HTTP checks ผ่าน ภาพ QA อยู่ `.local/ui-review/mobile-workspace/` เปลี่ยนเวอร์ชัน CSS/JS เป็น `20261013-workspace` ทั้งคู่ เซิร์ฟเวอร์เสิร์ฟไฟล์ใหม่ได้โดยไม่ restart
+
+
+## มือถือหลังล็อกอินและคลังราคากลาง — Codex, 13 ตุลาคม 2569
+
+- แก้หน้าแรกที่บางครั้งแสดง MeshCentral Mobile เดิมหลังล็อกอิน: `handleRootRequestEx` อาจถูกเรียกตรงหลัง POST และข้าม middleware GET `/` จึงเรียกนโยบายเลือกหน้าของ `hospital/mobile` หลังตรวจโดเมนและบัญชีล็อก ก่อน render
+- เพิ่ม `scp-mobile-landing.js` ใน head ของหน้ามือถือเดิมเป็นทางกลับ `/m` ที่ใช้ได้ทันทีจาก template ที่ build แล้ว ซ่อนหน้าเดิมระหว่างเปลี่ยนหน้า ลิงก์เครื่องเฉพาะและ `m=0` คงปลายทางและใช้หน้าเว็บเต็มที่ตกแต่งแล้ว เฉพาะโดเมนหลักที่มีเส้นทาง `/m`
+- ปรับ viewport หน้าเว็บเต็มให้ใช้ความกว้างของอุปกรณ์ ตรวจ Chrome จำลองมือถือทั้ง light/dark ว่าเข้าหน้า `/m`, ไม่มีแถบ X/หน้ารายการเดิมค้าง และไม่มีการล้นแนวนอน ไม่ได้ใช้บัญชีจริงหรือเชื่อมต่อเครื่องลูกในการทดสอบ
+- ตัวป้องกันฝั่ง template/สคริปต์เสิร์ฟจากเซิร์ฟเวอร์ปัจจุบันแล้ว ส่วน `webserver.js` จะโหลดเมื่อ restart ครั้งถัดไป ไม่ restart รอบนี้เพราะทางแก้ใน template ใช้ได้โดยไม่ตัดเซสชันรีโมต
+- ทำคลัง 18 ฉบับ / 973 รายการพร้อม PDF, เลือกปีงบ 2551–2570, หมวดทุกอุปกรณ์, ค้นสเปก, CSV, พิมพ์ และประมาณการซ่อม อ่านขอบเขต/ปีที่ยังขาดใน `REFERENCE-PRICE-ARCHIVE.md` ไม่อ้างว่าพบต้นฉบับครบทุกปี
+- เทสต์ระบบทั้งหมด, build ภาษาไทย, HTTP/config checks และ Chrome/PDF QA ผ่าน ไฟล์ QA อยู่ `.local/ui-review/mobile-prices/` มีชุดปัจจุบัน 70 รายการถึงท้ายรายงาน ไม่มีหน้าปกว่าง
+
+
 ## รับช่วงงาน Claude — 12 ตุลาคม 2569
 
 ทำคำขอล่าสุดเรื่องจำนวนและรายละเอียดในแท็บ **การประเมินสภาพเครื่อง** ครบแล้ว:
@@ -330,3 +374,10 @@ node scripts/allow-subnet.js add 192.168.x.0/24     เพิ่มวงเค�
 - Map on a phone (≤700 px): the map takes the screen; floor picker full width on top, view tabs under it, alert below; control buttons become one sideways-scrolling row along the bottom, the legend one line above them, the risk button above that; arranging by drag is hidden (needs a mouse).
 - Remote screen on a phone (`scp-remote-ui.js`): two fingers pinch-zoom the picture up to 4× round the point between them and move it; one finger slides the zoomed picture; a tap is still a click (mapped via offsetX, so it stays exact when zoomed or scrolled). A "พอดีจอ · NNN%" button in the app bar fits it again. Nothing is sent to the remote PC — its own resolution is deliberately left alone so the person using it is not disturbed. `sharing.handlebars` was not touched (it has someone else's pending changes), so the Desktop App keeps its old script version tag.
 - Full site on a phone (≤760 px): the left menu folds away behind a ☰ button in the masthead (scp-ui.js) and opens as a drawer over the page with a dimmed backdrop; choosing an item, tapping outside or Esc folds it. The page gets the full width.
+
+## Central repair estimates (Codex, 2026-10-13)
+
+- `hospital/ticket-estimates.js` implements `getTicketEstimate` / `saveTicketEstimate` through existing `scpops`. Estimates live in `scpticket.estimate` in the same DB write; device/domain access and ticket revision are checked, and the existing ticket queue is shared with status updates. History records estimate revision, author, time and total. No schema migration is needed.
+- Price archive has ticket selection, explicit central save/load, local draft preservation on conflicts, and printing with ticket details. Ticket detail opens the archive to its estimate. The server derives citation snapshots from the local verified catalogue; manual parts remain quotations. At most 1,000 lines; amounts round to two decimals per line before summing. Older local drafts need an explicit ticket selection and save.
+- Further research is in `hospital/reference-price-research.json`, included in the generated catalogue and shown in source details. General originals 2551–2552 and 2554 remain unverified. MOPH index mentions 60 items for 2554, but its PDF could not be verified; DMH PDF is the same GIS manual. Do not fill missing years with modern prices or label the GIS manual as the general edition.
+- Build and 550 tests passed. Isolated real Chrome QA at 320/390/1440px, fresh-tab restore and one-page estimate PDF passed. No test records were written to production. User-authorized SCP service restart completed at about 17:11 Bangkok: old server PID 53680 stopped, new PID 48788 listens on 8443; HTTP checks and live assets passed. Cloudflared was left running.

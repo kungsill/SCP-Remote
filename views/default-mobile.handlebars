@@ -7,6 +7,7 @@
     <meta name="viewport" content="user-scalable=1.0,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="robots" content="noindex,nofollow">
+    <script src="{{{domainurl}}}scripts/scp-mobile-landing.js?v=20261013" data-domainurl="{{{domainurl}}}"></script>
     <link rel="manifest" href="{{{domainurl}}}manifest.json">
     <link rel="shortcut icon" href="{{{domainurl}}}favicon.ico" />
     <link rel="icon" type="image/png" sizes="16x16" href="{{{domainurl}}}favicon-16x16.png">
@@ -744,7 +745,7 @@
     <!-- SCP-Remote: local hospital fonts and theme. -->
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-remote.css" />
     <script defer src="{{{domainurl}}}scripts/scp-files.js"></script>
-    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-ui.css" />
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-ui.css?v=20261013-contrast" />
     <script defer src="{{{domainurl}}}scripts/scp-ui.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-transfer.css" />
     <script defer src="{{{domainurl}}}scripts/scp-transfer.js"></script>
@@ -1453,6 +1454,7 @@
         });
 
         function startup() {
+            if (window.ScpMobileLandingRedirect) return;
             if ((features & 32) == 0) {
                 // Guard against other site's top frames (web bugs).
                 var loc = null;

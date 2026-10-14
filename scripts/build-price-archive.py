@@ -13,7 +13,7 @@ from pathlib import Path
 import pymupdf
 
 ROOT = Path(__file__).resolve().parents[1]
-PUA = {0xF701: 'ิ', 0xF702: 'ี', 0xF706: '่', 0xF70A: '่', 0xF70B: '้',
+PUA = {0xF701: 'ิ', 0xF702: 'ี', 0xF706: '้', 0xF70A: '่', 0xF70B: '้',
        0xF70C: '๊', 0xF70E: '์', 0xF710: 'ั', 0xF712: '็', 6: '์', 23: '้'}
 
 
@@ -27,13 +27,13 @@ def normalize(text):
 
 
 def category(name):
+    if re.search(r'โปรแกรม|ซอฟต์แวร์|License|Anti.?virus', name, re.I): return 'software'
     if re.search(r'เครื่องพิมพ์|Printer|Plotter', name, re.I): return 'printer'
     if re.search(r'All\s*[- ]?\s*In\s*[- ]?\s*One', name, re.I): return 'aio'
     if re.search(r'โน้ตบุ|Notebook', name, re.I): return 'notebook'
     if re.search(r'แม่ข่าย|Server|Blade|Enclosure', name, re.I): return 'server'
     if re.search(r'แท็บเล็ต|Tablet', name, re.I): return 'tablet'
     if 'เครื่องคอมพิวเตอร์' in name: return 'desktop'
-    if re.search(r'โปรแกรม|ซอฟต์แวร์|License|Anti.?virus', name, re.I): return 'software'
     if re.search(r'สำรองไฟ|UPS|kVA|VA\b', name, re.I): return 'ups'
     if re.search(r'จอภาพ|จอแสดง|Monitor', name, re.I): return 'monitor'
     if re.search(r'สแกน|Scanner', name, re.I): return 'scanner'
@@ -48,18 +48,23 @@ def extract(source, pdf):
     page_offsets = []
     length = 0
     for page_no, page in enumerate(doc, 1):
+        # The GIS manual repeats the same catalogue with explanatory examples
+        # from page 28. Index the original catalogue, not the repeated examples.
+        if source.get('scope') == 'gis' and page_no > 27: break
         page_offsets.append((length, page_no))
         for line in normalize(page.get_text()).splitlines():
             line = line.strip()
             if not line or re.fullmatch(r'\d{1,3}', line): continue
-            if re.match(r'^(?:เกณฑ์ราคากลาง|ประกาศ ณ|ณ วันที่|มีผลบังคับใช้|คู่มือเกณฑ์)', line): continue
+            if re.match(r'^(?:\(ร่าง\)\s*)?(?:เกณฑ์ราคากลาง|ประกาศ ณ|ณ วันที่|มีผลบังคับใช้|คู่มือเกณฑ์|และซอฟต์แวร์(?:สำหรับ|สําหรับ)งาน GIS)', line): continue
             lines.append(line)
             length += len(line) + 1
     text = '\n'.join(lines)
     # All priced headings must begin with a list number, except the tablet supplement.
-    prefix = r'(?m)^(?:(\d{1,3})\.[ \t]*)'
+    prefix = r'(?m)^(?:(\d{1,3})\.[ \t\n]*)'
+    if source.get('scope') == 'gis': prefix = r'(?m)^(\d{1,3}\.\d+)[ \t\n]+'
     if source.get('unnumbered'): prefix = r'(?m)^(?:(\d{1,3})\.[ \t]*)?'
-    pattern = prefix + r'([^\n]{2,180}(?:\n[^\n]{1,160}){0,3}?)\s*ราคา\s*([\d,]+(?:\.\d+)?)\s*บาท([^\n]*)'
+    name = r'([\u0e00-\u0e7fA-Za-z(](?:(?!ราคา|คุณลักษณะ|\n\d{1,3}\.\s|\n[-•])[^\n]|\n(?!\d{1,3}\.\s|[-•])){1,500}?)'
+    pattern = prefix + name + r'\s*ราคา\s*([\d,]+(?:\.\d+)?)\s*บาท([^\n]*)'
     matches = []
     for match in re.finditer(pattern, text):
         name = ' '.join(match[2].split())
@@ -68,12 +73,18 @@ def extract(source, pdf):
         matches.append(match)
     rows = []
     for i, match in enumerate(matches):
-        item = int(match[1]) if match[1] else None
+        item = match[1] if source.get('scope') == 'gis' else (int(match[1]) if match[1] else None)
         name = ' '.join(match[2].split())
         price = float(match[3].replace(',', ''))
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         specs = text[match.end():end].strip()
-        if 'หมายเหตุ' in specs: specs = specs.split('หมายเหตุ')[0].strip()
+        # Retain exclusions such as "price excludes monitor" with the specs.
+        # The final general notes belong to the edition, not the antivirus item.
+        if i == len(matches) - 1 and source.get('scope') != 'gis':
+            note_start = re.search(r'(?:^|\n)(?:หมายเหตุ|ข้อแนะนำประกอบการพิจารณา)', specs)
+            if note_start:
+                source['notes'] = specs[note_start.start():].strip()
+                specs = specs[:note_start.start()].strip()
         page = max((p for offset, p in page_offsets if offset <= match.start()), default=1)
         rows.append({'id': source['id'] + '-' + str(i + 1), 'sourceId': source['id'],
                      'item': item, 'name': name, 'category': category(name), 'price': price,
@@ -93,15 +104,18 @@ def main():
         pdf = ROOT / '.local/reference-prices/sources' / (source['id'] + '.pdf')
         if not pdf.exists(): raise ValueError('Missing cached PDF: ' + str(pdf))
         extracted = extract(source, pdf)
+        if source.get('expectedItems') is not None and len(extracted) != source['expectedItems']:
+            raise ValueError('Unexpected catalogue size: ' + source['id'])
         source['itemCount'] = len(extracted)
         source['sha256'] = hashlib.sha256(pdf.read_bytes()).hexdigest()
         source['localPath'] = 'data/reference-prices/' + pdf.name
         shutil.copyfile(pdf, out / pdf.name)
         rows.extend(extracted)
         print(source['id'], len(extracted), 'items', 'numbers', [r['item'] for r in extracted])
-    result = {'schemaVersion': 1, 'checkedAt': '2026-10-12', 'fiscalYearStart': 2551,
+    result = {'schemaVersion': 1, 'checkedAt': '2026-10-13', 'fiscalYearStart': 2551,
               'fiscalYearEnd': 2570, 'sources': sources, 'items': rows,
-              'missingOriginalYears': [2551, 2552]}
+              'missingOriginalYears': [2551, 2552],
+              'historicalResearch': json.loads((ROOT / 'hospital/reference-price-research.json').read_text(encoding='utf-8'))}
     (out / 'catalog.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
     print('Total:', len(rows), 'items')
 

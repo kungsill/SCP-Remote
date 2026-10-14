@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>คู่มือ SCP-Remote ฉบับสมบูรณ์</title>
+<style>
+  @font-face { font-family: "Sarabun"; src: local("Sarabun"), url("server/public/fonts/thai/Sarabun-Regular.ttf"), url("1-SCP-Remote-Suite/server/public/fonts/thai/Sarabun-Regular.ttf"), url("file:///F:/Antigravity/sichomphu-remote/public/fonts/thai/Sarabun-Regular.ttf"); font-weight: 400; }
+  @font-face { font-family: "Sarabun"; src: local("Sarabun Bold"), url("server/public/fonts/thai/Sarabun-Bold.ttf"), url("1-SCP-Remote-Suite/server/public/fonts/thai/Sarabun-Bold.ttf"), url("file:///F:/Antigravity/sichomphu-remote/public/fonts/thai/Sarabun-Bold.ttf"); font-weight: 700; }
+  :root { --brand: #b02a72; --ink: #1f2430; --muted: #5b6475; --line: #e6dbe2; --soft: #fbf3f7; --code: #f4f1f3; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Sarabun", "Leelawadee UI", Tahoma, sans-serif; color: var(--ink); background: #fff; font-size: 17px; line-height: 1.7; }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+  header.cover { background: linear-gradient(120deg, #c4317f, #6d1846); color: #fff; padding: 48px 20px; }
+  header.cover div { max-width: 900px; margin: 0 auto; }
+  header.cover h1 { margin: 0; font-size: 40px; line-height: 1.15; }
+  header.cover p { margin: 10px 0 0; font-size: 19px; opacity: .95; }
+  h2 { margin: 48px 0 12px; padding-bottom: 6px; border-bottom: 3px solid var(--brand); font-size: 27px; color: var(--brand); }
+  h3 { margin: 28px 0 8px; font-size: 21px; }
+  h4 { margin: 20px 0 6px; font-size: 18px; }
+  code, pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 14.5px; }
+  code { background: var(--code); padding: 1px 6px; border-radius: 5px; }
+  pre { background: #241b21; color: #f6e9f0; padding: 14px 16px; border-radius: 10px; overflow-x: auto; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 15.5px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); }
+  .note { border-left: 5px solid var(--brand); background: var(--soft); padding: 10px 14px; border-radius: 8px; margin: 12px 0; }
+  .warn { border-left: 5px solid #d97706; background: #fff7e6; padding: 10px 14px; border-radius: 8px; margin: 12px 0; }
+  nav.toc { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 14px 22px; }
+  nav.toc ol { margin: 0; padding-left: 22px; }
+  nav.toc a { color: var(--ink); text-decoration: none; }
+  nav.toc a:hover { color: var(--brand); }
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+  .flow span { background: var(--soft); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 15px; }
+  .flow b { color: var(--brand); }
+  @media print { header.cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; } h2 { break-before: page; } pre, table, .note, .warn { break-inside: avoid; } main { padding-top: 0; } }
+</style>
+</head>
+<body>
+<header class="cover"><div>
+  <h1>คู่มือ SCP-Remote ฉบับสมบูรณ์</h1>
+  <p>ระบบดูแลคอมพิวเตอร์โรงพยาบาล · ติดตั้ง · ใช้งาน · กระบวนการทำงาน · เอเจนต์ · พัฒนาต่อ</p>
+  <p style="font-size:15px;opacity:.85">ทีมไอที โรงพยาบาลสีชมพู · ฉบับ 14 ตุลาคม 2569</p>
+</div></header>
+<main>
+
+<nav class="toc"><b>สารบัญ</b>
+<ol>
+  <li><a href="#overview">ภาพรวม: ระบบนี้คืออะไร ประกอบด้วยอะไร</a></li>
+  <li><a href="#install">ติดตั้งเซิร์ฟเวอร์</a></li>
+  <li><a href="#network">ตั้งค่าเครือข่าย ความปลอดภัย และสำรองข้อมูล</a></li>
+  <li><a href="#agents">เอเจนต์: ลงที่เครื่องลูกยังไง ทำงานยังไง</a></li>
+  <li><a href="#use">การใช้งานทุกเมนู</a></li>
+  <li><a href="#process">กระบวนการทำงานประจำ (ทีละขั้น)</a></li>
+  <li><a href="#tools">SCPclear และ SCPPrint: วิธีใช้ทีละขั้น</a></li>
+  <li><a href="#dev">สำหรับคนที่จะแก้ไข/พัฒนาต่อ</a></li>
+  <li><a href="#trouble">แก้ปัญหาที่พบบ่อย</a></li>
+  <li><a href="#roadmap">แนวทางพัฒนาต่อไป</a></li>
+</ol></nav>
+
+<!-- ====================================================== -->
+<h2 id="overview">1. ภาพรวม</h2>
+<p><b>SCP-Remote</b> คือเว็บสำหรับฝ่ายไอทีใช้ดูแลคอมพิวเตอร์ทุกเครื่องในโรงพยาบาลจากหน้าจอเดียว: รีโมตเข้าเครื่อง ส่งไฟล์ ตรวจสุขภาพเครื่อง หาดิสก์ที่ใกล้เสีย ออกใบงานช่างพร้อมวิธีซ่อม ดูเครื่องพิมพ์ทั้ง รพ. วางแผนงบเปลี่ยนเครื่อง และใช้บนมือถือได้ พัฒนาต่อยอดจากโปรแกรมโอเพนซอร์ส <b>MeshCentral 1.2.5</b> (สัญญาอนุญาต Apache-2.0) โดยเพิ่มหน้าภาษาไทยและงานเฉพาะโรงพยาบาล</p>
+
+<h3>ส่วนประกอบ</h3>
+<table>
+<tr><th>ส่วน</th><th>อยู่ที่ไหน</th><th>ทำอะไร</th></tr>
+<tr><td><b>เซิร์ฟเวอร์ SCP-Remote</b></td><td>เครื่อง Windows 1 เครื่องในวง LAN (โฟลเดอร์ <code>server/</code>)</td><td>เว็บ <code>https://&lt;IP&gt;:8443</code> เก็บรายชื่อเครื่อง ผู้ใช้ ประวัติ และสั่งงานเอเจนต์</td></tr>
+<tr><td><b>เอเจนต์ (Mesh Agent)</b></td><td>ทุกเครื่องลูก ทำงานเป็นบริการ Windows ชื่อ <code>Mesh Agent</code></td><td>ต่อกลับมาหาเซิร์ฟเวอร์เอง ให้รีโมต ส่งไฟล์ รันคำสั่งตรวจ/แก้</td></tr>
+<tr><td><b>ตัวติดตั้งเครื่องลูก</b></td><td><code>server/hospital/client-setup/</code></td><td>ตัวช่วยติดตั้งเอเจนต์แบบกดถัดไป ตั้งชื่อเครื่อง เลขครุภัณฑ์ ปีงบ ราคา</td></tr>
+<tr><td><b>SCPclear</b></td><td><code>tools/SCPclear-plus/</code></td><td>โปรแกรมทำความสะอาด/ปรับแต่งที่หน้าเครื่อง</td></tr>
+<tr><td><b>SCPPrint</b></td><td><code>tools/SCPPrint/</code></td><td>แชร์เครื่องพิมพ์ผ่านพอร์ต 9100 ให้เครื่องอื่นพิมพ์ผ่าน</td></tr>
+</table>
+
+<h3>ทำงานยังไง (ภาพใหญ่)</h3>
+<div class="flow"><span>เครื่องลูก + เอเจนต์</span><b>→ ต่อออก wss://เซิร์ฟเวอร์:8443 →</b><span>เซิร์ฟเวอร์ SCP-Remote</span><b>← เปิดเว็บ ←</b><span>ช่าง (คอม/มือถือ)</span></div>
+<ul>
+  <li>เอเจนต์เป็นฝ่าย<b>ต่อออก</b>ไปหาเซิร์ฟเวอร์ เครื่องลูกจึงไม่ต้องเปิดพอร์ตรับ</li>
+  <li>เอเจนต์จำ<b>ลายนิ้วมือใบรับรอง</b>ของเซิร์ฟเวอร์ไว้ จะคุยกับเซิร์ฟเวอร์ตัวจริงเท่านั้น เซิร์ฟเวอร์อื่นสั่งเครื่องไม่ได้</li>
+  <li>การตรวจสุขภาพคือการส่งสคริปต์ PowerShell แบบ<b>อ่านอย่างเดียว</b>ไปให้เอเจนต์รันแล้วส่งผลกลับ ปุ่มแก้ทุกปุ่มต้องกดยืนยันและบันทึกว่าใครสั่ง</li>
+</ul>
+
+<!-- ====================================================== -->
+<h2 id="install">2. ติดตั้งเซิร์ฟเวอร์</h2>
+<h3>ต้องมี</h3>
+<ul>
+  <li>เครื่อง Windows 10/11 หรือ Windows Server ที่เปิดตลอดเวลา IP คงที่ (ตั้งจองใน DHCP หรือกำหนดเอง) แรม 4 GB ขึ้นไป</li>
+  <li>Node.js 20 ขึ้นไป (ตัวติดตั้งจะช่วยลงให้ ทดสอบกับ 22.17)</li>
+</ul>
+
+<h3>วิธีที่ 1: คลิกเดียว (แนะนำ)</h3>
+<ol>
+  <li>เปิดโฟลเดอร์ <code>1-SCP-Remote-Suite</code> ดับเบิลคลิก <b>START-HERE.cmd</b> กด Yes เมื่อ Windows ขอสิทธิ์</li>
+  <li>ตัวติดตั้งจะ: ตรวจ/ลง Node.js → ลงแพ็กเกจ → สร้างหน้าเว็บภาษาไทย → สร้างทางลัดบนเดสก์ท็อป (SCP-Remote, SCPclear, ติดตั้ง SCPPrint) → ถามว่าจะให้เปิดเองทุกครั้งที่เปิดเครื่องไหม (บริการ Windows) → เปิดเบราว์เซอร์</li>
+  <li>หน้าแรกให้<b>สร้างบัญชีแรก</b> บัญชีนี้เป็นผู้ดูแลระบบ เบราว์เซอร์จะเตือนเรื่องใบรับรอง เป็นปกติของใบรับรองที่สร้างเอง กด Advanced → Continue</li>
+</ol>
+
+<h3>วิธีที่ 2: ทีละคำสั่ง</h3>
+<pre><code>cd 1-SCP-Remote-Suite\server
+npm ci                     # ลงแพ็กเกจ
+npm run build:hospital     # สร้างหน้าเว็บไทย/อังกฤษ
+npm run start:hospital     # เปิดชั่วคราว (ปิดหน้าต่าง = ปิดระบบ)
+npm run service:install    # หรือ ติดตั้งเป็นบริการ Windows (PowerShell แบบผู้ดูแล)</code></pre>
+<p>ครั้งแรกระบบจะคัดลอก <code>hospital/config.example.json</code> ไปเป็น <code>.local/scp-remote/config.json</code> และสร้างฐานข้อมูลกับใบรับรองใน <code>.local/scp-remote/</code></p>
+<div class="warn"><b>โฟลเดอร์ <code>.local/scp-remote</code> คือหัวใจของระบบ</b> มีฐานข้อมูล บัญชี และใบรับรองที่เครื่องลูกเชื่อถือ ถ้าหายโดยไม่มีไฟล์สำรอง ต้องเดินไปลงเอเจนต์ใหม่ทุกเครื่อง ห้ามลบหรือย้ายโดยไม่สำรอง</div>
+
+<h3>คำสั่งที่ใช้บ่อย (รันในโฟลเดอร์ <code>server</code>)</h3>
+<table>
+<tr><th>คำสั่ง</th><th>ใช้เมื่อ</th></tr>
+<tr><td><code>npm run service:restart</code> / <code>service:stop</code> / <code>service:start</code></td><td>เริ่ม/หยุดบริการ</td></tr>
+<tr><td><code>npm run update:system</code></td><td>อัปเดตทั้งระบบ: build หน้าเว็บ → รีสตาร์ต → ดันโค้ดใหม่ไปเครื่องลูก (ใส่ <code>-- --check</code> เพื่อดูเฉย ๆ)</td></tr>
+<tr><td><code>npm run build:hospital</code></td><td>หลังแก้เทมเพลตหน้าเว็บ (<code>views/*.handlebars</code>)</td></tr>
+<tr><td><code>npm run test:hospital</code></td><td>รันเทสต์ทั้งหมด (500+ ข้อ) ก่อนรีสตาร์ตทุกครั้ง</td></tr>
+<tr><td><code>npm run check:config</code> / <code>check:hospital</code></td><td>ตรวจไฟล์ตั้งค่า / ตรวจว่าหน้าเว็บเสิร์ฟได้จริง</td></tr>
+<tr><td><code>npm run allow:subnet</code></td><td>เพิ่มวง LAN ที่อนุญาตให้เครื่องลูกต่อเข้ามา</td></tr>
+<tr><td><code>npm run backup:copy -- H:\SCP-Remote-Backups</code></td><td>ก๊อปไฟล์สำรองไปอีกไดรฟ์ทันที</td></tr>
+<tr><td><code>npm run drill:restore</code></td><td>ซ้อมกู้ไฟล์สำรอง ไม่กระทบของจริง (ควรทำทุกไตรมาส)</td></tr>
+<tr><td><code>npm run build:setup-exe</code></td><td>สร้างตัวติดตั้งเครื่องลูก <code>SCP-Remote-Setup.exe</code> ใหม่</td></tr>
+</table>
+
+<!-- ====================================================== -->
+<h2 id="network">3. เครือข่าย ความปลอดภัย และสำรองข้อมูล</h2>
+<h3>วงเครือข่ายที่อนุญาต</h3>
+<p>เซิร์ฟเวอร์รับเฉพาะวง LAN ที่อนุญาต เพิ่มวงด้วย <code>node scripts/allow-subnet.js add 192.168.10.0/24</code> แล้วรีสตาร์ต ตัวติดตั้งกฎไฟร์วอลล์ <code>SCP-Remote (TCP 8443)</code> จำกัดเฉพาะวงเหล่านี้ ถ้าโรงพยาบาลมีหลายวง (หลาย VLAN) ต้องให้ทุกวงวิ่งถึงเซิร์ฟเวอร์ที่พอร์ต 8443</p>
+<h3>ความปลอดภัยที่ต้องทำ</h3>
+<ul>
+  <li><b>เปิดยืนยันตัวตน 2 ชั้น</b> ให้บัญชีผู้ดูแล: บัญชีของฉัน → ความปลอดภัย → เพิ่มแอปยืนยันตัวตน</li>
+  <li><b>ห้ามเปิดพอร์ต 8443 ออกอินเทอร์เน็ตตรง ๆ</b> ถ้าต้องรีโมตจากนอก รพ. ใช้ Cloudflare Tunnel หรือ Tailscale ตามคู่มือ <code>REMOTE-OVER-INTERNET.md</code> และ <code>CLOUDFLARE-SETUP.md</code></li>
+  <li>เปลี่ยนรหัส admin เมื่อมีคนลาออก และดูหน้า <b>เหตุการณ์</b> ทุกเดือน</li>
+  <li>การดูหน้าจอเครื่องที่มีคนใช้อยู่เกี่ยวกับข้อมูลส่วนบุคคล ควรมีประกาศแจ้งเจ้าหน้าที่ตามนโยบายของหน่วยงาน (การเข้าคุมเครื่องมีหน้าต่างขออนุญาตบนเครื่องลูก)</li>
+</ul>
+<h3>สำรองข้อมูล</h3>
+<p>ระบบสำรองอัตโนมัติทุกคืน (ไฟล์ <code>meshcentral-autobackup-*.zip</code>) และก๊อปสำเนาไปอีกไดรฟ์ได้ทุกวัน ตรวจทุกเดือนว่ามีไฟล์ของวันล่าสุดจริง ย้ายเซิร์ฟเวอร์ไปเครื่องใหม่: อ่าน <code>MOVING-THE-SERVER.md</code> ก่อน (ถ้า IP เซิร์ฟเวอร์เปลี่ยน เครื่องลูกจะหาไม่เจอ)</p>
+
+<!-- ====================================================== -->
+<h2 id="agents">4. เอเจนต์</h2>
+<h3>เอเจนต์คืออะไร</h3>
+<p>โปรแกรมเล็ก ๆ (Mesh Agent) ที่ลงในเครื่องลูกทุกเครื่อง ทำงานเป็นบริการ Windows ชื่อ <code>Mesh Agent</code> อยู่ใน <code>C:\Program Files\Mesh Agent\</code> มีไฟล์สำคัญ:</p>
+<table>
+<tr><th>ไฟล์</th><th>คืออะไร</th></tr>
+<tr><td><code>MeshAgent.exe</code></td><td>ตัวโปรแกรม</td></tr>
+<tr><td><code>MeshAgent.msh</code></td><td>ที่อยู่เซิร์ฟเวอร์ + ลายนิ้วมือใบรับรอง + กลุ่มอุปกรณ์ที่สังกัด</td></tr>
+<tr><td><code>MeshAgent.db</code></td><td><b>ตัวตนของเครื่อง</b> ถ้าเก็บไว้ ลงวินใหม่แล้วคืนไฟล์นี้ เครื่องจะกลับมาเป็นรายการเดิม</td></tr>
+<tr><td><code>MeshAgent.tag</code></td><td>ชื่อเครื่องและคำอธิบายที่ตั้งตอนติดตั้ง</td></tr>
+</table>
+
+<h3>วิธีลงเอเจนต์ (3 แบบ)</h3>
+<h4>แบบ ก: ตัวติดตั้งของ รพ. (แนะนำ)</h4>
+<ol>
+  <li>สร้างตัวติดตั้งครั้งเดียว: <code>npm run build:setup-exe</code> ได้ <code>hospital/client-setup/SCP-Remote-Setup.exe</code> (ฝังที่อยู่เซิร์ฟเวอร์ของคุณไว้ อย่าแจกนอกหน่วยงาน)</li>
+  <li>ที่เครื่องลูก เปิด <code>SCP-Remote-Setup.exe</code> → อ่านคำขอความยินยอม → ตั้งชื่อเครื่อง เลขครุภัณฑ์ ปีงบ ราคา → ติดตั้ง</li>
+  <li>เครื่องขึ้นในกลุ่ม "เครื่องใหม่" บนแดชบอร์ด แล้วค่อยย้ายไปกลุ่มแผนก (แนวคิด: ชุดติดตั้งเดียวใช้ได้ทุกเครื่อง ดู <code>client-setup/README.md</code>)</li>
+  <li>ถ้าเครื่องไม่ขึ้น: รัน <code>Check-Network.cmd</code> บนเครื่องนั้น บอกว่าเครื่องอยู่วงไหน ต่อเซิร์ฟเวอร์ได้ไหม</li>
+</ol>
+<h4>แบบ ข: จากหน้าแดชบอร์ด (ง่ายที่สุด)</h4>
+<ol><li>กดเมนู <b>ดูแลเครื่อง ▾ → เพิ่มเครื่อง (ติดตั้งเอเจนต์)</b> · ถ้ายังไม่มีเครื่องเลย หน้าแดชบอร์ดจะมีปุ่ม <b>➕ เพิ่มเครื่องแรก</b> หรือกด <b>รีเฟรช</b> หน้าติดตั้งจะเด้งขึ้นมาเอง</li><li>ถ้ายังไม่มีกลุ่มอุปกรณ์ ระบบสร้างกลุ่ม <b>เครื่องใหม่</b> ให้ ถ้ามีหลายกลุ่ม เลือกกลุ่มที่จะให้เครื่องขึ้น</li><li>หน้าต่าง <b>เพิ่ม SCP-Remote Agent</b>: เลือกระบบปฏิบัติการ (Windows / Linux / macOS / มือถือ) แล้วดาวน์โหลดตัวติดตั้ง</li><li>เอาไฟล์ไปรันที่เครื่องลูก (สิทธิ์ผู้ดูแล) กด Install รอไม่กี่วินาที เครื่องจะขึ้นบนแดชบอร์ด</li></ol>
+<h4>แบบ ค: ระบบอื่นนอกจาก Windows</h4>
+<p>โฟลเดอร์ <code>server/agents/</code> มีเอเจนต์สำเร็จรูปของ MeshCentral สำหรับ Windows (x86/x64/ARM64), Linux (x86, ARM, MIPS ฯลฯ), macOS, FreeBSD และ Android ดาวน์โหลดผ่านหน้าเพิ่มเอเจนต์ได้เหมือนกัน</p>
+
+<div class="warn"><b>ติดตั้งแล้วขึ้น "Could not find a part of the path ... MeshAgent.tag"</b> แปลว่ามีบริการ <code>Mesh Agent</code> ค้างอยู่แต่ไม่มีไฟล์ ให้รัน Command Prompt แบบผู้ดูแล: <code>sc stop "Mesh Agent"</code> แล้ว <code>sc delete "Mesh Agent"</code> แล้วติดตั้งใหม่</div>
+
+<h3>โปรแกรมฝั่งช่าง</h3>
+<ul>
+  <li><b>SCP-Remote Desktop</b> (<code>hospital/desktop-app</code>): โปรแกรมบนเครื่องช่าง เปิดผังห้อง ลากไฟล์ส่งไปเครื่องลูก ดู <code>DESKTOP-APP.md</code></li>
+  <li><b>หน้ามือถือ</b> <code>https://&lt;เซิร์ฟเวอร์&gt;:8443/m</code>: ดูสถานะ กดแก้ปริ้นไม่ออกได้จากมือถือ</li>
+</ul>
+
+<!-- ====================================================== -->
+<h2 id="use">5. การใช้งานทุกเมนู</h2>
+<h3>แดชบอร์ด</h3>
+<p>ตัวเลขสรุป (ทั้งหมด/เปิดอยู่/กำลังใช้/ว่าง/ปิด/ต้องดูแล) ช่องค้นหาชื่อ ผู้ใช้ หรือ IP ตัวกรองตามแผนก และ 3 เมนูหลักด้านบน:</p>
+<table>
+<tr><th>เมนู</th><th>มีอะไร</th></tr>
+<tr><td><b>ดูแลเครื่อง ▾</b></td><td><b>งานช่างค้างทั้ง รพ.</b> · ตรวจสุขภาพทุกเครื่อง · สุขภาพดิสก์ทั้ง รพ. · เครื่องพิมพ์ทั้ง รพ. · ติดตั้งฟอนต์ไทย · แจ้งซ่อม/ตรวจระบบ · คลังไดรเวอร์</td></tr>
+<tr><td><b>รายงาน ▾</b></td><td>สรุปประจำวัน · รายงานและชาร์ต (พิมพ์) · ออกรายงานการใช้งาน · ออกรายการครุภัณฑ์ · QR ติดเครื่อง</td></tr>
+<tr><td><b>งบและประเมิน ▾</b></td><td>คลังราคากลาง/ประมาณการซ่อม · เกณฑ์ประเมิน · ตรวจเครื่อง (ชนิด/Windows แท้)</td></tr>
+</table>
+
+<h3>ผัง รพ. 2.5 มิติ</h3>
+<p>เมนูซ้าย "ผังแผนที่ รพ." แสดงทุกตึกพร้อมจำนวนเครื่องเปิด/ทั้งหมดและเครื่องเสี่ยง โหมด <b>สถานะ / ความเสี่ยง / แผนเปลี่ยนเครื่อง</b> ซูม หมุน ลากได้ คลิกตึกเพื่อดูภายใน คลิกเครื่องเพื่อเปิดรายละเอียด "จัดตำแหน่งเครื่อง" ใช้วางเครื่องลงห้อง</p>
+
+<h3>หน้ารายละเอียดเครื่อง</h3>
+<ul>
+  <li>รีโมตหน้าจอ (ขออนุญาตผู้ใช้ก่อนเข้าคุม), เทอร์มินัล, ไฟล์, ส่งข้อความ, เปิด/ปิด/รีสตาร์ต</li>
+  <li><b>เครื่องนี้ต้องทำอะไร</b> (ใบงานช่าง): งานเรียง 🔴 ด่วน 🟡 ควรทำเร็ว 🔵 วางแผน แต่ละงานมีปุ่มแก้ (ถ้าทำจากที่นี่ได้) หรือป้าย 🚶 ไปหน้าเครื่อง และ <b>วิธีซ่อม</b> (สาเหตุ หลักการ ขั้นตอน ตรวจผล ข้อควรระวัง) ปุ่ม 🖨️ พิมพ์ใบงานพร้อมช่องลงชื่อ</li>
+  <li><b>ผลตรวจละเอียดทั้งหมด</b>: ระบบ ฮาร์ดแวร์ (แรม CPU ดิสก์ทุกลูกพร้อม % สุขภาพ) เครือข่าย เครื่องพิมพ์ ความเร็ว การติดตั้ง Windows ฟอนต์ และกราฟแนวโน้มจากการตรวจเช้า</li>
+</ul>
+
+<h3>ตรวจสุขภาพและปุ่มแก้</h3>
+<p>การตรวจใช้เวลาราว 15 วินาที <b>อ่านอย่างเดียว</b> ปุ่มแก้ที่มี: แก้ปริ้นไม่ออก (ล้างงานค้าง + รีสตาร์ต Spooler), รีสตาร์ต Spooler, พิมพ์ทดสอบ, ให้เครื่องพิมพ์ทำงานต่อ, ล้าง DNS, เปิดบริการ (เฉพาะรายการที่กำหนด), TRIM SSD, โหมดพลังงาน Balanced, ตั้งชื่อ PACS (hosts), เปิด/ปิดโปรแกรมเปิดพร้อมเครื่อง, ติดตั้งฟอนต์ไทย (ตรวจ SHA-256 ก่อนลง), ล้างไฟล์ชั่วคราว</p>
+
+<h3>สุขภาพดิสก์ (%)</h3>
+<p>อ่าน SMART ของดิสก์ทุกลูก: SSD เริ่มจากอายุที่เหลือที่ดิสก์บอก HDD หักตามชั่วโมงใช้งานเกิน 30,000 ชม. แล้วหักตาม bad sector (ย้ายแล้ว / รอย้าย / อ่านไม่ได้) และการอ่านพลาด ถ้า Windows/SMART เตือนใกล้เสีย ไม่เกิน 10% · <b>ต่ำกว่า 40% = ควรเปลี่ยน</b> · ต่ำกว่า 80% หรือมี bad sector = ควรดู (สูตรเต็มใน <code>HEALTH-CHECK.md</code>)</p>
+
+<h3>ตรวจเช้าอัตโนมัติ 07:30</h3>
+<p>เซิร์ฟเวอร์ตรวจทุกเครื่องที่เปิดอยู่เองทุกเช้า เก็บผลและแนวโน้ม สรุปเรียงเครื่องค้าง/ช้าก่อน ตามด้วยดิสก์ที่ควรเปลี่ยน ส่งสรุปเข้า Telegram หรือ webhook ได้โดยตั้งใน <code>.local/scp-remote/config.json</code> ส่วน <code>settings</code>:</p>
+<pre><code>"scpmorningcheck": "07:30",                          // หรือ "off"
+"scptelegram": { "token": "&lt;bot token&gt;", "chat": "&lt;chat id&gt;" },
+"scpalertwebhook": "https://..."                      // ถ้ามีระบบรับ JSON</code></pre>
+<p>แก้แล้วต้องรีสตาร์ตบริการ</p>
+
+<h3>งานไอทีอื่น ๆ</h3>
+<ul>
+  <li><b>แจ้งซ่อม / ตรวจระบบ</b>: บันทึกงานซ่อม ประวัติเครื่อง (<code>IT-OPERATIONS.md</code>)</li>
+  <li><b>คลังไดรเวอร์</b>: อัปโหลดไดรเวอร์ของ รพ. แล้วสั่งลงที่เครื่องลูก (เริ่มต้นว่าง)</li>
+  <li><b>QR ติดเครื่อง</b>: พิมพ์สติกเกอร์ สแกนแล้วเปิดหน้าเครื่องนั้น</li>
+  <li><b>แผนงบประมาณ 5 ปี / เกณฑ์ประเมิน</b>: ประเมินอายุเครื่อง CPU แรม Windows 11 และวางแผนเปลี่ยนตามปีงบ (เริ่ม ต.ค.)</li>
+</ul>
+
+<!-- ====================================================== -->
+<h2 id="process">6. กระบวนการทำงานประจำ</h2>
+<h3>6.1 รับเครื่องใหม่เข้าระบบ</h3>
+<div class="flow"><span>ลง Windows + โปรแกรม รพ.</span><b>→</b><span>เพิ่มเครื่อง (ดูแลเครื่อง ▾) หรือ SCP-Remote-Setup.exe</span><b>→</b><span>ย้ายเข้ากลุ่มแผนก</span><b>→</b><span>ตรวจสุขภาพ + ลงฟอนต์ไทย</span><b>→</b><span>วางตำแหน่งบนผัง</span></div>
+
+<h3>6.2 ทุกเช้า (10 นาที)</h3>
+<ol>
+  <li>เปิด <b>สรุปประจำวัน</b> หรืออ่านสรุปใน Telegram</li>
+  <li>เปิด <b>งานช่างค้างทั้ง รพ.</b> → แท็บ 🔴 ด่วน</li>
+  <li>กดแก้งานที่ "ทำจากที่นี่ได้" ก่อน (เช่น งานพิมพ์ค้าง)</li>
+  <li>งาน 🚶 ไปหน้าเครื่อง: กดพิมพ์ใบงาน แล้วออกไปทำตามรอบ</li>
+</ol>
+
+<h3>6.3 ซ่อมเครื่องหนึ่งเครื่อง</h3>
+<div class="flow"><span>เปิดเครื่องนั้น</span><b>→</b><span>ดู "เครื่องนี้ต้องทำอะไร"</span><b>→</b><span>อ่านวิธีซ่อม</span><b>→</b><span>กดแก้ หรือไปหน้าเครื่อง</span><b>→</b><span>กดตรวจอีกครั้ง ยืนยันผล</span><b>→</b><span>บันทึกในแจ้งซ่อม</span></div>
+<p>ทุกปุ่มแก้ถูกบันทึกในประวัติเครื่องโดยอัตโนมัติ (ใคร กดอะไร ผลเป็นยังไง)</p>
+
+<h3>6.4 ดิสก์ใกล้เสีย</h3>
+<ol>
+  <li>สุขภาพดิสก์ทั้ง รพ. → แท็บ "ควรดู/ควรเปลี่ยน"</li>
+  <li>ต่ำกว่า 40% หรือมี bad sector "อ่านไม่ได้": แจ้งผู้ใช้ สำรองข้อมูลวันนั้น</li>
+  <li>เปลี่ยนเป็น SSD (โคลนถ้าลูกเดิมยังอ่านได้ ไม่งั้นลง Windows ใหม่)</li>
+  <li><b>ห้ามรัน CHKDSK /R หรือ Defrag กับดิสก์ใกล้เสียก่อนสำรองข้อมูล</b></li>
+</ol>
+
+<h3>6.5 ปริ้นไม่ออก</h3>
+<ol>
+  <li>เปิดเครื่องนั้น (หรือ /m บนมือถือ) → <b>แก้ปริ้นไม่ออก</b></li>
+  <li>ยังไม่ได้: ดูสถานะเครื่องพิมพ์ (Offline / กระดาษติด / หมึก) → ไปหน้าเครื่อง</li>
+  <li><b>อย่ากดแก้ปริ้นกับเครื่องที่เป็นเซิร์ฟเวอร์ SCPPrint</b> เครื่องอื่นพิมพ์ผ่านเครื่องนั้น</li>
+</ol>
+
+<h3>6.6 วางแผนงบประจำปี</h3>
+<ol>
+  <li>งานช่างค้างทั้ง รพ. → 🖨️ พิมพ์สรุปงาน + รายการอะไหล่ (มีราคาประมาณและช่องผู้อนุมัติ)</li>
+  <li>แท็บแผนงบประมาณ 5 ปี → พิมพ์รายงานแผนงบ (PDF)</li>
+  <li>เทียบราคากับคลังราคากลาง</li>
+</ol>
+
+<h3>6.7 ประจำเดือน / ไตรมาส</h3>
+<table>
+<tr><th>เมื่อไร</th><th>ทำอะไร</th></tr>
+<tr><td>ทุกเดือน</td><td>ดูไฟล์สำรองล่าสุด · ดูหน้าเหตุการณ์ · ไล่งาน 🔵 วางแผน</td></tr>
+<tr><td>ทุกไตรมาส</td><td><code>npm run drill:restore</code> ซ้อมกู้ข้อมูล</td></tr>
+<tr><td>มีคนลาออก</td><td>ลบบัญชี เปลี่ยนรหัส admin</td></tr>
+</table>
+
+<!-- ====================================================== -->
+<h2 id="tools">7. SCPclear และ SCPPrint</h2>
+<p>สองโปรแกรมนี้ใช้<b>ที่หน้าเครื่อง</b> ส่วนแดชบอร์ด SCP-Remote ใช้<b>จากระยะไกล</b> การตรวจสุขภาพและปุ่มแก้บนแดชบอร์ดคือการนำส่วนตรวจของ SCPclear มาทำงานผ่านเอเจนต์ และแดชบอร์ดยังตรวจได้ว่าเครื่องไหนลง SCPPrint และเปิดอยู่ไหม</p>
+
+<h3>7.1 SCPclear: ทำความสะอาดและปรับแต่งเครื่อง</h3>
+<h4>เปิดโปรแกรม</h4>
+<ol>
+  <li>ดับเบิลคลิก <b>RUN.bat</b> ในโฟลเดอร์ <code>tools/SCPclear-plus</code> (หรือทางลัด <b>SCPclear</b> บนเดสก์ท็อปหลังรัน START-HERE)</li>
+  <li>กด Yes เมื่อ Windows ขอสิทธิ์ผู้ดูแล โปรแกรมจะเปิดในหน้าต่างที่สอง</li>
+  <li>ถ้ามีตัวหนังสือสีแดงในหน้าต่างดำ ให้ถ่ายรูปเก็บไว้ดูสาเหตุ</li>
+</ol>
+<p><code>SCPclear.exe</code> เป็นรุ่นเก่า ถ้าต้องการ exe รุ่นล่าสุดให้รัน <code>BUILD-EXE.bat</code> แล้วใช้ตัวใหม่</p>
+
+<h4>หน้าจอหลัก: เลือกสิ่งที่จะทำ แล้วกด "เริ่มทำงาน"</h4>
+<p>ปุ่มลัดด้านบน: <b>แนะนำ</b> (เลือกชุดที่ปลอดภัยให้) · <b>เลือกทั้งหมด</b> · <b>ล้างทั้งหมด</b> · เมื่อเปิดโปรแกรม ระบบติ๊ก SysMain และ Defrag ให้เองเฉพาะเครื่องที่เป็น HDD</p>
+<table>
+<tr><th>หมวด</th><th>ตัวเลือก</th><th>ทำอะไร</th></tr>
+<tr><td rowspan="11">⚡ ปรับความเร็ว / ล้างขยะ</td><td>Restore Point</td><td>สร้างจุดคืนค่าระบบก่อนทำทุกอย่าง <b>ควรติ๊กไว้เสมอ</b></td></tr>
+<tr><td>Virtual Memory</td><td>ตั้งขนาด pagefile ให้เหมาะกับแรม</td></tr>
+<tr><td>Visual Effects</td><td>ลดเอฟเฟกต์ภาพให้เครื่องลื่นขึ้น</td></tr>
+<tr><td>Transparency</td><td>ปิดความโปร่งใสของหน้าต่าง</td></tr>
+<tr><td>SysMain</td><td>ปิดบริการ SysMain (ช่วยเครื่อง HDD ที่ดิสก์ทำงาน 100%)</td></tr>
+<tr><td>ล้าง Temp</td><td>ลบไฟล์ชั่วคราว</td></tr>
+<tr><td>Windows Update cache</td><td>ล้างไฟล์อัปเดตที่โหลดค้าง (แก้อัปเดตค้าง)</td></tr>
+<tr><td>Recycle Bin + DNS</td><td>ล้างถังขยะและแคช DNS</td></tr>
+<tr><td>Hibernation</td><td>ปิดโหมดจำศีล คืนพื้นที่ดิสก์เท่าขนาดแรม</td></tr>
+<tr><td>Power Plan</td><td>ตั้งเป็น High Performance</td></tr>
+<tr><td>Defrag / Startup</td><td>จัดเรียงดิสก์ (เฉพาะ HDD ข้ามถ้าเป็น SSD) · เปิด Task Manager แท็บ Startup ให้ปิดโปรแกรมเปิดพร้อมเครื่อง</td></tr>
+<tr><td rowspan="3">🪟 ปรับแต่ง Windows</td><td>โฆษณา/คำแนะนำ</td><td>ปิดโฆษณาและคำแนะนำของ Windows</td></tr>
+<tr><td>เมนูคลิกขวาแบบเก่า</td><td>คืนเมนูคลิกขวาแบบเต็มของ Windows 11</td></tr>
+<tr><td>Widgets + Chat</td><td>ปิด Widgets และ Chat บนแถบงาน</td></tr>
+<tr><td rowspan="4">🗑️ AI / Bloatware / ความเป็นส่วนตัว</td><td>Copilot / Recall</td><td>ปิดหรือลบ Copilot และปิด Recall</td></tr>
+<tr><td>Bloatware</td><td>ลบแอปที่ติดมากับ Windows ที่ไม่ได้ใช้</td></tr>
+<tr><td>Telemetry</td><td>ปิดการส่งข้อมูลการใช้งานไป Microsoft</td></tr>
+<tr><td>OneDrive</td><td>ถอน OneDrive (ไม่ติ๊กไว้ก่อน ถ้าแผนกใช้ OneDrive อย่าติ๊ก)</td></tr>
+<tr><td rowspan="2">🖥️ จัดการระบบ</td><td>Windows Update</td><td>ตรวจ โหลด และติดตั้งอัปเดต (ใช้เวลาหลายนาที)</td></tr>
+<tr><td>SFC + DISM</td><td>ตรวจและซ่อมไฟล์ระบบที่เสีย (<code>sfc /scannow</code> แล้ว <code>DISM RestoreHealth</code>) ใช้เวลานาน</td></tr>
+<tr><td>—</td><td>ยืนยันก่อนทำ</td><td>ถามยืนยันก่อนเริ่มทุกครั้ง</td></tr>
+</table>
+<p>ทำเสร็จจะขึ้นหน้า <b>สรุปผล</b> บอกว่าทำอะไรไป คืนพื้นที่ดิสก์ได้เท่าไหร่ และมีปุ่ม <b>รีสตาร์ทเดี๋ยวนี้</b> (แนะนำให้รีสตาร์ท) ตัวเลือกที่ติ๊กไว้จะถูกจำไว้ใน <code>SCPclear-settings.json</code></p>
+
+<h4>ปุ่มอื่นในหน้าจอหลัก</h4>
+<table>
+<tr><th>ปุ่ม</th><th>ใช้ทำอะไร</th></tr>
+<tr><td><b>ตรวจสอบเครื่อง</b></td><td>ดูสเปกและสิ่งที่ควรปรับ กด <b>ปรับตามคำแนะนำ</b> เพื่อให้โปรแกรมติ๊กตัวเลือกที่เหมาะกับเครื่องนี้ให้</td></tr>
+<tr><td><b>ตรวจสุขภาพเครื่อง (IT)</b></td><td>เวลาเปิดเครื่องต่อเนื่อง อัปเดตรอรีสตาร์ท ดิสก์ แรม เครื่องพิมพ์ทีละเครื่อง (กดให้ทำงานต่อได้ถ้าถูก Pause) สถานะ SCPPrint ฟอนต์ไทย โปรแกรมกินแรม 5 อันดับ มีปุ่ม TRIM SSD, ตั้ง Balanced, ติดตั้งฟอนต์ไทย, <b>Export รายงาน</b> และ <b>ประวัติการตรวจ/ซ่อม</b></td></tr>
+<tr><td><b>ย้อนกลับการปรับแต่ง</b></td><td>คืนค่าการปรับแต่งที่ทำไป ถ้าทำแล้วเครื่องมีปัญหา</td></tr>
+<tr><td><b>จัดการ Startup</b></td><td>เปิด/ปิดโปรแกรมที่เปิดพร้อมเครื่อง</td></tr>
+<tr><td><b>ตรวจสอบอัปเดต SCPclear</b></td><td>เช็กรุ่นใหม่ของโปรแกรมจาก GitHub ที่ตั้งไว้ในโค้ด (<code>$GitHubRepo</code>)</td></tr>
+</table>
+
+<h4>ขั้นตอนแนะนำสำหรับเครื่องที่ช้า</h4>
+<ol>
+  <li>เปิด SCPclear → <b>ตรวจสอบเครื่อง</b> → <b>ปรับตามคำแนะนำ</b></li>
+  <li>เช็กว่าติ๊ก <b>Restore Point</b> และ <b>ยืนยันก่อนทำ</b> แล้ว</li>
+  <li>กด <b>เริ่มทำงาน</b> รอจนขึ้นสรุปผล แล้วกดรีสตาร์ท</li>
+  <li>หลังรีสตาร์ท เปิดแดชบอร์ด SCP-Remote กดตรวจเครื่องนั้นอีกครั้ง ดูว่างาน "แก้เครื่องค้าง/ช้า" หายไหม</li>
+</ol>
+<div class="warn"><b>ข้อควรระวัง</b>
+<ul>
+  <li>ตัวเลือก Power Plan ของ SCPclear ตั้งเป็น <b>High Performance</b> ส่วนปุ่มบนแดชบอร์ดตั้งเป็น <b>Balanced</b> สำหรับโน้ตบุ๊กหรือเครื่องที่ร้อนง่ายให้ใช้ Balanced</li>
+  <li>อย่าติ๊ก Defrag หรือ SFC/DISM กับเครื่องที่ดิสก์สุขภาพต่ำหรือมี bad sector ให้สำรองข้อมูลและเปลี่ยนดิสก์ก่อน</li>
+  <li>ถอน OneDrive / ลบ Bloatware ย้อนกลับยาก ตรวจก่อนว่าผู้ใช้ไม่ได้ใช้</li>
+</ul></div>
+
+<h3>7.2 SCPPrint: แชร์เครื่องพิมพ์ให้เครื่องอื่นพิมพ์ผ่าน</h3>
+<p>ทำให้คอมเครื่องหนึ่งเป็น <b>print server พอร์ต 9100</b> เหมือนกล่อง print server ฮาร์ดแวร์ เครื่องอื่นในวง LAN ส่งงานพิมพ์มาที่เครื่องนี้ แล้วเครื่องนี้ส่งต่อไปเครื่องพิมพ์ เหมาะกับเครื่องพิมพ์ USB ที่ต่ออยู่กับคอมเครื่องเดียวแต่หลายเครื่องต้องใช้ หรือเครื่องพิมพ์สติกเกอร์/ฉลาก (เช่น Zebra ZD230)</p>
+<h4>ติดตั้ง</h4>
+<ol>
+  <li>เลือกคอมที่ต่อเครื่องพิมพ์อยู่และ<b>เปิดตลอดเวลา</b> (เป็น "เครื่องแม่")</li>
+  <li>รัน <code>tools/SCPPrint/bin/SCPPrint_Setup.exe</code> (หรือทางลัด "ติดตั้ง SCPPrint" บนเดสก์ท็อป)</li>
+  <li>เปิดโปรแกรม SCPPrint จะเห็น <b>IP เครื่องนี้</b> อยู่บนสุด จด IP นี้ไว้ (ควรตั้ง IP คงที่)</li>
+</ol>
+<h4>เพิ่มเครื่องพิมพ์ (แท็บ "หลัก")</h4>
+<ol>
+  <li>ช่อง <b>เพิ่มปริ้นเตอร์ใหม่</b> เลือกชนิด:
+    <ul>
+      <li><b>USB (ปริ้นเตอร์ในเครื่องนี้)</b>: เลือกเครื่องพิมพ์จากรายการ (กด <b>รีเฟรช</b> ถ้าไม่เห็น) งานจะส่งผ่านคิว Windows</li>
+      <li><b>เครือข่าย (มี IP ตัวเอง)</b>: ใส่ IP และพอร์ตของเครื่องพิมพ์ กด <b>ทดสอบการเชื่อมต่อ</b></li>
+    </ul></li>
+  <li>ตั้ง <b>พอร์ตรับงาน</b>: เครื่องพิมพ์แรกใช้ 9100 ตัวถัดไป 9101, 9102 …</li>
+  <li>ใส่ <b>ชื่อไดรเวอร์</b> (ไม่บังคับ) ถ้าใส่ สคริปต์ติดตั้งเครื่องลูกจะเพิ่มเครื่องพิมพ์ให้ครบในขั้นเดียว</li>
+  <li>กด <b>+ เพิ่มปริ้นเตอร์</b> โปรแกรมจะเปิดไฟร์วอลล์ ใส่ข้อยกเว้น Windows Defender และอัปเดตสคริปต์ติดตั้งเครื่องลูกให้เอง</li>
+  <li>กด <b>▶ เริ่มทำงานทั้งหมด</b> สถานะต้องขึ้นว่ากำลังทำงาน</li>
+</ol>
+<h4>แท็บ "จัดการ / อัปเดต"</h4>
+<ul>
+  <li>ตาราง <b>พอร์ตรับงาน → ปลายทาง → จำนวนงานพิมพ์</b> ของแต่ละพอร์ต · ปุ่ม <b>แก้ไข</b> / <b>ลบ</b></li>
+  <li>ตัวเลือก <b>เปิดโปรแกรมนี้พร้อม Windows</b> (ควรเปิดไว้) และเปิดแบบย่อลงถาดระบบ</li>
+  <li><b>บันทึกการทำงาน (Log)</b> แยกรายวัน เก็บ 15 วัน · ปุ่ม <b>เปิดโฟลเดอร์</b> ดูไฟล์ตั้งค่าและ log (<code>%LOCALAPPDATA%\SCPPrint</code>)</li>
+  <li><b>สร้างสคริปต์ติดตั้งเครื่องลูก (.ps1)</b> เพื่อบันทึกไปไว้ที่อื่น เช่น แฟลชไดรฟ์</li>
+</ul>
+<h4>ตั้งค่าเครื่องลูก (เครื่องที่จะพิมพ์ผ่าน)</h4>
+<ol>
+  <li>ก๊อปไฟล์ <code>install-client-printer.ps1</code> ที่ SCPPrint สร้างไว้ไปที่เครื่องลูก</li>
+  <li>ลงไดรเวอร์ของเครื่องพิมพ์รุ่นนั้นที่เครื่องลูกก่อน (ไดรเวอร์เดียวกับเครื่องแม่)</li>
+  <li>คลิกขวาไฟล์ → Run with PowerShell (แบบผู้ดูแล) สคริปต์จะสร้างพอร์ต <code>SCPPrint_9100</code> ชี้ไปที่ IP เครื่องแม่</li>
+  <li>ถ้าในสคริปต์มีบรรทัด <code># Add-Printer ... &lt;ใส่ชื่อไดรเวอร์ตรงนี้&gt;</code> ให้รัน <code>Get-PrinterDriver</code> ดูชื่อไดรเวอร์ แล้วใส่ชื่อแทนและเอา <code>#</code> ออก แล้วรันใหม่</li>
+  <li>หรือตั้งเอง: Control Panel → Devices and Printers → Add a printer → Add a local printer → Create a new port: <b>Standard TCP/IP Port</b> → ใส่ IP เครื่องแม่ → พอร์ต 9100 (หรือ 9101 …) → เลือกไดรเวอร์</li>
+  <li>สั่งพิมพ์หน้าทดสอบ ตัวเลข "งานพิมพ์" ในตารางของ SCPPrint ต้องเพิ่มขึ้น</li>
+</ol>
+<div class="warn"><b>ข้อควรระวัง</b>
+<ul>
+  <li>เครื่องแม่ต้องเปิดตลอดเวลา ถ้าปิดเครื่องหรือปิดโปรแกรม เครื่องลูกทั้งหมดจะพิมพ์ไม่ได้ (กด X = ย่อลงถาด ไม่ได้ปิด)</li>
+  <li><b>อย่ากด "แก้ปริ้นไม่ออก" หรือล้างคิวที่เครื่องแม่</b> จะล้างงานของเครื่องอื่นที่ส่งมาด้วย</li>
+  <li>SCPPrint รับงานเฉพาะวง LAN และจำกัดขนาดงาน 200 MB ต่องาน (โหมดคิว Windows)</li>
+  <li>บนแดชบอร์ด ถ้าเครื่องไหนลง SCPPrint แต่ไม่ได้เปิด จะขึ้นเป็นงาน 🔴 ด่วน "เปิด SCPPrint"</li>
+</ul></div>
+<h4>แก้โค้ด SCPPrint</h4>
+<p>ไฟล์หลัก <code>print_server_full.py</code> (Python 3.12, <code>pip install pywin32 pystray pillow</code>) · สร้าง exe ด้วย <code>build.bat</code> (PyInstaller ตาม <code>SCPPrint.spec</code>) · สร้างตัวติดตั้งด้วย Inno Setup จาก <code>installer.iss</code></p>
+
+<!-- ====================================================== -->
+<h2 id="dev">8. สำหรับคนที่จะแก้ไข/พัฒนาต่อ</h2>
+<h3>โครงสร้างไฟล์ที่ รพ. เพิ่ม</h3>
+<table>
+<tr><th>ที่อยู่</th><th>คืออะไร</th></tr>
+<tr><td><code>hospital/*.js</code></td><td>โมดูลฝั่งเซิร์ฟเวอร์: <code>operations.js</code> (งานไอที, เก็บผลตรวจ, ประวัติ) <code>morning-check.js</code> <code>mobile.js</code> <code>driver-library.js</code> <code>templates.js</code></td></tr>
+<tr><td><code>public/scripts/scp-*.js</code></td><td>ฝั่งเบราว์เซอร์: <code>scp-dashboard.js</code> (แดชบอร์ด) <code>scp-health.js</code> (ตรวจสุขภาพ ดิสก์ ใบงาน วิธีซ่อม) <code>scp-map*.js</code> (ผัง) <code>scp-mobile.js</code> <code>scp-operations.js</code> <code>scp-programs.js</code> ฯลฯ</td></tr>
+<tr><td><code>public/styles/scp-*.css</code></td><td>ธีมสีชมพูของ รพ.</td></tr>
+<tr><td><code>views/*.handlebars</code></td><td>เทมเพลตหน้าเว็บ (แก้แล้วต้อง <code>npm run build:hospital</code>)</td></tr>
+<tr><td><code>hospital/tests/</code></td><td>เทสต์ทั้งหมด รันด้วย <code>npm run test:hospital</code></td></tr>
+<tr><td><code>hospital/UPSTREAM-CHANGES.md</code></td><td>รายการไฟล์ของ MeshCentral ที่ถูกแก้ (อ่านก่อนอัปเกรด MeshCentral)</td></tr>
+</table>
+
+<h3>แก้อะไรแล้วต้องทำอะไรต่อ</h3>
+<table>
+<tr><th>แก้ไฟล์</th><th>ต้องทำ</th></tr>
+<tr><td><code>public/</code> (JS, CSS)</td><td>ไม่ต้องรีสตาร์ต แต่ต้อง<b>เปลี่ยนเลขเวอร์ชัน</b> <code>?v=...</code> ในแท็ก script/link ของ <code>views/default.handlebars</code> แล้ว build ไม่งั้นเบราว์เซอร์ใช้ไฟล์เก่าจากแคช</td></tr>
+<tr><td><code>views/*.handlebars</code></td><td><code>npm run build:hospital</code> (ไม่ต้องรีสตาร์ต)</td></tr>
+<tr><td><code>hospital/*.js</code>, <code>meshcentral.js</code>, <code>meshagent.js</code></td><td>รีสตาร์ตบริการ (<b>ผู้ใช้ทุกคนจะหลุดล็อกอิน</b> แจ้งก่อน)</td></tr>
+</table>
+
+<h3>ข้อควรรู้ที่เคยพลาดมาแล้ว</h3>
+<ul>
+  <li><b>สคริปต์ที่ส่งให้เอเจนต์รัน</b> ต้องเขียน 1 คำสั่งต่อบรรทัด เอเจนต์ป้อน PowerShell ทีละบรรทัด และควรแปลงอักษรไทยเป็น <code>\uXXXX</code> ก่อนส่งกลับ (ไม่งั้นเพี้ยนตาม code page)</li>
+  <li><b>เอเจนต์รันได้ทีละคำสั่ง</b> ส่งซ้อนจะได้ <code>COMMAND_BUSY</code> ใน <code>scp-health.js</code> มีคิวต่อเครื่องให้แล้ว</li>
+  <li><b><code>ScpOperations.request(op, data)</code></b> ห้ามมีฟิลด์ชื่อ <code>action</code> ใน data จะไปทับชื่อช่องทาง <code>scpops</code></li>
+  <li><b>ไฟล์ในโปรเจกต์ใช้บรรทัดแบบ LF</b> ถ้าแก้ด้วยโปรแกรมที่เขียน CRLF ไฟล์จะเปลี่ยนทั้งไฟล์</li>
+  <li><b>เพิ่มปุ่มแก้ใหม่</b>: เพิ่มฟังก์ชันใน <code>FIX</code> ของ <code>scp-health.js</code> (ต้องพิมพ์ <code>SCP_FIX:{json}</code>) + ชื่อใน <code>ACTIONS</code> ของ <code>operations.js</code> + เทสต์</li>
+  <li><b>เพิ่มวิธีซ่อม</b>: เพิ่มใน <code>GUIDE</code> และ <code>KINDS</code> ของ <code>scp-health.js</code> มีเทสต์ตรวจว่าทุกงานมีวิธีซ่อม</li>
+  <li>แก้ไฟล์ของ MeshCentral ต้องใส่คอมเมนต์ <code>SCP-Remote:</code> และจดใน <code>UPSTREAM-CHANGES.md</code></li>
+</ul>
+
+<!-- ====================================================== -->
+<h2 id="trouble">9. แก้ปัญหาที่พบบ่อย</h2>
+<table>
+<tr><th>อาการ</th><th>ทำอะไร</th></tr>
+<tr><td>เข้าหน้าเว็บไม่ได้</td><td><code>npm run service:restart</code> ดู log ของบริการ · พอร์ต 8443 ถูกโปรแกรมอื่นใช้อยู่ไหม</td></tr>
+<tr><td>เครื่องลูกไม่ขึ้น / หายไป</td><td>เครื่องเปิดไหม · วงของเครื่องอยู่ในวงที่อนุญาตไหม (<code>allow:subnet</code>) · รัน <code>Check-Network.cmd</code> บนเครื่องนั้น · <code>sc query "Mesh Agent"</code></td></tr>
+<tr><td>ติดตั้งเอเจนต์แล้ว error MeshAgent.tag</td><td><code>sc delete "Mesh Agent"</code> แล้วติดตั้งใหม่</td></tr>
+<tr><td>หน้าเว็บเพี้ยนหลังอัปเดต</td><td><code>npm run build:hospital</code> แล้ว Ctrl+F5</td></tr>
+<tr><td>แก้ JS แล้วไม่เห็นผล</td><td>ยังไม่ได้เปลี่ยน <code>?v=</code> ในเทมเพลต</td></tr>
+<tr><td>บริการไม่ยอมเริ่มหลังแก้โค้ด</td><td><code>npm run test:hospital</code> ดูเทสต์ที่แดง</td></tr>
+<tr><td>ลืมรหัส admin</td><td>หยุดบริการ แล้ว <code>node meshcentral.js --datapath .local/scp-remote --resetaccount admin --pass "รหัสใหม่"</code> (ปิด 2FA ของบัญชีนั้นด้วย)</td></tr>
+<tr><td>ตรวจเช้าไม่ทำงาน</td><td>ดู <code>settings.scpmorningcheck</code> · ระบบรอ 5 นาทีหลังเปิดเซิร์ฟเวอร์ก่อนตรวจ · ทำได้ในช่วง 3 ชม. หลังเวลาที่ตั้ง</td></tr>
+</table>
+
+<!-- ====================================================== -->
+<h2 id="roadmap">10. แนวทางพัฒนาต่อไป</h2>
+<p>เป้าหมาย: ให้ระบบเป็น "งานช่าง" ที่รู้ว่าเครื่องไหนต้องแก้อะไร ขาดอะไร ก่อนผู้ใช้จะแจ้ง</p>
+<table>
+<tr><th>ขั้น</th><th>ทำอะไร</th><th>สถานะ</th></tr>
+<tr><td>1. ใบงานช่างรายเครื่อง + วิธีซ่อม</td><td>สรุปงานต่อเครื่อง เรียงความด่วน มีวิธีซ่อม 24 แบบ</td><td>✅ เสร็จ</td></tr>
+<tr><td>2. งานค้างทั้ง รพ. + อะไหล่</td><td>รวมงานทุกเครื่อง พิมพ์ใบขอซื้อ</td><td>✅ เสร็จ</td></tr>
+<tr><td>3. มาตรฐานเครื่อง รพ.</td><td>กำหนดโปรแกรม/การตั้งค่าที่ทุกเครื่องและแต่ละแผนกต้องมี แล้วเทียบว่าเครื่องไหนขาดอะไร</td><td>รอรายการโปรแกรมของหน่วยงาน</td></tr>
+<tr><td>4. ปุ่มลงโปรแกรมที่ขาด</td><td>คลังตัวติดตั้งที่ตรวจ SHA-256 ลงแบบเงียบ ทีละเครื่องหรือทั้งแผนก ("ชุดเครื่องใหม่")</td><td>ออกแบบแล้ว</td></tr>
+<tr><td>5. ประวัติและอาการซ้ำ</td><td>บอกเครื่องที่เสียเรื่องเดิมบ่อย ใช้ตัดสินใจเปลี่ยนเครื่อง</td><td>ข้อมูลมีแล้ว</td></tr>
+<tr><td>แจ้งเตือน Telegram</td><td>ส่งสรุปตรวจเช้าเข้ากลุ่ม Telegram ของทีม (ระบบรองรับแล้ว ใส่ token ใน config) และต่อ LINE ผ่าน webhook ในอนาคต</td><td>รอ bot token</td></tr>
+<tr><td>ลง Windows จากระยะไกล</td><td>สั่งลง Windows ใหม่ผ่านเอเจนต์ แล้วเอเจนต์ต่อกลับเอง (ทดลองสำเร็จแล้ว ต้องปรับให้ไฟล์ตอบคำถามติดตั้งไปถึงเครื่องผ่าน <code>$OEM$</code>)</td><td>ทดลองแล้ว ยังไม่รวมในชุดนี้</td></tr>
+<tr><td>ตัวติดตั้งเครื่องลูก</td><td>ถ้าเจอบริการ Mesh Agent ค้างโดยไม่มีไฟล์ ให้ติดตั้งใหม่เองแทนการแจ้ง error</td><td>รอแก้</td></tr>
+<tr><td>ไอคอนทั้งระบบ</td><td>เปลี่ยนอีโมจิที่เหลือเป็นไอคอนเส้นแบบเดียวกับเมนู</td><td>ทำแล้วบางส่วน</td></tr>
+</table>
+<div class="note">ข้อเสนอแนะ: ก่อนเพิ่มฟีเจอร์ใหม่ เขียนเทสต์ก่อน รัน <code>npm run test:hospital</code> ให้ผ่านทุกข้อ แล้วค่อยรีสตาร์ตบริการ และแจ้งผู้ใช้ทุกครั้งก่อนรีสตาร์ต</div>
+
+<p style="margin-top:40px;color:var(--muted);font-size:14px">SCP-Remote ต่อยอดจาก MeshCentral (Apache-2.0) · ฟอนต์แห่งชาติ SIPA และ Google Fonts (OFL) · SCPclear และ SCPPrint โดยทีมไอที โรงพยาบาลสีชมพู</p>
+</main>
+</body>
+</html>

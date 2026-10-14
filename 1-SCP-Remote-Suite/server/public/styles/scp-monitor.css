@@ -1,0 +1,147 @@
+/* The live device monitor and the fleet overview that opens it.
+
+   Everything here reads from the --scp-* tokens rather than naming colours. The previous
+   version hard-coded them and carried a single `.night` rule that changed only the background
+   and the text, so in the dark theme the borders, buttons and table rules stayed light and the
+   panel looked like a hole cut in the page. Tokens mean the dark theme is simply the tokens.
+
+   The numbers are the point of this screen, so they are set large and in colour and the chart
+   is the quieter context behind them - the reverse of how it read before, where the reading was
+   the same size as its own label. */
+
+/* ---- Fleet overview, on the dashboard ---- */
+.scp-monitor-overview {
+    background: var(--scp-surface, #fff);
+    border: 1px solid var(--scp-line, #f0dbe6);
+    border-radius: 16px;
+    padding: 20px;
+    margin: 14px 0;
+    box-shadow: var(--scp-shadow, 0 12px 40px #4a11340a);
+}
+.scp-monitor-overview h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+.scp-monitor-overview h4 { margin: 20px 0 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; color: var(--scp-muted, #6d5560); }
+
+.scp-monitor-bar { margin: 12px 0; }
+.scp-monitor-bar > span { display: block; font-size: 12px; color: var(--scp-muted, #6d5560); }
+/* The track stays neutral rather than taking the brand wash. A pink track puts the amber and
+   red job bars on a coloured ground in the dark theme, where telling "failed" from "working"
+   at a glance is the whole job of the colour. The first declaration is the fallback. */
+.scp-monitor-bar > div { height: 10px; background: var(--scp-soft, #fce9f3); background: color-mix(in srgb, currentColor 11%, transparent); border-radius: 999px; margin-top: 6px; overflow: hidden; }
+.scp-monitor-bar i { display: block; height: 100%; border-radius: 999px; transition: width .3s ease; }
+
+/* ---- Buttons, shared by the overview and the dialog ---- */
+.scp-monitor-overview button, #scpMonitor button {
+    font: inherit;
+    padding: 10px 16px;
+    min-height: 40px;
+    border: 1px solid var(--scp-line, #f0dbe6);
+    border-radius: 10px;
+    background: var(--scp-surface, #fff);
+    color: var(--scp-ink, #2a1520);
+    cursor: pointer;
+}
+.scp-monitor-overview button:hover, #scpMonitor button:hover { background: var(--scp-soft, #fce9f3); border-color: var(--scp-accent, #b02a72); }
+/* The one action on the overview: opening the live view. */
+.scp-monitor-overview > button:last-child { margin-top: 18px; background: var(--scp-accent, #b02a72); border-color: var(--scp-accent, #b02a72); color: #fff; font-weight: 600; }
+.scp-monitor-overview > button:last-child:hover { filter: brightness(1.08); }
+
+/* ---- The dialog ---- */
+#scpMonitor {
+    box-sizing: border-box;
+    width: min(1100px, 94vw);
+    max-height: 90vh;
+    padding: 24px;
+    border: 1px solid var(--scp-line, #f0dbe6);
+    border-radius: 18px;
+    font-family: inherit;
+    background: var(--scp-bg, #faf6f9);
+    color: var(--scp-ink, #2a1520);
+    box-shadow: 0 30px 90px #2a152033;
+}
+#scpMonitor::backdrop { background: #2a152099; backdrop-filter: blur(2px); }
+#scpMonitor header {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    position: sticky; top: -24px; z-index: 2;
+    margin: -24px -24px 16px; padding: 18px 24px;
+    background: var(--scp-surface, #fff);
+    border-bottom: 1px solid var(--scp-line, #f0dbe6);
+    border-radius: 18px 18px 0 0;
+}
+#scpMonitor header h2 { margin: 0; font-size: 18px; font-weight: 600; }
+
+#scpMonitor select, #scpMonitor input {
+    box-sizing: border-box; width: 100%; font: inherit;
+    padding: 11px 12px; min-height: 44px; margin: 8px 0;
+    border: 1px solid var(--scp-line, #f0dbe6); border-radius: 10px;
+    background: var(--scp-surface, #fff); color: var(--scp-ink, #2a1520);
+}
+#scpMonitor :is(select, input, button):focus-visible { outline: 3px solid var(--scp-accent, #b02a72); outline-offset: 2px; }
+.scp-monitor-status { font-size: 12px; color: var(--scp-muted, #6d5560); margin: 4px 0 16px; min-height: 18px; }
+
+/* ---- Charts ---- */
+/* A grid rather than two inline-blocks at 49%: the cards then share the row evenly, and a
+   third chart added later falls into place instead of wrapping to a ragged second line. */
+.scp-monitor-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.scp-monitor-charts h4 { grid-column: 1 / -1; margin: 14px 0 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; color: var(--scp-muted, #6d5560); }
+.scp-monitor-charts > :is(p, small) { grid-column: 1 / -1; margin: 0; font-size: 11px; color: var(--scp-muted, #6d5560); }
+.scp-monitor-charts > .scp-monitor-bar { grid-column: 1 / -1; }
+.scp-monitor-chart {
+    box-sizing: border-box; min-width: 0; padding: 16px;
+    background: var(--scp-surface, #fff);
+    border: 1px solid var(--scp-line, #f0dbe6);
+    border-radius: 14px;
+}
+.scp-monitor-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.scp-monitor-chart-head span { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--scp-muted, #6d5560); }
+/* The reading is what someone actually came to look at. */
+.scp-monitor-reading { font-size: 30px; font-weight: 700; line-height: 1.1; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.scp-monitor-chart svg { width: 100%; height: 92px; display: block; margin-top: 12px; overflow: visible; }
+/* The chart's own furniture, styled here rather than written into SVG attributes, so the dark
+   theme reaches it. A gridline drawn with a fixed colour is invisible on one theme or the other. */
+.scp-monitor-grid { stroke: var(--scp-line, #f0dbe6); }
+.scp-monitor-axis { fill: var(--scp-muted, #6d5560); }
+.scp-monitor-live { stroke: var(--scp-surface, #fff); }
+
+/* ---- Processes ---- */
+.scp-monitor-search { margin-top: 18px !important; }
+#scpMonitor pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; background: var(--scp-surface, #fff); border: 1px solid var(--scp-line, #f0dbe6); border-radius: 10px; padding: 12px; margin: 0 0 12px; }
+#scpMonitor pre:empty { display: none; }
+.scp-monitor-processes { display: block; border: 1px solid var(--scp-line, #f0dbe6); border-radius: 12px; overflow: hidden; background: var(--scp-surface, #fff); }
+.scp-monitor-processes > p { margin: 0; padding: 12px 14px; font-size: 12px; color: var(--scp-muted, #6d5560); border-bottom: 1px solid var(--scp-line, #f0dbe6); }
+#scpMonitor table { width: 100%; border-collapse: collapse; }
+#scpMonitor th, #scpMonitor td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--scp-line, #f0dbe6); overflow-wrap: anywhere; max-width: 380px; font-size: 13px; }
+#scpMonitor th { position: sticky; top: 0; background: var(--scp-soft, #fce9f3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--scp-muted, #6d5560); }
+#scpMonitor tr:last-child td { border-bottom: 0; }
+#scpMonitor tbody tr:hover td { background: var(--scp-soft, #fce9f3); }
+#scpMonitor td:first-child { font-family: Consolas, ui-monospace, monospace; color: var(--scp-muted, #6d5560); }
+
+@media (max-width: 650px) {
+    #scpMonitor { padding: 14px; width: 96vw; }
+    #scpMonitor header { margin: -14px -14px 12px; padding: 14px; top: -14px; }
+    .scp-monitor-charts { grid-template-columns: 1fr; }
+    .scp-monitor-reading { font-size: 26px; }
+    #scpMonitor th, #scpMonitor td { padding: 9px 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .scp-monitor-bar i { transition: none; } }
+
+/* ---- Cleanup job progress, shown here and on the dashboard ---- */
+.scp-job-progress {
+    box-sizing: border-box; min-width: 0; max-width: 340px; width: 100%;
+    border: 1px solid var(--scp-line, #f0dbe6); border-radius: 10px;
+    padding: 10px 12px; margin-top: 4px; color: inherit;
+    background: var(--scp-surface, #fff);
+}
+.scp-job-progress small { display: block; line-height: 1.5; font-size: 10px; color: var(--scp-muted, #6d5560); }
+.scp-job-progress small:first-child { font-size: 12px; font-weight: 600; color: var(--scp-accent, #b02a72); }
+.scp-job-progress progress { appearance: none; display: block; width: 100%; height: 6px; border: 0; border-radius: 6px; overflow: hidden; background: var(--scp-soft, #fce9f3); margin: 8px 0; accent-color: var(--scp-accent, #b02a72); }
+.scp-job-progress progress::-webkit-progress-bar { background: var(--scp-soft, #fce9f3); border-radius: 6px; }
+.scp-job-progress progress::-webkit-progress-value { background: var(--scp-accent, #b02a72); border-radius: 6px; }
+.scp-job-progress progress::-moz-progress-bar { background: var(--scp-accent, #b02a72); border-radius: 6px; }
+
+/* Four steps as four segments of a rule, so how far along a job is reads without arithmetic. */
+.scp-job-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 0; margin: 6px 0 0; list-style: none; font-size: 10px; }
+.scp-job-steps li { padding-top: 5px; border-top: 2px solid var(--scp-line, #f0dbe6); }
+.scp-job-steps [data-state=next] { color: var(--scp-muted, #6d5560); }
+.scp-job-steps [data-state=current] { font-weight: 700; color: var(--scp-accent, #b02a72); }
+.scp-job-steps [data-state=done] { color: #168065; }
+.scp-job-steps :is([data-state=current], [data-state=done]) { border-top-color: var(--scp-accent, #b02a72); }

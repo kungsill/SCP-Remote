@@ -1,0 +1,9 @@
+# installed and generated on each machine
+server/node_modules/
+server/.local/
+server/views/translations/
+tools/SCPPrint/build/
+tools/SCPPrint/dist/
+tools/SCPPrint/__pycache__/
+tools/SCPclear-plus/SCPclear-history.json
+*.log

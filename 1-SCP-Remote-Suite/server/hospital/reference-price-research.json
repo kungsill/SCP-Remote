@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-10-13",
+  "missingGeneralOriginalYears": [2551, 2552, 2554],
+  "findings": [
+    {
+      "yearBE": 2551,
+      "status": "unverified-computer-prices",
+      "note": "พบหนังสือราคามาตรฐานครุภัณฑ์ สำนักงบประมาณ พฤษภาคม 2551 (ใช้จัดทำงบ 2552 และบริหารงบ 2551–2552) แต่ยังไม่พบเกณฑ์คอมพิวเตอร์ทั่วไปที่ยืนยันราคาได้ จึงไม่นำราคาครุภัณฑ์หมวดอื่นมาเติมแทน",
+      "url": "https://namtok.go.th/files/save_news_file.php?file=prostd_103730.pdf"
+    },
+    {
+      "yearBE": 2552,
+      "status": "not-found",
+      "note": "หน้า MDES พบหลักเกณฑ์และแนวทางปฏิบัติการจัดหาระบบภาครัฐลงวันที่ 27 กรกฎาคม 2552 ซึ่งยังไม่ใช่ตารางราคากลางคอมพิวเตอร์ที่ตรวจต้นฉบับได้",
+      "url": "https://mdes.go.th/service/29?page=2"
+    },
+    {
+      "yearBE": 2554,
+      "status": "index-found-original-pending",
+      "note": "พบดัชนี สธ. ระบุราคากลางคอมพิวเตอร์ 11 พฤษภาคม 2554 จำนวน 60 รายการ แต่ยังดึง PDF เกณฑ์ทั่วไปจากลิงก์นั้นมาตรวจไม่ได้ (หน้าเว็บตอบ 403) จึงยังไม่รับรองราคา 60 รายการ",
+      "url": "https://ict.moph.go.th/index.php/th/extension/164"
+    },
+    {
+      "yearBE": 2554,
+      "status": "verified-gis-only",
+      "note": "ตรวจ PDF จากกรมสุขภาพจิตแล้วเป็นคู่มือ GIS 60 หน้า SHA-256 ตรงกับฉบับ GIS ที่เก็บอยู่ในคลัง ไม่ใช่หลักฐานว่าครบเกณฑ์คอมพิวเตอร์ทั่วไป 60 รายการ",
+      "url": "https://audit.dmh.go.th/books/admin/patsadu21.pdf",
+      "sha256": "efaba0a59d3ce67cbb7783453fb5b18e490948933ec31dd5bab1441e62a65be0"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+(function(){
+'use strict';
+var th=document.documentElement.lang==='th',jobs={},sequence=0;
+function t(en,thai){return th?thai:en;}
+function redraw(){if(window.ScpDashboard)window.ScpDashboard.render();}
+function size(n){return (Math.max(0,Number(n)||0)/1048576).toFixed(1)+' MB';}
+function supported(n){var id=n.agent&&n.agent.id;return (id>0&&id<5)||(id>41&&id<44);}
+async function run(node){
+ if(!(node.conn&1)||!supported(node))return;
+ if(jobs[node._id]&&jobs[node._id].state==='working')return;
+ if(!window.confirm(t('Clean old temporary files on ','ล้างไฟล์ชั่วคราวเก่าบนเครื่อง ')+node.name+'?\n\n'+t('Deletes only files older than 7 days in Windows Temp and user Temp folders. Skips files in use and linked folders. Keeps Downloads, documents, browser data, passwords and Recycle Bin. No restart. This frees space; it cannot guarantee faster performance.','ลบเฉพาะไฟล์อายุเกิน 7 วันใน Windows Temp และ Temp ของผู้ใช้ ข้ามไฟล์ที่ลบไม่ได้และโฟลเดอร์ลิงก์ ไม่ล้าง Downloads เอกสาร ข้อมูลเบราว์เซอร์ รหัสผ่าน หรือถังขยะ ไม่รีสตาร์ตเครื่อง ช่วยคืนพื้นที่แต่ไม่รับประกันความเร็ว')))return;
+ var job=jobs[node._id]={state:'working',ticket:'scpclean-'+Date.now()+'-'+(++sequence),started:Date.now(),progress:window.ScpProgress?ScpProgress.model('preparing'):null,text:t('Command sent; waiting for the remote computer…','ส่งคำสั่งแล้ว กำลังรอเครื่องลูกตอบรับ…')};redraw();
+ try{var response=await fetch((window.domainUrl||'/')+'scripts/scp-cleanup.ps1',{credentials:'same-origin'});if(!response.ok)throw Error('SCRIPT_UNAVAILABLE');var script=await response.text();if(!script.includes('SCP_CLEANUP_RESULT:'))throw Error('INVALID_SCRIPT');
+ window.meshserver.send({action:'runcommands',nodeids:[node._id],type:2,runAsUser:0,reply:true,responseid:job.ticket,cmds:script});
+ job.timer=setTimeout(function(){if(job.state==='working'){job.state='unknown';job.text=t('No result yet. The job may still be running. Refresh device status before retrying.','ยังไม่ได้รับผล งานอาจยังทำงานอยู่ ตรวจสถานะเครื่องก่อนลองใหม่');redraw();}},180000);
+ }catch(e){job.state='failed';job.text=t('Could not start cleanup','เริ่มล้างไฟล์ไม่ได้');redraw();}
+}
+function receive(m){if(!m||typeof m.responseid!=='string'||!m.responseid.startsWith('scpclean-'))return false;var nodeid=Object.keys(jobs).find(function(id){return jobs[id].ticket===m.responseid;});if(!nodeid)return false;var job=jobs[nodeid];if(m.nodeid&&m.nodeid!==nodeid)return true;
+ if(m.action==='runcommands'){if(m.result==='OK')return true;clearTimeout(job.timer);job.state='failed';job.text=t('Command rejected: ','คำสั่งถูกปฏิเสธ: ')+String(m.result).slice(0,150);redraw();return true;}
+ if(m.action!=='msg'||m.type!=='runcommands'||m.nodeid!==nodeid)return true;
+ if(m.progress===true){
+  try{var progress=JSON.parse(String(m.result).match(/SCP_CLEANUP_PROGRESS:(\{[^\r\n]*\})/)[1]);var phases={'scanning':t('Counting eligible files','สำรวจและนับไฟล์ที่เข้าเงื่อนไข'),'cleaning':t('Cleaning counted files','ล้างไฟล์ตามรายการที่ตรวจพบ'),'preparing':t('Preparing','เตรียมงาน'),'system-temp':t('Checking / cleaning Windows Temp','ตรวจและล้าง Windows Temp'),'user-temp':t('Checking / cleaning user Temp','ตรวจและล้าง Temp ของผู้ใช้'),'summarizing':t('Measuring free space','วัดพื้นที่ว่างและสรุปผล')};
+   job.state='working';job.updated=Date.now();if(window.ScpProgress)job.progress=ScpProgress.model(progress.stage,progress.processed,progress.total);job.text=(phases[progress.stage]||t('Working','กำลังทำงาน'))+' · '+t('Scanned ','ตรวจแล้ว ')+Number(progress.scanned||0)+t(' items · removed ',' รายการ · ลบแล้ว ')+Number(progress.deletedFiles||0)+' · '+size(progress.deletedBytes);redraw();
+  clearTimeout(job.timer);job.timer=setTimeout(function(){if(job.state==='working'){job.state='unknown';job.text=t('No progress for 3 minutes; result unconfirmed.','ไม่พบความคืบหน้า 3 นาที ยังยืนยันผลไม่ได้');redraw();}},180000);
+  }catch(e){}return true;
+ }
+ clearTimeout(job.timer);var match=String(m.result).match(/SCP_CLEANUP_RESULT:(\{[^\r\n]*\})/);try{if(!match)throw Error();var r=JSON.parse(match[1]);if(r.version!==1||!Number.isFinite(r.deletedBytes)||!Number.isFinite(r.deletedFiles))throw Error();job.state=r.limited?'partial':r.state;if(window.ScpProgress){job.progress=r.state==='completed'?ScpProgress.model(r.limited?'cleaning':'summarizing',r.processed,r.total,true,r.limited):job.progress;}job.text=r.state==='busy'?t('Another cleanup is already running','มีงานล้างไฟล์กำลังทำงานอยู่'):r.state!=='completed'?t('Cleanup failed; some files may already have been removed','ล้างไฟล์ไม่ครบ อาจลบไปแล้วบางส่วน'):t('Removed ','ลบแล้ว ')+r.deletedFiles+t(' files · ',' ไฟล์ · ')+size(r.deletedBytes)+'\n'+t('System drive free: ','พื้นที่ว่างไดรฟ์ระบบ: ')+size(r.beforeFree)+' → '+size(r.afterFree)+'\n'+t('Skipped / errors: ','ข้าม / ลบไม่ได้: ')+r.skipped+' / '+r.errors+(r.limited?' · '+t('Time / item limit reached','ถึงขีดจำกัดเวลา / จำนวนไฟล์'):'');}
+ catch(e){job.state='failed';job.text=String(m.result).includes('COMMAND_BUSY')?t('Another command is running; cleanup has not started.','เครื่องลูกกำลังทำคำสั่งอื่น ยังไม่ได้เริ่มล้าง'):t('No valid result received; do not assume cleanup succeeded.','ไม่ได้รับผลลัพธ์ที่ถูกต้อง ยังยืนยันการล้างไม่ได้');}redraw();return true;
+}
+function control(node){var box=document.createElement('div');if(!supported(node))return box;var job=jobs[node._id],b=document.createElement('button');b.type='button';b.className='scp-dash-scan';b.textContent=job&&job.state==='working'?t('Cleaning…','กำลังล้าง…'):t('Clean temporary files','ล้างไฟล์ชั่วคราว');b.disabled=!(node.conn&1)||!!(job&&(job.state==='working'||job.state==='unknown'));b.onclick=function(){run(node);};box.appendChild(b);if(job){var result=document.createElement('small');result.style.cssText='display:block;white-space:pre-wrap;max-width:260px;margin-top:6px';result.setAttribute('role','status');result.textContent=job.text;box.appendChild(result);if(window.ScpProgress&&job.progress)box.appendChild(ScpProgress.view(job.progress));}return box;}
+var loading=false;
+function refresh(){if(loading||!window.ScpOperations)return;loading=true;window.ScpOperations.request('cleanupStatus').then(function(rows){rows.forEach(function(row){var job=jobs[row.nodeid];if(job&&(job.ticket!==row.ticket||job.savedAt>=row.updated))return;if(!job)job=jobs[row.nodeid]={ticket:row.ticket};receive({action:'msg',type:'runcommands',nodeid:row.nodeid,responseid:row.ticket,result:row.result,progress:row.progress});job.savedAt=row.updated;if(row.progress&&Date.now()-row.updated>180000){job.state='unknown';job.text=t('Last progress is older than 3 minutes; result not confirmed.','ความคืบหน้าล่าสุดเกิน 3 นาที ยังยืนยันผลไม่ได้');}});redraw();}).catch(function(){}).then(function(){loading=false;});}
+window.ScpCleanup={control:control,receive:receive,run:run,refresh:refresh,snapshot:function(){return Object.keys(jobs).map(function(id){return {nodeid:id,state:jobs[id].state,text:jobs[id].text};});}};
+}());

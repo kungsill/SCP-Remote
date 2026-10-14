@@ -1,0 +1,76 @@
+{
+  "settings": {
+    "cert": "scp-remote.hospital.example",
+    "port": 8443,
+    "redirPort": 0,
+    "exactPorts": true,
+    "selfUpdate": false,
+    "webRTC": false,
+    "plugins": {
+      "enabled": false
+    },
+    "userAllowedIP": [
+      "10.10.1.0/24",
+      "10.10.2.0/24",
+      "10.10.3.0/24"
+    ],
+    "agentAllowedIP": [
+      "10.10.1.0/24",
+      "10.10.2.0/24",
+      "10.10.3.0/24"
+    ],
+    "autoBackup": {
+      "backupIntervalHours": 24,
+      "backupHour": 2,
+      "keepLastDaysBackup": 30,
+      "zipCompression": 6,
+      "backupPath": "CHANGE-ME/scp-remote-backups",
+      "backupSkipFoldersGlob": [
+        "**/signedagents"
+      ],
+      "scpBackupCopyPath": "CHANGE-ME-second-drive/SCP-Remote-Backups"
+    }
+  },
+  "domains": {
+    "": {
+      "title": "SCP-Remote",
+      "title2": "Hospital IT",
+      "newAccounts": false,
+      "minify": false,
+      "siteStyle": 1,
+      "meshMessengerTitle": "SCP-Remote",
+      "userConsentFlags": {
+        "desktopnotify": true,
+        "desktopprompt": true,
+        "terminalprompt": true,
+        "fileprompt": true,
+        "desktopprivacybar": false
+      },
+      "desktopViewOnlyNoPrompt": true,
+      "consentMessages": {
+        "Title": "SCP-Remote · ขออนุญาตเข้าถึงเครื่อง",
+        "autoAcceptOnTimeout": false,
+        "Language": "th",
+        "BackgroundColor": "#F7F8FC",
+        "ForegroundColor": "#213547",
+        "Desktop": "{0} ขอดูหน้าจอและควบคุมเครื่องนี้\nสามารถใช้เมาส์และคีย์บอร์ดเพื่อช่วยแก้ปัญหา\nคุณต้องการอนุญาตหรือไม่?",
+        "Terminal": "{0} ขอใช้หน้าต่างคำสั่งบนเครื่องนี้\nสามารถเรียกใช้คำสั่งและแก้ไขระบบได้\nคุณต้องการอนุญาตหรือไม่?",
+        "Files": "{0} ขอจัดการไฟล์บนเครื่องนี้\nสามารถดู ดาวน์โหลด อัปโหลด และลบไฟล์ได้\nคุณต้องการอนุญาตหรือไม่?"
+      },
+      "footer": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล",
+      "loginfooter": "SCP-Remote &middot; Hospital IT &middot; Powered by สุขภาพดิจิทัล",
+      "twoFactorCookieDurationDays": 30,
+      "passwordRequirements": {
+        "otp2factor": true,
+        "backupcode2factor": true,
+        "email2factor": false,
+        "sms2factor": false,
+        "msg2factor": false,
+        "push2factor": false,
+        "duo2factor": false,
+        "force2factor": false,
+        "lock2factor": false
+      }
+    }
+  }
+}

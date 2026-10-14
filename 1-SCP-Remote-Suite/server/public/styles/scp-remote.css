@@ -1,0 +1,133 @@
+/* SCP-Remote hospital theme. Sarabun is served locally under the OFL. */
+@font-face { font-family: Sarabun; src: url('../fonts/sarabun/Sarabun-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: Sarabun; src: url('../fonts/sarabun/Sarabun-SemiBold.ttf') format('truetype'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: Sarabun; src: url('../fonts/sarabun/Sarabun-Bold.ttf') format('truetype'); font-weight: 700; font-style: normal; font-display: swap; }
+body, button, input, select, textarea, .title, .title2, .modal, .popover {
+    font-family: Sarabun, sans-serif;
+}
+body.login { background: #f5edf1; }
+#masthead { background: #63123b; }
+#masthead .title, #masthead .title2 { font-family: Sarabun, sans-serif; color: #fff; text-shadow: none; }
+#masthead font { font-family: Sarabun, sans-serif !important; }
+#page_leftbar { background: linear-gradient(to bottom, #701744, #521031); }
+body.login #masthead { background: #63123b; color: #fff; }
+body.login #topbar { background: #4b0c2c; }
+body.login #column_l { line-height: 1.65; }
+body.login .title { font-weight: 700; letter-spacing: .3px; }
+.scp-language { display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding: 6px 12px; background: #63123b; color: #fff; font: 14px Sarabun, sans-serif; }
+.scp-language a { color: #fff; padding: 3px 10px; border: 1px solid #dcb5c9; border-radius: 5px; text-decoration: none; }
+.scp-language a[aria-current="true"] { color: #4e1230; background: #fff; font-weight: 700; }
+.scp-language a:focus-visible { outline: 3px solid #ffd166; outline-offset: 2px; }
+.scp-language .scp-brand { margin-right: auto; font-weight: 600; }
+.scp-language-inbar { float: right; height: 24px; box-sizing: border-box; padding: 0 36px 0 8px; background: transparent; }
+.scp-language-inbar a { padding: 0 8px; line-height: 20px; }
+body.login #welcomeimage img { max-width: 320px; width: 100%; }
+.scp-hospital-notice { margin: 12px 0; color: #63123b; font-weight: 600; }
+body.night .scp-hospital-notice { color: #e6a6c6; }
+/* Keep the monospace fonts used by remote terminals and code editors. */
+.xterm, .xterm textarea, pre, code, .ace_editor, .ace_editor textarea { font-family: monospace; }
+.scp-files-panel { margin: 10px; padding: 12px 14px; border: 1px solid #dec9d3; border-radius: 8px; background: #f7f0f3; color: #44172e; line-height: 1.5; }
+.scp-files-help { margin: 0 0 8px; }
+.scp-files-controls, .scp-upload-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.scp-files-panel button { border: 1px solid #996e84; border-radius: 5px; padding: 4px 10px; background: white; color: #63123b; cursor: pointer; }
+.scp-files-panel button:focus-visible { outline: 3px solid #edb842; outline-offset: 2px; }
+.scp-files-summary { margin-top: 8px; font-weight: 600; }
+.scp-upload-list { max-height: 250px; overflow: auto; }
+.scp-upload-row { padding: 10px 0; border-top: 1px solid #dec9d3; }
+.scp-upload-heading { display: flex; justify-content: space-between; gap: 10px; overflow-wrap: anywhere; }
+.scp-upload-heading span { white-space: nowrap; }
+.scp-upload-status { margin: 4px 0; overflow-wrap: anywhere; }
+.scp-upload-row[data-state="success"] .scp-upload-status { color: #176039; }
+.scp-upload-row[data-state="error"] .scp-upload-status { color: #a22525; }
+.scp-upload-row progress { width: 100%; height: 12px; accent-color: #81184d; }
+.scp-files-empty { padding: 28px 16px; text-align: center; color: #775265; }
+.scp-file-new { background: #dcf4e8 !important; box-shadow: inset 3px 0 #25835b; }
+.night .scp-files-panel { background: #361727; color: #eee2e8; border-color: #775265; }
+.night .scp-upload-row[data-state="success"] .scp-upload-status { color: #9ce3b8; }
+.night .scp-upload-row[data-state="error"] .scp-upload-status { color: #ffb1b1; }
+
+/* Unified remote session tools. */
+#scp-remote-dock{padding:0;box-sizing:border-box;position:fixed;right:20px;bottom:60px;z-index:10010;width:340px;max-width:calc(100vw - 32px);color:#4a1731;background:rgba(255,255,255,.98);border:1px solid #eddce5;border-radius:18px;box-shadow:0 16px 56px #4b173124,0 2px 8px #4b17310c;font:13px Sarabun,Segoe UI,sans-serif;overflow:hidden}
+#scp-remote-dock[hidden],#scp-remote-dock [hidden]{display:none!important}
+#scp-remote-dock>header{height:auto;box-sizing:border-box;display:flex;align-items:center;gap:11px;padding:14px 16px;background:linear-gradient(120deg,#f8eaf1,#fff7fb);border-bottom:1px solid #efe1e8}
+.scp-dock-brand{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:#b02a72;color:white;font-size:11px;font-weight:700;letter-spacing:.5px;box-shadow:0 4px 10px #b02a7224}
+#scp-remote-dock strong{font-size:14px}#scp-remote-dock header small{display:block;color:#906b7e;font-size:10px;margin-top:3px}#scp-remote-dock header button{margin-left:auto;width:30px;height:30px;padding:0;font-size:20px;background:#ffffffbb}
+.scp-dock-content{max-height:min(65vh,520px);overflow:auto;padding:4px 0}
+#scp-remote-dock button,#scp-remote-dock select,#scp-remote-dock a{font:inherit!important;box-sizing:border-box;border:1px solid #e8d4de!important;border-radius:9px!important;padding:8px 11px!important;background:#fff!important;color:#8a1f59!important;cursor:pointer;text-decoration:none;transition:background .15s,box-shadow .15s}
+#scp-remote-dock button:hover,#scp-remote-dock a:hover{background:#f8edf3!important;box-shadow:0 2px 6px #46162e10}#scp-remote-dock button:disabled,#scp-remote-dock select:disabled{opacity:.5;cursor:default}#scp-remote-dock :focus-visible{outline:3px solid #dc84b0;outline-offset:2px}
+#scp-remote-dock #scp-session-health,#scp-remote-dock #scp-recording{position:static!important;transform:none!important;max-width:none!important;width:auto!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;margin:0!important;color:inherit!important;font:inherit!important}
+#scp-remote-dock #scp-session-health{padding:14px 16px!important}#scp-session-health>[role=status]{line-height:1.65;font-weight:600;padding-left:14px;position:relative;margin-bottom:10px}#scp-session-health>[role=status]:before{content:'';width:6px;height:6px;background:#d1428c;position:absolute;left:0;top:8px;border-radius:50%;box-shadow:0 0 0 3px #e1f5f0}
+#scp-session-health>small{display:block;line-height:1.9;color:#8e6b7d;background:#faf3f7;padding:10px;border:1px solid #f2e7ed;border-radius:10px;margin:10px 0;font-size:11px}
+#scp-session-health>select{width:100%;margin-top:8px}#scp-session-health>button{margin:4px 0!important}
+#scp-remote-dock #scp-recording{border-top:1px solid #f1e5eb!important;padding:4px 4px 8px!important}#scp-remote-dock #scp-recording>button{border:0!important;font-weight:600!important;text-align:left;width:100%;background:transparent!important}#scp-recording small{color:#9d8290;font-size:10px;line-height:1.65;margin-top:12px}#scp-recording [role=status]{line-height:1.7;margin:6px 0}
+body.scp-dock-visible #scpConnection{display:none!important}
+@media(max-width:650px){#scp-remote-dock{right:12px;bottom:56px;width:290px}.scp-dock-content{max-height:45vh}}
+@media(prefers-reduced-motion:reduce){#scp-remote-dock *{transition:none!important}}
+
+#scp-remote-dock header button{padding:0!important;flex-shrink:0}
+
+/* Session tools belong to the desktop toolbar, never over the navigation. */
+#deskarea1:has(.scp-inline){background:#fcf8fa;padding:8px 10px;border:1px solid #ecdbe3;border-radius:12px 12px 0 0;color:#6f4359;box-sizing:border-box}
+#deskarea1:has(.scp-inline) input[type=button]{font:12px Sarabun,sans-serif;padding:5px 10px;border:1px solid #e5cfda;border-radius:7px;background:#fff;color:#622443;cursor:pointer}
+#scp-remote-dock.scp-inline{position:relative;inset:auto;clear:both;width:100%;max-width:none;overflow:visible;border:0;border-top:1px solid #f0e2e9;border-radius:0;box-shadow:none;background:transparent;margin:8px 0 0;padding:8px 0 0;z-index:5}
+#scp-remote-dock.scp-inline>header{display:none}
+#scp-remote-dock.scp-inline .scp-dock-content{display:flex;align-items:center;gap:16px;padding:0;max-height:none;overflow:visible}
+#scp-remote-dock.scp-inline #scp-session-health{display:grid;grid-template-columns:minmax(220px,1fr) auto;column-gap:20px;row-gap:2px;flex:1;min-width:0;padding:0!important}
+#scp-remote-dock.scp-inline #scp-session-health>[role=status]{grid-column:1;grid-row:1;margin:0;font-size:12px}
+#scp-remote-dock.scp-inline #scp-session-health>small{grid-column:1;grid-row:2;margin:0;padding:0 0 0 14px;background:transparent;border:0;font-size:10px;line-height:1.6;overflow-wrap:anywhere}
+#scp-remote-dock.scp-inline #scp-session-health>small:empty{display:none}
+#scp-remote-dock.scp-inline #scp-session-health>select{grid-column:2;grid-row:1 / span 2;align-self:center;width:180px;margin:0;font-size:12px!important}
+#scp-remote-dock.scp-inline #scp-session-health>button{grid-column:1;grid-row:3;justify-self:start}
+#scp-remote-dock.scp-inline #scp-recording{position:relative!important;flex:0 0 auto;padding:0!important;border:0!important;overflow:visible!important}
+#scp-remote-dock.scp-inline #scp-recording>button{width:auto;border:1px solid #e5cfda!important;background:#fff!important;white-space:nowrap;font-size:12px!important}
+#scp-remote-dock.scp-inline #scp-recording>div{position:absolute;right:0;top:calc(100% + 10px);width:300px;max-width:80vw;padding:16px!important;background:#fff;border:1px solid #ebd6e1;border-radius:12px;box-shadow:0 12px 36px #4a193226;z-index:20}
+body.scp-inline-tools #deskarea3x{height:var(--scp-canvas-height)!important;max-height:var(--scp-canvas-height)!important}
+#deskarea0>#deskarea1{display:block!important}
+body.fulldesk.scp-inline-tools #deskarea0{grid-template-rows:auto max-content minmax(0,1fr) max-content}
+@media(max-width:800px){#scp-remote-dock.scp-inline .scp-dock-content{gap:8px;flex-wrap:wrap}#scp-remote-dock.scp-inline #scp-session-health{grid-template-columns:minmax(140px,1fr) auto;column-gap:8px}#scp-remote-dock.scp-inline #scp-session-health>select{width:145px}}
+
+/* Left tool rail: reserved space, never drawn over the remote image. */
+body.scp-inline-tools #deskarea0{position:relative;box-sizing:border-box;padding-left:246px;min-height:280px;display:block!important}
+body.scp-inline-tools #deskarea0>#deskarea1{position:absolute;left:0;top:0;bottom:0;width:234px;overflow:auto;padding:16px 12px;border:1px solid #eddce5;border-radius:12px;background:#fcf8fa;line-height:1.8!important}
+body.scp-inline-tools #deskarea1>.toright2{float:none;display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:14px}
+body.scp-inline-tools #deskarea1 .deskareaicon{float:none}
+body.scp-inline-tools #deskarea1>div:not(.toright2){line-height:2.2}
+body.scp-inline-tools #scp-remote-dock.scp-inline{margin-top:18px;padding-top:14px}
+body.scp-inline-tools #scp-remote-dock.scp-inline .scp-dock-content{display:flex;flex-direction:column;align-items:stretch;gap:18px}
+body.scp-inline-tools #scp-remote-dock.scp-inline #scp-session-health{display:flex;flex-direction:column;gap:8px;order:0;flex:auto}
+body.scp-inline-tools #scp-remote-dock.scp-inline #scp-session-health>select{width:100%;align-self:stretch}
+body.scp-inline-tools #scp-remote-dock.scp-inline #scp-recording{order:1}
+body.scp-inline-tools #scp-remote-dock.scp-inline #scp-recording>button{width:100%}
+body.scp-inline-tools #scp-remote-dock.scp-inline #scp-recording>div{position:static;width:auto;max-width:none;margin-top:10px;padding:10px!important;box-shadow:none}
+@media(max-width:850px){body.scp-inline-tools #deskarea0{padding-left:198px}body.scp-inline-tools #deskarea0>#deskarea1{width:188px}}
+
+/* The app-like remote screen, used when /m sends someone straight to one computer.
+   The page itself is asked to drop its chrome (hide=31); this is the slim bar that replaces
+   it, carrying only the three things still worth saying - which machine, whether it is
+   connected, and the way back. scp-remote-ui.js builds it. */
+body.scp-app-view #scp-app-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top));background:var(--scp-surface,#fff);border-bottom:1px solid var(--scp-line,#f0dbe6);box-sizing:border-box}
+body.scp-app-view #scp-app-bar:after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,var(--scp-accent,#b02a72),#d1428c)}
+/* 44px because this is the only way out of the screen on a phone. */
+body.scp-app-view .scp-app-back{display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:12px;border:1px solid var(--scp-line,#f0dbe6);color:var(--scp-accent,#b02a72);text-decoration:none}
+body.scp-app-view .scp-app-back:hover{background:var(--scp-soft,#fce9f3)}
+body.scp-app-view .scp-app-back svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+body.scp-app-view #scp-app-device{flex:1;min-width:0;font-size:16px;font-weight:600;color:var(--scp-ink,#2a1520);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.scp-app-view #scp-app-state{flex:none;font-size:11px;font-weight:600;padding:5px 11px;border-radius:9px;background:var(--scp-soft,#fce9f3);color:var(--scp-muted,#6d5560);white-space:nowrap}
+body.scp-app-view #scp-app-state:before{content:'\25CF';margin-right:5px}
+/* Green, because "can I reach this machine" is the same question everywhere else in here. */
+body.scp-app-view #scp-app-state.is-live{background:#e2f6ef;color:#0b8f6f}
+@media(prefers-color-scheme:dark){body.scp-app-view #scp-app-state.is-live{background:#10402f;color:#34d9a8}}
+/* Nothing on the page but that bar and the picture.
+   /m already asks the server for this with hide=31, so nothing flashes on the way in. These
+   rules are what makes the same thing true when the screen is reached the other way - open a
+   device on the full site, press Desktop - where no query string is involved at all. The tabs
+   beside Desktop go with the rest and come back on the way out. */
+body.scp-app-view :is(#masthead,#topbar,#footer,#page_leftbar,#p11title,#p10title){display:none!important}
+body.scp-app-view #column_l{padding:0!important;left:0!important;width:100%!important}
+body.scp-app-view #page_content{top:0!important;bottom:0!important;left:0!important;right:0!important}
+body.scp-app-view #container{border:0!important;min-width:0!important}
+@media(max-width:560px){body.scp-app-view #scp-app-device{font-size:15px}}
+/* Pinch-zoomed remote picture: one finger slides it, and a button in the bar fits it again */
+#DeskParent.scp-zoomed{touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+body.scp-app-view #scp-app-bar .scp-app-fit{flex:none;border:1px solid var(--scp-line,#f0dbe6);background:var(--scp-surface,#fff);color:var(--scp-accent,#b02a72);font-size:11px;font-weight:700;padding:5px 10px;border-radius:9px;cursor:pointer;white-space:nowrap}
+body.scp-app-view #scp-app-bar .scp-app-fit[hidden]{display:none}

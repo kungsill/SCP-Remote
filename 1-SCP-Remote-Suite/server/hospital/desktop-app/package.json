@@ -1,0 +1,18 @@
+{
+  "name": "scp-remote-desktop",
+  "productName": "SCP-Remote",
+  "version": "0.4.3",
+  "private": true,
+  "description": "SCP-Remote hospital remote desktop client",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:clipboard": "node clipboard/build.js",
+    "prepackage": "npm run build:clipboard",
+    "package": "node package.js"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.4.3"
+  }
+}

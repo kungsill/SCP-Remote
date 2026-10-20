@@ -1,0 +1,22 @@
+/* SCP-Remote: SCPclear technician tools (scp-tech.js). Buttons, notes and rows reuse the health check styles. */
+.scp-tech-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 8px; }
+.scp-tech-bar .scp-health-hint { margin: 0 0 0 4px; }
+.scp-tech-block { border-top: 1px solid var(--scp-line); padding-top: 8px; margin-top: 8px; }
+.scp-tech-block h5, .scp-tech-fleet h5 { margin: 6px 0; font-size: 13px; color: var(--scp-ink); }
+.scp-tech-pre { white-space: pre-wrap; font-size: 12px; margin: 4px 0; }
+pre.scp-tech-pre { background: var(--scp-soft); color: var(--scp-ink); padding: 6px 8px; border-radius: 8px; max-height: 180px; overflow: auto; font-weight: 400; }
+.scp-tech-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 6px 0; display: block; overflow-x: auto; }
+.scp-tech-table th, .scp-tech-table td { border-bottom: 1px solid var(--scp-line); padding: 4px 6px; text-align: left; vertical-align: top; }
+.scp-tech-table th { color: var(--scp-muted); font-weight: 700; white-space: nowrap; }
+.scp-tech-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.scp-tech-tab { border: 1px solid var(--scp-line); background: var(--scp-surface); color: var(--scp-ink); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.scp-tech-tab.active { background: var(--scp-accent, #b02a72); border-color: var(--scp-accent, #b02a72); color: #fff; }
+.scp-tech-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 10px; margin: 6px 0 10px; }
+.scp-tech-who { max-height: 32vh; overflow-y: auto; border: 1px solid var(--scp-line); border-radius: 10px; padding: 6px 8px; }
+.scp-tech-check { font-size: 12.5px; color: var(--scp-ink); cursor: pointer; }
+.scp-tech-input { border: 1px solid var(--scp-line); border-radius: 9px; padding: 6px 9px; font: inherit; font-size: 12.5px; background: var(--scp-surface); color: var(--scp-ink); min-width: 0; width: 100%; max-width: 420px; margin: 4px 0; box-sizing: border-box; }
+select.scp-tech-input { width: auto; max-width: 100%; }
+.scp-tech-status { margin-top: 8px; }
+.scp-tech-inv details summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 700px) { .scp-tech-pick { grid-template-columns: 1fr 1fr; } }
+.scp-tech-table tr.scp-tech-missing td { background: #fff4dc; color: #92400e; font-weight: 600; }

@@ -2845,6 +2845,7 @@
         secAsset.appendChild(assetBtnRow);
         cmBody.appendChild(secAsset);
         if (window.ScpHealth) cmBody.appendChild(window.ScpHealth.section(node));
+        if (window.ScpTech) cmBody.appendChild(window.ScpTech.section(node)); // SCP-Remote: SCPclear technician tools
         cmBody.appendChild(historySection(node));
         box.appendChild(cmBody);
 
@@ -3985,6 +3986,7 @@
         [/งานช่างค้าง|Work waiting/, 'M9 4h6v3H9zM7 5H5v16h14V5h-2M9 13l2 2 4-4'],
         [/ตรวจสุขภาพทุกเครื่อง|Health check all/, 'M3 12h4l2-5 4 10 2-5h6'],
         [/สุขภาพดิสก์|Disk health/, 'M4 5h16v14H4zM4 13h16M8 16h.01M12 16h4'],
+        [/เครื่องมือช่าง SCPclear|SCPclear tools/, 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z'],
         [/เครื่องพิมพ์ทั้ง|All printers/, 'M7 8V3h10v5M6 17H4v-7h16v7h-2M7 14h10v7H7z'],
         [/ฟอนต์ไทย|Thai fonts/, 'M4 19l5-14 5 14M6 14h6M15 13a3 3 0 1 1 6 0v6M21 16h-3a3 3 0 0 1 0-3'],
         [/แจ้งซ่อม|Repairs/, 'M5 4h14v16H5zM9 9h6M9 13h6M9 17h3'],
@@ -4024,7 +4026,7 @@
     // label so a button added later still lands somewhere (anything unknown goes last).
     function groupHeadingActions(actions) {
         var groups = [
-            { label: thai ? '🧰 ดูแลเครื่อง' : '🧰 Care', order: [/เพิ่มเครื่อง|Add a computer/, /งานช่างค้าง|Work waiting/, /ตรวจสุขภาพทุกเครื่อง|Health check all/, /สุขภาพดิสก์|Disk health/, /เครื่องพิมพ์ทั้ง|All printers/, /ฟอนต์ไทย|Thai fonts/, /แจ้งซ่อม|Repairs/, /คลังไดรเวอร์|Driver library/] },
+            { label: thai ? '🧰 ดูแลเครื่อง' : '🧰 Care', order: [/เพิ่มเครื่อง|Add a computer/, /งานช่างค้าง|Work waiting/, /ตรวจสุขภาพทุกเครื่อง|Health check all/, /สุขภาพดิสก์|Disk health/, /เครื่องมือช่าง SCPclear|SCPclear tools/, /เครื่องพิมพ์ทั้ง|All printers/, /ฟอนต์ไทย|Thai fonts/, /แจ้งซ่อม|Repairs/, /คลังไดรเวอร์|Driver library/] },
             { label: thai ? '📊 รายงาน' : '📊 Reports', order: [/สรุปประจำวัน|Daily summary/, /รายงานและชาร์ต|Reports & Print/, /ออกรายงานการใช้งาน|usage/i, /ออกรายการครุภัณฑ์|inventory|CSV/i, /QR/] },
             { label: thai ? '💰 งบและประเมิน' : '💰 Budget', order: [/คลังราคากลาง|Reference prices/, /แผนงบประมาณ|budget plan/i, /เกณฑ์ประเมิน|Criteria/, /ตรวจเครื่อง \(|Check type/] }
         ];
@@ -4535,6 +4537,11 @@
             actions.appendChild(button(thai ? '🧰 งานช่างค้างทั้ง รพ.' : '🧰 Work waiting', 'scp-dash-refresh', function () { window.ScpHealth.openBacklog(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '💽 สุขภาพดิสก์ทั้ง รพ.' : '💽 Disk health', 'scp-dash-refresh', function () { window.ScpHealth.openDisks(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '🔤 ติดตั้งฟอนต์ไทย' : '🔤 Install Thai fonts', 'scp-dash-refresh', function () { window.ScpHealth.openFonts(allNodes(), overlayDialog); }));
+        }
+        // SCP-Remote: SCPclear technician tools (blue screens, RAM, batteries, SFC/DISM, winget, LAN scan) - scp-tech.js
+        if (window.ScpTech) {
+            window.ScpTech.overlay = overlayDialog;
+            actions.appendChild(button(thai ? '🛠️ เครื่องมือช่าง SCPclear' : '🛠️ SCPclear tools', 'scp-dash-refresh', function () { window.ScpTech.openFleet(allNodes(), overlayDialog); }));
         }
         actions.appendChild(button(document.documentElement.lang === 'th' ? 'แจ้งซ่อม / ตรวจระบบ' : 'Repairs / system checks', 'scp-dash-refresh', function () { window.ScpOperations.open(); }));
         var libraryButton=button(thai?'คลังไดรเวอร์':'Driver library','scp-dash-refresh',function(){window.ScpOperations.openLibrary();});libraryButton.id='scpDriverLibraryButton';libraryButton.hidden=true;actions.appendChild(libraryButton);

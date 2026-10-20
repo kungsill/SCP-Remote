@@ -58,7 +58,7 @@
     <script defer src="{{{domainurl}}}scripts/scp-files.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-ui.css?v=20261013-contrast" />
     <script defer src="{{{domainurl}}}scripts/scp-ui.js?v=20261013-drawer"></script>
-    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-dashboard.css?v=20261014-addpc" />
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-dashboard.css?v=20261018-fixprog" />
     <script defer src="{{{domainurl}}}scripts/scp-progress.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-monitor.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-monitor.css" />
@@ -72,7 +72,10 @@
     <script defer src="{{{domainurl}}}scripts/scp-report.js?v=20261012-fiscal"></script>
     <script defer src="{{{domainurl}}}scripts/scp-care-center.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-care.js"></script>
-    <script defer src="{{{domainurl}}}scripts/scp-health.js?v=20261014-simple"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-health.js?v=20261018-fixprog"></script>
+    <!-- SCP-Remote: SCPclear technician tools (blue screens, RAM, batteries, SFC/DISM, winget, LAN scan, send SCPclear). -->
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-tech.css?v=20261018-notinst" />
+    <script defer src="{{{domainurl}}}scripts/scp-tech.js?v=20261019-wuinstall"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-operations.css" />
     <script defer src="{{{domainurl}}}scripts/scp-price-reference.js?v=20261012-fiscal"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-price-archive.css?v=20261013-central" />
@@ -80,7 +83,7 @@
     <script defer src="{{{domainurl}}}scripts/scp-assess.js?v=20261013-ryzen"></script>
     <script defer src="{{{domainurl}}}scripts/scp-map.js?v=20261013-sign"></script>
     <script defer src="{{{domainurl}}}scripts/scp-map-anime.js?v=20261013-sign"></script>
-    <script defer src="{{{domainurl}}}scripts/scp-dashboard.js?v=20261014-addpc"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-dashboard.js?v=20261018-tech"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-transfer.css" />
     <script defer src="{{{domainurl}}}scripts/scp-transfer.js"></script>
 <script defer src="{{{domainurl}}}scripts/scp-recording.js?v=20260922-2"></script>
@@ -2686,6 +2689,7 @@
             if (window.ScpMonitor && ScpMonitor.receive(message)) return;
             if (window.ScpCleanup && ScpCleanup.receive(message)) return;
             if (window.ScpHealth && ScpHealth.receive(message)) return;
+            if (window.ScpTech && ScpTech.receive(message)) return; // SCP-Remote: SCPclear technician tools
             switch (message.action) {
                 case 'scpops': if(window.ScpOperations) ScpOperations.receive(message); break;
                 case 'trace': {

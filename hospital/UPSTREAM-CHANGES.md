@@ -66,6 +66,7 @@ grep -rn "// SCP-Remote\|/\* SCP-Remote\|<!-- SCP-Remote" --include=*.js --inclu
 | `views/default.handlebars` | ~5574 | การ์ดจอสตรีมประกาศตัวว่าดูอย่างเดียว | จอสตรีมกลับไปเด้งกล่องขออนุญาต |
 | `views/default.handlebars` | ~10195 | คุณภาพภาพรีโมตเต็มจอ 100 | ภาพรีโมตกลับไปเบลอ |
 | `views/default.handlebars` | ~16500 | แสดงขนาดไฟล์แบบอ่านออก | กลับไปเป็นจำนวนไบต์ดิบ |
+| `views/default.handlebars` | `<head>` (บรรทัด `<!-- SCP-Remote: SCPclear technician tools ... -->`) และต้น `function onMessage` | โหลด `scp-tech.js`/`scp-tech.css` และส่งคำตอบ Run Commands ที่ขึ้นต้น `scptech` ให้ `ScpTech.receive` (แบบเดียวกับ `ScpMonitor` / `ScpCleanup` / `ScpHealth` ที่อยู่บรรทัดข้างบน) | ปุ่ม 🛠️ เครื่องมือช่าง SCPclear หาย หรือกดแล้วรอจนหมดเวลา เพราะไม่มีใครรับคำตอบ |
 | `views/default.handlebars` | ปุ่ม `devLiveScreensButton` + `scpToggleLiveScreens` | ปุ่มเข้าหน้าจอสตรีมที่มีตัวหนังสือ | กลับไปเหลือไอคอนสี่อันที่ไม่มีใครหาเจอ |
 | `views/default.handlebars`, `default3` | `autoConnectDesktop` ใน `getstore`/`putstore` และตอนวาดรายการ | จำค่า "ต่อภาพอัตโนมัติ" ไว้ | เข้าหน้าจอสตรีมแล้วเจอกล่องดำเต็มหน้า |
 | `views/default3.handlebars` | ~2376, ~2625, ~6485 | เหมือน `default.handlebars` สำหรับหน้าจอแบบที่สอง | เหมือนกัน |

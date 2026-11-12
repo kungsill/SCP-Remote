@@ -131,3 +131,21 @@ body.scp-app-view #container{border:0!important;min-width:0!important}
 #DeskParent.scp-zoomed{touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 body.scp-app-view #scp-app-bar .scp-app-fit{flex:none;border:1px solid var(--scp-line,#f0dbe6);background:var(--scp-surface,#fff);color:var(--scp-accent,#b02a72);font-size:11px;font-weight:700;padding:5px 10px;border-radius:9px;cursor:pointer;white-space:nowrap}
 body.scp-app-view #scp-app-bar .scp-app-fit[hidden]{display:none}
+
+/* The remote screen uses the whole window. The left menu, header, tabs and footer are hidden
+   while a screen is showing (above); these take back the grid column and rows that held them. */
+body.scp-app-view #container{grid-template-columns:0 minmax(0,1fr)!important;-ms-grid-columns:0 1fr!important}
+body.scp-app-view #container{grid-template-rows:0 0 minmax(0,1fr) 0!important;-ms-grid-rows:0 0 1fr 0!important}
+/* The tools panel folded away (scp-remote-ui.js), and the button that folds and unfolds it. */
+body.scp-inline-tools.scp-side-collapsed #deskarea0{padding-left:0}
+body.scp-inline-tools.scp-side-collapsed #deskarea0>#deskarea1{display:none!important}
+#scp-side-toggle{position:absolute;left:234px;top:10px;z-index:30;width:22px;height:54px;padding:0;border:1px solid #eddce5;border-left:0;border-radius:0 10px 10px 0;background:#fcf8fa;color:#8a1f59;font:600 18px/1 Sarabun,"Segoe UI",sans-serif;cursor:pointer;box-shadow:2px 2px 8px #46162e1f}
+#scp-side-toggle:hover{background:#f8edf3}
+#scp-side-toggle[hidden]{display:none}
+body.scp-side-collapsed #scp-side-toggle{left:0;background:rgba(252,248,250,.86)}
+body:not(.scp-inline-tools) #scp-side-toggle{display:none}
+@media(max-width:850px){#scp-side-toggle{left:188px}body.scp-side-collapsed #scp-side-toggle{left:0}}
+/* The control bar (Ctrl+Alt+Del, Scale, Clipboard, Reboot, Disconnect) sits in the top strip
+   beside the back arrow instead of floating over the remote screen, where it covered the
+   remote program's own toolbar. Only on windows wide enough to hold it beside the name. */
+@media(min-width:1280px){body.scp-app-view #vncFloatingToolbar{position:fixed;top:7px;box-shadow:0 2px 8px rgba(0,0,0,.18)}body.scp-app-view #vncFloatingToolbar.unpinned{top:7px;opacity:1}body.scp-app-view #vncFloatingToolbarTrigger{display:none}body.scp-app-view #vncFloatingToolbar .vnc-tb-btn.pin{display:none}}

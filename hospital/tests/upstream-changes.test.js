@@ -15,7 +15,10 @@ const MARKER = /(\/\/|\/\*|<!--)\s*SCP-Remote/;
 const ours = [
     /^hospital[\\/]/, /^scp-[^\\/]+\.js$/, /^public[\\/]scripts[\\/]scp-/, /^public[\\/]styles[\\/]scp-/,
     /^agents[\\/]modules_meshcore[\\/]scp-/, /^agents[\\/]modules_meshcore[\\/]win-scp-/,
-    /^scripts[\\/]/, /^views[\\/]translations[\\/]/
+    /^scripts[\\/]/, /^views[\\/]translations[\\/]/,
+    // published copies of hospital/desktop-app, written by its publish-update.js for the
+    // program's self-update; nothing of MeshCentral's is in there
+    /^public[\\/]app-update[\\/]/
 ];
 
 // Upstream files known to carry edits, as recorded in the document. The view templates

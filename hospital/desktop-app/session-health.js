@@ -10,7 +10,7 @@
   if(s.state===1)return s.age>=20000?'serverTimeout':'server';
   return 'ended';
  }
- function quality(sample,current){if(sample.backlog>20||(sample.rtt!=null&&sample.rtt>350))return 2;if(sample.backlog>8||(sample.rtt!=null&&sample.rtt>180))return Math.max(1,current);if((sample.rtt==null||sample.rtt<100)&&sample.backlog<3)return Math.max(0,current-1);return current;}
+ function quality(sample,current){if(sample.backlog>20||(sample.rtt!=null&&sample.rtt>350))return 3;if(sample.backlog>8||(sample.rtt!=null&&sample.rtt>180))return Math.max(2,current);if((sample.rtt==null||sample.rtt<100)&&sample.backlog<3)return Math.max(0,current-1);return current;}
  if(typeof module!=='undefined'&&module.exports){module.exports={diagnose,quality};return;}
  if(root.ScpSessionHealth)return;root.ScpSessionHealth=true;
  const th=(root.scpClipboardLanguage||document.documentElement.lang)==='th',t=(en,thai)=>th?thai:en;
@@ -19,13 +19,17 @@
  const originalState=root.onDesktopStateChange;
  if(typeof originalState==='function')root.onDesktopStateChange=function(c,state){if(state===0&&c.contype===1){sender=c;target=root.currentNode&&root.currentNode._id;}return originalState.apply(this,arguments);};
  // SendCompressionLevel(agentencoding, quality, scaling, framerate). Encodings: 1 JPEG, 2 PNG,
- // 3 TIFF, 4 WEBP. Sharp stays on WEBP because the hospital chose it deliberately over PNG for
- // exactly this stream - see the scpDesktopQuality3 note in views/default.handlebars. An earlier
- // version of this ladder opened every session on PNG, which quietly undid that choice a few
- // tiles in. The lower rungs drop quality and then size, which is what saves a slow link; the
- // encoding is not the thing to trade away.
- const profiles=[[4,100,1024,50],[4,70,1024,100],[4,45,768,200]];
- function panel(){if(box)return;box=document.createElement('div');box.id='scp-session-health';box.style.cssText='position:fixed;top:8px;left:8px;z-index:10005;max-width:min(360px,66vw);padding:10px 14px;border:1px solid #ddbdcd;border-radius:12px;background:rgba(255,248,252,.97);color:#4b1631;box-shadow:0 6px 24px #45172e26;font:13px Sarabun,Segoe UI,sans-serif';text=document.createElement('div');text.setAttribute('role','status');stats=document.createElement('small');retry=document.createElement('button');retry.textContent=t('Retry','ลองใหม่');retry.style.margin='0 8px';retry.onclick=()=>{if(root.desktop&&root.desktop.contype!==1)return;if(root.desktop)root.connectDesktop(null,0);root.connectDesktop(null,3);};select=document.createElement('select');[['auto',t('Auto quality','ปรับภาพอัตโนมัติ')],['0',t('Sharp','คมชัด')],['1',t('Balanced','สมดุล')],['2',t('Low bandwidth','ประหยัดเน็ต')]].forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o);});select.value='0';select.setAttribute('aria-label',t('Image quality','คุณภาพภาพ'));select.onchange=()=>{if(select.value!=='auto')apply(Number(select.value));streak=0;};box.append(text,stats,retry,select);if(root.ScpRemoteUI)root.ScpRemoteUI.mount(box);else document.body.append(box);}
+ // 3 TIFF, 4 WEBP. The top rung is PNG: lossless, so remote text is exactly what is on the
+ // remote screen. The administrator chose it as the default on 12 Nov 2026 after WEBP, even at
+ // quality 100, left text too soft to read; it costs more traffic, and the rungs below are WEBP
+ // for links that cannot carry it. No rung sends a smaller picture: the browser would stretch
+ // it back up and blur every letter. What a slow link gives up is quality and frame rate.
+ const profiles=[[2,100,1024,50],[4,100,1024,50],[4,70,1024,100],[4,45,1024,200]];
+ const names=()=>[t('Sharpest','คมชัดสูงสุด'),t('Sharp','คมชัด'),t('Balanced','สมดุล'),t('Low bandwidth','ประหยัดเน็ต')];
+ // The rung a technician picked is kept for their next session (per browser).
+ function remembered(){try{const v=root.localStorage.getItem('scpQualityChoice');if(v==='auto'||(/^[0-3]$/).test(v||''))return v;}catch(e){}return '0';}
+ function remember(v){try{root.localStorage.setItem('scpQualityChoice',v);}catch(e){}}
+ function panel(){if(box)return;box=document.createElement('div');box.id='scp-session-health';box.style.cssText='position:fixed;top:8px;left:8px;z-index:10005;max-width:min(360px,66vw);padding:10px 14px;border:1px solid #ddbdcd;border-radius:12px;background:rgba(255,248,252,.97);color:#4b1631;box-shadow:0 6px 24px #45172e26;font:13px Sarabun,Segoe UI,sans-serif';text=document.createElement('div');text.setAttribute('role','status');stats=document.createElement('small');retry=document.createElement('button');retry.textContent=t('Retry','ลองใหม่');retry.style.margin='0 8px';retry.onclick=()=>{if(root.desktop&&root.desktop.contype!==1)return;if(root.desktop)root.connectDesktop(null,0);root.connectDesktop(null,3);};select=document.createElement('select');[['auto',t('Auto quality','ปรับภาพอัตโนมัติ')]].concat(names().map((label,i)=>[String(i),label])).forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o);});select.value=remembered();select.setAttribute('aria-label',t('Image quality','คุณภาพภาพ'));select.onchange=()=>{remember(select.value);if(select.value!=='auto')apply(Number(select.value));streak=0;};box.append(text,stats,retry,select);if(root.ScpRemoteUI)root.ScpRemoteUI.mount(box);else document.body.append(box);}
  function apply(index){if(!sender||sender.State!==3||!sender.m.SendCompressionLevel)return;profile=index;lastChange=Date.now();sender.m.SendCompressionLevel.apply(sender.m,profiles[index]);}
  async function rtcStats(c){if(!c.webrtc||!c.webRtcActive||pollingStats)return;pollingStats=true;try{const report=await c.webrtc.getStats();let pair;report.forEach(v=>{if(v.type==='transport'&&v.selectedCandidatePairId)pair=report.get(v.selectedCandidatePairId);});if(!pair)report.forEach(v=>{if(v.type==='candidate-pair'&&v.nominated&&v.state==='succeeded')pair=v;});if(c!==sender)return;if(pair){rtc.rtt=Number.isFinite(pair.currentRoundTripTime)?pair.currentRoundTripTime*1000:null;const a=report.get(pair.localCandidateId),b=report.get(pair.remoteCandidateId);rtc.route=a&&b?(a.candidateType==='relay'||b.candidateType==='relay'?'turn':'direct'):null;}}catch{}finally{pollingStats=false;}}
  async function tick(){
@@ -41,7 +45,7 @@
   if(now-lastSample<5000)return;const seconds=(now-lastSample)/1000,kbps=Math.max(0,(observed.bytes-previous.bytes)/1024/seconds),tiles=Math.max(0,(observed.tiles-previous.tiles)/seconds);previous={...observed};lastSample=now;
   rtcStats(c);const rtt=c.webRtcActive?rtc.rtt:(c.latency&&c.latency.current>=0?c.latency.current:null);
   const route=c.State!==3?'—':c.webRtcActive?(rtc.route==='direct'?'Direct / WebRTC':rtc.route==='turn'?'Relay / TURN':t('WebRTC · checking route','WebRTC · กำลังตรวจเส้นทาง')):'Relay / Server';
-  stats.textContent=route+' · '+(rtt==null?'RTT —':Math.round(rtt)+' ms')+' · '+kbps.toFixed(1)+' KB/s · '+tiles.toFixed(1)+' '+t('tiles/s','ภาพย่อย/วิ')+' · '+[t('Sharp','คมชัด'),t('Balanced','สมดุล'),t('Low bandwidth','ประหยัดเน็ต')][profile];stats.title=t('Image updates are tiles, not complete video frames. An idle screen can have zero updates. Direct WebRTC does not prove the peers share a LAN.','อัตราภาพย่อยไม่ใช่ FPS เต็มเฟรม หน้าจอนิ่งอาจเป็นศูนย์ และ Direct WebRTC ไม่ได้ยืนยันว่าอยู่ LAN เดียวกัน');
+  stats.textContent=route+' · '+(rtt==null?'RTT —':Math.round(rtt)+' ms')+' · '+kbps.toFixed(1)+' KB/s · '+tiles.toFixed(1)+' '+t('tiles/s','ภาพย่อย/วิ')+' · '+names()[profile];stats.title=t('Image updates are tiles, not complete video frames. An idle screen can have zero updates. Direct WebRTC does not prove the peers share a LAN.','อัตราภาพย่อยไม่ใช่ FPS เต็มเฟรม หน้าจอนิ่งอาจเป็นศูนย์ และ Direct WebRTC ไม่ได้ยืนยันว่าอยู่ LAN เดียวกัน');
   if(select.value==='auto'&&c.State===3&&observed.tiles){const next=quality({rtt,backlog:(m.PendingOperations||[]).length},profile);if(next===wanted)streak++;else{wanted=next;streak=1;}if(next!==profile&&streak>=(next>profile?2:6)&&now-lastChange>=15000){apply(next);streak=0;}}
  }
  const timer=setInterval(tick,1000);root.addEventListener('unload',()=>clearInterval(timer));

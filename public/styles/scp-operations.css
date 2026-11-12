@@ -76,9 +76,50 @@
 .scp-print-root{display:none}
 @media print{
  html.scp-printing body>*:not(.scp-print-root){display:none!important}
+ html.scp-printing #scpReport, html.scp-printing dialog{display:none!important}
  html.scp-printing .scp-print-root{display:block!important;color:#000;padding:0}
  html.scp-printing{background:#fff}
- .scp-print-root .scp-report-stat,.scp-print-root .scp-report-list>li{border:1px solid #888}
- .scp-print-root .scp-report-body h3{border-color:#888}
+ .scp-print-root .scp-report-stat,.scp-print-root .scp-report-list>li{border:1px solid #cbd5e1}
+ .scp-print-root .scp-report-body h3{border-color:#cbd5e1}
  .scp-print-root a{color:#000;text-decoration:none}
+}
+
+/* Official Thai Government Maintenance Request Form (บันทึกแจ้งซ่อม) */
+.scp-repair-ticket-print-root{display:none}
+
+.scp-repair-form-dialog{width:920px;max-width:96vw;height:95vh;max-height:95vh;padding:0;margin:auto;border:none;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,0.4);background:#e2e8f0;display:flex;flex-direction:column;overflow:hidden;position:fixed;inset:0;z-index:999999}
+.scp-repair-form-dialog:not([open]){display:none!important}
+.scp-repair-form-dialog::backdrop{background:rgba(15,23,42,0.65);backdrop-filter:blur(4px)}
+
+.scp-repair-form-toolbar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#1e293b;color:#fff;flex-shrink:0;gap:12px;border-bottom:1px solid #334155}
+.scp-repair-form-toolbar strong{font-size:14px;letter-spacing:0.3px}
+.scp-rf-tool-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.scp-repair-form-toolbar button{padding:6px 14px;font-size:12.5px;font-weight:600;border-radius:6px;cursor:pointer;border:1px solid transparent;transition:all 0.15s ease}
+.scp-repair-form-toolbar .scp-btn-primary{background:#7a0b43;color:#fff;border-color:#7a0b43}
+.scp-repair-form-toolbar .scp-btn-primary:hover{background:#960f54}
+.scp-repair-form-toolbar .scp-btn-sample,.scp-repair-form-toolbar .scp-btn-blank{background:#334155;color:#f1f5f9;border-color:#475569}
+.scp-repair-form-toolbar .scp-btn-sample:hover,.scp-repair-form-toolbar .scp-btn-blank:hover{background:#475569}
+.scp-repair-form-toolbar .scp-rf-preset-select{padding:5px 8px;font-size:12px;border-radius:6px;background:#334155;color:#fff;border:1px solid #475569;cursor:pointer}
+.scp-repair-form-toolbar .scp-btn-close{background:#ef4444;color:#fff;border-color:#dc2626}
+.scp-repair-form-toolbar .scp-btn-close:hover{background:#dc2626}
+
+.scp-repair-form-scroll{flex:1;overflow:auto;padding:24px 16px;background:#94a3b8;display:flex}
+
+/* The A4 paper itself is styled by scp-ticket-form.js (shared with the print frame) */
+.scp-repair-form-scroll>.scp-repair-paper{margin:0 auto;flex-shrink:0;box-shadow:0 10px 25px rgba(0,0,0,0.25)}
+.scp-repair-form-scroll .scp-rf-val:empty{background:#fef9c3}
+.scp-repair-paper .scp-rf-val:hover,.scp-repair-paper .scp-rf-val:focus{background:#fef08a;box-shadow:0 0 0 1px #eab308}
+
+.scp-dept-pills{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px 0}
+.scp-dept-pill{padding:3px 10px;font-size:12px;font-weight:600;border-radius:12px;border:1px solid #d08fb0;background:#fff;color:#7a0b43;cursor:pointer;transition:all 0.15s ease}
+.scp-dept-pill:hover,.scp-dept-pill.active{background:#7a0b43;color:#fff}
+
+/* Fallback print (no iframe): show only the ticket */
+@media print{
+ @page{size:A4 portrait;margin:0}
+ html.scp-ticket-printing,html.scp-ticket-printing body{position:static!important;height:auto!important;overflow:visible!important;background:#fff!important;margin:0!important;padding:0!important}
+ html.scp-ticket-printing body>*:not(.scp-repair-ticket-print-root){display:none!important}
+ html.scp-ticket-printing .scp-repair-ticket-print-root{display:block!important}
+ .scp-repair-ticket-print-root .scp-repair-paper{height:297mm;overflow:hidden;box-shadow:none!important}
+ .scp-repair-ticket-print-root .scp-rf-val{background:transparent!important;box-shadow:none!important}
 }

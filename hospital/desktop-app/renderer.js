@@ -22,6 +22,9 @@ const messages = {
   SERVER_CERTIFICATE_CHANGED: ['ใบรับรองเซิร์ฟเวอร์เปลี่ยน กรุณาติดต่อผู้ดูแล', 'Server certificate changed. Contact IT.']
 };
 
+// Fix printing: which computers are being fixed right now, and what the last fix reported.
+const fixing = new Set(), fixNotes = new Map();
+
 function error(code) {
   return messages[code] ? messages[code][lang === 'th' ? 0 : 1] : t('ติดต่อระบบไม่สำเร็จ: ', 'Connection failed: ') + code;
 }
@@ -223,7 +226,32 @@ function render() {
       e.stopPropagation();
       await triggerConnect();
     };
-    card.appendChild(b);
+    // Fix printing, beside Connect: clears the stuck print jobs and restarts the spooler
+    // without opening the screen. The program asks for confirmation before anything is sent.
+    const fix = el('button', t('แก้ปริ้น', 'Fix printing'), 'vnc-fix-btn');
+    fix.type = 'button';
+    fix.disabled = !n.online || n.connectionUnknown === true || fixing.has(n.id);
+    fix.title = n.online ? t('ล้างงานพิมพ์ที่ค้าง แล้วเริ่ม Print Spooler ใหม่ (จะถามยืนยันก่อน)', 'Clear stuck print jobs and restart the print spooler (asks first)') : t('เครื่องออฟไลน์', 'Offline');
+    fix.onclick = async (e) => {
+      e.stopPropagation();
+      if (fix.disabled) return;
+      const say = text => { fixNotes.set(n.id, text); if ($('status')) $('status').textContent = n.name + ': ' + text; };
+      try {
+        fixing.add(n.id); render();
+        const r = await window.scp.fixPrinter(n.id, n.name, n.ip, data.rooms.find(x => x.id === n.room)?.name || '');
+        if (!r.ok) throw Error(r.error);
+        if (r.result && r.result.cancelled) { fixNotes.delete(n.id); if ($('status')) $('status').textContent = t('ยกเลิกแล้ว ไม่ได้ทำอะไรกับเครื่อง', 'Cancelled. Nothing was done.'); }
+        else if (r.result && r.result.ok) say(t('✓ แก้ปริ้นแล้ว · งานค้าง ', '✓ Printing fixed · jobs waiting ') + r.result.before + ' → ' + r.result.after + ' · Spooler ' + r.result.spooler);
+        else say(t('✗ Spooler ยังไม่ทำงาน (', '✗ Spooler not running (') + ((r.result && r.result.spooler) || '?') + ')');
+      } catch (err) {
+        say('✗ ' + ({ ACCESS_DENIED: t('โปรแกรมนี้ไม่มีสิทธิ์สั่งงานเครื่องนี้', 'This program may not run this on that computer'), NOT_ONLINE: t('เครื่องไม่ได้เปิดอยู่ หรือไม่ใช่ Windows', 'The computer is off, or is not Windows'), NO_ANSWER: t('เครื่องไม่ตอบในเวลาที่กำหนด', 'The computer did not answer in time'), COMMAND_BUSY: t('เครื่องกำลังทำคำสั่งอื่น ลองใหม่อีกครั้ง', 'Busy with another command; try again'), UNKNOWN_OPERATION: t('เซิร์ฟเวอร์ยังไม่รองรับ ต้องอัปเดตเซิร์ฟเวอร์ก่อน', 'The server does not support this yet') }[err.message] || error(err.message)));
+      } finally { fixing.delete(n.id); render(); }
+    };
+    const actions = el('div', null, 'vnc-card-actions');
+    actions.appendChild(b);
+    actions.appendChild(fix);
+    card.appendChild(actions);
+    if (fixNotes.has(n.id)) card.appendChild(el('small', fixNotes.get(n.id), 'vnc-fix-note'));
 
     // Card click selects, double-click immediately connects (no hurdles!)
     card.onclick = () => {

@@ -1058,6 +1058,119 @@
         return parts.length ? parts.join('  ·  ') : null;
     }
 
+    // The Remote page: find a computer, see whether it is on, press Remote. It is the dashboard
+    // panel drawn another way (remoteMode), so it shares the computers, the department filter
+    // and the refresh with the dashboard instead of keeping a second copy of them.
+    var remoteMode = false, remoteFind = null, remoteText = '';
+    function openRemotePage() { remoteMode = true; if (typeof window.go === 'function') { window.go(1); } else { show(); } }
+    function openDashboardPage() { remoteMode = false; if (typeof window.go === 'function') { window.go(1); } else { show('overview'); } }
+    function renderRemotePage(list, caret) {
+        var hadFocus = caret >= 0;
+        var head = element('section', 'scp-remote-head');
+        head.appendChild(element('span', 'scp-eyebrow', thai ? 'SCP-REMOTE / รีโมต' : 'SCP-REMOTE / REMOTE'));
+        head.appendChild(element('h2', '', thai ? 'รีโมตช่วยเหลือ' : 'Remote support'));
+        head.appendChild(element('p', '', thai ? 'ค้นหาชื่อเครื่อง IP ผู้ใช้ หรือหน่วยงาน ดูสถานะ แล้วกดรีโมต' : 'Find a computer by name, IP, user or department, check its status, then press Remote.'));
+        if (!remoteFind) {
+            remoteFind = document.createElement('input');
+            remoteFind.type = 'search';
+            remoteFind.id = 'scpRemoteSearch';
+            remoteFind.className = 'scp-dash-search scp-remote-search';
+            remoteFind.placeholder = thai ? 'พิมพ์ชื่อเครื่อง IP ผู้ใช้ หรือหน่วยงาน' : 'Computer name, IP, user or department';
+            remoteFind.setAttribute('aria-label', remoteFind.placeholder);
+            remoteFind.addEventListener('input', function () { remoteText = remoteFind.value.trim().toLowerCase(); render(); });
+        }
+        head.appendChild(remoteFind);
+        body.appendChild(head);
+
+        var counts = {};
+        Object.keys(window.meshes || {}).forEach(function (id) { var mesh = window.meshes[id]; if (mesh && mesh.name) counts[mesh.name] = 0; });
+        list.forEach(function (node) { var room = roomOf(node); counts[room] = (counts[room] || 0) + 1; });
+        var everyRoom = Object.keys(counts).sort();
+        if (everyRoom.length > 1 && !remoteText) { body.appendChild(roomChips(everyRoom, counts)); }
+
+        // Typing searches every department: someone looking for an IP should not have to know
+        // which department filter happens to be on.
+        var shown = list.filter(function (node) { return remoteText ? matchesRemote(node) : roomShown(roomOf(node)); });
+        shown.sort(function (a, b) { return (isOnline(b) ? 1 : 0) - (isOnline(a) ? 1 : 0) || String(a.name || '').localeCompare(String(b.name || ''), 'th'); });
+        var on = shown.filter(isOnline).length;
+        body.appendChild(element('p', 'scp-remote-count', thai ? ('พบ ' + shown.length + ' เครื่อง · เปิดอยู่ ' + on + ' · ปิดอยู่ ' + (shown.length - on)) : (shown.length + ' computers · ' + on + ' on · ' + (shown.length - on) + ' off')));
+        if (!shown.length) { body.appendChild(element('div', 'scp-dash-empty', thai ? 'ไม่พบเครื่องที่ตรงกับคำค้น ลองพิมพ์บางส่วนของชื่อ หรือ IP' : 'No computer matches. Try part of the name or the IP.')); }
+        // Drawn like the SCP-Remote program's own home screen: one picture of a screen per
+        // computer, its IP and name under it, and Connect. Double-clicking the picture connects too.
+        var rows = element('div', 'scp-remote-list');
+        var themes = ['windows', 'sunset', 'dark', 'plain'];
+        shown.forEach(function (node, index) {
+            var online = isOnline(node), user = signedInUser(node);
+            var row = element('article', 'scp-remote-row' + (online ? '' : ' off'));
+            var thumb = element('div', 'scp-remote-thumb ' + themes[index % themes.length]);
+            var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+            var shape = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            shape.setAttribute('d', 'M4 6h16v10H4V6zm2 2v6h12V8H6zm-3 11h18v2H3v-2z');
+            svg.appendChild(shape); thumb.appendChild(svg);
+            if (!online) thumb.appendChild(element('div', 'scp-remote-thumb-off', thai ? 'ออฟไลน์' : 'Offline'));
+            thumb.title = online ? (thai ? 'ดับเบิลคลิกเพื่อรีโมต' : 'Double-click to connect') : (thai ? 'เครื่องปิดอยู่ หรือไม่ได้ต่อเครือข่าย' : 'Off or not on the network');
+            thumb.addEventListener('dblclick', function () { if (isOnline(node)) openRemote(node); });
+            row.appendChild(thumb);
+            row.appendChild(element('div', 'scp-remote-ip', node.ip || node.host || (thai ? 'ยังไม่มี IP' : 'IP not reported')));
+            var name = element('strong', '', node.name || '');
+            name.title = thai ? 'ดูรายละเอียดเครื่อง' : 'Computer details';
+            name.addEventListener('click', function () { showComputerDetailModal(node); });
+            row.appendChild(name);
+            row.appendChild(element('small', '', [roomOf(node), user ? ((thai ? 'ผู้ใช้ ' : 'User ') + user) : ''].filter(Boolean).join(' · ')));
+            row.appendChild(element('span', 'scp-remote-state', online
+                ? (isBusy(node) ? (thai ? 'ออนไลน์ · มีคนใช้งาน' : 'Online · in use') : (thai ? 'ออนไลน์ · ว่าง' : 'Online · idle'))
+                : (thai ? 'ออฟไลน์' : 'Offline')));
+            var go = button(thai ? 'เชื่อมต่อ' : 'Connect', 'scp-remote-go', function () { openRemote(node); });
+            if (!online) { go.disabled = true; go.title = thai ? 'เครื่องปิดอยู่ หรือไม่ได้ต่อเครือข่าย จึงรีโมตไม่ได้' : 'The computer is off or not on the network, so it cannot be reached.'; }
+            var acts = element('div', 'scp-remote-acts');
+            acts.appendChild(go);
+            var fixState = remoteFix[node._id];
+            var fixBtn = button(thai ? 'แก้ปริ้น' : 'Fix printing', 'scp-remote-fix', function () { fixPrinting(node); });
+            fixBtn.title = online ? (thai ? 'ล้างงานพิมพ์ที่ค้าง แล้วเริ่ม Print Spooler ใหม่' : 'Clear stuck print jobs and restart the print spooler') : (thai ? 'เครื่องปิดอยู่ หรือไม่ได้ต่อเครือข่าย' : 'Off or not on the network');
+            if (!online || (fixState && fixState.busy)) fixBtn.disabled = true;
+            acts.appendChild(fixBtn);
+            row.appendChild(acts);
+            if (fixState && fixState.text) row.appendChild(element('div', 'scp-remote-fix-note', fixState.text));
+            rows.appendChild(row);
+        });
+        body.appendChild(rows);
+        if (hadFocus) { remoteFind.focus(); try { remoteFind.setSelectionRange(caret, caret); } catch (e) { /* search inputs in some browsers */ } }
+    }
+    // Fix printing, from the card: clears the jobs stuck in the queue and restarts the print
+    // spooler. It goes through the server's own endpoint (hospital/mobile.js, /m-fix), which
+    // checks this account may run commands on that computer and records who pressed it.
+    var remoteFix = {};
+    function fixPrinting(node) {
+        if (!isOnline(node) || (remoteFix[node._id] && remoteFix[node._id].busy) || typeof window.fetch !== 'function') return;
+        // It cannot be undone, so the question names the computer: name, IP and department.
+        var which = [node.name || '', node.ip || node.host || '', roomOf(node)].filter(Boolean).join(' · ');
+        if (!window.confirm((thai ? 'แก้ปริ้นไม่ออกที่เครื่องนี้ใช่หรือไม่' : 'Fix printing on this computer?') + '\n\n' + which + '\n\n' +
+            (thai ? 'งานพิมพ์ที่ค้างในคิวของเครื่องนี้จะถูกลบทั้งหมด แล้ว Print Spooler จะเริ่มใหม่ (ไม่กี่วินาที) ถ้าเครื่องนี้แชร์เครื่องพิมพ์ให้เครื่องอื่น งานที่ค้างของเครื่องอื่นจะถูกลบด้วย\n\nย้อนกลับไม่ได้ งานที่ถูกลบต้องสั่งพิมพ์ใหม่'
+                : 'Every job waiting in the print queue of this computer is deleted and the print spooler restarts (a few seconds). If it shares printers with other computers, their waiting jobs are deleted too.\n\nThis cannot be undone. Deleted jobs have to be printed again.'))) return;
+        var id = node._id;
+        remoteFix[id] = { busy: true, text: thai ? 'กำลังแก้… (รอเครื่องตอบ)' : 'Working… (waiting for the computer)' };
+        render();
+        var base = (typeof window.domainUrl === 'string' && window.domainUrl) ? window.domainUrl : '/';
+        var done = function (text) { remoteFix[id] = { busy: false, text: text }; render(); };
+        window.fetch(base + 'm-fix', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-SCP-Request': '1' }, body: JSON.stringify({ nodeid: id, action: 'printer' }) })
+            .then(function (r) { return r.json().catch(function () { return {}; }).then(function (body) { return { r: r, body: body || {} }; }); })
+            .then(function (x) {
+                var r = x.r, body = x.body;
+                if (r.ok && body.ok) return done((thai ? '✓ แก้แล้ว · งานค้าง ' : '✓ Done · jobs waiting ') + body.before + ' → ' + body.after + ' · Spooler ' + body.spooler);
+                if (r.ok) return done((thai ? '✗ Spooler ยังไม่ทำงาน (' : '✗ Spooler not running (') + body.spooler + ')');
+                var why = { ACCESS_DENIED: thai ? 'ไม่มีสิทธิ์สั่งงานเครื่องนี้' : 'No permission on this computer', NOT_ONLINE: thai ? 'เครื่องไม่ได้เปิดอยู่ หรือไม่ใช่ Windows' : 'The computer is not on, or is not Windows',
+                    NO_ANSWER: thai ? 'เครื่องไม่ตอบใน 90 วินาที' : 'No answer in 90 seconds', COMMAND_BUSY: thai ? 'เครื่องกำลังทำคำสั่งอื่น ลองใหม่อีกครั้ง' : 'Busy with another command; try again',
+                    NOT_SIGNED_IN: thai ? 'ต้องเข้าสู่ระบบใหม่' : 'Please sign in again' }[body.error];
+                done('✗ ' + (why || ((thai ? 'ทำไม่สำเร็จ ' : 'Failed ') + (body.error || r.status))));
+            })
+            .catch(function () { done(thai ? '✗ ติดต่อเซิร์ฟเวอร์ไม่ได้' : '✗ Could not reach the server'); });
+    }
+    function matchesRemote(node) {
+        var hay = [node.name, node.rname, node.host, node.ip, signedInUser(node), roomOf(node)].join(' ').toLowerCase();
+        return hay.indexOf(remoteText) >= 0;
+    }
+
     function matchesSearch(node) {
         if (!searchText) return true;
         var hay = [node.name, node.rname, node.host, node.ip, signedInUser(node), roomOf(node)].join(' ').toLowerCase();
@@ -1316,8 +1429,16 @@
 
     function openRemote(node) {
         if (!isOnline(node)) { window.alert(t('offlineAction')); return; }
+        // Remember which page this was pressed on, so the remote screen's back arrow returns here.
+        window.scpRemoteReturn = remoteMode ? 'remote' : 'dashboard';
         hide();
         if (typeof window.gotoDevice === 'function') window.gotoDevice(node._id, 11);
+    }
+    function returnFromRemote() {
+        // The dashboard only when that is where Remote was pressed; from anywhere else, the Remote page.
+        remoteMode = (window.scpRemoteReturn !== 'dashboard');
+        window.scpRemoteReturn = null;
+        if (typeof window.go === 'function') { window.go(1); } else { show(); }
     }
 
     function liveSupported() {
@@ -1611,6 +1732,17 @@
         var expanded = !panel.hidden && activeView === 'assess' && assessmentExpanded;
         panel.classList.toggle('scp-dash-expanded', expanded);
         document.body.classList.toggle('scp-assessment-expanded', expanded);
+        // Spread out beside the left menu and under the header, not over them: the menu is how
+        // anyone leaves this page. Measured, because both change size with the window and are
+        // hidden altogether on a phone.
+        if (expanded) {
+            var edge = function (id, side) { var n = document.getElementById(id); if (!n || n.offsetParent === null) return 0; var r = n.getBoundingClientRect(); return Math.max(0, Math.round(r[side])); };
+            var left = edge('page_leftbar', 'right'), top = edge('masthead', 'bottom');
+            if (left > window.innerWidth * 0.5) left = 0; // a menu drawn across the top or bottom is not beside the page
+            if (top > window.innerHeight * 0.3) top = 0;
+            panel.style.setProperty('--scp-exp-left', left + 'px');
+            panel.style.setProperty('--scp-exp-top', top + 'px');
+        }
         // Escape the workspace's clipped scroll container when occupying the viewport.
         if (expanded && panel.parentElement !== document.body) document.body.appendChild(panel);
         else if (!expanded && panelAnchor && panelAnchor.parentNode && panel.parentNode !== panelAnchor.parentNode) {
@@ -1636,6 +1768,8 @@
         // reading a room further down the page is thrown back to the top each time.
         var libraryButton=document.getElementById('scpDriverLibraryButton');if(libraryButton)libraryButton.hidden=!(window.userinfo&&window.userinfo.siteadmin===4294967295);
         var scrollTop = panel.scrollTop;
+        // Clearing the page takes the search box out with it, so note first whether it was being typed in.
+        var remoteCaret = (remoteFind && document.activeElement === remoteFind) ? remoteFind.selectionStart : -1;
         body.textContent = '';
         liveSkipped = 0;
         var list = allNodes();
@@ -1648,6 +1782,7 @@
         if (liveOn) { list.forEach(function (node) { if (isOnline(node) && roomShown(roomOf(node))) { watchable[node._id] = true; } }); }
         Object.keys(tiles).forEach(function (nodeid) { if (!watchable[nodeid]) { stopTile(nodeid); } });
 
+        if (remoteMode) { renderRemotePage(list, remoteCaret); panel.scrollTop = scrollTop; return; }
         if (!list.length) {
             var empty = element('div', 'scp-dash-empty', t('empty'));
             if (!allNodes().length) { empty.appendChild(element('br')); empty.appendChild(button(thai ? '➕ เพิ่มเครื่องแรก (ติดตั้งเอเจนต์)' : '➕ Add the first computer (install the agent)', 'scp-dash-refresh scp-dash-action-main scp-add-first', addComputer)); }
@@ -1741,6 +1876,7 @@
         fleet.appendChild(element('p', '', t('online') + ' ' + online.length + ' / ' + list.length + ' ' + t('devices')));
         fleet.appendChild(element('small', '', thai ? 'เลือกเครื่องเพื่อดู CPU, RAM และโปรเซสแบบสด' : 'Select a device for live CPU, RAM and processes'));
         fleet.appendChild(button(thai ? 'ดูสถานะเครื่อง / Task Manager' : 'Monitor / Task Manager', 'scp-dash-refresh', function () { if(window.ScpMonitor) window.ScpMonitor.open(); }));
+        var intake = intakePanel(); if (intake) sections.overview.appendChild(intake);
         overview.appendChild(fleet); overview.appendChild(attentionPanel(list)); sections.overview.appendChild(overview);
 
         // Banner linking to the dedicated standalone Hospital Map page
@@ -2181,8 +2317,10 @@
         stripUnwantedNav();
         if (!panel) return;
         document.querySelectorAll('#page_leftbar .lbbutton').forEach(function (item) { item.classList.remove('lbbuttonsel'); });
-        var navButton = document.getElementById('LeftMenuScpDashboard');
+        var navButton = document.getElementById(remoteMode ? 'LeftMenuScpRemote' : 'LeftMenuScpDashboard');
         if (navButton) navButton.classList.add('lbbuttonsel');
+        panel.classList.toggle('scp-dash-remote-mode', remoteMode);
+        document.body.classList.toggle('scp-remote-page', remoteMode);
         // Hide whatever page the site is showing (p0-p60) without touching how it manages them.
         for (var i = 0; i <= 60; i++) {
             var page = document.getElementById('p' + i);
@@ -2258,6 +2396,9 @@
         if (navButton) navButton.classList.remove('lbbuttonsel');
         var mapNavBtn = document.getElementById('LeftMenuScpHosMap');
         if (mapNavBtn) mapNavBtn.classList.remove('lbbuttonsel');
+        var remoteNavBtn = document.getElementById('LeftMenuScpRemote');
+        if (remoteNavBtn) remoteNavBtn.classList.remove('lbbuttonsel');
+        document.body.classList.remove('scp-remote-page');
         document.querySelectorAll('[data-scp-hidden]').forEach(function (page) {
             page.style.display = '';
             delete page.dataset.scpHidden;
@@ -3976,6 +4117,73 @@
         body.appendChild(list);
         d.box.appendChild(body);
     }
+    // One installer for the whole hospital puts every new computer in one arrival group
+    // (ทดสอบ, or the "new computers" group made above). They are shown on the first page,
+    // whatever department filter is on, each with one button to move it to its department.
+    function isIntakeGroupName(name) { return /^(ทดสอบ|เครื่องใหม่|new computers)$/i.test(String(name == null ? '' : name).trim()); }
+    function intakePanel() {
+        var ids = {};
+        agentGroups().forEach(function (g) { if (isIntakeGroupName(g.name)) ids[g._id] = g.name; });
+        var fresh = allNodes().filter(function (node) { return ids[node.meshid] != null; });
+        if (!fresh.length) return null;
+        fresh.sort(function (a, b) { return (isOnline(b) ? 1 : 0) - (isOnline(a) ? 1 : 0) || String(a.name || '').localeCompare(String(b.name || ''), 'th'); });
+        var panelEl = element('section', 'scp-dash-attention scp-dash-intake');
+        var head = element('div', 'scp-dash-attention-head');
+        head.appendChild(element('h3', '', thai ? 'เครื่องใหม่ รอจัดเข้าหน่วยงาน' : 'New computers waiting for a department'));
+        head.appendChild(element('span', 'scp-dash-attention-count', fresh.length + (thai ? ' เครื่อง · กด "ย้ายไปหน่วยงาน" เพื่อจัดเข้าแผนกของเครื่องนั้น' : ' computers · press "Move to department"')));
+        panelEl.appendChild(head);
+        var rows = element('div', 'scp-dash-attention-rows');
+        fresh.forEach(function (node, index) {
+            var row = element('div', 'scp-dash-attention-row');
+            row.hidden = !intakeExpanded && index >= 5;
+            var who = element('div', 'scp-dash-attention-who');
+            var whoName = element('strong', '', node.name || '');
+            whoName.style.cursor = 'pointer';
+            whoName.addEventListener('click', function (e) { e.stopPropagation(); showComputerDetailModal(node); });
+            who.appendChild(whoName);
+            who.appendChild(element('small', '', [ids[node.meshid], node.ip || node.host || ''].filter(Boolean).join(' · ')));
+            row.appendChild(who);
+            var what = element('div', 'scp-dash-attention-what');
+            what.appendChild(element('span', 'scp-dash-flag ' + (isOnline(node) ? 'ok' : 'warn'), isOnline(node) ? (thai ? 'เปิดอยู่' : 'Online') : (thai ? 'ปิดอยู่' : 'Offline')));
+            row.appendChild(what);
+            var buttons = element('div', 'scp-dash-attention-buttons');
+            buttons.appendChild(button(thai ? 'ย้ายไปหน่วยงาน…' : 'Move to department…', 'scp-dash-fix-go', function () { moveComputer(node); }));
+            row.appendChild(buttons);
+            rows.appendChild(row);
+        });
+        panelEl.appendChild(rows);
+        if (fresh.length > 5) panelEl.appendChild(button(intakeExpanded ? (thai ? 'ย่อรายการ' : 'Show less') : (thai ? 'ดูทั้งหมด ' + fresh.length + ' เครื่อง' : 'View all ' + fresh.length), 'scp-dash-refresh', function () { intakeExpanded = !intakeExpanded; render(); }));
+        return panelEl;
+    }
+    var intakeExpanded = false;
+    // Moving is MeshCentral's own changeDeviceMesh, so the server decides whether this account
+    // may do it. The agent stays installed and connected; only the group it is listed in changes.
+    function moveComputer(node) {
+        if (!window.meshserver) return;
+        var groups = agentGroups().filter(function (g) { return g._id !== node.meshid; });
+        groups.sort(function (a, b) { return (isIntakeGroupName(a.name) ? 1 : 0) - (isIntakeGroupName(b.name) ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'th'); });
+        var d = overlayDialog((thai ? 'ย้าย ' : 'Move ') + (node.name || '') + (thai ? ' ไปหน่วยงาน' : ' to a department'));
+        var body = element('div', 'scp-extra-body');
+        var status = element('p', 'scp-health-hint', thai ? 'เลือกหน่วยงานของเครื่องนี้ เครื่องจะย้ายไปอยู่ในกลุ่มนั้นทันที ไม่ต้องติดตั้งใหม่' : 'Choose this computer\'s department. It moves at once; nothing is reinstalled.');
+        body.appendChild(status);
+        var list = element('div', 'scp-add-computer-groups');
+        var moveFailed = thai ? 'ย้ายไม่สำเร็จ บัญชีนี้อาจไม่มีสิทธิ์จัดการกลุ่มปลายทาง หรือเครื่องถูกย้ายไปแล้ว' : 'The move did not happen. This account may not manage that group.';
+        groups.forEach(function (g) {
+            list.appendChild(button(g.name || g._id, 'scp-dash-refresh', function () {
+                var all = list.querySelectorAll('button'), i;
+                for (i = 0; i < all.length; i++) all[i].disabled = true;
+                status.textContent = (thai ? 'กำลังย้ายไป ' : 'Moving to ') + (g.name || '') + '…';
+                window.meshserver.send({ action: 'changeDeviceMesh', nodeids: [node._id], meshid: g._id });
+                var tries = 0, wait = setInterval(function () {
+                    var now = allNodes().filter(function (n) { return n._id === node._id; })[0];
+                    if (now && now.meshid === g._id) { clearInterval(wait); d.close(); render(); }
+                    else if (++tries > 32) { clearInterval(wait); status.textContent = moveFailed; for (i = 0; i < all.length; i++) all[i].disabled = false; }
+                }, 250);
+            }));
+        });
+        body.appendChild(list);
+        d.box.appendChild(body);
+    }
     // Line icons in the same style as the left menu, in place of emoji (which Windows draws as
     // small coloured squares in this font). Matched by label, like the grouping below.
     var HEADING_ICONS = [
@@ -4026,7 +4234,7 @@
     // label so a button added later still lands somewhere (anything unknown goes last).
     function groupHeadingActions(actions) {
         var groups = [
-            { label: thai ? '🧰 ดูแลเครื่อง' : '🧰 Care', order: [/เพิ่มเครื่อง|Add a computer/, /งานช่างค้าง|Work waiting/, /ตรวจสุขภาพทุกเครื่อง|Health check all/, /สุขภาพดิสก์|Disk health/, /เครื่องมือช่าง SCPclear|SCPclear tools/, /เครื่องพิมพ์ทั้ง|All printers/, /ฟอนต์ไทย|Thai fonts/, /แจ้งซ่อม|Repairs/, /คลังไดรเวอร์|Driver library/] },
+            { label: thai ? '🧰 ดูแลเครื่อง' : '🧰 Care', order: [/งานช่างค้าง|Work waiting/, /ตรวจสุขภาพทุกเครื่อง|Health check all/, /สุขภาพดิสก์|Disk health/, /เครื่องมือช่าง SCPclear|SCPclear tools/, /เครื่องพิมพ์ทั้ง|All printers/, /ฟอนต์ไทย|Thai fonts/, /แจ้งซ่อม|Repairs/, /คลังไดรเวอร์|Driver library/] },
             { label: thai ? '📊 รายงาน' : '📊 Reports', order: [/สรุปประจำวัน|Daily summary/, /รายงานและชาร์ต|Reports & Print/, /ออกรายงานการใช้งาน|usage/i, /ออกรายการครุภัณฑ์|inventory|CSV/i, /QR/] },
             { label: thai ? '💰 งบและประเมิน' : '💰 Budget', order: [/คลังราคากลาง|Reference prices/, /แผนงบประมาณ|budget plan/i, /เกณฑ์ประเมิน|Criteria/, /ตรวจเครื่อง \(|Check type/] }
         ];
@@ -4441,6 +4649,7 @@
             renderMapPage();
         }));
         topActions.appendChild(button(thai ? '📊 ไปยังแดชบอร์ด' : '📊 Go to Dashboard', 'scp-dash-refresh', function () {
+            remoteMode = false;
             showDashboard();
         }));
         topBar.appendChild(topActions);
@@ -4472,12 +4681,26 @@
         svg.appendChild(path);
         navButton.appendChild(svg);
         navButton.appendChild(element('span', 'scp-nav-label', t('title')));
-        navButton.addEventListener('click', function () {
-            if (typeof window.go === 'function') { window.go(1); } else { show('overview'); }
-        });
-        navButton.addEventListener('keypress', function (event) {
-            if (event.key === 'Enter') { if (typeof window.go === 'function') { window.go(1); } else { show('overview'); } }
-        });
+        navButton.addEventListener('click', openDashboardPage);
+        navButton.addEventListener('keypress', function (event) { if (event.key === 'Enter') { openDashboardPage(); } });
+
+        var remoteNavButton = element('div', 'lbbutton');
+        remoteNavButton.id = 'LeftMenuScpRemote';
+        remoteNavButton.tabIndex = 0;
+        remoteNavButton.title = thai ? 'รีโมต' : 'Remote';
+        remoteNavButton.setAttribute('role', 'button');
+        remoteNavButton.setAttribute('aria-label', thai ? 'รีโมต' : 'Remote');
+        var remoteSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        remoteSvg.setAttribute('viewBox', '0 0 24 24');
+        remoteSvg.setAttribute('aria-hidden', 'true');
+        remoteSvg.classList.add('scp-nav-icon');
+        var remotePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        remotePath.setAttribute('d', 'M3 4h18v12H3z M8 20h8 M12 16v4 M10 7.5l5 3-2.2.5-.6 2.2z');
+        remoteSvg.appendChild(remotePath);
+        remoteNavButton.appendChild(remoteSvg);
+        remoteNavButton.appendChild(element('span', 'scp-nav-label', thai ? 'รีโมต' : 'Remote'));
+        remoteNavButton.addEventListener('click', openRemotePage);
+        remoteNavButton.addEventListener('keypress', function (event) { if (event.key === 'Enter') { openRemotePage(); } });
 
         var mapNavButton = element('div', 'lbbutton');
         mapNavButton.id = 'LeftMenuScpHosMap';
@@ -4503,9 +4726,11 @@
 
         var first = document.getElementById('LeftMenuMyDevices');
         if (first) {
+            bar.insertBefore(remoteNavButton, first);
             bar.insertBefore(navButton, first);
             bar.insertBefore(mapNavButton, first);
         } else {
+            bar.appendChild(remoteNavButton);
             bar.appendChild(navButton);
             bar.appendChild(mapNavButton);
         }
@@ -4533,7 +4758,6 @@
         if (window.ScpHealth) {
             actions.appendChild(button(thai ? '🩺 ตรวจสุขภาพทุกเครื่อง' : '🩺 Health check all', 'scp-dash-refresh', function () { window.ScpHealth.openFleet(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '🖨️ เครื่องพิมพ์ทั้ง รพ.' : '🖨️ All printers', 'scp-dash-refresh', function () { window.ScpHealth.openPrinters(allNodes(), overlayDialog); }));
-            actions.appendChild(button(thai ? '➕ เพิ่มเครื่อง (ติดตั้งเอเจนต์)' : '➕ Add a computer', 'scp-dash-refresh', addComputer));
             actions.appendChild(button(thai ? '🧰 งานช่างค้างทั้ง รพ.' : '🧰 Work waiting', 'scp-dash-refresh', function () { window.ScpHealth.openBacklog(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '💽 สุขภาพดิสก์ทั้ง รพ.' : '💽 Disk health', 'scp-dash-refresh', function () { window.ScpHealth.openDisks(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '🔤 ติดตั้งฟอนต์ไทย' : '🔤 Install Thai fonts', 'scp-dash-refresh', function () { window.ScpHealth.openFonts(allNodes(), overlayDialog); }));
@@ -4598,13 +4822,15 @@
         }
         loadRoomFilter();
         window.addEventListener('resize', fitHeight);
-        window.ScpDashboard = { addComputer: addComputer, show: show, showDashboard: showDashboard, showMap: showMap, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
+        window.addEventListener('resize', fitAssessmentView);
+        window.ScpDashboard = { openRemote: openRemote, returnFromRemote: returnFromRemote, addComputer: addComputer, show: show, showDashboard: showDashboard, showMap: showMap, hide: hide, render: render, fitHeight: fitHeight, receiveSoftware: receiveSoftware, setLive: setLive, roomShown: roomShown, toggleRoom: toggleRoom,
             exportInventory: exportInventory, nodes: allNodes, specLine: specLine, disksOf: disksOf,
             hoursPoweredOn: hoursPoweredOn, usageOf: usageOf, daysAway: daysAway,
             hoursByDay: hoursByDay, exportUsage: exportUsage, faultsOf: faultsOf,
             fixDrivers: fixDrivers, driverScript: driverScript, snapshot: snapshot,
             reloadAssessment: function () { loadFleetAssessment(true); render(); },
             openMorningSummary: openMorningSummary, openQrSheet: openQrSheet, showComputer: showComputerDetailModal };
+        if (/[?&]scppage=remote(&|$)/.test(window.location.search || '')) remoteMode = true;
         openDeepLink();
         setTimeout(show, 50);
     }

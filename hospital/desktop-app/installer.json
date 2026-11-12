@@ -1,0 +1,40 @@
+{
+ "productName": "SCP-Remote",
+ "copyright": "Copyright © 2026 SCP Hospital",
+ "directories": {
+  "output": "release/installer"
+ },
+ "files": [
+  "**/*",
+  "!release{,/**}",
+  "!dist{,/**}",
+  "!tests{,/**}",
+  "!**/*.md",
+  "!clipboard/ClipboardHostTests.cs",
+  "!clipboard/test-agent-host.js",
+  "!publish-update.js",
+  "!build-installer.js",
+  "!package.js",
+  "!installer.json",
+  "!_icon_*"
+ ],
+ "asarUnpack": [
+  "**/ClipboardHost.exe"
+ ],
+ "electronVersion": "44.4.3",
+ "electronDist": "node_modules/electron/dist",
+ "win": {
+  "target": [
+   {
+    "target": "nsis",
+    "arch": [
+     "x64"
+    ]
+   }
+  ],
+  "icon": "scp-logo.ico"
+ },
+ "nsis": {
+  "artifactName": "SCP-Remote-Full-Setup-${version}.exe"
+ }
+}

@@ -671,7 +671,7 @@
 
     function printReport() {
         if (!lastData) { return; }
-        var printRoot = el('div', null, 'scp-print-root');
+        var printRoot = el('div', null, 'scp-print-root' + (currentReportMode === 'device' ? ' scp-assessment-report' : ''));
         var titles = {
             overview: t('SCP-Remote — Hospital Fleet Overview', 'SCP-Remote — รายงานภาพรวมครุภัณฑ์คอมพิวเตอร์ทั้งโรงพยาบาล'),
             department: t('SCP-Remote — Department / Ward Hardware Audit', 'SCP-Remote — รายงานการประเมินสภาพเครื่องแยกตามหน่วยงาน'),

@@ -15,9 +15,15 @@ test('add a computer opens MeshCentral\'s add-agent dialog, making the first dev
     assert.match(fn, /overlayDialog\(/, 'several groups: ask which');
 });
 
-test('the empty dashboard, refresh with no computers, and the Care menu all lead there', () => {
+test('the empty dashboard and refresh with no computers lead there', () => {
     assert.match(src, /if \(!allNodes\(\)\.length\) \{ empty\.appendChild\(element\('br'\)\); empty\.appendChild\(button\(thai \? '➕ เพิ่มเครื่องแรก/);
     assert.match(src, /button\(t\('refresh'\), 'scp-dash-refresh', function \(\) \{ render\(\); if \(!allNodes\(\)\.length\) \{ addComputer\(\); \} \}\)/);
-    assert.match(src, /button\(thai \? '➕ เพิ่มเครื่อง \(ติดตั้งเอเจนต์\)' : '➕ Add a computer', 'scp-dash-refresh', addComputer\)/);
-    assert.match(src, /order: \[\/เพิ่มเครื่อง\|Add a computer\/, \/งานช่างค้าง/, 'first in the Care menu');
+});
+
+test('the Care menu no longer offers to add a computer', () => {
+    // Removed at the administrator's request on 12 Nov 2026: with computers already enrolled
+    // it sat first in the menu and is not something used day to day. A server with no
+    // computers still leads to the install page (above); otherwise use the device group page.
+    assert.doesNotMatch(src, /'➕ เพิ่มเครื่อง \(ติดตั้งเอเจนต์\)'/);
+    assert.doesNotMatch(src, /order: \[\/เพิ่มเครื่อง/);
 });

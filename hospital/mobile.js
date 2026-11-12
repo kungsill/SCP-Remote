@@ -195,6 +195,22 @@ exports.fix = function (web, req, res) {
         });
     }).catch(e => { res.status(400).json({ error: e.message || 'INVALID_INPUT' }); });
 };
+// The same fix, asked for by something other than a signed-in browser: the SCP-Remote program
+// (hospital/desktop-clients.js), which has already checked that it may act on this computer.
+// The command is the server's own; the caller supplies only which computer, and who to record.
+exports.run = function (web, nodeid, by, from) {
+    return new Promise((resolve, reject) => {
+        const agent = web.wsagents[nodeid];
+        if (!isWindowsAgent(agent)) { reject(Error('NOT_ONLINE')); return; }
+        if (!fixScript) { fixScript = require('./morning-check').loadHealth().FIX.printer_fix(); }
+        const ticket = 'scpmfix' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+        const timer = setTimeout(() => { if (pendingFix.delete(ticket)) reject(Error('NO_ANSWER')); }, 75000);
+        if (timer.unref) timer.unref();
+        pendingFix.set(ticket, { resolve, reject, timer, web, nodeid, domain: '', user: by, from: String(from || 'app').slice(0, 80) });
+        try { agent.send(JSON.stringify({ action: 'runcommands', type: 2, cmds: fixScript, runAsUser: 0, reply: true, responseid: ticket })); }
+        catch (e) { clearTimeout(timer); pendingFix.delete(ticket); reject(Error('SEND_FAILED')); }
+    });
+};
 // Called from meshagent.js with the computer's answer.
 exports.receive = function (nodeid, command) {
     const job = command && pendingFix.get(command.responseid);
@@ -208,9 +224,13 @@ exports.receive = function (nodeid, command) {
     const key = 'scphealthlog/' + nodeid;
     job.web.db.Get(key, function (err, rows) {
         const before = (!err && rows && rows[0]) || null;
-        const entries = ((before && before.entries) || []).concat([{ at: Date.now(), action: 'printer_fix', ok: !!(r && r.ok), result: r, by: job.user, from: 'mobile' }]).slice(-30);
+        const entries = ((before && before.entries) || []).concat([{ at: Date.now(), action: 'printer_fix', ok: !!(r && r.ok), result: r, by: job.user, from: job.from || 'mobile' }]).slice(-30);
         job.web.db.Set({ _id: key, type: 'scphealthlog', domain: job.domain, nodeid, entries, updated: Date.now() }, function () { });
     });
+    if (job.resolve) { // asked for by the SCP-Remote program, not a browser
+        if (r) job.resolve({ ok: !!r.ok, before: r.before, after: r.after, spooler: r.spooler }); else job.reject(Error(busy ? 'COMMAND_BUSY' : 'NO_RESULT'));
+        return true;
+    }
     job.res.setHeader('Cache-Control', 'no-store');
     if (r) job.res.json({ ok: !!r.ok, before: r.before, after: r.after, spooler: r.spooler });
     else job.res.status(busy ? 409 : 502).json({ error: busy ? 'COMMAND_BUSY' : 'NO_RESULT' });

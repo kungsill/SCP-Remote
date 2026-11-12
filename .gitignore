@@ -333,3 +333,12 @@ hospital/desktop-app/release/
 hospital/native-agent/release/
 *.msi
 
+
+# SCP-Remote: built installers, a portable copy of the program, and the program files published
+# for self-update (written by hospital/desktop-app/publish-update.js). Kept on disk, not in git.
+/SCP-Remote-Full-Setup-*.exe
+/SCP-Remote-Viewer/
+/public/app-update/
+/test_rendered.pdf
+/test_screen.png
+/.tmp-bug-sweep.js

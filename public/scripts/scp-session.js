@@ -11,11 +11,41 @@
   return 'ended';
  }
  function quality(sample,current){if(sample.backlog>20||(sample.rtt!=null&&sample.rtt>350))return 3;if(sample.backlog>8||(sample.rtt!=null&&sample.rtt>180))return Math.max(2,current);if((sample.rtt==null||sample.rtt<100)&&sample.backlog<3)return Math.max(0,current-1);return current;}
- if(typeof module!=='undefined'&&module.exports){module.exports={diagnose,quality};return;}
+ // A session that had a picture and then ended without anyone ending it has dropped. It is
+ // reopened by itself, a few times and a little later each time, as long as the computer is
+ // still on and the technician is still on the remote screen. A session the person at the
+ // other end refused, or one the technician closed, is never reopened.
+ const RETRY_DELAYS=[2000,5000,10000];
+ function reconnectIn(s){
+  if(!s.hadImage||s.userClosed||s.onScreen===false||s.online===false)return null;
+  if(s.outcome==='denied'||s.outcome==='refused')return null;
+  if(!(s.attempts>=0)||s.attempts>=RETRY_DELAYS.length)return null;
+  return RETRY_DELAYS[s.attempts];
+ }
+ // What is worth writing down about a session, or null. 'ready' and still-waiting states are not.
+ const FAILURES=['offline','serverTimeout','agentTimeout','consentTimeout','denied','refused','imageTimeout'];
+ function failureOf(diagnostic,hadImage,userClosed){
+  if(FAILURES.includes(diagnostic))return diagnostic;
+  if(diagnostic==='ended'&&hadImage&&!userClosed)return 'dropped';
+  return null;
+ }
+ if(typeof module!=='undefined'&&module.exports){module.exports={diagnose,quality,reconnectIn,failureOf,RETRY_DELAYS};return;}
  if(root.ScpSessionHealth)return;root.ScpSessionHealth=true;
  const th=(root.scpClipboardLanguage||document.documentElement.lang)==='th',t=(en,thai)=>th?thai:en;
  const labels={offline:t('Device is offline. Check power and its network connection.','เครื่องออฟไลน์ ตรวจไฟและเครือข่ายเครื่องลูก'),server:t('Connecting to server…','กำลังติดต่อเซิร์ฟเวอร์…'),serverTimeout:t('Server connection timed out. Check network and server availability.','ติดต่อเซิร์ฟเวอร์เกินเวลา ตรวจเครือข่ายและเซิร์ฟเวอร์'),agent:t('Server reached; opening remote channel…','ถึงเซิร์ฟเวอร์แล้ว กำลังเปิดช่องรีโมต…'),agentTimeout:t('No response from the remote channel. Check the agent and network.','ช่องรีโมตไม่ตอบกลับ ตรวจเอเจนต์และเครือข่ายเครื่องลูก'),consent:t('Waiting for the remote user to allow access…','รอผู้ใช้เครื่องลูกกดอนุญาต…'),consentTimeout:t('Permission is still pending or timed out. Ask the user, then retry.','ยังไม่ได้รับอนุญาตหรือคำขอหมดเวลา ติดต่อผู้ใช้แล้วกดลองใหม่'),denied:t('The remote user declined access.','ผู้ใช้เครื่องลูกปฏิเสธการเข้าถึง'),refused:t('The session was refused or could not open.','คำขอถูกปฏิเสธหรือเปิดเซสชันไม่ได้'),image:t('Remote channel connected; waiting for the first image…','ช่องรีโมตเชื่อมต่อแล้ว กำลังรอภาพแรก…'),imageTimeout:t('Connected but no image received. Check the display/session and retry.','เชื่อมต่อแล้วแต่ยังไม่ได้ภาพ ตรวจหน้าจอ/เซสชัน Windows แล้วลองใหม่'),ready:t('Remote image received','ได้รับภาพแล้ว'),ended:t('Session ended. Retry to request a new connection.','การเชื่อมต่อสิ้นสุด กดลองใหม่เพื่อขอเชื่อมต่ออีกครั้ง')};
  let sender,target,lastKey='',changed=Date.now(),box,text,stats,retry,select,lastSample=Date.now(),previous={bytes:0,tiles:0},profile=0,profileApplied=false,wanted=0,streak=0,lastChange=0,online,healthAt=0,checking=false,pollingStats=false,rtc={rtt:null,route:null};
+ // Reconnecting and recording: what this session has been through.
+ let startedAt=Date.now(),hadImage=false,userClosed=false,internalCall=false,attempts=0,retryTimer=null,logged='',endedHandled=false;
+ const realConnect=root.connectDesktop;
+ if(typeof realConnect==='function'&&!realConnect.scpSession){
+  // Mode 0 is 'disconnect'. Anyone pressing it - the page's button, the control bar, the back
+  // arrow - means it; our own reconnect goes through internalCall so it is not mistaken for that.
+  root.connectDesktop=function(e,mode){if(!internalCall){userClosed=(mode===0);if(mode===0){clearTimeout(retryTimer);retryTimer=null;attempts=0;}}return realConnect.apply(this,arguments);};
+  root.connectDesktop.scpSession=true;
+ }
+ function reopen(){internalCall=true;try{if(root.desktop)root.connectDesktop(null,0);root.connectDesktop(null,3);}catch(e){}finally{internalCall=false;}}
+ // Sent to the server from the website (scpops); the program's window has no such channel.
+ function record(outcome){if(!outcome||!target||logged===outcome)return;logged=outcome;try{if(root.ScpOperations&&root.ScpOperations.request&&root.meshserver)root.ScpOperations.request('sessionLog',{nodeid:target,outcome:outcome,ms:Date.now()-startedAt}).catch(function(){});}catch(e){}}
  const originalState=root.onDesktopStateChange;
  if(typeof originalState==='function')root.onDesktopStateChange=function(c,state){if(state===0&&c.contype===1){sender=c;target=root.currentNode&&root.currentNode._id;}return originalState.apply(this,arguments);};
  // SendCompressionLevel(agentencoding, quality, scaling, framerate). Encodings: 1 JPEG, 2 PNG,
@@ -29,18 +59,23 @@
  // The rung a technician picked is kept for their next session (per browser).
  function remembered(){try{const v=root.localStorage.getItem('scpQualityChoice');if(v==='auto'||(/^[0-3]$/).test(v||''))return v;}catch(e){}return '0';}
  function remember(v){try{root.localStorage.setItem('scpQualityChoice',v);}catch(e){}}
- function panel(){if(box)return;box=document.createElement('div');box.id='scp-session-health';box.style.cssText='position:fixed;top:8px;left:8px;z-index:10005;max-width:min(360px,66vw);padding:10px 14px;border:1px solid #ddbdcd;border-radius:12px;background:rgba(255,248,252,.97);color:#4b1631;box-shadow:0 6px 24px #45172e26;font:13px Sarabun,Segoe UI,sans-serif';text=document.createElement('div');text.setAttribute('role','status');stats=document.createElement('small');retry=document.createElement('button');retry.textContent=t('Retry','ลองใหม่');retry.style.margin='0 8px';retry.onclick=()=>{if(root.desktop&&root.desktop.contype!==1)return;if(root.desktop)root.connectDesktop(null,0);root.connectDesktop(null,3);};select=document.createElement('select');[['auto',t('Auto quality','ปรับภาพอัตโนมัติ')]].concat(names().map((label,i)=>[String(i),label])).forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o);});select.value=remembered();select.setAttribute('aria-label',t('Image quality','คุณภาพภาพ'));select.onchange=()=>{remember(select.value);if(select.value!=='auto')apply(Number(select.value));streak=0;};box.append(text,stats,retry,select);if(root.ScpRemoteUI)root.ScpRemoteUI.mount(box);else document.body.append(box);}
+ function panel(){if(box)return;box=document.createElement('div');box.id='scp-session-health';box.style.cssText='position:fixed;top:8px;left:8px;z-index:10005;max-width:min(360px,66vw);padding:10px 14px;border:1px solid #ddbdcd;border-radius:12px;background:rgba(255,248,252,.97);color:#4b1631;box-shadow:0 6px 24px #45172e26;font:13px Sarabun,Segoe UI,sans-serif';text=document.createElement('div');text.setAttribute('role','status');stats=document.createElement('small');retry=document.createElement('button');retry.textContent=t('Retry','ลองใหม่');retry.style.margin='0 8px';retry.onclick=()=>{if(root.desktop&&root.desktop.contype!==1)return;clearTimeout(retryTimer);retryTimer=null;attempts=0;userClosed=false;reopen();};select=document.createElement('select');[['auto',t('Auto quality','ปรับภาพอัตโนมัติ')]].concat(names().map((label,i)=>[String(i),label])).forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o);});select.value=remembered();select.setAttribute('aria-label',t('Image quality','คุณภาพภาพ'));select.onchange=()=>{remember(select.value);if(select.value!=='auto')apply(Number(select.value));streak=0;};box.append(text,stats,retry,select);if(root.ScpRemoteUI)root.ScpRemoteUI.mount(box);else document.body.append(box);}
  function apply(index){if(!sender||sender.State!==3||!sender.m.SendCompressionLevel)return;profile=index;lastChange=Date.now();sender.m.SendCompressionLevel.apply(sender.m,profiles[index]);}
  async function rtcStats(c){if(!c.webrtc||!c.webRtcActive||pollingStats)return;pollingStats=true;try{const report=await c.webrtc.getStats();let pair;report.forEach(v=>{if(v.type==='transport'&&v.selectedCandidatePairId)pair=report.get(v.selectedCandidatePairId);});if(!pair)report.forEach(v=>{if(v.type==='candidate-pair'&&v.nominated&&v.state==='succeeded')pair=v;});if(c!==sender)return;if(pair){rtc.rtt=Number.isFinite(pair.currentRoundTripTime)?pair.currentRoundTripTime*1000:null;const a=report.get(pair.localCandidateId),b=report.get(pair.remoteCandidateId);rtc.route=a&&b?(a.candidateType==='relay'||b.candidateType==='relay'?'turn':'direct'):null;}}catch{}finally{pollingStats=false;}}
  async function tick(){
   const c=root.desktop;
   if(!c&&typeof root.xxcurrentView==='number'&&root.xxcurrentView!==11){if(box)box.hidden=true;return;}
-  if(!c){if(sender&&(!target||!root.currentNode||root.currentNode._id===target)){panel();box.hidden=false;text.textContent=labels[diagnose({state:0,messageId:sender.consoleMessageId===2?2:null,message:sender.consoleMessage,online})];retry.hidden=false;select.disabled=true;stats.textContent='';}else if(box)box.hidden=true;return;}
+  if(!c){if(sender&&(!target||!root.currentNode||root.currentNode._id===target)){panel();box.hidden=false;const gone=diagnose({state:0,messageId:sender.consoleMessageId===2?2:null,message:sender.consoleMessage,online});text.textContent=labels[gone];retry.hidden=false;select.disabled=true;stats.textContent='';
+    if(!endedHandled){endedHandled=true;record(failureOf(gone,hadImage,userClosed));
+     const wait=reconnectIn({hadImage,userClosed,outcome:gone,attempts,online,onScreen:typeof root.xxcurrentView!=='number'||root.xxcurrentView===11});
+     if(wait!=null){attempts++;const n=attempts;text.textContent=t('Connection lost. Reconnecting ('+n+'/'+RETRY_DELAYS.length+')…','การเชื่อมต่อหลุด กำลังต่อใหม่ (ครั้งที่ '+n+'/'+RETRY_DELAYS.length+')…');clearTimeout(retryTimer);retryTimer=setTimeout(function(){retryTimer=null;if(!root.desktop&&!userClosed)reopen();},wait);}
+    }else if(retryTimer)text.textContent=t('Connection lost. Reconnecting ('+attempts+'/'+RETRY_DELAYS.length+')…','การเชื่อมต่อหลุด กำลังต่อใหม่ (ครั้งที่ '+attempts+'/'+RETRY_DELAYS.length+')…');
+   }else if(box)box.hidden=true;return;}
   if(c.contype!==1||(c.m.CanvasId&&c.m.CanvasId.offsetParent===null)){if(box)box.hidden=true;return;}panel();box.hidden=false;
-  if(c!==sender){sender=c;target=root.currentNode&&root.currentNode._id;lastKey='';changed=Date.now();lastSample=Date.now();previous={bytes:0,tiles:0};profile=0;profileApplied=false;streak=0;online=undefined;rtc={rtt:null,route:null};lastChange=Date.now();}
+  if(c!==sender){startedAt=Date.now();hadImage=false;logged='';endedHandled=false;sender=c;target=root.currentNode&&root.currentNode._id;lastKey='';changed=Date.now();lastSample=Date.now();previous={bytes:0,tiles:0};profile=0;profileApplied=false;streak=0;online=undefined;rtc={rtt:null,route:null};lastChange=Date.now();}
   const now=Date.now(),key=c.State+':'+c.consoleMessageId;if(key!==lastKey){lastKey=key;changed=now;}
   if(root.scpSessionAPI&&now-healthAt>5000&&!checking){checking=true;healthAt=now;root.scpSessionAPI.status().then(r=>{if(c===sender&&r.ok)online=r.result.online;}).catch(()=>{}).finally(()=>checking=false);}else if(root.currentNode&&typeof root.currentNode.conn==='number')online=!!(root.currentNode.conn&1);
-  const m=c.m,observed=m.scpStats||{bytes:0,tiles:0};const diagnostic=diagnose({state:c.State,messageId:c.consoleMessageId,message:c.consoleMessage,age:now-changed,tiles:observed.tiles,online});text.textContent=labels[diagnostic];retry.hidden=!['offline','serverTimeout','agentTimeout','consentTimeout','denied','refused','imageTimeout','ended'].includes(diagnostic);select.disabled=c.State!==3;
+  const m=c.m,observed=m.scpStats||{bytes:0,tiles:0};const diagnostic=diagnose({state:c.State,messageId:c.consoleMessageId,message:c.consoleMessage,age:now-changed,tiles:observed.tiles,online});text.textContent=labels[diagnostic];endedHandled=false;if(diagnostic==='ready'){hadImage=true;attempts=0;}else record(failureOf(diagnostic,hadImage,userClosed));retry.hidden=!['offline','serverTimeout','agentTimeout','consentTimeout','denied','refused','imageTimeout','ended'].includes(diagnostic);select.disabled=c.State!==3;
   if(c.State===3&&observed.tiles&&!profileApplied){apply(select.value==='auto'?0:Number(select.value));profileApplied=true;}
   if(now-lastSample<5000)return;const seconds=(now-lastSample)/1000,kbps=Math.max(0,(observed.bytes-previous.bytes)/1024/seconds),tiles=Math.max(0,(observed.tiles-previous.tiles)/seconds);previous={...observed};lastSample=now;
   rtcStats(c);const rtt=c.webRtcActive?rtc.rtt:(c.latency&&c.latency.current>=0?c.latency.current:null);

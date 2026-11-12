@@ -1,7 +1,7 @@
 {
   "name": "scp-remote-desktop",
   "productName": "SCP-Remote",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "private": true,
   "description": "SCP-Remote hospital remote desktop client",
   "main": "boot.js",

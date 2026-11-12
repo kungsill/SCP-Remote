@@ -1439,6 +1439,9 @@
         remoteMode = (window.scpRemoteReturn !== 'dashboard');
         window.scpRemoteReturn = null;
         if (typeof window.go === 'function') { window.go(1); } else { show(); }
+        // The remote session was started from a repair ticket: bring that ticket back, ready to close.
+        var ticket = window.scpTicketReturn; window.scpTicketReturn = null;
+        if (ticket && window.ScpOperations && window.ScpOperations.openTicket) { try { window.ScpOperations.openTicket(ticket, true); } catch (e) { } }
     }
 
     function liveSupported() {
@@ -4117,6 +4120,57 @@
         body.appendChild(list);
         d.box.appendChild(body);
     }
+    // Why a remote session failed, in words; and the technician tools by name.
+    function sessionReason(outcome) {
+        return ({ offline: thai ? 'เครื่องปิดอยู่ หรือไม่ได้ต่อเครือข่าย' : 'Computer off or not on the network',
+            serverTimeout: thai ? 'ติดต่อเซิร์ฟเวอร์ไม่ได้' : 'Server did not answer',
+            agentTimeout: thai ? 'เอเจนต์บนเครื่องไม่ตอบ' : 'Agent on the computer did not answer',
+            consentTimeout: thai ? 'ผู้ใช้ไม่ได้กดอนุญาตในเวลา' : 'Nobody allowed it in time',
+            denied: thai ? 'ผู้ใช้กดปฏิเสธ' : 'The person there refused',
+            refused: thai ? 'เครื่องปฏิเสธการเชื่อมต่อ' : 'The session was refused',
+            imageTimeout: thai ? 'เชื่อมต่อได้แต่ไม่มีภาพ' : 'Connected but no picture',
+            dropped: thai ? 'หลุดระหว่างใช้งาน' : 'Dropped while in use' })[outcome] || String(outcome || '');
+    }
+    function techTaskName(task) {
+        return ({ inventory: thai ? 'อ่านจอฟ้า / RAM / แบตเตอรี่' : 'Blue screens / RAM / battery', bench: thai ? 'วัดความเร็วดิสก์' : 'Disk speed', sfc: thai ? 'ตรวจไฟล์ Windows (SFC)' : 'SFC check',
+            dism: thai ? 'ตรวจคลังระบบ (DISM)' : 'DISM check', deploy: thai ? 'ส่ง SCPclear' : 'Sent SCPclear', lan: thai ? 'สแกน LAN' : 'LAN scan', avscan: thai ? 'ตรวจแอนตี้ไวรัส' : 'Antivirus check',
+            avremove: thai ? 'ถอนแอนตี้ไวรัส' : 'Antivirus removal', wurepair: thai ? 'ซ่อม Windows Update' : 'Windows Update repair', wuinstall: thai ? 'ติดตั้งอัปเดต Windows' : 'Windows updates installed' })[task] || String(task || '');
+    }
+    // Which computers remote sessions keep failing on, and why (last 30 days). The website
+    // records each failure as it happens; this is where they are read.
+    function openRemoteFailures() {
+        var d = overlayDialog(thai ? '📡 รีโมตที่ต่อไม่ได้ (30 วันล่าสุด)' : '📡 Remote sessions that failed (last 30 days)');
+        var body = element('div', 'scp-extra-body');
+        var note = element('p', 'scp-health-hint', thai ? 'กำลังโหลด…' : 'Loading…');
+        body.appendChild(note); d.box.appendChild(body);
+        if (!window.ScpOperations || !window.ScpOperations.request) { note.textContent = thai ? 'ยังใช้ไม่ได้ในหน้านี้' : 'Not available here'; return; }
+        window.ScpOperations.request('sessionFailures').then(function (rows) {
+            rows = Array.isArray(rows) ? rows : [];
+            if (!rows.length) { note.textContent = thai ? 'ยังไม่มีการรีโมตที่ล้มเหลวใน 30 วันล่าสุด (บันทึกเฉพาะการรีโมตผ่านเว็บ)' : 'No failed remote sessions in the last 30 days (website sessions only).'; return; }
+            note.textContent = thai ? 'เรียงจากเครื่องที่มีปัญหาล่าสุด บันทึกเฉพาะการรีโมตผ่านเว็บ กดชื่อเครื่องเพื่อดูรายละเอียด' : 'Most recent trouble first. Website sessions only. Press a name for details.';
+            var list = element('div', 'scp-dash-attention-rows');
+            rows.forEach(function (r) {
+                var node = allNodes().filter(function (n) { return n._id === r.nodeid; })[0];
+                var row = element('div', 'scp-dash-attention-row');
+                var who = element('div', 'scp-dash-attention-who');
+                var nm = element('strong', '', node ? (node.name || '') : (thai ? '(เครื่องที่ไม่อยู่ในรายการแล้ว)' : '(no longer listed)'));
+                if (node) { nm.style.cursor = 'pointer'; nm.addEventListener('click', function () { d.close(); showComputerDetailModal(node); }); }
+                who.appendChild(nm);
+                who.appendChild(element('small', '', node ? [roomOf(node), node.ip || node.host || ''].filter(Boolean).join(' · ') : ''));
+                row.appendChild(who);
+                var what = element('div', 'scp-dash-attention-what');
+                Object.keys(r.reasons || {}).sort(function (a, b) { return r.reasons[b] - r.reasons[a]; }).forEach(function (k) {
+                    what.appendChild(element('span', 'scp-dash-flag ' + (k === 'denied' || k === 'consentTimeout' ? 'warn' : 'high'), sessionReason(k) + ' × ' + r.reasons[k]));
+                });
+                row.appendChild(what);
+                var when = element('div', 'scp-dash-attention-buttons');
+                when.appendChild(element('small', '', (thai ? 'ล่าสุด ' : 'Last ') + new Date(r.last.at).toLocaleString(thai ? 'th-TH' : 'en-GB')));
+                row.appendChild(when);
+                list.appendChild(row);
+            });
+            body.appendChild(list);
+        }).catch(function (e) { note.textContent = (thai ? 'โหลดไม่สำเร็จ: ' : 'Could not load: ') + (e && e.message || e); });
+    }
     // One installer for the whole hospital puts every new computer in one arrival group
     // (ทดสอบ, or the "new computers" group made above). They are shown on the first page,
     // whatever department filter is on, each with one button to move it to its department.
@@ -4234,7 +4288,7 @@
     // label so a button added later still lands somewhere (anything unknown goes last).
     function groupHeadingActions(actions) {
         var groups = [
-            { label: thai ? '🧰 ดูแลเครื่อง' : '🧰 Care', order: [/งานช่างค้าง|Work waiting/, /ตรวจสุขภาพทุกเครื่อง|Health check all/, /สุขภาพดิสก์|Disk health/, /เครื่องมือช่าง SCPclear|SCPclear tools/, /เครื่องพิมพ์ทั้ง|All printers/, /ฟอนต์ไทย|Thai fonts/, /แจ้งซ่อม|Repairs/, /คลังไดรเวอร์|Driver library/] },
+            { label: thai ? '🧰 ดูแลเครื่อง' : '🧰 Care', order: [/งานช่างค้าง|Work waiting/, /รีโมตที่ต่อไม่ได้|Remote failures/, /ตรวจสุขภาพทุกเครื่อง|Health check all/, /สุขภาพดิสก์|Disk health/, /เครื่องมือช่าง SCPclear|SCPclear tools/, /เครื่องพิมพ์ทั้ง|All printers/, /ฟอนต์ไทย|Thai fonts/, /แจ้งซ่อม|Repairs/, /คลังไดรเวอร์|Driver library/] },
             { label: thai ? '📊 รายงาน' : '📊 Reports', order: [/สรุปประจำวัน|Daily summary/, /รายงานและชาร์ต|Reports & Print/, /ออกรายงานการใช้งาน|usage/i, /ออกรายการครุภัณฑ์|inventory|CSV/i, /QR/] },
             { label: thai ? '💰 งบและประเมิน' : '💰 Budget', order: [/คลังราคากลาง|Reference prices/, /แผนงบประมาณ|budget plan/i, /เกณฑ์ประเมิน|Criteria/, /ตรวจเครื่อง \(|Check type/] }
         ];
@@ -4464,7 +4518,7 @@
             list.textContent = '';
             if (!rows || !rows.length) { list.appendChild(element('li', 'scp-extra-muted', thai ? 'ยังไม่มีประวัติ' : 'No history yet')); return; }
             rows.forEach(function (e) {
-                var icon = { ticket: '🛠️', driver: '🧩', cleanup: '🧹', care: '🛡️', moved: '📍', asset: '🏷️', health: '🩺' }[e.kind] || '•';
+                var icon = { ticket: '🛠️', driver: '🧩', cleanup: '🧹', care: '🛡️', moved: '📍', asset: '🏷️', health: '🩺', session: '📡', tech: '🧰' }[e.kind] || '•';
                 var text = '';
                 if (e.kind === 'ticket') text = (thai ? 'งานซ่อม: ' : 'Repair: ') + e.title + ' — ' + e.status + (e.note && e.note !== 'Created' ? ' (' + e.note + ')' : '');
                 else if (e.kind === 'driver') text = (thai ? 'ติดตั้งไดรเวอร์: ' : 'Drivers: ') + (e.progress ? (thai ? 'กำลังทำ' : 'running') : (e.note || '-'));
@@ -4472,6 +4526,8 @@
                 else if (e.kind === 'care') text = (thai ? 'ดูแลอัตโนมัติ: ' : 'Safe auto-care: ') + (e.state || '') + (e.result ? ' · ' + Object.keys(e.result).map(function (k) { return k + ' ' + e.result[k]; }).join(', ') : '');
                 else if (e.kind === 'moved') text = (thai ? 'ย้ายตำแหน่งบนแผนที่ → ' : 'Moved on the map → ') + floorName(e.floor);
                 else if (e.kind === 'asset') text = (thai ? 'แก้ข้อมูลครุภัณฑ์ ' : 'Asset record ') + (e.note || '');
+                else if (e.kind === 'session') text = (thai ? 'รีโมตไม่สำเร็จ: ' : 'Remote failed: ') + sessionReason(e.outcome);
+                else if (e.kind === 'tech') text = (thai ? 'เครื่องมือช่าง: ' : 'Technician tool: ') + techTaskName(e.task);
                 else if (e.kind === 'health') text = (e.ok ? '✓ ' : '✗ ') + ({ printer_fix: thai ? 'แก้ปริ้นไม่ออก (ล้างคิว)' : 'Fixed printing (cleared queue)', spooler_restart: thai ? 'รีสตาร์ท Print Spooler' : 'Restarted spooler', printer_test: thai ? 'พิมพ์หน้าทดสอบ' : 'Test page', printer_resume: thai ? 'สั่งเครื่องพิมพ์ทำงานต่อ' : 'Resumed printer', dns_flush: thai ? 'ล้าง DNS' : 'Flushed DNS', svc_start: thai ? 'เปิดบริการ' : 'Started service', trim: 'TRIM SSD', power_balanced: thai ? 'ตั้งโหมดพลังงาน Balanced' : 'Balanced power plan', synapse_hosts: thai ? 'ตั้งชื่อเครื่อง PACS (hosts)' : 'PACS hosts entry', startup: thai ? 'เปลี่ยนโปรแกรมเปิดพร้อมเครื่อง' : 'Start-up program', fonts: thai ? 'ติดตั้งฟอนต์ไทย' : 'Thai fonts' }[e.action] || e.action) +
                     (e.result && e.action === 'printer_fix' ? (thai ? ' · งานค้าง ' : ' · jobs ') + e.result.before + ' → ' + e.result.after : '') + (e.result && e.action === 'fonts' ? (thai ? ' · ใหม่ ' : ' · new ') + (e.result.installed || 0) : '');
                 var li = element('li');
@@ -4759,6 +4815,7 @@
             actions.appendChild(button(thai ? '🩺 ตรวจสุขภาพทุกเครื่อง' : '🩺 Health check all', 'scp-dash-refresh', function () { window.ScpHealth.openFleet(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '🖨️ เครื่องพิมพ์ทั้ง รพ.' : '🖨️ All printers', 'scp-dash-refresh', function () { window.ScpHealth.openPrinters(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '🧰 งานช่างค้างทั้ง รพ.' : '🧰 Work waiting', 'scp-dash-refresh', function () { window.ScpHealth.openBacklog(allNodes(), overlayDialog); }));
+            actions.appendChild(button(thai ? '📡 รีโมตที่ต่อไม่ได้' : '📡 Remote failures', 'scp-dash-refresh', openRemoteFailures));
             actions.appendChild(button(thai ? '💽 สุขภาพดิสก์ทั้ง รพ.' : '💽 Disk health', 'scp-dash-refresh', function () { window.ScpHealth.openDisks(allNodes(), overlayDialog); }));
             actions.appendChild(button(thai ? '🔤 ติดตั้งฟอนต์ไทย' : '🔤 Install Thai fonts', 'scp-dash-refresh', function () { window.ScpHealth.openFonts(allNodes(), overlayDialog); }));
         }

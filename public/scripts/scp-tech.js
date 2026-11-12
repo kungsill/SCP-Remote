@@ -134,6 +134,34 @@
             root.localStorage.setItem(STORE, JSON.stringify(keep));
         } catch (e) { /* storage full or blocked: results stay on this page */ }
     }
+    // The server keeps the latest result of each task for each computer, so they can be read
+    // from any browser and are not lost with this one's storage. Browser storage stays as a
+    // copy for when the server cannot be reached. Newest wins in both directions.
+    var KEPT = ['inventory', 'bench', 'sfc', 'dism', 'deploy', 'lan', 'avscan', 'avremove', 'wurepair', 'wuinstall'];
+    function ops() { return (root.ScpOperations && typeof root.ScpOperations.request === 'function' && root.meshserver) ? root.ScpOperations : null; }
+    function upload(items) { var o = ops(); if (!o || !items.length) return Promise.resolve(); return o.request('techSave', { items: items }).catch(function () { /* kept in this browser; sent again next time */ }); }
+    var synced = false;
+    function syncWithServer() {
+        var o = ops();
+        if (!o || synced) return Promise.resolve(false);
+        synced = true;
+        return o.request('techList').then(function (server) {
+            server = (server && typeof server === 'object') ? server : {};
+            var touched = {}, send = [];
+            Object.keys(server).forEach(function (id) { Object.keys(server[id] || {}).forEach(function (task) {
+                var s = server[id][task], mine = results[id] && results[id][task];
+                if (s && s.data && (!mine || !(mine.at >= s.at))) { results[id] = results[id] || {}; results[id][task] = { data: s.data, at: s.at }; touched[id] = true; }
+            }); });
+            Object.keys(results).forEach(function (id) { KEPT.forEach(function (task) {
+                var mine = results[id][task], s = server[id] && server[id][task];
+                if (mine && mine.data && typeof mine.at === 'number' && (!s || mine.at > s.at)) send.push({ nodeid: id, task: task, at: mine.at, data: mine.data });
+            }); });
+            persist();
+            Object.keys(touched).forEach(changed);
+            return upload(send).then(function () { return true; });
+        }).catch(function () { synced = false; return false; });
+    }
+    (function waitForServer(n) { if (ops()) { syncWithServer(); } else if (n < 40 && typeof setTimeout === 'function') { setTimeout(function () { waitForServer(n + 1); }, 1500); } })(0);
     function loadScript() {
         if (script) return Promise.resolve(script);
         return fetch(domainUrl() + 'scripts/scp-tech.ps1', { credentials: 'same-origin', cache: 'no-cache' })
@@ -181,7 +209,7 @@
         if (active[job.nodeid] !== job) return;
         clearTimeout(job.timer);
         job.state = error ? 'failed' : 'done'; job.error = error || ''; job.at = Date.now();
-        if (data) { results[job.nodeid] = results[job.nodeid] || {}; results[job.nodeid][job.task] = { data: data, at: job.at }; persist(); }
+        if (data) { results[job.nodeid] = results[job.nodeid] || {}; results[job.nodeid][job.task] = { data: data, at: job.at }; persist(); if (KEPT.indexOf(job.task) >= 0) upload([{ nodeid: job.nodeid, task: job.task, at: job.at, data: data }]); }
         active[job.nodeid] = null;
         changed(job.nodeid);
         next(job.nodeid);
@@ -859,6 +887,6 @@
         paint();
     }
 
-    root.ScpTech = { receive: receive, section: section, openFleet: openFleet, openInstall: openInstall, deploy: deploy, run: run, state: state, result: result, results: results, busy: busy,
+    root.ScpTech = { syncWithServer: syncWithServer, receive: receive, section: section, openFleet: openFleet, openInstall: openInstall, deploy: deploy, run: run, state: state, result: result, results: results, busy: busy,
         notInstalled: notInstalled, bugInfo: bugInfo, driverHint: driverHint, crashSummary: crashSummary, ramVerdict: ramVerdict, batteryVerdict: batteryVerdict, lanKind: lanKind, wingetText: wingetText, WINGET_ID: WINGET_ID, CATALOG: CATALOG, overlay: null };
 })(window);

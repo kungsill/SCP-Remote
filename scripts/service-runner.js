@@ -33,9 +33,11 @@ function startBackupCopies() {
     }
     if (!destination) { return; }
     try {
-        // Half past two, after the server's own backup at two.
-        require('./copy-backups.js').scheduleDaily(destination, 2, 30);
-        console.log('[backup-copy] จะก๊อปไฟล์สำรองไปที่ ' + destination + ' ทุกวันเวลา 02:30');
+        // Half past three. The server's own backup is asked for at two but its file is written
+        // at about 02:33 (the name says so), so a copy at 02:30 always took yesterday's file and
+        // the second copy ran a day behind. An hour's margin puts both copies on the same night.
+        require('./copy-backups.js').scheduleDaily(destination, 3, 30);
+        console.log('[backup-copy] จะก๊อปไฟล์สำรองไปที่ ' + destination + ' ทุกวันเวลา 03:30');
     } catch (error) {
         console.log('[backup-copy] ตั้งเวลาไม่สำเร็จ: ' + error.message);
     }

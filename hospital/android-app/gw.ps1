@@ -8,4 +8,12 @@ $env:JAVA_HOME = 'C:\Program Files\Microsoft\jdk-21.0.11.10-hotspot'
 $env:Path = $env:Path -replace '"', ''
 Set-Location $PSScriptRoot
 & .\gradlew.bat @GradleArgs --no-daemon -q
-exit $LASTEXITCODE
+$rc = $LASTEXITCODE
+# One summary line (quiet Gradle prints nothing on success).
+$xml = Get-ChildItem app\build\test-results -Recurse -Filter *.xml -ErrorAction SilentlyContinue
+if ($xml) {
+    $t = 0; $f = 0
+    foreach ($x in $xml) { $s = ([xml](Get-Content $x.FullName)).testsuite; $t += [int]$s.tests; $f += [int]$s.failures + [int]$s.errors }
+    "unit tests: $t run, $f failed (gradle exit $rc)"
+} else { "gradle exit $rc" }
+exit $rc

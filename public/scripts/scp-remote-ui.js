@@ -122,7 +122,7 @@
   readBtn=document.createElement('button');readBtn.type='button';readBtn.className='scp-app-fit scp-app-read';readBtn.hidden=true;
   readBtn.textContent=th?'ขยายให้อ่านได้':'Readable size';
   readBtn.onclick=function(){const z=readableZoom();if(z<=1)return;const parent=document.getElementById('DeskParent'),desk=document.getElementById('Desk');const r=desk.getBoundingClientRect();fit={w:r.width,h:r.height};zoomTo(z);if(parent){parent.scrollLeft=Math.max(0,(parent.scrollWidth-parent.clientWidth)/2);parent.scrollTop=0;}};
-  bar.append(back,name,state,readBtn,fitBtn);
+  bar.append(back,name,readBtn,fitBtn,state);
   document.body.insertBefore(bar,document.body.firstChild);
 
   // The view, the machine and the connection all change while the page stays put, so all three

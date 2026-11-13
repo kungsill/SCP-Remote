@@ -11,6 +11,7 @@ const path = require('node:path');
 const root = path.join(__dirname, '../..');
 const css = fs.readFileSync(path.join(root, 'public/styles/scp-remote.css'), 'utf8');
 const ui = fs.readFileSync(path.join(root, 'public/scripts/scp-remote-ui.js'), 'utf8');
+const ui0 = ui;
 
 test('the hidden left menu and header give their space back to the picture', () => {
     const m = /body\.scp-app-view #container\{[^}]*\}/g;
@@ -82,4 +83,20 @@ test('the back arrow returns to the page that opened the screen, and ends the se
 test('Disconnect on the control bar also returns to that page', () => {
     const page = fs.readFileSync(path.join(root, 'views/default.handlebars'), 'utf8');
     assert.ok(page.includes('class="vnc-tb-btn disconnect" onclick="connectDesktop(event, 0); if (window.ScpDashboard && window.ScpDashboard.returnFromRemote) { window.ScpDashboard.returnFromRemote(); }"'));
+});
+
+test('on a phone nothing is wider than the screen, and the remote bars fit', () => {
+    const ui = fs.readFileSync(path.join(root, 'public/styles/scp-ui.css'), 'utf8');
+    assert.match(ui, /@media \(max-width: 700px\) \{\s*body#body \{ min-width: 0 !important; \}/, 'the page\'s 495px minimum is lifted');
+    const m = /@media\(max-width:700px\)\{\s*body\.scp-app-view #scp-app-bar[\s\S]*?\n\}/.exec(css);
+    assert.ok(m, 'phone rules for the remote screen');
+    assert.match(m[0], /#vncFloatingToolbar \.vnc-tb-btn span\{display:none\}/, 'control bar: icons only');
+    assert.match(m[0], /#deskarea4\{max-width:100vw;overflow-x:auto/, 'bottom toolbar scrolls instead of widening the page');
+    assert.match(ui0, /bar\.append\(back,name,readBtn,fitBtn,state\);/, 'zoom buttons come before the connection dot');
+});
+
+test('a phone is not asked for clipboard access over the remote screen', () => {
+    const page = fs.readFileSync(path.join(root, 'views/default.handlebars'), 'utf8');
+    const fn = page.slice(page.indexOf('function scpClipboardAllowed(d) {'), page.indexOf('function updateSessionTime() {'));
+    assert.match(fn, /matchMedia\('\(pointer: coarse\)'\)\.matches\) return false;/);
 });

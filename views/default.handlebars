@@ -55,9 +55,9 @@
     {{{customJSTags}}}
     <title>{{{title}}}</title>
     <!-- SCP-Remote: local hospital fonts and theme. -->
-    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-remote.css?v=20261112-bar" />
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-remote.css?v=20261114-phonebar" />
     <script defer src="{{{domainurl}}}scripts/scp-files.js"></script>
-    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-ui.css?v=20261114-menubar" />
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-ui.css?v=20261114-phone" />
     <script defer src="{{{domainurl}}}scripts/scp-ui.js?v=20261013-drawer"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-dashboard.css?v=20261112-phone" />
     <!-- SCP-Remote: My Account page laid out as cards; unused controls (delete account, login tokens, 2FA) hidden. -->
@@ -110,7 +110,7 @@
 <script defer src="{{{domainurl}}}scripts/scp-lan.js?v=20260922-relay"></script>
 <!-- SCP-Remote: draws the remote picture on whole pixels (must load before scp-remote-ui.js). -->
 <script defer src="{{{domainurl}}}scripts/scp-remote-fit.js?v=20261112-fit"></script>
-<script defer src="{{{domainurl}}}scripts/scp-remote-ui.js?v=20261114-read"></script>
+<script defer src="{{{domainurl}}}scripts/scp-remote-ui.js?v=20261114-phonebar"></script>
 </head>
 <body id="body" oncontextmenu="handleContextMenu(event)" style="display:none;min-width:495px" onload="if (typeof(startup) !== 'undefined') startup();">
     <!-- right click menu -->
@@ -10158,6 +10158,8 @@
         // may only watch) never reads or writes that computer's clipboard.
         function scpClipboardAllowed(d) {
             if ((d == null) || (d.viewonly === true) || (d.State != 3) || (currentNode == null)) return false;
+            // SCP-Remote: not on a touch screen, where reading the clipboard each second raises a permission dialog over the remote screen.
+            try { if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return false; } catch (ex) { }
             if ((d.contype != 4) && !(d.m && d.m.scpStats && (d.m.scpStats.tiles > 0))) return false;
             var meshrights = GetNodeRights(currentNode);
             return ((features2 & 0x2000) == 0) && ((meshrights == 0xFFFFFFFF) || (((meshrights & 8) != 0) && ((meshrights & 256) == 0)));

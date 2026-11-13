@@ -18,7 +18,8 @@ class ControlMessagesTest {
     @Test fun scpopsCarriesTagOpAndExtra() {
         val j = JSONObject(ControlMessages.scpops(7, "fixPrinter", mapOf("nodeid" to "node//abc")))
         assertEquals("scpops", j.getString("action"))
-        assertEquals(7, j.getInt("tag"))
+        // meshuser.js drops an scpops message whose tag is not a string (typeof command.tag !== 'string').
+        assertEquals("7", j.get("tag"))
         assertEquals("fixPrinter", j.getString("op"))
         assertEquals("node//abc", j.getString("nodeid"))
     }

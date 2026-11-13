@@ -17,7 +17,8 @@ object ControlMessages {
     fun authHeader(user: String, pass: String) = b64(user) + "," + b64(pass)
 
     fun scpops(tag: Int, op: String, extra: Map<String, Any?> = emptyMap()): String {
-        val j = JSONObject().put("action", "scpops").put("tag", tag).put("op", op)
+        // The tag must be a string: meshuser.js ignores scpops messages whose tag is not.
+        val j = JSONObject().put("action", "scpops").put("tag", tag.toString()).put("op", op)
         extra.forEach { (k, v) -> j.put(k, v) }
         return j.toString()
     }

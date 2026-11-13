@@ -138,7 +138,7 @@ class ControlChannel(
             val m = try { JSONObject(text) } catch (e: Exception) { return }
             when (m.optString("action")) {
                 "close" -> ready.completeExceptionally(ControlError("BAD_LOGIN"))
-                "scpops" -> { welcome(); pending.remove(m.optInt("tag", -1))?.complete(m) }
+                "scpops" -> { welcome(); m.optString("tag").toIntOrNull()?.let { pending.remove(it) }?.complete(m) }
                 "authcookie" -> { welcome(); cookieWaiters.poll()?.complete(m) }
                 else -> welcome()
             }

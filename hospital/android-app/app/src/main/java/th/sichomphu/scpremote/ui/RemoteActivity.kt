@@ -51,7 +51,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
     private lateinit var retry: Button
     private lateinit var barScroll: View
     private val ui = Handler(Looper.getMainLooper())
-    private var session: RelaySession? = null
+    @Volatile private var session: RelaySession? = null
     private var attempts = 0
     private var hiddenClosed = false
     private var leaving = false
@@ -102,7 +102,11 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         val channel = AppSession.channel ?: return finish()
         val trust = AppSession.trust ?: return finish()
         session?.close(userInitiated = true)
-        session = RelaySession(channel, trust, device, this, AppSession.server, Quality.LADDER[prefs.quality]).also { it.start() }
+        // Assigned before start(): start() reports CONNECTING at once, and a fast failure reports
+        // CLOSED from another thread; onState only shows states from the current session.
+        val s = RelaySession(channel, trust, device, this, AppSession.server, Quality.LADDER[prefs.quality])
+        session = s
+        s.start()
     }
 
     private val prefs by lazy { Prefs(this) }

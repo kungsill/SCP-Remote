@@ -72,9 +72,16 @@ class RelaySession(
         }
     }
 
-    /** Sends one desktop-channel message (input, picture settings…); dropped unless connected. */
+    /**
+     * The relay paired the two ends ("c"/"cr") and the protocol was sent. Transport state, separate
+     * from [state]: while the person at the computer is asked to allow, the link is up and the
+     * picture that follows the Allow must get through.
+     */
+    @Volatile private var linked = false
+
+    /** Sends one desktop-channel message (input, picture settings…); dropped unless linked. */
     fun send(bytes: ByteArray) {
-        if (state == State.CONNECTED) socket?.send(bytes.toByteString())
+        if (linked) socket?.send(bytes.toByteString())
     }
 
     /** Changes the picture settings on the open session: compression then a full refresh. */
@@ -92,6 +99,7 @@ class RelaySession(
 
     fun close(userInitiated: Boolean) {
         if (userInitiated) userClosed = true
+        linked = false
         keepAlive?.cancel()
         socket?.close(1000, null)
         socket = null
@@ -109,11 +117,23 @@ class RelaySession(
     private fun received(cmd: KvmCommand) {
         when (cmd) {
             is KvmCommand.ScreenSize -> {
-                // As the web page: let the agent know touch is fine, and release any stuck modifiers.
+                // As the web page (ProcessScreenMsg and cmd 7): the picture settings again — the ones
+                // sent on "c" may have reached the agent before the person allowed the session —
+                // un-pause, ask for the displays, accept touch, and release any stuck modifier keys
+                // (key messages are input, so not from a view-only session).
+                val q = quality
+                send(KvmMessages.compression(q[0], q[1], q[2], q[3]))
+                send(KvmMessages.pause(false))
+                send(KvmMessages.getDisplays())
                 send(KvmMessages.touchInitAck())
-                for (vk in intArrayOf(16, 17, 18, 91, 92, 16)) send(KvmMessages.key(false, vk))
+                if (device.canControl && !device.viewOnly) {
+                    for (vk in intArrayOf(16, 17, 18, 91, 92, 16)) send(KvmMessages.key(false, vk))
+                }
             }
-            is KvmCommand.Tile -> hadImage = true
+            is KvmCommand.Tile -> {
+                hadImage = true
+                if (state == State.WAITING_CONSENT) setState(State.CONNECTED)
+            }
             else -> {}
         }
         listener.onCommand(cmd)
@@ -133,14 +153,15 @@ class RelaySession(
         override fun onOpen(webSocket: WebSocket, response: Response) = startKeepAlive(webSocket)
 
         override fun onMessage(webSocket: WebSocket, text: String) {
-            if (state != State.CONNECTED && (text == "c" || text == "cr")) {
+            if (!linked && (text == "c" || text == "cr")) {
+                if (state == State.CLOSED || state == State.REFUSED) return
                 webSocket.send("2")
-                state = State.CONNECTED
+                linked = true
                 val q = quality
                 webSocket.send(KvmMessages.compression(q[0], q[1], q[2], q[3]).toByteString())
                 webSocket.send(KvmMessages.refresh().toByteString())
                 webSocket.send(KvmMessages.getDisplays().toByteString())
-                listener.onState(State.CONNECTED)
+                setState(State.CONNECTED)
                 return
             }
             val m = try { JSONObject(text) } catch (e: Exception) { return }
@@ -155,7 +176,7 @@ class RelaySession(
         }
 
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-            if (state == State.CONNECTED) framer.feed(bytes.toByteArray())
+            if (linked) framer.feed(bytes.toByteArray())
         }
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) { webSocket.close(1000, null) }
@@ -166,6 +187,7 @@ class RelaySession(
             if (socket != null && socket !== webSocket) return
             keepAlive?.cancel()
             socket = null
+            linked = false
             if (state != State.REFUSED) setState(State.CLOSED)
         }
     }

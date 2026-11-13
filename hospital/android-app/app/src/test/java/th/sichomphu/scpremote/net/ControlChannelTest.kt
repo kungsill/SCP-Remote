@@ -88,6 +88,18 @@ class ControlChannelTest {
         assertEquals("n", ch.devices().userName)
     }
 
+    // The real server (meshuser.js:777-779) only answers string tags, and echoes them back as strings.
+    @Test fun worksAgainstAServerThatOnlyAcceptsStringTags() = runBlocking {
+        val fake = FakeServer(welcome) { m ->
+            val tag = m.opt("tag")
+            if (tag !is String) null
+            else """{"action":"scpops","tag":${JSONObject.quote(tag)},"result":{"user":{"name":"n"},"groups":[],"devices":[]}}"""
+        }
+        val ch = ControlChannel("https://h:1", trust, fake)
+        ch.signIn("a", "b")
+        assertEquals("n", ch.devices().userName)
+    }
+
     @Test fun repliesAreMatchedByTag() = runBlocking {
         // The server answers with a different tag first; only the matching one completes the call.
         val fake = FakeServer(welcome) { m ->

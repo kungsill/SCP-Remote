@@ -1,0 +1,50 @@
+/* SCP-Remote: device group page (p20). Laid out by scp-group.js. */
+.scp-grp-hidden { display: none !important; }
+body.scp-group-page #p20main { padding: 4px 28px 32px; box-sizing: border-box; }
+body.scp-group-page #MainMeshImage, body.scp-group-page #MainMeshImage img { width: 96px !important; height: 96px !important; opacity: .9; }
+body.scp-group-page #p20title h1 { font-size: 24px; }
+
+.scp-grp-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.scp-grp-chip { padding: 5px 12px; border-radius: 999px; background: var(--scp-soft, #fce9f3); color: var(--scp-ink, #2a1520); font-size: 13px; font-weight: 600; }
+.scp-grp-chip.on { background: #e2f6ef; color: #17704a; }
+.scp-grp-chip.off { background: rgba(0, 0, 0, .05); color: var(--scp-muted, #6d5560); }
+
+.scp-grp-card { border: 1px solid var(--scp-line, #f0dbe6); border-radius: 14px; background: var(--scp-surface, #fff); box-shadow: 0 2px 10px rgba(70, 22, 46, .06); padding: 16px 20px; box-sizing: border-box; max-width: 900px; }
+.scp-grp-card h3, .scp-grp-h { margin: 0 0 10px; font-size: 15px; font-weight: 700; color: var(--scp-ink, #2a1520); }
+.scp-grp-h { margin: 22px 0 8px; }
+.scp-grp-props { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 24px; }
+.scp-grp-props h3 { grid-column: 1 / -1; }
+.scp-grp-prop { width: 100%; border-collapse: collapse; }
+.scp-grp-prop td { padding: 7px 0; border-bottom: 1px solid var(--scp-line, #f0dbe6); vertical-align: top; font-size: 13.5px; color: var(--scp-ink, #2a1520); }
+.scp-grp-prop td:first-child { width: 130px !important; color: var(--scp-muted, #6d5560); }
+.scp-grp-prop b { font-weight: 600; }
+
+.scp-grp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.scp-grp-btn, #p20info input.scp-grp-btn { display: inline-flex; align-items: center; gap: 6px; margin: 0 !important; padding: 8px 14px !important; border: 1px solid var(--scp-line, #f0dbe6) !important; border-radius: 10px !important; background: var(--scp-surface, #fff) !important; color: var(--scp-accent, #b02a72) !important; font: inherit; font-size: 13.5px !important; font-weight: 600; text-decoration: none !important; cursor: pointer; }
+.scp-grp-btn:hover { background: var(--scp-soft, #fce9f3) !important; border-color: var(--scp-accent, #b02a72) !important; }
+
+/* People and computers: clean lists in place of grey tables (their colours are set inline) */
+table.scp-grp-list { max-width: 900px; border: 1px solid var(--scp-line, #f0dbe6) !important; border-radius: 12px; overflow: hidden; border-collapse: separate !important; border-spacing: 0; background: var(--scp-surface, #fff) !important; color: var(--scp-ink, #2a1520) !important; }
+table.scp-grp-list tr { background: transparent !important; }
+table.scp-grp-list tr:first-child { background: var(--scp-soft, #fce9f3) !important; }
+table.scp-grp-list th { padding: 9px 12px !important; font-size: 13px; color: var(--scp-ink, #2a1520); }
+table.scp-grp-list td { padding: 9px 12px !important; border-top: 1px solid var(--scp-line, #f0dbe6); font-size: 13.5px; vertical-align: middle; }
+table.scp-grp-list tr:hover td { background: var(--scp-soft, #fce9f3); }
+table.scp-grp-list a { color: var(--scp-ink, #2a1520) !important; font-weight: 600; text-decoration: none !important; }
+table.scp-grp-list a:hover { color: var(--scp-accent, #b02a72) !important; }
+.scp-grp-devices tr.scp-grp-on td:first-child { box-shadow: inset 3px 0 0 #1e8e5a; }
+.scp-grp-devices tr.scp-grp-off td { color: var(--scp-muted, #6d5560); }
+.scp-grp-devices tr.scp-grp-off a { color: var(--scp-muted, #6d5560) !important; font-weight: 500; }
+.scp-grp-remote { float: right; margin-left: 10px; padding: 5px 14px; border: 0; border-radius: 8px; background: var(--scp-accent, #b02a72); color: #fff; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.scp-grp-remote:hover { filter: brightness(1.08); }
+
+.scp-grp-danger { max-width: 900px; margin-top: 26px; padding-top: 14px; border-top: 1px dashed var(--scp-line, #f0dbe6); text-align: left !important; }
+.scp-grp-delete { color: #b42318 !important; font-size: 13px; text-decoration: none !important; }
+.scp-grp-delete:hover { text-decoration: underline !important; }
+
+@media (max-width: 700px) {
+  body.scp-group-page #p20main { padding: 4px 12px 24px; }
+  .scp-grp-props { grid-template-columns: minmax(0, 1fr); }
+  body.scp-group-page #MainMeshImage { display: none !important; }
+  table.scp-grp-list td:nth-child(2) div:last-child { font-size: 12px; }
+}

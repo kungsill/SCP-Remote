@@ -26,6 +26,8 @@ app.whenReady().then(()=>{
  secureWindow(home);home.loadFile(path.join(__dirname,'index.html'));
  function handle(name,fn){ipcMain.handle(name,async(event,...args)=>{if(event.sender!==home.webContents||!event.senderFrame.url.startsWith('file://'))throw Error('ACCESS_DENIED');try{return {ok:true,result:await fn(...args)};}catch(e){return {ok:false,error:e.message};}});}
  handle('scp:init',()=>request({op:'register',name:os.hostname(),autoApprove:true}));
+ // Which version is running: boot.js sets it (the installed copy, or a newer one it downloaded).
+ handle('scp:version',()=>{const a=global.scpApp||{},v=a.version||require('./package.json').version;return {version:v,installed:a.installedVersion||v,updated:a.updated===true};});
  handle('scp:devices',()=>request({op:'devices'}));
  ipcMain.handle('scp:session-status',async(event)=>{const current=remote;if(!current||current.isDestroyed()||event.sender!==current.webContents||event.senderFrame!==current.webContents.mainFrame)throw Error('ACCESS_DENIED');const u=new URL(event.senderFrame.url);if(u.origin!==origin||u.pathname!=='/sharing')throw Error('ACCESS_DENIED');try{return {ok:true,result:await request({op:'connectionStatus',nodeid:current.scpNodeId})};}catch(e){return {ok:false,error:e.message};}});
  ipcMain.handle('scp:clipboard',async(event,command)=>{

@@ -145,3 +145,14 @@ test('what is published is exactly what a program will accept', (t) => {
     assert.ok(!names.some(n => /^(node_modules|release|dist)\//.test(n)));
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8')), m);
 });
+
+test('the status bar says which version is running', () => {
+    const main = fs.readFileSync(path.join(appDir, 'main.js'), 'utf8');
+    assert.match(main, /handle\('scp:version',/);
+    assert.match(main, /global\.scpApp/, 'the version boot.js chose, which may be newer than the installed one');
+    assert.match(fs.readFileSync(path.join(appDir, 'preload.js'), 'utf8'), /version:\(\)=>ipcRenderer\.invoke\('scp:version'\)/);
+    assert.match(fs.readFileSync(path.join(appDir, 'index.html'), 'utf8'), /id="statusVersion"/);
+    const r = fs.readFileSync(path.join(appDir, 'renderer.js'), 'utf8');
+    assert.match(r, /\$\('statusVersion'\)/);
+    assert.match(r, /r\.result\.version/);
+});

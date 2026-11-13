@@ -719,3 +719,6 @@ body {
 .vnc-card .vnc-fix-btn:hover, .device button.vnc-fix-btn:hover { background-color: #fce9f3; }
 .vnc-card .vnc-fix-btn:disabled, .device button.vnc-fix-btn:disabled { opacity: 0.45; cursor: not-allowed; background-color: #ffffff; }
 .vnc-fix-note { display: block; margin-top: 4px; max-width: 190px; font-size: 10.5px; line-height: 1.35; color: #555555; text-align: center; overflow-wrap: anywhere; }
+
+/* Running version, in the status bar */
+.vnc-status-version { color: #555555; font-weight: 600; margin-right: 14px; white-space: nowrap; }

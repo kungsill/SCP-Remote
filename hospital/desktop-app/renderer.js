@@ -490,3 +490,16 @@ setInterval(() => {
   if (document.hidden) return;
   approved ? refresh() : init();
 }, 10000);
+
+// The version that is running, in the status bar, so anyone can say which one they have.
+(async () => {
+  try {
+    const r = await window.scp.version();
+    const box = $('statusVersion');
+    if (!box || !r || !r.ok) return;
+    box.textContent = t('รุ่น ', 'Version ') + r.result.version;
+    box.title = r.result.updated
+      ? t('อัปเดตอัตโนมัติจากเซิร์ฟเวอร์ · รุ่นที่ติดตั้งไว้คือ ', 'Updated from the server · installed version is ') + r.result.installed
+      : t('รุ่นที่ติดตั้งไว้ในเครื่องนี้', 'The version installed on this computer');
+  } catch (e) { /* an older main process has no version call: the bar just stays without it */ }
+})();

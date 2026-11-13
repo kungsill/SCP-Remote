@@ -7,13 +7,15 @@
 const test = require('node:test'), assert = require('node:assert/strict'), vm = require('node:vm'), fs = require('node:fs'), path = require('node:path');
 
 function page(opts = {}) {
-    const calls = [], elements = [];
+    const calls = [], elements = [], clock = { t: 1700000000000 };
     const side = { local: { seq: 100, text: opts.localText === undefined ? null : opts.localText, files: !!opts.localFiles, size: opts.localSize || 3 }, far: { seq: 500, text: opts.farText === undefined ? null : opts.farText, files: !!opts.farFiles, size: opts.farSize || 3 } };
     const element = () => { const e = { style: {}, append() { }, textContent: '', offsetParent: {} }; elements.push(e); return e; };
     async function handle(name, c) {
         const s = side[name];
         calls.push(name + ':' + c.op);
         if (opts.farFails && name === 'far') throw Error('HELPER_TIMEOUT_OR_OLD_AGENT');
+        if (name === 'far' && c.op === 'text' && opts.farTextFails > 0) { opts.farTextFails--; throw Error('CLIPBOARD_BUSY'); }
+        if (name === 'local' && c.op === 'snapshot' && opts.localSnapshotFails > 0) { opts.localSnapshotFails--; throw Error('CLIPBOARD_BUSY'); }
         switch (c.op) {
             case 'state': return { sequence: s.seq, files: s.files };
             case 'snapshot': return { job: 'j', sequence: s.seq, entries: s.files ? [{ path: 'a.txt', directory: false, size: s.size }] : [], text: s.files ? null : s.text };
@@ -24,8 +26,9 @@ function page(opts = {}) {
     }
     let connections = 0;
     const context = {
-        window: null, Map, Set, Promise, console, Date,
+        window: null, Map, Set, Promise, console,
         document: { documentElement: { lang: 'th' }, body: { appendChild() { } }, createElement: element, getElementById: () => ({ offsetParent: {} }), addEventListener() { }, hasFocus: () => opts.focused !== false },
+        Date: { now: () => clock.t },
         setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); t.unref(); return t; }, clearTimeout,
         serverPublicNamePort: 'host', authCookie: 'c', domainUrl: '/', scpClipboardReady: true,
         scpTransfer: { transfer: async (src, dst, snap, sequence) => { calls.push('TRANSFER'); await dst({ op: 'landed', sequence }); } },
@@ -44,7 +47,7 @@ function page(opts = {}) {
     context.document.addEventListener = (k, fn) => { handlers[k] = fn; };
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../desktop-app/inject-clipboard.js'), 'utf8'), context);
     const paste = () => handlers.keydown({ ctrlKey: true, code: 'KeyV', target: { closest: () => false }, preventDefault() { }, stopImmediatePropagation() { } });
-    return { side, calls, sync: () => context.scpClipboardSync(), shown: () => elements[0].style.display === 'flex', status: () => elements[1].textContent, action: () => elements[4], paste, connections: () => connections, context };
+    return { side, calls, sync: () => context.scpClipboardSync(), shown: () => elements[0].style.display === 'flex', status: () => elements[1].textContent, action: () => elements[4], paste, opts, clock, connections: () => connections, context };
 }
 
 test('text already copied here is on the remote clipboard as soon as the session is in use', async () => {
@@ -140,10 +143,64 @@ test('a large copy is offered with its size, not taken', async () => {
     assert.equal(p.side.far.files, true);
 });
 
-test('files already on the clipboard when a session starts are not sent unasked', async () => {
+test('a file copied before the session was opened is there to paste as well', async () => {
+    // Copy the file, then connect, then right-click Paste: the usual order. Leaving this out made
+    // copy and paste look as if it worked only some of the time.
     const p = page({ localFiles: true });
     await p.sync(); await settle();
-    assert.equal(p.calls.includes('TRANSFER'), false, 'only what is copied during the session');
+    assert.equal(p.calls.filter(c => c === 'TRANSFER').length, 1);
+    assert.equal(p.side.far.files, true);
+});
+
+// The Windows clipboard is briefly unavailable whenever another program has it open, which is
+// often, right after something is copied. A copy that could not be read at that instant has to
+// be tried again, not quietly forgotten.
+test('a clipboard that was busy for a moment is tried again on the next pass', async () => {
+    const p = page({ localText: 'one', farTextFails: 1 });
+    await p.sync();
+    assert.equal(p.side.far.text, null, 'the first try failed');
+    await p.sync();
+    assert.equal(p.side.far.text, 'one', 'the second gets it across');
+});
+
+test('text copied here while the clipboard is being read is not lost either', async () => {
+    const p = page({ localText: 'one' });
+    await p.sync();
+    p.side.local.text = 'two'; p.side.local.seq++; p.opts.localSnapshotFails = 2;
+    await p.sync(); await p.sync();
+    assert.equal(p.side.far.text, 'one');
+    await p.sync();
+    assert.equal(p.side.far.text, 'two');
+});
+
+test('a copy that keeps failing is given up after three tries, not retried for ever', async () => {
+    const p = page({ localText: 'one', farTextFails: 99 });
+    for (let i = 0; i < 8; i++) await p.sync();
+    assert.equal(p.calls.filter(c => c === 'far:text').length, 3);
+    // and the next thing copied starts with a clean count
+    p.opts.farTextFails = 0; p.side.local.text = 'next'; p.side.local.seq++;
+    await p.sync();
+    assert.equal(p.side.far.text, 'next');
+});
+
+test('copy on the remote, then click away at once: it still arrives here', async () => {
+    const p = page({ localText: 'x' });
+    await p.sync();
+    p.side.far.text = 'copied just before leaving'; p.side.far.seq++;
+    p.opts.focused = false;                 // the technician has clicked on their own desktop
+    p.clock.t += 3000;
+    await p.sync();                         // an ordinary pass, a few seconds after leaving
+    assert.equal(p.side.local.text, 'copied just before leaving');
+    // but a window left alone for a while exchanges nothing
+    p.side.far.text = 'much later'; p.side.far.seq++;
+    p.clock.t += 60000;
+    await p.sync();
+    assert.equal(p.side.local.text, 'copied just before leaving');
+});
+
+test('Ctrl+V pressed while a pass is in flight waits for it instead of colliding', () => {
+    const source = fs.readFileSync(path.join(__dirname, '../desktop-app/inject-clipboard.js'), 'utf8');
+    assert.match(source, /for\(let i=0;i<60&&autoBusy;i\+\+\)await delay\(50\);/);
 });
 
 test('nothing is exchanged while the remote window is not the one being used', async () => {

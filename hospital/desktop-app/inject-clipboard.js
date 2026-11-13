@@ -51,6 +51,7 @@
  const errors={CLIPBOARD_CHANGED:tr('คลิปบอร์ดเปลี่ยนระหว่างโอน กรุณาคัดลอกใหม่','Clipboard changed during transfer. Copy again.'),CANCELLED:tr('ยกเลิกแล้ว','Cancelled'),NOT_ENOUGH_SPACE:tr('พื้นที่ปลายทางไม่พอ','Not enough destination space'),HELPER_TIMEOUT_OR_OLD_AGENT:tr('เครื่องปลายทางไม่ตอบกลับหรือยังใช้เอเจนต์เก่า','Remote helper did not respond. Check the agent update.'),NO_COPY_CHANGE:tr('ยังไม่พบข้อมูลที่คัดลอก กรุณาเลือกไฟล์หรือข้อความแล้วกด Ctrl+C ใหม่','No new clipboard content. Select files or text and press Ctrl+C again.'),EMPTY_CLIPBOARD:tr('คลิปบอร์ดไม่มีไฟล์หรือข้อความ','No files or text on the clipboard')};
  async function run(direction){
   if(busy){status(tr('กำลังโอนอยู่ กรุณารอหรือยกเลิกก่อน','A transfer is running. Wait or cancel first.'),true);return;}
+  for(let i=0;i<60&&autoBusy;i++)await delay(50);
   busy=true;signal={cancelled:false};startedAt=Date.now();let files=false;
   // only said when it is actually taking a while (first use opens the channel and may wait for approval)
   const slow=setTimeout(()=>{if(busy&&box.style.display!=='flex')status(tr('กำลังเตรียมคลิปบอร์ด…','Preparing the clipboard…'),true);},1500);
@@ -105,35 +106,63 @@
  async function rebase(){try{autoLocal=(await local({op:'state'})).sequence;if(channel&&channel.State===3){autoFar=(await far({op:'state'})).sequence;inStep={local:autoLocal,far:autoFar};}}catch(e){}}
  async function files(direction,dstSequence){
   const snap=await (direction==='out'?local:far)({op:'snapshot'});
-  if(!snap.entries.length)return;
+  if(!snap.entries.length)return 'empty';
   const total=snap.entries.reduce(function(n,e){return n+(e.size||0);},0);
-  if(total>AUTO_FILE_BYTES){offer(direction,snap,dstSequence,total);return;}
-  if(await carry(direction,snap,dstSequence))await rebase();
+  if(total>AUTO_FILE_BYTES){offer(direction,snap,dstSequence,total);return 'offered';}
+  if(await carry(direction,snap,dstSequence)){await rebase();return 'done';}
+  return 'failed';
  }
+ // autoLocal / autoFar are the clipboard sequence numbers already dealt with. They move on only
+ // when a copy has actually been carried across (or there was nothing to carry). The Windows
+ // clipboard is often unavailable for an instant right after something is copied, because another
+ // program has it open; a copy that could not be read then is tried again on the next pass, up
+ // to three times, instead of being forgotten - which is what made it work "only sometimes".
+ let attempt={key:'',n:0},lastFocus=0;
+ function mayTry(key){if(attempt.key!==key)attempt={key:key,n:0};if(attempt.n>=3)return false;attempt.n++;return true;}
+ function plain(snap){return !snap.entries.length&&typeof snap.text==='string'&&snap.text.length>0&&snap.text.length<=1048576;}
  async function sync(force){
   if(autoBusy||busy||autoOff)return;
   if(typeof desktop==='undefined'||!desktop||desktop.State!==3||!(desktop.m&&desktop.m.scpStats&&desktop.m.scpStats.tiles>0))return;
-  if(!force&&document.hasFocus&&!document.hasFocus())return;
+  // While this window is in use, and for a few seconds after it is left: copying in the remote
+  // screen and clicking straight onto one's own desktop to paste is the ordinary way to do it.
+  const focused=!document.hasFocus||document.hasFocus();
+  if(focused)lastFocus=Date.now();
+  if(!force&&!focused&&Date.now()-lastFocus>20000)return;
   autoBusy=true;
   try{
    const here=await local({op:'state'});
    let there;
    try{there=await far({op:'state'});}catch(e){autoOff=true;quiet();return;}
    const first=autoLocal===null;
+   if(first&&autoFar===null)autoFar=there.sequence; // what the remote already held is not brought over; what is copied from now on is
    if(first||here.sequence!==autoLocal){
-    // copied on this computer (or the session has just started): send text to the remote
-    autoLocal=here.sequence;autoFar=there.sequence;inStep=null;
-    if(!here.files){const snap=await local({op:'snapshot'});
-     if(!snap.entries.length&&typeof snap.text==='string'&&snap.text.length&&snap.text.length<=1048576){await far({op:'text',text:snap.text,sequence:there.sequence});autoFar=(await far({op:'state'})).sequence;inStep={local:autoLocal,far:autoFar};}}
-    else if(!first){autoBusy=false;await files('out',there.sequence);}
+    // copied on this computer, or held on its clipboard when the session began: take it to the remote
+    if(!mayTry('L'+here.sequence)){autoLocal=here.sequence;return;}
+    inStep=null;
+    if(here.files){
+     autoBusy=false;
+     const did=await files('out',there.sequence);
+     if(did==='empty'||did==='offered')autoLocal=here.sequence; // 'done' has set both; 'failed' is tried again
+    }else{
+     const snap=await local({op:'snapshot'});
+     if(plain(snap)){await far({op:'text',text:snap.text,sequence:there.sequence});autoFar=(await far({op:'state'})).sequence;autoLocal=here.sequence;inStep={local:autoLocal,far:autoFar};}
+     else autoLocal=here.sequence; // nothing that can be carried (empty, a picture, or over a megabyte of text)
+    }
    }else if(there.sequence!==autoFar){
-    // copied on the remote computer: bring text here
-    autoFar=there.sequence;inStep=null;
-    if(!there.files){const snap=await far({op:'snapshot'});
-     if(!snap.entries.length&&typeof snap.text==='string'&&snap.text.length&&snap.text.length<=1048576){await local({op:'text',text:snap.text,sequence:here.sequence});autoLocal=(await local({op:'state'})).sequence;inStep={local:autoLocal,far:autoFar};}}
-    else{autoBusy=false;await files('in',here.sequence);}
+    // copied on the remote computer: bring it here
+    if(!mayTry('F'+there.sequence)){autoFar=there.sequence;return;}
+    inStep=null;
+    if(there.files){
+     autoBusy=false;
+     const did=await files('in',here.sequence);
+     if(did==='empty'||did==='offered')autoFar=there.sequence;
+    }else{
+     const snap=await far({op:'snapshot'});
+     if(plain(snap)){await local({op:'text',text:snap.text,sequence:here.sequence});autoLocal=(await local({op:'state'})).sequence;autoFar=there.sequence;inStep={local:autoLocal,far:autoFar};}
+     else autoFar=there.sequence;
+    }
    }
-  }catch(e){ /* the clipboard changed under us, or the channel dropped: the next pass sorts it out */ }
+  }catch(e){ /* not carried: the sequence numbers were not moved on, so the next pass tries again */ }
   finally{autoBusy=false;}
  }
  window.scpClipboardSync=sync;

@@ -346,3 +346,11 @@ hospital/native-agent/release/
 # Claude Code worktrees (isolated workspaces for plan execution)
 /.claude/worktrees/
 /.superpowers/
+
+# SCP-Remote Android app: build output, local SDK path, signing secrets
+/hospital/android-app/.gradle/
+/hospital/android-app/build/
+/hospital/android-app/app/build/
+/hospital/android-app/local.properties
+/hospital/android-app/*.jks
+/hospital/android-app/keystore.properties

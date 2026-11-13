@@ -7,11 +7,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="robots" content="noindex,nofollow">
-    <link rel="manifest" href="{{{domainurl}}}manifest.json">
-    <link rel="shortcut icon" type="image/x-icon" href="{{{domainurl}}}favicon.ico" />
+    <!-- SCP-Remote: the installed phone app uses the hospital name, logo and colour (public/scp-app.json, public/images/app/). -->
+    <link rel="manifest" href="{{{domainurl}}}scp-app.json">
+    <link rel="shortcut icon" type="image/png" href="{{{domainurl}}}images/app/favicon-32.png" />
     <link keeplink=1 type="text/css" href="styles/style.css" media="screen" rel="stylesheet" title="CSS" />
     {{{customCSSTags}}}
-    <link rel="apple-touch-icon" href="/favicon-303x303.png" />
+    <link rel="apple-touch-icon" href="{{{domainurl}}}images/app/apple-touch-icon.png" />
     <script type="text/javascript" src="scripts/common-0.0.1{{min}}.js"></script>
     {{{customJSTags}}}
     <script keeplink=1 type="text/javascript" src="scripts/u2f-api{{min}}.js"></script>

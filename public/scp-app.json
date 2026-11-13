@@ -1,0 +1,20 @@
+{
+  "id": "/scp-remote",
+  "name": "SCP-Remote โรงพยาบาลสีชมพู",
+  "short_name": "SCP-Remote",
+  "description": "รีโมตช่วยเหลือคอมพิวเตอร์ กลุ่มงานเทคโนโลยีสารสนเทศ โรงพยาบาลสีชมพู",
+  "lang": "th",
+  "start_url": "/?m=0&scppage=remote",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#b02a72",
+  "background_color": "#faf3f6",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    { "src": "images/app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "images/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "images/app/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "images/app/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

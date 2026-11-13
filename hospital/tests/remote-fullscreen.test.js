@@ -88,7 +88,8 @@ test('Disconnect on the control bar also returns to that page', () => {
 test('on a phone nothing is wider than the screen, and the remote bars fit', () => {
     const ui = fs.readFileSync(path.join(root, 'public/styles/scp-ui.css'), 'utf8');
     assert.match(ui, /@media \(max-width: 700px\) \{\s*body#body \{ min-width: 0 !important; \}/, 'the page\'s 495px minimum is lifted');
-    const m = /@media\(max-width:700px\)\{\s*body\.scp-app-view #scp-app-bar[\s\S]*?\n\}/.exec(css);
+    // the same rules for a phone held sideways: wider than 700px, but a touch screen with little height
+    const m = /@media\(max-width:700px\),\(pointer:coarse\) and \(max-height:600px\)\{\s*body\.scp-app-view #scp-app-bar[\s\S]*?\n\}/.exec(css);
     assert.ok(m, 'phone rules for the remote screen');
     assert.match(m[0], /#vncFloatingToolbar \.vnc-tb-btn span\{display:none\}/, 'control bar: icons only');
     assert.match(m[0], /#deskarea4\{max-width:100vw;overflow-x:auto/, 'bottom toolbar scrolls instead of widening the page');

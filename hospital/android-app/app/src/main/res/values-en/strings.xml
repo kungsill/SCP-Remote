@@ -33,6 +33,17 @@
     <string name="fix_printer">Fix printing</string>
     <string name="update">Update app</string>
 
+    <string name="disconnect">✕ Disconnect</string>
+    <string name="toolbar">Toolbar</string>
+    <string name="retry">Retry</string>
+    <string name="st_connecting">Connecting…</string>
+    <string name="st_consent">Waiting for the person at the computer to allow access…</string>
+    <string name="st_image">Connected; waiting for the first picture…</string>
+    <string name="st_refused">The person at the computer declined, or the session could not open</string>
+    <string name="st_closed">Session ended. Tap Retry to connect again</string>
+    <string name="st_reconnecting">Connection lost. Reconnecting (%1$d/3)…</string>
+    <string name="st_view_only">View only · mouse and keyboard are off</string>
+
     <string name="fix_title">Fix printing on this computer?</string>
     <string name="fix_warning">Every job waiting in this computer\'s print queue is deleted and the print spooler restarts (a few seconds). If it shares printers with other computers, their waiting jobs are deleted too.\n\nThis cannot be undone. Deleted jobs have to be printed again.</string>
     <string name="fix_go">Fix printing</string>

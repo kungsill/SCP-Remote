@@ -26,5 +26,13 @@
             android:name=".ui.DevicesActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <!-- Rotation and keyboard changes keep the same activity, so the remote session survives. -->
+        <activity
+            android:name=".ui.RemoteActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode"
+            android:exported="false"
+            android:theme="@style/Theme.ScpRemote.Remote"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
     </application>
 </manifest>

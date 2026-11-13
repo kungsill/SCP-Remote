@@ -96,8 +96,7 @@ class DevicesActivity : AppCompatActivity() {
     }
 
     private fun openRemote(d: Device) {
-        // The remote screen arrives with the relay session (next task).
-        android.widget.Toast.makeText(this, d.name, android.widget.Toast.LENGTH_SHORT).show()
+        startActivity(Intent(this, RemoteActivity::class.java).putExtra(RemoteActivity.EXTRA_DEVICE_ID, d.id))
     }
 
     /** Asks first (Cancel is the safe, focused choice): the fix deletes waiting print jobs. */

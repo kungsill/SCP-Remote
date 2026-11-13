@@ -34,6 +34,17 @@
     <string name="fix_printer">แก้ปริ้น</string>
     <string name="update">อัปเดตแอป</string>
 
+    <string name="disconnect">✕ ตัดการเชื่อมต่อ</string>
+    <string name="toolbar">แถบเครื่องมือ</string>
+    <string name="retry">ลองใหม่</string>
+    <string name="st_connecting">กำลังเชื่อมต่อ…</string>
+    <string name="st_consent">รอผู้ใช้เครื่องปลายทางกดอนุญาต…</string>
+    <string name="st_image">เชื่อมต่อแล้ว กำลังรอภาพแรก…</string>
+    <string name="st_refused">ผู้ใช้เครื่องปลายทางปฏิเสธ หรือเปิดเซสชันไม่ได้</string>
+    <string name="st_closed">การเชื่อมต่อสิ้นสุด กดลองใหม่เพื่อขอเชื่อมต่ออีกครั้ง</string>
+    <string name="st_reconnecting">การเชื่อมต่อหลุด กำลังต่อใหม่ (ครั้งที่ %1$d/3)…</string>
+    <string name="st_view_only">ดูอย่างเดียว · เมาส์และคีย์บอร์ดปิดอยู่</string>
+
     <string name="fix_title">แก้ปริ้นไม่ออกที่เครื่องนี้ใช่หรือไม่</string>
     <string name="fix_warning">งานพิมพ์ที่ค้างในคิวของเครื่องนี้จะถูกลบทั้งหมด แล้ว Print Spooler จะเริ่มใหม่ (ไม่กี่วินาที) ถ้าเครื่องนี้แชร์เครื่องพิมพ์ให้เครื่องอื่น งานที่ค้างของเครื่องอื่นจะถูกลบด้วย\n\nย้อนกลับไม่ได้ งานที่ถูกลบต้องสั่งพิมพ์ใหม่</string>
     <string name="fix_go">แก้ปริ้นเครื่องนี้</string>

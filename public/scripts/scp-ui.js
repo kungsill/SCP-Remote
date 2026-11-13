@@ -280,5 +280,16 @@
             window.addEventListener('resize', resizeLists); window.addEventListener('load', resizeLists); resizeLists();
         }
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+    // The "Root Certificate" link in the sign-in footer is for browsers that open this server by its
+    // LAN address (https://192.168.2.25:8443), whose certificate the server made for itself. Opened
+    // by its name (remote.kpsnana.com) the browser already trusts the connection, and on a phone
+    // the link only ends in Android's "Can't install CA certificate" message. It is hidden there,
+    // and kept where it is needed.
+    function byAddress(host) { return /^(\d{1,3}\.){3}\d{1,3}$/.test(host) || host.indexOf(':') >= 0 || host === 'localhost'; }
+    function rootCertLink() {
+        if (byAddress(String(location.hostname || ''))) return;
+        Array.prototype.forEach.call(document.querySelectorAll('a[href$="MeshServerRootCert.cer"]'), function (a) { a.style.display = 'none'; a.setAttribute('aria-hidden', 'true'); });
+    }
+    window.ScpUiRootCertByAddress = byAddress;
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { init(); rootCertLink(); }); else { init(); rootCertLink(); }
 }());

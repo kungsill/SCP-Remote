@@ -33,3 +33,17 @@ test('every page that offers installing points at it, not at MeshCentral\'s', ()
         assert.doesNotMatch(page, /favicon-303x303|favicon\.ico/, v);
     }
 });
+
+test('the Root Certificate link is hidden when the site is opened by its name, kept on the LAN address', () => {
+    const { JSDOM } = require('jsdom');
+    const run = url => {
+        const dom = new JSDOM('<html lang="th"><body><div id=footer><a href=/MeshServerRootCert.cer>Root Certificate</a></div></body></html>', { url, runScripts: 'outside-only' });
+        dom.window.eval(fs.readFileSync(path.join(root, 'public/scripts/scp-ui.js'), 'utf8'));
+        dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
+        const shown = dom.window.document.querySelector('a').style.display !== 'none';
+        dom.window.close();
+        return shown;
+    };
+    assert.equal(run('https://remote.kpsnana.com/'), false, 'by name: the browser already trusts it');
+    assert.equal(run('https://192.168.2.25:8443/'), true, 'by LAN address: the self-made certificate needs it');
+});

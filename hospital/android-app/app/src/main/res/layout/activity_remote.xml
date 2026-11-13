@@ -84,6 +84,20 @@
                 android:maxLines="1"
                 android:textColor="@android:color/white"
                 android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/viewOnly"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                android:text="@string/st_view_only"
+                android:textColor="#FFD54F"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/mode"
+                style="@style/BarButton" />
         </LinearLayout>
     </HorizontalScrollView>
 

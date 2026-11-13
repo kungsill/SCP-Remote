@@ -36,6 +36,8 @@
 
     <string name="disconnect">✕ ตัดการเชื่อมต่อ</string>
     <string name="toolbar">แถบเครื่องมือ</string>
+    <string name="mode_touchpad">🖱 ทัชแพด</string>
+    <string name="mode_direct">👆 แตะตรง</string>
     <string name="retry">ลองใหม่</string>
     <string name="st_connecting">กำลังเชื่อมต่อ…</string>
     <string name="st_consent">รอผู้ใช้เครื่องปลายทางกดอนุญาต…</string>

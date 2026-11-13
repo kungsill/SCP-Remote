@@ -18,6 +18,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import th.sichomphu.scpremote.R
 import th.sichomphu.scpremote.data.AppSession
+import th.sichomphu.scpremote.input.DirectTouchController
+import th.sichomphu.scpremote.input.PointerOut
+import th.sichomphu.scpremote.input.RemotePoint
+import th.sichomphu.scpremote.input.TouchAction
+import th.sichomphu.scpremote.input.TouchSample
+import th.sichomphu.scpremote.input.TouchpadController
+import th.sichomphu.scpremote.protocol.KvmMessages
+import th.sichomphu.scpremote.protocol.MouseAction
 import th.sichomphu.scpremote.model.Device
 import th.sichomphu.scpremote.net.RelaySession
 import th.sichomphu.scpremote.net.RelaySession.State
@@ -71,6 +79,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
             override fun handleOnBackPressed() = leave()
         })
         setUpGestures()
+        setUpModeToggle()
         connect()
     }
 
@@ -165,25 +174,105 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         retry.visibility = if (busy) View.GONE else View.VISIBLE
     }
 
-    /** Two fingers: pinch to zoom, move to pan. (One-finger mouse arrives with the input controllers.) */
+    /**
+     * Touch: in touchpad mode one finger drives the cursor and two fingers scroll; in direct mode a
+     * tap clicks where touched. In both, spreading or pinching two fingers zooms (and then pans).
+     */
     @SuppressLint("ClickableViewAccessibility")
     private fun setUpGestures() {
+        var spanStart = 0f
+        var pinching = false
+        var lastFx = 0f; var lastFy = 0f
         val scale = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScale(d: ScaleGestureDetector): Boolean { canvas.zoomBy(d.scaleFactor, d.focusX, d.focusY); return true }
+            override fun onScaleBegin(d: ScaleGestureDetector): Boolean { spanStart = d.currentSpan; return true }
+            override fun onScale(d: ScaleGestureDetector): Boolean {
+                if (!pinching && spanStart > 0 && kotlin.math.abs(d.currentSpan - spanStart) > PINCH_SLOP_PX * resources.displayMetrics.density) {
+                    pinching = true
+                    output(if (touchpadMode) touchpad?.cancel().orEmpty() else direct.cancel())
+                }
+                if (pinching) canvas.zoomBy(d.scaleFactor, d.focusX, d.focusY)
+                return true
+            }
         })
-        var lastX = 0f; var lastY = 0f
         canvas.setOnTouchListener { _, e ->
             scale.onTouchEvent(e)
-            if (e.pointerCount >= 2) {
-                val fx = (e.getX(0) + e.getX(1)) / 2; val fy = (e.getY(0) + e.getY(1)) / 2
-                if (e.actionMasked == MotionEvent.ACTION_MOVE) canvas.panBy(fx - lastX, fy - lastY)
-                lastX = fx; lastY = fy
+            if (e.actionMasked == MotionEvent.ACTION_DOWN) pinching = false
+            val sample = TouchSample.of(e) ?: run {
+                if (e.actionMasked == MotionEvent.ACTION_CANCEL) output(if (touchpadMode) touchpad?.cancel().orEmpty() else direct.cancel())
+                return@setOnTouchListener true
             }
+            if (e.pointerCount >= 2 && (pinching || !touchpadMode)) {
+                // Zooming (any mode) or two fingers in direct mode: move the picture.
+                if (sample.action == TouchAction.MOVE) canvas.panBy(sample.x - lastFx, sample.y - lastFy)
+                lastFx = sample.x; lastFy = sample.y
+                if (!touchpadMode) output(direct.onTouch(sample))
+                return@setOnTouchListener true
+            }
+            lastFx = sample.x; lastFy = sample.y
+            output(if (touchpadMode) touchpad?.onTouch(sample).orEmpty() else direct.onTouch(sample))
             true
         }
+        canvas.afterDraw = { c -> if (touchpadMode) touchpad?.let { drawCursor(c, it.cursorX, it.cursorY) } }
+        canvas.onScreenSize = { w, h -> touchpad = TouchpadController(w, h); canvas.invalidate() }
+    }
+
+    private var touchpadMode = true
+    private var touchpad: TouchpadController? = null
+    private val direct by lazy { DirectTouchController { x, y -> canvas.viewToRemote(x, y).let { RemotePoint(it.x, it.y) } } }
+
+    private fun setUpModeToggle() {
+        val b = findViewById<Button>(R.id.mode)
+        fun label() { b.text = getString(if (touchpadMode) R.string.mode_touchpad else R.string.mode_direct) }
+        label()
+        b.setOnClickListener {
+            output(if (touchpadMode) touchpad?.cancel().orEmpty() else direct.cancel())
+            touchpadMode = !touchpadMode
+            label(); canvas.invalidate()
+        }
+        b.visibility = if (device.canControl) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.viewOnly).visibility = if (device.canControl) View.GONE else View.VISIBLE
+        if (!device.canControl) touchpadMode = false
+    }
+
+    /** Mouse output → desktop-channel messages; nothing leaves a view-only session. */
+    private fun output(events: List<PointerOut>) {
+        if (events.isEmpty()) return
+        val s = session ?: return
+        var moved = false
+        for (ev in events) {
+            val bytes = when (ev) {
+                is PointerOut.Move -> { moved = true; KvmMessages.mouse(MouseAction.MOVE, 0, ev.x, ev.y) }
+                is PointerOut.Down -> KvmMessages.mouse(MouseAction.DOWN, ev.button, ev.x, ev.y)
+                is PointerOut.Up -> KvmMessages.mouse(MouseAction.UP, ev.button, ev.x, ev.y)
+                is PointerOut.Scroll -> KvmMessages.scroll(ev.x, ev.y, ev.delta)
+            }
+            if (device.canControl) s.send(bytes)
+        }
+        if (moved && touchpadMode) touchpad?.let { canvas.keepVisible(it.cursorX, it.cursorY); canvas.invalidate() }
+    }
+
+    private val cursorPath = android.graphics.Path()
+    private val cursorFill = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE }
+    private val cursorEdge = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.BLACK; style = android.graphics.Paint.Style.STROKE; strokeWidth = 2f
+    }
+
+    /** An arrow at the touchpad cursor (the remote picture does not include the mouse pointer). */
+    private fun drawCursor(c: android.graphics.Canvas, rx: Int, ry: Int) {
+        val (x, y) = canvas.remoteToView(rx, ry)
+        val u = resources.displayMetrics.density * 1.1f
+        cursorPath.reset()
+        cursorPath.moveTo(x, y)
+        cursorPath.lineTo(x, y + 17 * u); cursorPath.lineTo(x + 4.5f * u, y + 13 * u)
+        cursorPath.lineTo(x + 7.5f * u, y + 19.5f * u); cursorPath.lineTo(x + 10 * u, y + 18.5f * u)
+        cursorPath.lineTo(x + 7 * u, y + 12 * u); cursorPath.lineTo(x + 12.5f * u, y + 12 * u)
+        cursorPath.close()
+        c.drawPath(cursorPath, cursorFill); c.drawPath(cursorPath, cursorEdge)
     }
 
     companion object {
         const val EXTRA_DEVICE_ID = "deviceId"
+        /** How far two fingers must spread or pinch (dp) before it counts as zooming, not scrolling. */
+        private const val PINCH_SLOP_PX = 24f
     }
 }

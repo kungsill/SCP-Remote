@@ -35,6 +35,8 @@
 
     <string name="disconnect">✕ Disconnect</string>
     <string name="toolbar">Toolbar</string>
+    <string name="mode_touchpad">🖱 Touchpad</string>
+    <string name="mode_direct">👆 Direct touch</string>
     <string name="retry">Retry</string>
     <string name="st_connecting">Connecting…</string>
     <string name="st_consent">Waiting for the person at the computer to allow access…</string>

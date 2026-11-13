@@ -22,9 +22,10 @@
  const dot=document.createElement('span');dot.className='scp-ui-dot';
  cancel.textContent=tr('ยกเลิก','Cancel');cancel.className='scp-ui-cancel';
  cancel.onclick=()=>{if(signal)signal.cancelled=true;closeChannel('CANCELLED');};box.append(dot,label,cancel);document.body.appendChild(box);
+ const act=document.createElement('button');act.className='scp-ui-cancel';act.style.display='none';box.append(act);
  let hideTimer;
  // The bar is for what takes time or went wrong. Text pasted or copied in an instant shows nothing.
- function status(text,active,ms){clearTimeout(hideTimer);label.textContent=text;box.style.display='flex';cancel.style.display=active?'inline-block':'none';if(!active)hideTimer=setTimeout(()=>box.style.display='none',ms||9000);}
+ function status(text,active,ms){clearTimeout(hideTimer);act.style.display='none';act.onclick=null;label.textContent=text;box.style.display='flex';cancel.style.display=active?'inline-block':'none';if(!active)hideTimer=setTimeout(()=>box.style.display='none',ms||9000);}
  function quiet(){clearTimeout(hideTimer);box.style.display='none';}
  let startedAt=0;
  if(window.scpClipboardReady!==true){status(tr('คลิปบอร์ดไฟล์ต้องอัปเดตเอเจนต์ปลายทางเป็น 2026.09.21.1 ขึ้นไป','File clipboard requires remote agent 2026.09.21.1 or later'),false);return;}
@@ -56,6 +57,7 @@
   try{
    let snapshot,sequence,src,dst;
    if(direction==='out'){
+    if(inStep&&channel&&channel.State===3){const h=(await local({op:'state'})).sequence,f=(await far({op:'state'})).sequence;if(h===inStep.local&&f===inStep.far){keys(86);quiet();return;}}
     snapshot=await local({op:'snapshot'});src=local;dst=far;
     if(!snapshot.entries.length&&snapshot.text===null){keys(86);quiet();return;}
     sequence=(await far({op:'state'})).sequence;
@@ -69,7 +71,7 @@
    if(direction==='out'){keys(86);if(files)status(tr('ส่งไฟล์ครบ 100% และวางที่เครื่องปลายทางแล้ว','Files sent (100%) and pasted on the remote computer'),false,3000);else quiet();}
    else if(files)status(tr('ไฟล์พร้อมแล้ว 100% · กด Ctrl+V ที่เครื่องนี้เพื่อวาง','Files ready (100%). Press Ctrl+V on this computer to paste.'),false,6000);else quiet();
   }catch(e){status(errors[e.message]||tr('คัดลอกไม่สำเร็จ: ','Copy failed: ')+e.message,false);}
-  finally{clearTimeout(slow);busy=false;signal=null;try{autoLocal=(await local({op:'state'})).sequence;if(channel&&channel.State===3)autoFar=(await far({op:'state'})).sequence;}catch(e){}}
+  finally{clearTimeout(slow);busy=false;signal=null;await rebase();}
  }
  // Text follows the session by itself, the way a VNC viewer does it: whatever is copied on
  // either computer, by keyboard, right-click or a menu, is on the other's clipboard a moment
@@ -77,7 +79,37 @@
  // use and the remote picture has arrived (the person there has allowed the session), and it
  // never moves files: those go only when asked for with Ctrl+C / Ctrl+V, because a copied file
  // can be gigabytes. If the remote computer cannot do it, it is tried once and then left alone.
- let autoLocal=null,autoFar=null,autoBusy=false,autoOff=false;
+ let autoLocal=null,autoFar=null,autoBusy=false,autoOff=false,inStep=null;
+ // Files copied on either computer are carried across by themselves when they are small enough
+ // to be quick, so Paste works with the mouse as well as the keyboard, in both directions.
+ // Anything larger is offered with its size and one button: a copied folder can be gigabytes,
+ // and moving that without being asked would tie up the link and the other computer's disk.
+ const AUTO_FILE_BYTES=209715200; // 200 MB
+ function size(n){return n>=1073741824?(n/1073741824).toFixed(1)+' GB':n>=1048576?Math.round(n/1048576)+' MB':Math.max(1,Math.round(n/1024))+' KB';}
+ async function carry(direction,snap,dstSequence){
+  if(busy)return false;
+  busy=true;signal={cancelled:false};startedAt=Date.now();
+  try{
+   await scpTransfer.transfer(direction==='out'?local:far,direction==='out'?far:local,snap,dstSequence,progress,signal);
+   status(direction==='out'?tr('ไฟล์พร้อมวางที่เครื่องปลายทางแล้ว (คลิกขวา > วาง หรือ Ctrl+V)','Files are ready to paste on the remote computer'):tr('ไฟล์พร้อมวางที่เครื่องนี้แล้ว (คลิกขวา > วาง หรือ Ctrl+V)','Files are ready to paste on this computer'),false,4000);
+   return true;
+  }catch(e){status(errors[e.message]||tr('คัดลอกไฟล์ไม่สำเร็จ: ','Copying files failed: ')+e.message,false);return false;}
+  finally{busy=false;signal=null;}
+ }
+ function offer(direction,snap,dstSequence,total){
+  status((direction==='out'?tr('คัดลอกไฟล์ไว้ที่เครื่องนี้ ','Files copied on this computer: '):tr('คัดลอกไฟล์ไว้ที่เครื่องปลายทาง ','Files copied on the remote computer: '))+snap.entries.length+tr(' รายการ ',' item(s), ')+size(total)+tr(' · ใหญ่เกินกว่าจะโอนเอง',' · too large to move automatically'),false,30000);
+  act.textContent=direction==='out'?tr('ส่งไปเครื่องปลายทาง','Send to the remote'):tr('นำมาเครื่องนี้','Bring to this computer');
+  act.style.display='inline-block';
+  act.onclick=async function(){act.style.display='none';if(await carry(direction,snap,dstSequence))await rebase();};
+ }
+ async function rebase(){try{autoLocal=(await local({op:'state'})).sequence;if(channel&&channel.State===3){autoFar=(await far({op:'state'})).sequence;inStep={local:autoLocal,far:autoFar};}}catch(e){}}
+ async function files(direction,dstSequence){
+  const snap=await (direction==='out'?local:far)({op:'snapshot'});
+  if(!snap.entries.length)return;
+  const total=snap.entries.reduce(function(n,e){return n+(e.size||0);},0);
+  if(total>AUTO_FILE_BYTES){offer(direction,snap,dstSequence,total);return;}
+  if(await carry(direction,snap,dstSequence))await rebase();
+ }
  async function sync(force){
   if(autoBusy||busy||autoOff)return;
   if(typeof desktop==='undefined'||!desktop||desktop.State!==3||!(desktop.m&&desktop.m.scpStats&&desktop.m.scpStats.tiles>0))return;
@@ -90,14 +122,16 @@
    const first=autoLocal===null;
    if(first||here.sequence!==autoLocal){
     // copied on this computer (or the session has just started): send text to the remote
+    autoLocal=here.sequence;autoFar=there.sequence;inStep=null;
     if(!here.files){const snap=await local({op:'snapshot'});
-     if(!snap.entries.length&&typeof snap.text==='string'&&snap.text.length&&snap.text.length<=1048576){await far({op:'text',text:snap.text,sequence:there.sequence});there=await far({op:'state'});}}
-    autoLocal=here.sequence;autoFar=there.sequence;
+     if(!snap.entries.length&&typeof snap.text==='string'&&snap.text.length&&snap.text.length<=1048576){await far({op:'text',text:snap.text,sequence:there.sequence});autoFar=(await far({op:'state'})).sequence;inStep={local:autoLocal,far:autoFar};}}
+    else if(!first){autoBusy=false;await files('out',there.sequence);}
    }else if(there.sequence!==autoFar){
     // copied on the remote computer: bring text here
+    autoFar=there.sequence;inStep=null;
     if(!there.files){const snap=await far({op:'snapshot'});
-     if(!snap.entries.length&&typeof snap.text==='string'&&snap.text.length&&snap.text.length<=1048576){await local({op:'text',text:snap.text,sequence:here.sequence});autoLocal=(await local({op:'state'})).sequence;}}
-    autoFar=there.sequence;
+     if(!snap.entries.length&&typeof snap.text==='string'&&snap.text.length&&snap.text.length<=1048576){await local({op:'text',text:snap.text,sequence:here.sequence});autoLocal=(await local({op:'state'})).sequence;inStep={local:autoLocal,far:autoFar};}}
+    else{autoBusy=false;await files('in',here.sequence);}
    }
   }catch(e){ /* the clipboard changed under us, or the channel dropped: the next pass sorts it out */ }
   finally{autoBusy=false;}

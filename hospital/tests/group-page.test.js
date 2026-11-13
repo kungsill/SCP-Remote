@@ -54,12 +54,13 @@ test('the details are one card, without Intel AMT', (t) => {
     assert.ok(card.querySelector('[onclick="p20editmesh(2)"]'), 'editing the description still works from the card');
 });
 
-test('add-user, add-computer and notes are buttons that keep their own actions', (t) => {
+test('add-user and notes are buttons that keep their own actions, and adding an agent is not offered', (t) => {
     const { doc } = page(t);
     const btns = [...doc.querySelectorAll('.scp-grp-actions .scp-grp-btn')];
-    assert.equal(btns.length, 3);
+    assert.equal(btns.length, 2);
     assert.ok(btns.some(b => /p20showAddMeshUserDialog/.test(b.getAttribute('onclick'))));
-    assert.ok(btns.some(b => /addAgentToMesh/.test(b.getAttribute('onclick'))));
+    assert.equal(doc.querySelector('.scp-grp-actions [onclick*="addAgentToMesh"]'), null, 'no Add Agent button');
+    assert.equal(visible(doc.querySelector('[onclick*="addAgentToMesh"]')), false, 'the page link is hidden');
     assert.equal(doc.querySelector('.scp-grp-actions img'), null);
 });
 

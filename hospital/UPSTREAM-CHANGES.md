@@ -74,6 +74,7 @@ grep -rn "// SCP-Remote\|/\* SCP-Remote\|<!-- SCP-Remote" --include=*.js --inclu
 | `views/default.handlebars` | `<head>` (บรรทัด `<!-- SCP-Remote: My Account page laid out as cards ... -->`) | โหลด `scp-account.css` / `scp-account.js` จัดหน้าบัญชีของฉันเป็นการ์ด ซ่อนลบบัญชี โทเค็นเข้าสู่ระบบ และ 2FA | หน้าบัญชีกลับเป็นลิงก์เรียงกับแถบเทา และมีปุ่มลบบัญชีให้กดพลาดได้ |
 | `views/default.handlebars` | `<head>` (บรรทัด `<!-- SCP-Remote: device group page laid out as cards ... -->`) | โหลด `scp-group.css` / `scp-group.js` จัดหน้ากลุ่มอุปกรณ์ใหม่หลัง `p20updateMesh()` มีปุ่มรีโมตต่อเครื่อง ซ่อน Intel AMT | หน้ากลุ่มกลับเป็นตารางเทา |
 | `views/default.handlebars` | `<head>` (บรรทัด `<!-- SCP-Remote: a computer's General page regrouped ... -->`) | โหลด `scp-device.css` / `scp-device.js` จัดหน้า ทั่วไป ของเครื่องเป็นการ์ด (ข้อมูลเครื่อง / ความปลอดภัย / การใช้งาน) มีปุ่มรีโมตและไฟล์ด้านบน | หน้าเครื่องกลับเป็นตารางยาว |
+| `views/default.handlebars` | `<head>` (บรรทัด `<!-- SCP-Remote: My Events as what happened ... -->`) | โหลด `scp-events.css` / `scp-events.js` รวมบันทึกของการรีโมตหนึ่งครั้งเป็นบรรทัดเดียวหลัง `eventsUpdate()` ปุ่มดูแบบละเอียดแสดงรายการเดิม | หน้าเหตุการณ์กลับเป็นบันทึกดิบทีละบรรทัด |
 | `views/default.handlebars` | ปุ่ม `devLiveScreensButton` + `scpToggleLiveScreens` | ปุ่มเข้าหน้าจอสตรีมที่มีตัวหนังสือ | กลับไปเหลือไอคอนสี่อันที่ไม่มีใครหาเจอ |
 | `views/default.handlebars`, `default3` | `autoConnectDesktop` ใน `getstore`/`putstore` และตอนวาดรายการ | จำค่า "ต่อภาพอัตโนมัติ" ไว้ | เข้าหน้าจอสตรีมแล้วเจอกล่องดำเต็มหน้า |
 | `views/default3.handlebars` | ~2376, ~2625, ~6485 | เหมือน `default.handlebars` สำหรับหน้าจอแบบที่สอง | เหมือนกัน |
@@ -102,3 +103,6 @@ grep -rn "// SCP-Remote\|/\* SCP-Remote\|<!-- SCP-Remote" --include=*.js --inclu
 ## ข้อควรรู้
 
 จุดที่เสี่ยงที่สุดคือ **กลุ่ม ค แถวที่เกี่ยวกับ view-only ทั้งสามจุด** (`meshuser.js`, `agents/meshcore.js`, `agent-redir-ws`) ทั้งสามต้องอยู่ครบพร้อมกัน ถ้าเหลือแค่การยกเว้นกล่องขออนุญาตโดยไม่มีการบล็อกอินพุต จะกลายเป็นว่าใครก็เข้าคุมเครื่องได้โดยไม่ต้องขออนุญาต เทสต์ใน `hospital/tests/viewonly.test.js` มีไว้จับกรณีนี้โดยเฉพาะ **อย่าข้ามเทสต์นั้นเด็ดขาด**
+# Event summary integration — 2026-11-13
+
+`views/default.handlebars` loads local `scp-events.css` and `scp-events.js` (version `20261113-2`). The script wraps `eventsUpdate` to display readable summaries and preserves the original event list and detail dialog. Keep these asset tags when updating the upstream template. Tests: `hospital/tests/events-page.test.js`.

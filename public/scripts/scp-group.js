@@ -35,6 +35,10 @@
                 if (n.querySelector('[onclick*="p20editMeshAmt"]')) { n.classList.add('scp-grp-hidden'); return; } // Intel AMT: not used here
                 n.classList.add('scp-grp-prop'); props.appendChild(n); return;
             }
+            // SCP-Remote: no "Add Agent" button on the group page. The administrator enrolls
+            // computers from the agent test page, and a new computer is added from the dashboard,
+            // so this link only sat in the row where people go to add a user.
+            if (n.getAttribute && (n.getAttribute('onclick') || '').indexOf('addAgentToMesh') >= 0) { n.classList.add('scp-grp-hidden'); return; }
             if (n.tagName === 'INPUT' || (n.tagName === 'A' && n.getAttribute('onclick'))) { n.classList.add('scp-grp-btn'); actions.appendChild(n); return; }
             if (n.tagName === 'TABLE') { n.classList.add('scp-grp-list'); if (!firstList) firstList = n; return; }
             if (n.tagName === 'BR' || n.tagName === 'P') n.classList.add('scp-grp-hidden');

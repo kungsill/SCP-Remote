@@ -23,6 +23,10 @@
     --scp-shadow-lg: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 18px 48px rgba(74, 17, 52, 0.12);
     --scp-radius: 20px;
     --scp-radius-sm: 13px;
+    /* The menu bar's current-page pill. On the dark scheme the brand pink is too pale to carry
+       white text, so the pair flips rather than the pill losing its contrast. */
+    --scp-nav-pill-bg: #b02a72;
+    --scp-nav-pill-ink: #ffffff;
     color: var(--scp-ink); background: var(--scp-bg);
     font-family: "IBM Plex Sans Thai", Sarabun, sans-serif !important;
 }
@@ -37,6 +41,8 @@
     --scp-soft: #46172f;
     --scp-brand-grad: linear-gradient(135deg, #f472b6, #d1428c);
     --scp-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    --scp-nav-pill-bg: #f9a8d4;
+    --scp-nav-pill-ink: #2a1520;
 }
 .scp-ui :is(button, input, select, textarea) { font-family: "IBM Plex Sans Thai", Sarabun, sans-serif; }
 .scp-ui :is(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid #d1428c !important; outline-offset: 3px; }
@@ -115,12 +121,32 @@
 .scp-nav-icon { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; position: absolute; left: 15px; top: 14px; }
 .scp-nav-label { display: block; padding: 14px 8px 14px 47px; font-size: 14px; line-height: 20px; }
 .scp-workspace #page_leftbar .lbbutton { width: calc(100% - 20px); height: auto; min-height: 48px; margin: 6px 10px; }
-.scp-workspace #topbar { background: var(--scp-surface); border-bottom: 1px solid var(--scp-line); }
-.scp-workspace .topbar_td { color: var(--scp-ink); }
-.scp-workspace #topbar :is(.style3, .style3x, .style3sel) { background: transparent; color: var(--scp-muted); font-weight: 500; border-radius: 999px; transition: all 0.2s ease; }
-.scp-workspace #topbar :is(.fullselect, .style3sel) { background: var(--scp-soft); color: var(--scp-accent); font-weight: 700; }
+/* The menu bar along the top. MeshCentral draws it as a 24px strip of grey bold cells, and on a
+   light page that reads as a row of dim labels with nothing to say which page is open. The row
+   cannot grow - the grid above it is fixed - so the work is done inside it: darker labels, a
+   pill around each one so the click target is visible, and the current page in the brand colour,
+   which is the first thing the eye should find up here. */
+.scp-workspace #topbar { background: var(--scp-surface); border-bottom: 1px solid var(--scp-line); box-shadow: 0 2px 10px rgba(74, 17, 52, 0.05); }
+.scp-workspace .topbar_td { color: var(--scp-ink-2); }
+.scp-workspace #topbar :is(.style3, .style3x, .style3sel) {
+    background: transparent; color: var(--scp-ink-2);
+    font-size: 12.5px; font-weight: 600; letter-spacing: .2px;
+    line-height: 22px; padding: 0 12px; border-radius: 9px; vertical-align: middle;
+    transition: background-color .15s, color .15s, box-shadow .15s;
+}
 .scp-workspace #topbar .style3x:hover { background: var(--scp-soft); color: var(--scp-accent); }
-.scp-workspace #uiMenuButton { color: var(--scp-muted); }
+/* The parent of an open submenu: tinted, so it reads as one step back from the page you are on. */
+.scp-workspace #topbar .semiselect { background: var(--scp-soft); color: var(--scp-accent); font-weight: 700; }
+.scp-workspace #topbar :is(.fullselect, .style3sel) {
+    background: var(--scp-nav-pill-bg); color: var(--scp-nav-pill-ink); font-weight: 700;
+    box-shadow: 0 2px 8px rgba(176, 42, 114, 0.28);
+}
+.scp-workspace #uiMenuButton {
+    top: 1px; right: 6px; width: 20px; height: 20px; padding: 0;
+    line-height: 20px; text-align: center; font-size: 11px;
+    border-radius: 50%; color: var(--scp-nav-pill-ink); background: var(--scp-brand-grad);
+    box-shadow: 0 2px 6px rgba(176, 42, 114, 0.3);
+}
 .scp-workspace #SearchInput {
     width: min(360px, 100%); min-width: 220px;
     border-radius: 999px; padding: 9px 18px; font-size: 13.5px;

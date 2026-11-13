@@ -1,15 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/remote_bg">
 
-    <th.sichomphu.scpremote.ui.RemoteCanvas
-        android:id="@+id/canvas"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:focusable="true"
-        android:focusableInTouchMode="true" />
+        android:orientation="vertical">
+
+        <th.sichomphu.scpremote.ui.RemoteCanvas
+            android:id="@+id/canvas"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
+
+        <!-- The key bar (full control only) sits under the picture, above the phone keyboard. -->
+        <FrameLayout
+            android:id="@+id/keybarHost"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
 
     <!-- Connection state over the picture, with Retry when it has ended. -->
     <LinearLayout

@@ -18,7 +18,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import th.sichomphu.scpremote.R
 import th.sichomphu.scpremote.data.AppSession
+import androidx.core.view.ViewCompat
 import th.sichomphu.scpremote.input.DirectTouchController
+import th.sichomphu.scpremote.input.InputGate
+import th.sichomphu.scpremote.input.KeyboardBridge
 import th.sichomphu.scpremote.input.PointerOut
 import th.sichomphu.scpremote.input.RemotePoint
 import th.sichomphu.scpremote.input.TouchAction
@@ -80,6 +83,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         })
         setUpGestures()
         setUpModeToggle()
+        setUpKeyboard()
         connect()
     }
 
@@ -102,6 +106,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
     private fun leave() {
         leaving = true
         ui.removeCallbacksAndMessages(null)
+        keys?.releaseAll()
         session?.close(userInitiated = true)
         session = null
         finish()
@@ -234,10 +239,28 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         if (!device.canControl) touchpadMode = false
     }
 
+    /** Every input message goes through here; a view-only account's input never leaves the phone. */
+    private val gate by lazy { InputGate(device.canControl) { session?.send(it) } }
+    private var keys: KeyboardBridge? = null
+
+    private fun setUpKeyboard() {
+        val root = findViewById<View>(R.id.root)
+        // Edge-to-edge: make room for the phone keyboard ourselves, so the picture and key bar sit above it.
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            v.setPadding(0, 0, 0, insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            insets
+        }
+        if (!device.canControl) return
+        val k = KeyboardBridge(gate::send)
+        keys = k
+        canvas.keyboard = k
+        val host = findViewById<android.widget.FrameLayout>(R.id.keybarHost)
+        host.addView(KeyBar(this, host, k, canvas).view)
+    }
+
     /** Mouse output → desktop-channel messages; nothing leaves a view-only session. */
     private fun output(events: List<PointerOut>) {
         if (events.isEmpty()) return
-        val s = session ?: return
         var moved = false
         for (ev in events) {
             val bytes = when (ev) {
@@ -246,7 +269,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
                 is PointerOut.Up -> KvmMessages.mouse(MouseAction.UP, ev.button, ev.x, ev.y)
                 is PointerOut.Scroll -> KvmMessages.scroll(ev.x, ev.y, ev.delta)
             }
-            if (device.canControl) s.send(bytes)
+            gate.send(bytes)
         }
         if (moved && touchpadMode) touchpad?.let { canvas.keepVisible(it.cursorX, it.cursorY); canvas.invalidate() }
     }

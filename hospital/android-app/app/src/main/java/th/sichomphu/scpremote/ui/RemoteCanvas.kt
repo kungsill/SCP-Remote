@@ -8,8 +8,15 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Point
+import android.text.InputType
 import android.util.AttributeSet
+import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.BaseInputConnection
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import th.sichomphu.scpremote.input.KeyboardBridge
+import th.sichomphu.scpremote.input.SpecialKey
 
 /**
  * The remote screen: a bitmap the size of the remote desktop, tiles drawn into it as they arrive
@@ -148,4 +155,54 @@ class RemoteCanvas @JvmOverloads constructor(context: Context, attrs: AttributeS
 
     /** Extra drawing over the picture (the touchpad cursor). */
     var afterDraw: ((Canvas) -> Unit)? = null
+
+    /** Where the phone keyboard's typing goes; null = no keyboard (view-only). */
+    var keyboard: KeyboardBridge? = null
+
+    override fun onCheckIsTextEditor() = keyboard != null
+
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+        val k = keyboard ?: return null
+        outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN or EditorInfo.IME_ACTION_NONE
+        return object : BaseInputConnection(this, false) {
+            override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean { text?.let(k::commitText); return true }
+            override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean { k.setComposingText(text ?: ""); return true }
+            override fun finishComposingText(): Boolean { k.finishComposing(); return true }
+            override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+                k.delete(beforeLength)
+                repeat(afterLength) { k.special(SpecialKey.DELETE) }
+                return true
+            }
+            override fun sendKeyEvent(event: KeyEvent): Boolean { if (event.action == KeyEvent.ACTION_DOWN) keyDown(k, event); return true }
+        }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val k = keyboard ?: return super.onKeyDown(keyCode, event)
+        if (keyCode == KeyEvent.KEYCODE_BACK) return super.onKeyDown(keyCode, event)
+        return keyDown(k, event) || super.onKeyDown(keyCode, event)
+    }
+
+    /** Keys the phone keyboard (or a Bluetooth keyboard) sends as key events rather than text. */
+    private fun keyDown(k: KeyboardBridge, e: KeyEvent): Boolean {
+        val special = when (e.keyCode) {
+            KeyEvent.KEYCODE_DEL -> SpecialKey.BACKSPACE
+            KeyEvent.KEYCODE_FORWARD_DEL -> SpecialKey.DELETE
+            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> SpecialKey.ENTER
+            KeyEvent.KEYCODE_TAB -> SpecialKey.TAB
+            KeyEvent.KEYCODE_ESCAPE -> SpecialKey.ESC
+            KeyEvent.KEYCODE_DPAD_LEFT -> SpecialKey.LEFT
+            KeyEvent.KEYCODE_DPAD_RIGHT -> SpecialKey.RIGHT
+            KeyEvent.KEYCODE_DPAD_UP -> SpecialKey.UP
+            KeyEvent.KEYCODE_DPAD_DOWN -> SpecialKey.DOWN
+            KeyEvent.KEYCODE_MOVE_HOME -> SpecialKey.HOME
+            KeyEvent.KEYCODE_MOVE_END -> SpecialKey.END
+            else -> null
+        }
+        if (special != null) { k.special(special); return true }
+        val ch = e.unicodeChar
+        if (ch != 0) { k.commitText(String(Character.toChars(ch))); return true }
+        return false
+    }
 }

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="login_title">Sichomphu Hospital IT</string>
+    <string name="login_subtitle">Sign in with your SCP-Remote account</string>
+    <string name="server">Server address</string>
+    <string name="user">User name</string>
+    <string name="password">Password</string>
+    <string name="remember">Remember this account on this phone (encrypted)</string>
+    <string name="sign_in">Sign in</string>
+    <string name="signing_in">Signing in…</string>
+    <string name="err_BAD_LOGIN">Wrong user name or password</string>
+    <string name="err_CERT_MISMATCH">The server\'s certificate is not the one this app knows, so the password was not sent</string>
+    <string name="err_UNREACHABLE">Cannot reach the server (you must be on the hospital network)</string>
+    <string name="err_DISCONNECTED">The connection to the server dropped</string>
+    <string name="err_TIMEOUT">The server did not answer in time</string>
+    <string name="err_UNKNOWN_OPERATION">The server does not support this app yet; update the server first</string>
+    <string name="err_other">Failed (%1$s)</string>
+    <string name="fill_in">Enter your user name and password</string>
+
+    <string name="devices_title">Computers</string>
+    <string name="search_hint">Search name, IP, user, department</string>
+    <string name="all_groups">All departments</string>
+    <string name="refresh">Refresh</string>
+    <string name="sign_out">Sign out</string>
+    <string name="sign_out_confirm">Sign out and forget the account saved on this phone?</string>
+    <string name="loading">Loading…</string>
+    <string name="no_devices">No computer matches the search</string>
+    <string name="count">%1$d computers · %2$d on</string>
+    <string name="online">On</string>
+    <string name="offline">Off</string>
+    <string name="connect">Connect</string>
+    <string name="view_only">View only</string>
+    <string name="fix_printer">Fix printing</string>
+    <string name="update">Update app</string>
+
+    <string name="fix_title">Fix printing on this computer?</string>
+    <string name="fix_warning">Every job waiting in this computer\'s print queue is deleted and the print spooler restarts (a few seconds). If it shares printers with other computers, their waiting jobs are deleted too.\n\nThis cannot be undone. Deleted jobs have to be printed again.</string>
+    <string name="fix_go">Fix printing</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="fix_working">Working… (waiting for the computer)</string>
+    <string name="fix_done">✓ Done · jobs waiting %1$s → %2$s · Spooler %3$s</string>
+    <string name="fix_spooler_down">✗ Spooler not running (%1$s)</string>
+    <string name="fix_ACCESS_DENIED">✗ No permission on this computer</string>
+    <string name="fix_NOT_ONLINE">✗ The computer is not on, or is not Windows</string>
+    <string name="fix_NO_ANSWER">✗ No answer in 90 seconds</string>
+    <string name="fix_COMMAND_BUSY">✗ Busy with another command; try again</string>
+    <string name="fix_failed">✗ Failed (%1$s)</string>
+</resources>

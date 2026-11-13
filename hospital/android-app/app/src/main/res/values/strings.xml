@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SCP-Remote</string>
+    <string name="login_title">IT รพ.สีชมพู</string>
+    <string name="login_subtitle">เข้าสู่ระบบด้วยบัญชี SCP-Remote</string>
+    <string name="server">ที่อยู่เซิร์ฟเวอร์</string>
+    <string name="user">ชื่อผู้ใช้</string>
+    <string name="password">รหัสผ่าน</string>
+    <string name="remember">จำบัญชีไว้ในเครื่องนี้ (เข้ารหัส)</string>
+    <string name="sign_in">เข้าสู่ระบบ</string>
+    <string name="signing_in">กำลังเข้าสู่ระบบ…</string>
+    <string name="err_BAD_LOGIN">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</string>
+    <string name="err_CERT_MISMATCH">ใบรับรองของเซิร์ฟเวอร์ไม่ตรงกับที่แอปรู้จัก จึงไม่ได้ส่งรหัสผ่าน</string>
+    <string name="err_UNREACHABLE">ติดต่อเซิร์ฟเวอร์ไม่ได้ (ต้องอยู่ในเครือข่ายของโรงพยาบาล)</string>
+    <string name="err_DISCONNECTED">การเชื่อมต่อกับเซิร์ฟเวอร์หลุด</string>
+    <string name="err_TIMEOUT">เซิร์ฟเวอร์ไม่ตอบในเวลาที่กำหนด</string>
+    <string name="err_UNKNOWN_OPERATION">เซิร์ฟเวอร์ยังไม่รองรับแอปนี้ ต้องอัปเดตเซิร์ฟเวอร์ก่อน</string>
+    <string name="err_other">ทำไม่สำเร็จ (%1$s)</string>
+    <string name="fill_in">กรอกชื่อผู้ใช้และรหัสผ่าน</string>
+
+    <string name="devices_title">เครื่องคอมพิวเตอร์</string>
+    <string name="search_hint">ค้นหาชื่อ IP ผู้ใช้ หน่วยงาน</string>
+    <string name="all_groups">ทุกหน่วยงาน</string>
+    <string name="refresh">รีเฟรช</string>
+    <string name="sign_out">ออกจากระบบ</string>
+    <string name="sign_out_confirm">ออกจากระบบและลืมบัญชีที่จำไว้ในเครื่องนี้?</string>
+    <string name="loading">กำลังโหลด…</string>
+    <string name="no_devices">ไม่พบเครื่องที่ตรงกับการค้นหา</string>
+    <string name="count">%1$d เครื่อง · เปิดอยู่ %2$d</string>
+    <string name="online">เปิดอยู่</string>
+    <string name="offline">ปิดอยู่</string>
+    <string name="connect">เชื่อมต่อ</string>
+    <string name="view_only">ดูอย่างเดียว</string>
+    <string name="fix_printer">แก้ปริ้น</string>
+    <string name="update">อัปเดตแอป</string>
+
+    <string name="fix_title">แก้ปริ้นไม่ออกที่เครื่องนี้ใช่หรือไม่</string>
+    <string name="fix_warning">งานพิมพ์ที่ค้างในคิวของเครื่องนี้จะถูกลบทั้งหมด แล้ว Print Spooler จะเริ่มใหม่ (ไม่กี่วินาที) ถ้าเครื่องนี้แชร์เครื่องพิมพ์ให้เครื่องอื่น งานที่ค้างของเครื่องอื่นจะถูกลบด้วย\n\nย้อนกลับไม่ได้ งานที่ถูกลบต้องสั่งพิมพ์ใหม่</string>
+    <string name="fix_go">แก้ปริ้นเครื่องนี้</string>
+    <string name="cancel">ยกเลิก</string>
+    <string name="ok">ตกลง</string>
+    <string name="fix_working">กำลังแก้… (รอเครื่องตอบ)</string>
+    <string name="fix_done">✓ แก้แล้ว · งานค้าง %1$s → %2$s · Spooler %3$s</string>
+    <string name="fix_spooler_down">✗ Spooler ยังไม่ทำงาน (%1$s)</string>
+    <string name="fix_ACCESS_DENIED">✗ ไม่มีสิทธิ์สั่งงานเครื่องนี้</string>
+    <string name="fix_NOT_ONLINE">✗ เครื่องไม่ได้เปิดอยู่ หรือไม่ใช่ Windows</string>
+    <string name="fix_NO_ANSWER">✗ เครื่องไม่ตอบใน 90 วินาที</string>
+    <string name="fix_COMMAND_BUSY">✗ เครื่องกำลังทำคำสั่งอื่น ลองใหม่อีกครั้ง</string>
+    <string name="fix_failed">✗ ทำไม่สำเร็จ (%1$s)</string>
+</resources>

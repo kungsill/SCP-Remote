@@ -28,3 +28,24 @@ test('two-finger touches are kept from the browser so the page itself does not z
 test('the page re-fitting the picture keeps the zoom', () => {
     assert.match(zoomPart, /root\.deskAdjust=function\(\)\{[\s\S]*?if\(zoom>1&&root\.deskAspectRatio!==1\)zoomTo\(zoom\)/);
 });
+
+test('a phone starts on a lighter picture, sized by the device itself; a computer is unchanged', () => {
+    const { defaultQuality } = require('../../public/scripts/scp-session');
+    assert.equal(defaultQuality({ coarse: false, shortSide: 1080 }), '0', 'a computer: Sharpest');
+    assert.equal(defaultQuality({ coarse: true, shortSide: 393 }), '2', 'a phone: Balanced');
+    assert.equal(defaultQuality({ coarse: true, shortSide: 820 }), '2', 'a small tablet too');
+    assert.equal(defaultQuality({ coarse: true, shortSide: 1024 }), '0', 'a large tablet is treated as a computer');
+    assert.equal(defaultQuality({ coarse: false, shortSide: 1080, saveData: true }), '3', 'data saver on: Low bandwidth');
+    assert.equal(defaultQuality({ coarse: true, shortSide: 393, effectiveType: '3g' }), '3');
+    assert.equal(defaultQuality({}), '0');
+    const src = fs.readFileSync(path.join(root, 'public/scripts/scp-session.js'), 'utf8');
+    assert.match(src, /return defaultQuality\(device\(\)\);\}/, 'only where nobody has chosen; a choice made is still remembered');
+});
+
+test('one press makes the picture readable, enlarged by what this screen needs', () => {
+    assert.match(ui, /function readableZoom\(\)\{[^}]*return Math\.max\(1,Math\.min\(4,desk\.width\/r\.width\)\);\}/);
+    assert.match(ui, /readBtn\.textContent=th\?'ขยายให้อ่านได้'/);
+    assert.match(ui, /const want=connected&&zoom===1&&readableZoom\(\)>1\.15;/, 'only offered when the picture is noticeably shrunk');
+    const part = ui.slice(ui.indexOf('readBtn.onclick='), ui.indexOf('bar.append(back'));
+    assert.doesNotMatch(part, /\.send\(|SendMouseMsg|SendKey|setResolution/, 'the remote computer\'s own screen is left as it is');
+});

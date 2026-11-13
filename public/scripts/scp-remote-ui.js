@@ -116,7 +116,13 @@
   // shown only while the picture is zoomed in: one tap back to the whole screen
   fitBtn=document.createElement('button');fitBtn.type='button';fitBtn.className='scp-app-fit';fitBtn.hidden=true;
   fitBtn.onclick=function(){zoomTo(1);};
-  bar.append(back,name,state,fitBtn);
+  // Shown while the whole remote screen is shrunk to fit: one press enlarges it so one remote
+  // pixel is one pixel of this screen - readable on any phone, whatever its size - and a finger
+  // then slides it about. The size comes from this device, so no phone is guessed at.
+  readBtn=document.createElement('button');readBtn.type='button';readBtn.className='scp-app-fit scp-app-read';readBtn.hidden=true;
+  readBtn.textContent=th?'ขยายให้อ่านได้':'Readable size';
+  readBtn.onclick=function(){const z=readableZoom();if(z<=1)return;const parent=document.getElementById('DeskParent'),desk=document.getElementById('Desk');const r=desk.getBoundingClientRect();fit={w:r.width,h:r.height};zoomTo(z);if(parent){parent.scrollLeft=Math.max(0,(parent.scrollWidth-parent.clientWidth)/2);parent.scrollTop=0;}};
+  bar.append(back,name,state,readBtn,fitBtn);
   document.body.insertBefore(bar,document.body.firstChild);
 
   // The view, the machine and the connection all change while the page stays put, so all three
@@ -136,6 +142,7 @@
    if(node&&node.name&&node.name!==shown){shown=node.name;name.textContent=node.name;}
    // 3 is connected, the same test the page makes on itself.
    const connected=!!(root.desktop&&root.desktop.State===3);
+   if(readBtn){const want=connected&&zoom===1&&readableZoom()>1.15;if(readBtn.hidden===want)readBtn.hidden=!want;}
    if(connected!==live){
     live=connected;
     state.textContent=connected?(th?'เชื่อมต่อแล้ว':'Connected'):(th?'ยังไม่เชื่อมต่อ':'Not connected');
@@ -154,13 +161,16 @@
  // The remote mouse is placed from where the tap lands on the picture (offsetX against the
  // picture's displayed width), which stays right however large the picture is drawn or far it
  // is scrolled. Two-finger touches never become clicks, so pinching presses nothing remotely.
- let zoom=1,fit=null,fitBtn=null;
+ let zoom=1,fit=null,fitBtn=null,readBtn=null;
+ // How much to enlarge a shrunk picture so each remote pixel takes one CSS pixel of this screen.
+ function readableZoom(){const desk=document.getElementById('Desk');if(!desk||!desk.width)return 1;const r=desk.getBoundingClientRect();if(!(r.width>0))return 1;return Math.max(1,Math.min(4,desk.width/r.width));}
  function zoomTo(z){
   const parent=document.getElementById('DeskParent'),desk=document.getElementById('Desk');
   if(!parent||!desk)return;
   zoom=Math.max(1,Math.min(4,z));
   if(zoom<1.04){zoom=1;parent.classList.remove('scp-zoomed');if(typeof root.deskAdjust==='function')root.deskAdjust();}
   else if(fit){desk.style.width=Math.round(fit.w*zoom)+'px';desk.style.height=Math.round(fit.h*zoom)+'px';desk.style.marginTop='0px';parent.style.overflow='auto';parent.classList.add('scp-zoomed');}
+  if(readBtn&&zoom!==1)readBtn.hidden=true;
   if(fitBtn){fitBtn.hidden=zoom===1;fitBtn.textContent=(document.documentElement.lang==='th'?'พอดีจอ':'Fit')+' · '+Math.round(zoom*100)+'%';}
  }
  function pinchZoom(){

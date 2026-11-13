@@ -149,3 +149,7 @@ body:not(.scp-inline-tools) #scp-side-toggle{display:none}
    beside the back arrow instead of floating over the remote screen, where it covered the
    remote program's own toolbar. Only on windows wide enough to hold it beside the name. */
 @media(min-width:1280px){body.scp-app-view #vncFloatingToolbar{position:fixed;top:7px;box-shadow:0 2px 8px rgba(0,0,0,.18)}body.scp-app-view #vncFloatingToolbar.unpinned{top:7px;opacity:1}body.scp-app-view #vncFloatingToolbarTrigger{display:none}body.scp-app-view #vncFloatingToolbar .vnc-tb-btn.pin{display:none}}
+
+/* "Readable size": the main action on a phone, so it is filled in rather than outlined */
+body.scp-app-view #scp-app-bar .scp-app-read{background:var(--scp-accent,#b02a72);color:#fff;border-color:var(--scp-accent,#b02a72)}
+body.scp-app-view #scp-app-bar .scp-app-read[hidden]{display:none}

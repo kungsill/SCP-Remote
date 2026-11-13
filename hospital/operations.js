@@ -425,6 +425,37 @@ exports.handle = async function (ctx, cmd) {
   }
   return map;
  }
+ if (cmd.op === 'appDevices') {
+  // For the SCP-Remote Android app: the computers this account may see and what it may do on
+  // each, decided here (GetNodeWithRights) so the app never works out rights for itself.
+  const FULL = 0xFFFFFFFF, CONTROL = 0x8, VIEWONLY = 0x100, NODESKTOP = 0x10000, COMMAND = 0x20000;
+  const nodes = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('node', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const meshes = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('mesh', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const meshName = {}; for (const m of meshes) if (m && m._id) meshName[m._id] = m.name || '';
+  const devices = [], groups = {};
+  for (const n of nodes) {
+   if (!n || typeof n._id !== 'string') continue;
+   const r = await new Promise(resolve => parent.GetNodeWithRights(domain, user, n._id, (node, rights, visible) => resolve((node && visible) ? (rights >>> 0) : null)));
+   if (r == null) continue;
+   const full = r === FULL;
+   const canView = full || ((r & CONTROL) !== 0 && (r & NODESKTOP) === 0);
+   const viewOnly = !full && (r & VIEWONLY) !== 0;
+   const agent = parent.wsagents && parent.wsagents[n._id];
+   devices.push({ id: n._id, name: n.name || '', groupId: n.meshid || '', ip: n.host || n.ip || '', online: !!(agent && agent.authenticated === 2),
+    users: Array.isArray(n.users) ? n.users.filter(u => typeof u === 'string').slice(0, 5) : [], rights: r,
+    canView, canControl: canView && !viewOnly, viewOnly, canFixPrinter: full || (r & COMMAND) !== 0 });
+   if (n.meshid) groups[n.meshid] = meshName[n.meshid] || '';
+  }
+  return { user: { name: user.realname || user.name || '', siteadmin: user.siteadmin || 0 }, groups: Object.keys(groups).map(id => ({ id, name: groups[id] })), devices };
+ }
+ if (cmd.op === 'fixPrinter') {
+  // The printer fix for the Android app. The app names a computer and nothing else: the command
+  // is the server's own (hospital/mobile.js), and the account must hold the right to run commands.
+  if (typeof cmd.nodeid !== 'string') throw Error('ACCESS_DENIED');
+  const allowed = await new Promise(resolve => parent.GetNodeWithRights(domain, user, cmd.nodeid, (node, rights, visible) => resolve(!!(node && visible && (((rights >>> 0) === 0xFFFFFFFF) || ((rights & 0x20000) !== 0))))));
+  if (!allowed) throw Error('ACCESS_DENIED');
+  return require('./mobile').run(parent, cmd.nodeid, user._id, 'app');
+ }
  if (cmd.op === 'mapPlacements') {
   // Where each computer was dragged to on the hospital map. Shared by everyone, so the map
   // looks the same on every screen; only computers this user may see are returned.

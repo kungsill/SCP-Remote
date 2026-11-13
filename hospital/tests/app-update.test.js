@@ -156,3 +156,12 @@ test('the status bar says which version is running', () => {
     assert.match(r, /\$\('statusVersion'\)/);
     assert.match(r, /r\.result\.version/);
 });
+
+test('the About box shows the running version, and nothing names a person', () => {
+    const html = fs.readFileSync(path.join(appDir, 'index.html'), 'utf8');
+    assert.doesNotMatch(html, /0\.4\.3/, 'no version written into the page by hand');
+    assert.match(html, /id="aboutVersion"/);
+    assert.match(fs.readFileSync(path.join(appDir, 'renderer.js'), 'utf8'), /\$\('aboutVersion'\)/);
+    assert.match(html, /id="userName">IT รพ\.สีชมพู</);
+    assert.doesNotMatch(html, /WebP 100%/, 'the picture is PNG by default now');
+});

@@ -498,6 +498,8 @@ setInterval(() => {
     const box = $('statusVersion');
     if (!box || !r || !r.ok) return;
     box.textContent = t('รุ่น ', 'Version ') + r.result.version;
+    const about = $('aboutVersion');
+    if (about) about.textContent = t('เวอร์ชัน ', 'Version ') + r.result.version + ' (Hospital Edition)' + (r.result.updated ? t(' · ติดตั้งไว้ ', ' · installed ') + r.result.installed : '');
     box.title = r.result.updated
       ? t('อัปเดตอัตโนมัติจากเซิร์ฟเวอร์ · รุ่นที่ติดตั้งไว้คือ ', 'Updated from the server · installed version is ') + r.result.installed
       : t('รุ่นที่ติดตั้งไว้ในเครื่องนี้', 'The version installed on this computer');

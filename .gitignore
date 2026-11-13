@@ -342,3 +342,7 @@ hospital/native-agent/release/
 /test_rendered.pdf
 /test_screen.png
 /.tmp-bug-sweep.js
+
+# Claude Code worktrees (isolated workspaces for plan execution)
+/.claude/worktrees/
+/.superpowers/

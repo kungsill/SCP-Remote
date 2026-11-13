@@ -84,6 +84,12 @@ class RelaySession(
         send(KvmMessages.refresh())
     }
 
+    /** Shows another display (65535 = all) in the same session: no new tunnel. */
+    fun selectDisplay(n: Int) {
+        send(KvmMessages.setDisplay(n))
+        send(KvmMessages.refresh())
+    }
+
     fun close(userInitiated: Boolean) {
         if (userInitiated) userClosed = true
         keepAlive?.cancel()
@@ -133,6 +139,7 @@ class RelaySession(
                 val q = quality
                 webSocket.send(KvmMessages.compression(q[0], q[1], q[2], q[3]).toByteString())
                 webSocket.send(KvmMessages.refresh().toByteString())
+                webSocket.send(KvmMessages.getDisplays().toByteString())
                 listener.onState(State.CONNECTED)
                 return
             }

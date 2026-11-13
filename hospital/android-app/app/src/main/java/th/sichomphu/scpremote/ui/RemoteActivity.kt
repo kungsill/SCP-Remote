@@ -18,6 +18,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import th.sichomphu.scpremote.R
 import th.sichomphu.scpremote.data.AppSession
+import th.sichomphu.scpremote.data.Prefs
+import th.sichomphu.scpremote.data.Quality
 import androidx.core.view.ViewCompat
 import th.sichomphu.scpremote.input.DirectTouchController
 import th.sichomphu.scpremote.input.InputGate
@@ -84,6 +86,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         setUpGestures()
         setUpModeToggle()
         setUpKeyboard()
+        setUpPicture()
         connect()
     }
 
@@ -99,7 +102,36 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         val channel = AppSession.channel ?: return finish()
         val trust = AppSession.trust ?: return finish()
         session?.close(userInitiated = true)
-        session = RelaySession(channel, trust, device, this, AppSession.server).also { it.start() }
+        session = RelaySession(channel, trust, device, this, AppSession.server, Quality.LADDER[prefs.quality]).also { it.start() }
+    }
+
+    private val prefs by lazy { Prefs(this) }
+    private var displays: List<Int> = emptyList()
+    private var selectedDisplay = 0
+
+    private fun setUpPicture() {
+        val q = findViewById<Button>(R.id.quality)
+        fun label() { q.text = getString(R.string.quality_button, QualityPicker.names(this)[prefs.quality]) }
+        label()
+        q.setOnClickListener {
+            QualityPicker.pickQuality(this, prefs.quality) { i ->
+                prefs.quality = i; label()
+                session?.setQuality(Quality.LADDER[i])
+            }
+        }
+        findViewById<Button>(R.id.display).setOnClickListener {
+            QualityPicker.pickDisplay(this, displays, selectedDisplay) { n ->
+                selectedDisplay = n; showDisplays()
+                session?.selectDisplay(n)
+            }
+        }
+    }
+
+    /** The display button appears only for a computer with more than one display. */
+    private fun showDisplays() {
+        val b = findViewById<Button>(R.id.display)
+        b.visibility = if (displays.size > 1) View.VISIBLE else View.GONE
+        b.text = getString(R.string.display_button, QualityPicker.displayName(this, selectedDisplay))
     }
 
     /** Back or Disconnect: end on purpose (no reconnect) and return to the computer list. */
@@ -144,6 +176,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
     override fun onCommand(cmd: KvmCommand) {
         when (cmd) {
             is KvmCommand.ScreenSize -> canvas.setScreenSize(cmd.w, cmd.h)
+            is KvmCommand.Displays -> ui.post { displays = cmd.list; selectedDisplay = cmd.selected; showDisplays() }
             is KvmCommand.Tile -> {
                 canvas.drawTile(cmd.x, cmd.y, cmd.image)
                 ui.post { if (overlay.visibility == View.VISIBLE && session?.state == State.CONNECTED) { attempts = 0; overlay.visibility = View.GONE } }
@@ -229,9 +262,12 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         val b = findViewById<Button>(R.id.mode)
         fun label() { b.text = getString(if (touchpadMode) R.string.mode_touchpad else R.string.mode_direct) }
         label()
+        touchpadMode = prefs.touchpadMode
+        label()
         b.setOnClickListener {
             output(if (touchpadMode) touchpad?.cancel().orEmpty() else direct.cancel())
             touchpadMode = !touchpadMode
+            prefs.touchpadMode = touchpadMode
             label(); canvas.invalidate()
         }
         b.visibility = if (device.canControl) View.VISIBLE else View.GONE

@@ -112,6 +112,15 @@
             <Button
                 android:id="@+id/mode"
                 style="@style/BarButton" />
+
+            <Button
+                android:id="@+id/quality"
+                style="@style/BarButton" />
+
+            <Button
+                android:id="@+id/display"
+                style="@style/BarButton"
+                android:visibility="gone" />
         </LinearLayout>
     </HorizontalScrollView>
 

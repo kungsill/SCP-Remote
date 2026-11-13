@@ -36,6 +36,18 @@
 
     <string name="disconnect">✕ ตัดการเชื่อมต่อ</string>
     <string name="toolbar">แถบเครื่องมือ</string>
+    <string name="quality">คุณภาพภาพ</string>
+    <string-array name="quality_names">
+        <item>คมชัดสูงสุด</item>
+        <item>คมชัด</item>
+        <item>สมดุล</item>
+        <item>ประหยัดเน็ต</item>
+    </string-array>
+    <string name="quality_button">🖼 %1$s</string>
+    <string name="display">เลือกจอ</string>
+    <string name="all_displays">ทุกจอ</string>
+    <string name="display_n">จอ %1$d</string>
+    <string name="display_button">🖥 %1$s</string>
     <string name="mode_touchpad">🖱 ทัชแพด</string>
     <string name="mode_direct">👆 แตะตรง</string>
     <string name="retry">ลองใหม่</string>

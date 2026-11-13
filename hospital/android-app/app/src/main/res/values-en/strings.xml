@@ -35,6 +35,18 @@
 
     <string name="disconnect">✕ Disconnect</string>
     <string name="toolbar">Toolbar</string>
+    <string name="quality">Picture quality</string>
+    <string-array name="quality_names">
+        <item>Sharpest</item>
+        <item>Sharp</item>
+        <item>Balanced</item>
+        <item>Low bandwidth</item>
+    </string-array>
+    <string name="quality_button">🖼 %1$s</string>
+    <string name="display">Choose display</string>
+    <string name="all_displays">All displays</string>
+    <string name="display_n">Display %1$d</string>
+    <string name="display_button">🖥 %1$s</string>
     <string name="mode_touchpad">🖱 Touchpad</string>
     <string name="mode_direct">👆 Direct touch</string>
     <string name="retry">Retry</string>

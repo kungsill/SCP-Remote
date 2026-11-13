@@ -1,7 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+// Release signing: keystore.properties (storeFile, storePassword, keyAlias, keyPassword) is never
+// committed. Looked for next to this project, then at $SCP_ANDROID_KEYSTORE, then in the
+// administrator's add-ons folder on the server. See README.md.
+val keystoreFile = listOfNotNull(
+    rootProject.file("keystore.properties"),
+    System.getenv("SCP_ANDROID_KEYSTORE")?.let { file(it) },
+    file("F:/SCP-addons/android-keystore/keystore.properties"),
+).firstOrNull { it.isFile }
+val keystore = Properties().apply { keystoreFile?.inputStream()?.use { load(it) } }
 
 android {
     namespace = "th.sichomphu.scpremote"
@@ -15,9 +27,21 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        if (keystoreFile != null) {
+            create("release") {
+                storeFile = file(keystore.getProperty("storeFile"))
+                storePassword = keystore.getProperty("storePassword")
+                keyAlias = keystore.getProperty("keyAlias")
+                keyPassword = keystore.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {

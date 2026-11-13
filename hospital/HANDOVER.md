@@ -22,6 +22,7 @@
 | สำเนาไฟล์สำรอง | `H:\SCP-Remote-Backups` | |
 | บันทึกของบริการ | `scripts\daemon\scpremote.out.log` และ `.err.log` | |
 | ตัวติดตั้งสำหรับเครื่องลูก | `hospital\client-setup\SCP-Remote-Setup.exe` | สร้างใหม่ได้ด้วย `npm run build:setup-exe` |
+| **กุญแจลงลายเซ็นแอป Android** | `F:\SCP-addons\android-keystore\` (`scp-remote-release.jks` + `keystore.properties` ที่มีรหัสผ่าน) วิธีออกรุ่นใหม่อยู่ใน `hospital\android-app\README.md` | **แอปรุ่นใหม่ติดตั้งทับไม่ได้ ทุกมือถือต้องถอนแล้วลงใหม่** — สำรองไว้ที่อื่นด้วย |
 
 `.local\scp-remote` คือของที่ขาดไม่ได้ ในนั้นมีฐานข้อมูล บัญชีผู้ใช้ และใบรับรองที่เครื่องลูกใช้ยืนยันว่าเซิร์ฟเวอร์นี้คือตัวจริง **ห้ามลบ ห้ามย้าย โดยไม่อ่านหัวข้อกู้คืนก่อน**
 

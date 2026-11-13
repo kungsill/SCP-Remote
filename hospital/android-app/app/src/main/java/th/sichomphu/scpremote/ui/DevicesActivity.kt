@@ -25,6 +25,8 @@ import th.sichomphu.scpremote.data.SecureStore
 import th.sichomphu.scpremote.model.Device
 import th.sichomphu.scpremote.model.DeviceList
 import th.sichomphu.scpremote.model.FixResult
+import th.sichomphu.scpremote.update.AppUpdater
+import th.sichomphu.scpremote.update.UpdateManifest
 
 /** The computers this account may see, with search, a department filter, Connect and Fix printing. */
 class DevicesActivity : AppCompatActivity() {
@@ -70,6 +72,7 @@ class DevicesActivity : AppCompatActivity() {
                 val list = channel.devices()
                 AppSession.devices = list
                 show(list)
+                checkUpdate(manual = false)
             } catch (e: Exception) {
                 status.text = errorText(e)
             }
@@ -136,8 +139,47 @@ class DevicesActivity : AppCompatActivity() {
 
     private fun menu(anchor: View) {
         PopupMenu(this, anchor).apply {
+            menu.add(R.string.update).setOnMenuItemClickListener { checkUpdate(manual = true); true }
             menu.add(R.string.sign_out).setOnMenuItemClickListener { confirmSignOut(); true }
+            menu.add(getString(R.string.version, packageManager.getPackageInfo(packageName, 0).versionName)).isEnabled = false
             show()
+        }
+    }
+
+    private fun updater(): AppUpdater? = AppSession.trust?.let { AppUpdater(applicationContext, AppSession.server, it) }
+
+    /** Once per sign-in (and from the menu): offer a newer app published on the server. */
+    private fun checkUpdate(manual: Boolean) {
+        val u = updater() ?: return
+        if (!manual && AppSession.updateChecked) return
+        AppSession.updateChecked = true
+        lifecycleScope.launch {
+            val m = u.check()
+            if (m == null) {
+                if (manual) android.widget.Toast.makeText(this@DevicesActivity, R.string.update_none, android.widget.Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            AlertDialog.Builder(this@DevicesActivity)
+                .setTitle(getString(R.string.update_available, m.versionName))
+                .setMessage(R.string.update_message)
+                .setNegativeButton(R.string.later, null)
+                .setPositiveButton(R.string.update) { _, _ -> runUpdate(u, m) }
+                .show()
+        }
+    }
+
+    private fun runUpdate(u: AppUpdater, m: UpdateManifest) {
+        if (!u.canInstall()) {
+            android.widget.Toast.makeText(this, R.string.update_allow, android.widget.Toast.LENGTH_LONG).show()
+            u.openInstallPermission()
+            return
+        }
+        status.text = getString(R.string.update_downloading)
+        lifecycleScope.launch {
+            val apk = u.download(m)
+            if (apk == null) { status.text = getString(R.string.update_failed); return@launch }
+            render()
+            u.install(apk)
         }
     }
 

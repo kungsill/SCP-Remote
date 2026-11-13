@@ -33,6 +33,14 @@
     <string name="view_only">ดูอย่างเดียว</string>
     <string name="fix_printer">แก้ปริ้น</string>
     <string name="update">อัปเดตแอป</string>
+    <string name="version">เวอร์ชัน %1$s</string>
+    <string name="later">ภายหลัง</string>
+    <string name="update_none">ใช้รุ่นล่าสุดอยู่แล้ว</string>
+    <string name="update_available">มีแอปรุ่นใหม่ %1$s</string>
+    <string name="update_message">ดาวน์โหลดจากเซิร์ฟเวอร์ของโรงพยาบาล ตรวจลายเซ็นไฟล์ แล้ว Android จะถามยืนยันการติดตั้ง</string>
+    <string name="update_allow">อนุญาตให้ SCP-Remote ติดตั้งแอป แล้วกดอัปเดตอีกครั้ง</string>
+    <string name="update_downloading">กำลังดาวน์โหลดรุ่นใหม่…</string>
+    <string name="update_failed">ดาวน์โหลดรุ่นใหม่ไม่สำเร็จ หรือไฟล์ไม่ตรงกับที่ประกาศ จึงไม่ติดตั้ง</string>
 
     <string name="disconnect">✕ ตัดการเชื่อมต่อ</string>
     <string name="toolbar">แถบเครื่องมือ</string>

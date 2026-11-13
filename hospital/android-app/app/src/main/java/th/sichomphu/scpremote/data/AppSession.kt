@@ -23,10 +23,13 @@ object AppSession {
     @Volatile var trust: PinnedTrust? = null
     @Volatile var channel: ControlChannel? = null
     @Volatile var devices: DeviceList? = null
+    /** The app looked for a newer version after this sign-in. */
+    @Volatile var updateChecked = false
 
     fun signOut() {
         channel?.close()
         channel = null
         devices = null
+        updateChecked = false
     }
 }

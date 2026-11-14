@@ -34,6 +34,8 @@ class LoginActivity : AppCompatActivity() {
         if (AppSession.channel != null) { openDevices(); return }
         setContentView(R.layout.activity_login)
         // Light page: dark status-bar icons, and keep the form clear of the bars and the keyboard.
+        @Suppress("DEPRECATION") // ignored on Android 15+, where the page already runs under the bar
+        window.statusBarColor = androidx.core.content.ContextCompat.getColor(this, R.color.background)
         androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
         findViewById<View>(R.id.loginRoot).padForSystemBars(top = true, bottom = true)
         server = findViewById(R.id.server); user = findViewById(R.id.user); pass = findViewById(R.id.pass)

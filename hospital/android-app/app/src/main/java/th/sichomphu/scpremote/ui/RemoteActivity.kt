@@ -346,7 +346,8 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
     /** An arrow at the touchpad cursor (the remote picture does not include the mouse pointer). */
     private fun drawCursor(c: android.graphics.Canvas, rx: Int, ry: Int) {
         val (x, y) = canvas.remoteToView(rx, ry)
-        val u = resources.displayMetrics.density * 1.1f
+        // About 14 dp tall: close to a Windows pointer, without hiding what it points at.
+        val u = resources.displayMetrics.density * 0.72f
         cursorPath.reset()
         cursorPath.moveTo(x, y)
         cursorPath.lineTo(x, y + 17 * u); cursorPath.lineTo(x + 4.5f * u, y + 13 * u)

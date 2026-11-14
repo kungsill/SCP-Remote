@@ -63,77 +63,31 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Toolbar: hidden by the ▴ button so the whole screen is the remote picture. -->
-    <HorizontalScrollView
-        android:id="@+id/barScroll"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_gravity="top"
-        android:layout_marginEnd="48dp"
-        android:background="@color/bar_bg"
-        android:scrollbars="none">
+        <!-- Floating menu button (drag it anywhere): keyboard, mouse mode, quality, display,
+         Ctrl+Alt+Del, help, disconnect. The dot is the connection's signal light. -->
+    <FrameLayout
+        android:id="@+id/fab"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="10dp">
 
-        <LinearLayout
-            android:id="@+id/bar"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp">
+        <ImageButton
+            android:id="@+id/fabButton"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="center"
+            android:background="@drawable/fab_bg"
+            android:contentDescription="@string/menu"
+            android:elevation="6dp"
+            android:src="@drawable/ic_menu" />
 
-            <Button
-                android:id="@+id/disconnect"
-                style="@style/BarButton"
-                android:drawableStart="@drawable/ic_close"
-                android:text="@string/disconnect" />
-
-            <TextView
-                android:id="@+id/title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:layout_marginEnd="10dp"
-                android:maxWidth="160dp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="@android:color/white"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/viewOnly"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:text="@string/st_view_only"
-                android:textColor="#FFD54F"
-                android:textSize="12sp"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/mode"
-                style="@style/BarButton" />
-
-            <Button
-                android:id="@+id/quality"
-                style="@style/BarButton"
-                android:drawableStart="@drawable/ic_image" />
-
-            <Button
-                android:id="@+id/display"
-                style="@style/BarButton"
-                android:drawableStart="@drawable/ic_monitor"
-                android:visibility="gone" />
-        </LinearLayout>
-    </HorizontalScrollView>
-
-    <!-- Shows / hides the toolbar; the toolbar also hides itself after a few seconds untouched. -->
-    <ImageButton
-        android:id="@+id/barToggle"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="top|end"
-        android:background="@color/bar_bg"
-        android:contentDescription="@string/toolbar"
-        android:src="@drawable/ic_expand_less" />
+        <View
+            android:id="@+id/signalDot"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/signal_dot"
+            android:elevation="7dp" />
+    </FrameLayout>
 </FrameLayout>

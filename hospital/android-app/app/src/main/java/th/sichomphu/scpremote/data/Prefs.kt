@@ -19,6 +19,15 @@ class Prefs(context: Context) {
         get() = p.getBoolean("touchpad", true)
         set(v) { p.edit().putBoolean("touchpad", v).apply() }
 
+    /** Computers connected to most recently, newest first (ids; ids never contain a newline). */
+    var recent: List<String>
+        get() = p.getString("recent", "")!!.split('\n').filter { it.isNotEmpty() }
+        set(v) { p.edit().putString("recent", v.joinToString("\n")).apply() }
+
+    /** Gesture guide already shown for this mouse mode. */
+    fun guideSeen(touchpad: Boolean) = p.getBoolean(if (touchpad) "guide_touchpad" else "guide_direct", false)
+    fun setGuideSeen(touchpad: Boolean) { p.edit().putBoolean(if (touchpad) "guide_touchpad" else "guide_direct", true).apply() }
+
     private fun dataSaver(): Boolean {
         val cm = app.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
         // Never let a settings lookup stop the remote screen from opening.

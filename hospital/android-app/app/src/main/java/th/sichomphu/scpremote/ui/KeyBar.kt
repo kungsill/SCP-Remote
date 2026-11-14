@@ -52,7 +52,7 @@ class KeyBar(context: Context, parent: ViewGroup, private val keys: KeyboardBrid
             setPadding((10 * density).toInt(), 0, (10 * density).toInt(), 0)
             setBackgroundResource(android.R.drawable.list_selector_background)
             isClickable = true
-            setOnClickListener { onTap() }
+            setOnClickListener { performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP); onTap() }
         }
         row.addView(v, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
         return v

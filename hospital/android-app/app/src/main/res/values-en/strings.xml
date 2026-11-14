@@ -21,6 +21,13 @@
     <string name="search_hint">Search name, IP, user, department</string>
     <string name="all_groups">All departments</string>
     <string name="refresh">Refresh</string>
+    <string name="menu">Menu</string>
+    <string name="clear_search">Clear search</string>
+    <string name="show_password">Show password</string>
+    <string name="chip_label">%1$s (%2$d)</string>
+    <string name="section_recent">Recent (%1$d)</string>
+    <string name="section_online">On (%1$d)</string>
+    <string name="section_offline">Off (%1$d)</string>
     <string name="sign_out">Sign out</string>
     <string name="sign_out_confirm">Sign out and forget the account saved on this phone?</string>
     <string name="loading">Loading…</string>
@@ -44,6 +51,22 @@
     <string name="disconnect">Disconnect</string>
     <string name="toolbar">Toolbar</string>
     <string name="keyboard">Show keyboard</string>
+    <string name="keyboard_short">Keyboard</string>
+    <string name="help">How to use</string>
+    <string name="close">Close</string>
+    <string name="got_it">Got it</string>
+    <string name="mode_touchpad_on">Touchpad mouse: drag a finger to move the pointer</string>
+    <string name="mode_direct_on">Direct touch: tap where you want to click</string>
+    <string name="signal_unknown">● Measuring the connection…</string>
+    <string name="signal_good">● Good connection · %1$d ms</string>
+    <string name="signal_fair">● Fair connection · %1$d ms</string>
+    <string name="signal_poor">● Slow connection · %1$d ms (try "Low bandwidth")</string>
+    <string name="signal_slow_hint">Slow connection. Try: round button → quality → Low bandwidth</string>
+    <string name="guide_title_touchpad">How to use · Touchpad</string>
+    <string name="guide_title_direct">How to use · Direct touch</string>
+    <string name="guide_touchpad">• Drag one finger = move the pointer\n• Tap = left click\n• Tap with two fingers = right click\n• Drag two fingers up/down = scroll\n• Tap, then touch and drag = drag and drop\n• Spread / pinch two fingers = zoom\n\nRound pink button = menu (keyboard, mouse mode, picture quality, Ctrl+Alt+Del, disconnect); drag it to move it\nDot on the button: green = good, amber = fair, red = slow</string>
+    <string name="guide_direct">• Tap = click there\n• Hold half a second, then let go = right click\n• Drag one finger = drag and drop\n• Spread / pinch two fingers = zoom\n• Drag two fingers = move the zoomed picture\n\nRound pink button = menu (keyboard, mouse mode, picture quality, Ctrl+Alt+Del, disconnect); drag it to move it\nDot on the button: green = good, amber = fair, red = slow</string>
+    <string name="guide_view_only">This account can only view this screen; mouse and keyboard are off.\n\n• Spread / pinch two fingers = zoom\n• Drag two fingers = move the zoomed picture\n\nRound pink button = menu (picture quality, disconnect)</string>
     <string name="quality">Picture quality</string>
     <string-array name="quality_names">
         <item>Sharpest</item>

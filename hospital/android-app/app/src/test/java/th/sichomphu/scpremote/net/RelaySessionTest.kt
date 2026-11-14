@@ -145,6 +145,30 @@ class RelaySessionTest {
         session.close(userInitiated = true)
     }
 
+    // The agent echoes the keep-alive; the round trip is the connection's latency (for the signal light).
+    @Test fun keepAliveEchoReportsLatency() {
+        val server = Recorder(
+            onOpen = { it.text("""{"action":"serverinfo"}""") },
+            onText = { r, t -> if (JSONObject(t).optString("action") == "authcookie") r.text("""{"action":"authcookie","cookie":"C","rcookie":"R"}""") },
+        )
+        val control = ControlChannel("https://1.2.3.4:443", PinnedTrust("00"), server)
+        runBlocking { control.signIn("u", "p") }
+        val relay = Recorder()
+        val latencies = CopyOnWriteArrayList<Long>()
+        val session = RelaySession(control, PinnedTrust("00"), device, object : RelaySession.Listener {
+            override fun onState(state: RelaySession.State) {}
+            override fun onCommand(cmd: KvmCommand) {}
+            override fun onLatency(ms: Long) { latencies.add(ms) }
+        }, "https://1.2.3.4:443", opener = relay)
+        session.start()
+        relay.opened.await(5, TimeUnit.SECONDS)
+        relay.text("c")
+        relay.text("""{"ctrlChannel":102938,"type":"rtt","time":${System.currentTimeMillis() - 120}}""")
+        assertEquals(1, latencies.size)
+        assertTrue(latencies[0] in 100L..2000L)
+        session.close(userInitiated = true)
+    }
+
     // Review Focus 3: a view-only session puts no key message on the wire, not even key releases.
     @Test fun viewOnlySessionSendsNoKeyReleases() {
         val (session, relay, _) = open(device.copy(canControl = false, viewOnly = true))

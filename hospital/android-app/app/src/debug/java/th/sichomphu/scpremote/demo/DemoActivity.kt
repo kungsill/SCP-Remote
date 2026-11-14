@@ -42,7 +42,8 @@ class DemoActivity : AppCompatActivity() {
             AppSession.trust = trust
             AppSession.channel = channel
             AppSession.updateChecked = true
-            AppSession.relayOpener = FakeSocket.opener({ null }, welcome = false, relay = true)
+            // The fake computer echoes the keep-alive ~45 ms later, like an agent on the LAN.
+            AppSession.relayOpener = FakeSocket.opener({ m -> if (m.optString("type") == "rtt") { Thread.sleep(45); m.toString() } else null }, welcome = false, relay = true)
             startActivity(Intent(this@DemoActivity, DevicesActivity::class.java))
             finish()
         }

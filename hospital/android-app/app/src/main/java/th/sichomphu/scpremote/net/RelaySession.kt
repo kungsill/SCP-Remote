@@ -42,6 +42,8 @@ class RelaySession(
     interface Listener {
         fun onState(state: State)
         fun onCommand(cmd: KvmCommand)
+        /** Round trip of the keep-alive, in ms (every 10 s). */
+        fun onLatency(ms: Long) {}
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -172,6 +174,10 @@ class RelaySession(
                     2 -> { refused = true; setState(State.REFUSED) }
                 }
                 "ping" -> webSocket.send("{\"ctrlChannel\":\"102938\",\"type\":\"pong\"}")
+                "rtt" -> if (m.opt("time") is Number) {
+                    val ms = System.currentTimeMillis() - m.getLong("time")
+                    if (ms in 0..120_000) listener.onLatency(ms)
+                }
             }
         }
 

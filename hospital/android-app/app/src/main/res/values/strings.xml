@@ -22,6 +22,13 @@
     <string name="search_hint">ค้นหาชื่อ IP ผู้ใช้ หน่วยงาน</string>
     <string name="all_groups">ทุกหน่วยงาน</string>
     <string name="refresh">รีเฟรช</string>
+    <string name="menu">เมนู</string>
+    <string name="clear_search">ล้างคำค้นหา</string>
+    <string name="show_password">แสดงรหัสผ่าน</string>
+    <string name="chip_label">%1$s (%2$d)</string>
+    <string name="section_recent">ใช้ล่าสุด (%1$d)</string>
+    <string name="section_online">เปิดอยู่ (%1$d)</string>
+    <string name="section_offline">ปิดอยู่ (%1$d)</string>
     <string name="sign_out">ออกจากระบบ</string>
     <string name="sign_out_confirm">ออกจากระบบและลืมบัญชีที่จำไว้ในเครื่องนี้?</string>
     <string name="loading">กำลังโหลด…</string>
@@ -45,6 +52,22 @@
     <string name="disconnect">ตัดการเชื่อมต่อ</string>
     <string name="toolbar">แถบเครื่องมือ</string>
     <string name="keyboard">เปิดคีย์บอร์ด</string>
+    <string name="keyboard_short">คีย์บอร์ด</string>
+    <string name="help">วิธีใช้</string>
+    <string name="close">ปิด</string>
+    <string name="got_it">เข้าใจแล้ว</string>
+    <string name="mode_touchpad_on">เมาส์แบบทัชแพด: ลากนิ้วเพื่อเลื่อนเมาส์</string>
+    <string name="mode_direct_on">เมาส์แบบแตะตรง: แตะตรงไหนคลิกตรงนั้น</string>
+    <string name="signal_unknown">● กำลังวัดสัญญาณ…</string>
+    <string name="signal_good">● สัญญาณดี · %1$d ms</string>
+    <string name="signal_fair">● สัญญาณพอใช้ · %1$d ms</string>
+    <string name="signal_poor">● สัญญาณช้า · %1$d ms (ลองคุณภาพ "ประหยัดเน็ต")</string>
+    <string name="signal_slow_hint">สัญญาณช้า แนะนำ: แตะปุ่มกลม → คุณภาพ → ประหยัดเน็ต</string>
+    <string name="guide_title_touchpad">วิธีใช้ · แบบทัชแพด</string>
+    <string name="guide_title_direct">วิธีใช้ · แบบแตะตรง</string>
+    <string name="guide_touchpad">• ลากนิ้วเดียว = เลื่อนเมาส์\n• แตะ 1 ครั้ง = คลิกซ้าย\n• แตะสองนิ้วพร้อมกัน = คลิกขวา\n• ลากสองนิ้วขึ้น-ลง = เลื่อนหน้า\n• แตะแล้วแตะค้างลาก = ลากวาง\n• ถ่าง / บีบสองนิ้ว = ซูม\n\nปุ่มกลมสีชมพู = เมนู (คีย์บอร์ด, เปลี่ยนแบบเมาส์, คุณภาพภาพ, Ctrl+Alt+Del, ตัดการเชื่อมต่อ) ลากย้ายได้\nจุดสีบนปุ่ม: เขียว = เน็ตดี, เหลือง = พอใช้, แดง = ช้า</string>
+    <string name="guide_direct">• แตะตรงไหน = คลิกตรงนั้น\n• กดค้างครึ่งวินาทีแล้วปล่อย = คลิกขวา\n• ลากนิ้วเดียว = ลากวาง\n• ถ่าง / บีบสองนิ้ว = ซูม\n• ลากสองนิ้ว = เลื่อนภาพตอนซูม\n\nปุ่มกลมสีชมพู = เมนู (คีย์บอร์ด, เปลี่ยนแบบเมาส์, คุณภาพภาพ, Ctrl+Alt+Del, ตัดการเชื่อมต่อ) ลากย้ายได้\nจุดสีบนปุ่ม: เขียว = เน็ตดี, เหลือง = พอใช้, แดง = ช้า</string>
+    <string name="guide_view_only">บัญชีนี้ดูหน้าจอได้อย่างเดียว เมาส์และคีย์บอร์ดปิดอยู่\n\n• ถ่าง / บีบสองนิ้ว = ซูม\n• ลากสองนิ้ว = เลื่อนภาพตอนซูม\n\nปุ่มกลมสีชมพู = เมนู (คุณภาพภาพ, ตัดการเชื่อมต่อ)</string>
     <string name="quality">คุณภาพภาพ</string>
     <string-array name="quality_names">
         <item>คมชัดสูงสุด</item>

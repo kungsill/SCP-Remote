@@ -53,13 +53,30 @@
                 android:imeOptions="actionNext" />
 
             <TextView style="@style/FieldLabel" android:text="@string/password" />
-            <EditText
-                android:id="@+id/pass"
-                style="@style/Field"
-                android:autofillHints="password"
-                android:importantForAutofill="yes"
-                android:inputType="textPassword"
-                android:imeOptions="actionDone" />
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <EditText
+                    android:id="@+id/pass"
+                    style="@style/Field"
+                    android:autofillHints="password"
+                    android:importantForAutofill="yes"
+                    android:inputType="textPassword"
+                    android:imeOptions="actionDone"
+                    android:paddingEnd="48dp" />
+
+                <!-- Hold-free eye button: shows / hides the password. -->
+                <ImageButton
+                    android:id="@+id/showPass"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="end|center_vertical"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/show_password"
+                    android:src="@drawable/ic_visibility"
+                    android:tint="@color/text_muted" />
+            </FrameLayout>
 
             <TextView style="@style/FieldLabel" android:text="@string/server" />
             <EditText

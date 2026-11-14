@@ -36,7 +36,8 @@ class LoginActivity : AppCompatActivity() {
         // Light page: dark status-bar icons, and keep the form clear of the bars and the keyboard.
         @Suppress("DEPRECATION") // ignored on Android 15+, where the page already runs under the bar
         window.statusBarColor = androidx.core.content.ContextCompat.getColor(this, R.color.background)
-        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
+        val night = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = !night
         findViewById<View>(R.id.loginRoot).padForSystemBars(top = true, bottom = true)
         // On a tablet the form stays a comfortable 480 dp wide instead of spanning the screen.
         if (resources.configuration.screenWidthDp > 560) {
@@ -55,6 +56,12 @@ class LoginActivity : AppCompatActivity() {
             if (savedInstanceState == null && !intent.getBooleanExtra(EXTRA_NO_AUTO, false)) signIn()
         }
         button.setOnClickListener { signIn() }
+        findViewById<android.widget.ImageButton>(R.id.showPass).setOnClickListener { eye ->
+            val hidden = pass.transformationMethod is android.text.method.PasswordTransformationMethod
+            pass.transformationMethod = if (hidden) null else android.text.method.PasswordTransformationMethod.getInstance()
+            pass.setSelection(pass.text.length)
+            eye.alpha = if (hidden) 1f else 0.6f
+        }
         pass.setOnEditorActionListener { _, id, _ -> if (id == EditorInfo.IME_ACTION_DONE) { signIn(); true } else false }
     }
 

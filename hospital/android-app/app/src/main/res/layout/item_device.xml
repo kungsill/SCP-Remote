@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- One computer. Tapping anywhere on the card connects (when allowed and the computer is on). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -6,6 +7,7 @@
     android:layout_marginEnd="5dp"
     android:layout_marginBottom="10dp"
     android:background="@drawable/card"
+    android:foreground="?attr/selectableItemBackground"
     android:orientation="vertical"
     android:padding="14dp">
 
@@ -51,40 +53,39 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:gravity="end|center_vertical"
         android:orientation="horizontal">
 
-        <!-- 36dp: the same visible height as the Connect button (AppCompat insets it within 44dp). -->
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/fix"
-            style="@style/Button.Plain"
+            style="@style/Button.Outline"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:layout_marginEnd="4dp"
-            android:background="@drawable/button_outline"
+            android:layout_height="wrap_content"
             android:minWidth="96dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:text="@string/fix_printer"
-            android:textColor="@color/accent" />
+            android:text="@string/fix_printer" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/connect"
             style="@style/Button.Accent"
             android:layout_width="wrap_content"
-            android:layout_height="44dp"
+            android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:minWidth="110dp"
             android:text="@string/connect" />
     </LinearLayout>
 
+    <!-- Printer-fix progress / result as a coloured chip. -->
     <TextView
         android:id="@+id/result"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:textColor="@color/text"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/chip_bg"
+        android:paddingStart="10dp"
+        android:paddingTop="5dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="5dp"
         android:textSize="13sp"
         android:visibility="gone" />
 </LinearLayout>

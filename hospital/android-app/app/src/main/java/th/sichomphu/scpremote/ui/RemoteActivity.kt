@@ -1,46 +1,60 @@
 package th.sichomphu.scpremote.ui
 
 import android.annotation.SuppressLint
+import android.content.res.ColorStateList
+import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.GridLayout
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import th.sichomphu.scpremote.R
 import th.sichomphu.scpremote.data.AppSession
 import th.sichomphu.scpremote.data.Prefs
 import th.sichomphu.scpremote.data.Quality
-import androidx.core.view.ViewCompat
 import th.sichomphu.scpremote.input.DirectTouchController
 import th.sichomphu.scpremote.input.InputGate
 import th.sichomphu.scpremote.input.KeyboardBridge
 import th.sichomphu.scpremote.input.PointerOut
 import th.sichomphu.scpremote.input.RemotePoint
+import th.sichomphu.scpremote.input.SpecialKey
 import th.sichomphu.scpremote.input.TouchAction
 import th.sichomphu.scpremote.input.TouchSample
 import th.sichomphu.scpremote.input.TouchpadController
-import th.sichomphu.scpremote.protocol.KvmMessages
-import th.sichomphu.scpremote.protocol.MouseAction
 import th.sichomphu.scpremote.model.Device
 import th.sichomphu.scpremote.net.RelaySession
 import th.sichomphu.scpremote.net.RelaySession.State
 import th.sichomphu.scpremote.net.SessionPolicy
+import th.sichomphu.scpremote.net.Signal
 import th.sichomphu.scpremote.protocol.KvmCommand
+import th.sichomphu.scpremote.protocol.KvmMessages
+import th.sichomphu.scpremote.protocol.MouseAction
 
 /**
  * Full-screen remote session. Rotation does not restart it (configChanges in the manifest); it is
  * closed on Back / Disconnect and when the app stays hidden for 30 s, and reopened by itself after a
- * drop (2, 5, 10 s), as the web page does.
+ * drop (2, 5, 10 s), as the web page does. Everything else sits behind one floating button.
  */
 class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
     private lateinit var device: Device
@@ -49,29 +63,20 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
     private lateinit var stateText: TextView
     private lateinit var spinner: ProgressBar
     private lateinit var retry: Button
-    private lateinit var barScroll: View
-    private lateinit var barToggle: android.widget.ImageButton
-
-    /** The toolbar hides itself 4 s after it was last used, once there is a picture to look at. */
-    private val hideBar = Runnable { if (session?.hadImage == true) setBar(false) }
-
-    private fun setBar(show: Boolean) {
-        barScroll.visibility = if (show) View.VISIBLE else View.GONE
-        barToggle.setImageResource(if (show) R.drawable.ic_expand_less else R.drawable.ic_expand_more)
-        if (show) pokeBar() else ui.removeCallbacks(hideBar)
-    }
-
-    /** The toolbar was just used: start its 4-second hide timer again. */
-    private fun pokeBar() {
-        ui.removeCallbacks(hideBar)
-        if (barScroll.visibility == View.VISIBLE) ui.postDelayed(hideBar, BAR_HIDE_MS)
-    }
+    private lateinit var fab: View
+    private lateinit var signalDot: View
     private val ui = Handler(Looper.getMainLooper())
+    private val prefs by lazy { Prefs(this) }
     @Volatile private var session: RelaySession? = null
     private var attempts = 0
     private var hiddenClosed = false
     private var leaving = false
     private val closeHidden = Runnable { hiddenClosed = true; session?.close(userInitiated = true) }
+    private var displays: List<Int> = emptyList()
+    private var selectedDisplay = 0
+    /** Last keep-alive round trip (ms), null until the first one. */
+    private var latency: Long? = null
+    private var slowHintShown = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,21 +91,17 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         canvas = findViewById(R.id.canvas)
         overlay = findViewById(R.id.overlay); stateText = findViewById(R.id.stateText)
         spinner = findViewById(R.id.spinner); retry = findViewById(R.id.retry)
-        barScroll = findViewById(R.id.barScroll)
-        findViewById<TextView>(R.id.title).text = device.name
-        findViewById<Button>(R.id.disconnect).setOnClickListener { leave() }
-        barToggle = findViewById(R.id.barToggle)
-        barToggle.setOnClickListener { setBar(barScroll.visibility != View.VISIBLE) }
-        // In portrait there is room above the picture: keep it clear of the toolbar.
-        canvas.topInset = 48 * resources.displayMetrics.density
+        fab = findViewById(R.id.fab); signalDot = findViewById(R.id.signalDot)
         retry.setOnClickListener { attempts = 0; connect() }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = leave()
         })
+        touchpadMode = device.canControl && prefs.touchpadMode
         setUpGestures()
-        setUpModeToggle()
         setUpKeyboard()
-        setUpPicture()
+        setUpFab()
+        showSignal()
+        if (!device.canControl) Toast.makeText(this, R.string.st_view_only, Toast.LENGTH_LONG).show()
         connect()
     }
 
@@ -116,6 +117,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         val channel = AppSession.channel ?: return finish()
         val trust = AppSession.trust ?: return finish()
         session?.close(userInitiated = true)
+        latency = null; showSignal()
         // Assigned before start(): start() reports CONNECTING at once, and a fast failure reports
         // CLOSED from another thread; onState only shows states from the current session.
         val q = Quality.LADDER[prefs.quality]
@@ -123,39 +125,6 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
             ?: RelaySession(channel, trust, device, this, AppSession.server, q)
         session = s
         s.start()
-    }
-
-    private val prefs by lazy { Prefs(this) }
-    private var displays: List<Int> = emptyList()
-    private var selectedDisplay = 0
-
-    private fun setUpPicture() {
-        val q = findViewById<Button>(R.id.quality)
-        fun label() { q.text = getString(R.string.quality_button, QualityPicker.names(this)[prefs.quality]) }
-        label()
-        q.setOnClickListener {
-            ui.removeCallbacks(hideBar)
-            QualityPicker.pickQuality(this, prefs.quality) { i ->
-                pokeBar()
-                prefs.quality = i; label()
-                session?.setQuality(Quality.LADDER[i])
-            }
-        }
-        findViewById<Button>(R.id.display).setOnClickListener {
-            ui.removeCallbacks(hideBar)
-            QualityPicker.pickDisplay(this, displays, selectedDisplay) { n ->
-                pokeBar()
-                selectedDisplay = n; showDisplays()
-                session?.selectDisplay(n)
-            }
-        }
-    }
-
-    /** The display button appears only for a computer with more than one display. */
-    private fun showDisplays() {
-        val b = findViewById<Button>(R.id.display)
-        b.visibility = if (displays.size > 1) View.VISIBLE else View.GONE
-        b.text = getString(R.string.display_button, QualityPicker.displayName(this, selectedDisplay))
     }
 
     /** Back or Disconnect: end on purpose (no reconnect) and return to the computer list. */
@@ -200,13 +169,22 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
     override fun onCommand(cmd: KvmCommand) {
         when (cmd) {
             is KvmCommand.ScreenSize -> canvas.setScreenSize(cmd.w, cmd.h)
-            is KvmCommand.Displays -> ui.post { displays = cmd.list; selectedDisplay = cmd.selected; showDisplays() }
+            is KvmCommand.Displays -> ui.post { displays = cmd.list; selectedDisplay = cmd.selected }
             is KvmCommand.Tile -> {
                 canvas.drawTile(cmd.x, cmd.y, cmd.image)
-                ui.post { if (overlay.visibility == View.VISIBLE && session?.state == State.CONNECTED) { attempts = 0; overlay.visibility = View.GONE; pokeBar() } }
+                ui.post {
+                    if (overlay.visibility == View.VISIBLE && session?.state == State.CONNECTED) {
+                        attempts = 0; overlay.visibility = View.GONE
+                        firstPicture()
+                    }
+                }
             }
             else -> {}
         }
+    }
+
+    override fun onLatency(ms: Long) {
+        ui.post { latency = ms; showSignal() }
     }
 
     private fun showState(state: State, s: RelaySession?) {
@@ -217,6 +195,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
             State.REFUSED -> status(getString(R.string.st_refused), busy = false)
             State.CLOSED -> {
                 if (leaving || hiddenClosed) return
+                latency = null; showSignal()
                 val wait = SessionPolicy.reconnectDelay(s?.hadImage == true, s?.userClosed == true, s?.refused == true, onScreen = !isFinishing, attempts = attempts)
                 if (wait != null) {
                     attempts++
@@ -235,6 +214,150 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         spinner.visibility = if (busy) View.VISIBLE else View.GONE
         retry.visibility = if (busy) View.GONE else View.VISIBLE
     }
+
+    /** The first picture of this screen: show the gesture guide once per mouse mode. */
+    private fun firstPicture() {
+        if (!prefs.guideSeen(touchpadMode)) showGuide()
+    }
+
+    // --- Floating button and its menu ------------------------------------------------------------
+
+    /** Drag to move it out of the way; tap to open the menu. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setUpFab() {
+        val button = findViewById<View>(R.id.fabButton)
+        val slop = 10 * resources.displayMetrics.density
+        var downX = 0f; var downY = 0f; var startX = 0f; var startY = 0f; var dragging = false
+        button.setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { downX = e.rawX; downY = e.rawY; startX = fab.translationX; startY = fab.translationY; dragging = false }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = e.rawX - downX; val dy = e.rawY - downY
+                    if (!dragging && (kotlin.math.abs(dx) > slop || kotlin.math.abs(dy) > slop)) dragging = true
+                    if (dragging) {
+                        val parent = fab.parent as View
+                        // Keep the whole button on screen.
+                        fab.translationX = (startX + dx).coerceIn(-(fab.left).toFloat(), (parent.width - fab.right).toFloat())
+                        fab.translationY = (startY + dy).coerceIn(-(fab.top).toFloat(), (parent.height - fab.bottom).toFloat())
+                    }
+                }
+                MotionEvent.ACTION_UP -> if (!dragging) { button.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); openMenu() }
+            }
+            true
+        }
+    }
+
+    private fun signalColor() = when (Signal.level(latency)) {
+        Signal.Level.GOOD -> R.color.signal_good
+        Signal.Level.FAIR -> R.color.signal_fair
+        Signal.Level.POOR -> R.color.signal_poor
+        Signal.Level.UNKNOWN -> R.color.signal_unknown
+    }
+
+    private fun showSignal() {
+        val level = Signal.level(latency)
+        signalDot.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this, signalColor()))
+        // A slow connection: suggest Low bandwidth once, unless it is already chosen.
+        if (level == Signal.Level.POOR && !slowHintShown && prefs.quality < Quality.LADDER.size - 1) {
+            slowHintShown = true
+            Toast.makeText(this, R.string.signal_slow_hint, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun signalText(): String {
+        val ms = latency ?: return getString(R.string.signal_unknown)
+        return getString(
+            when (Signal.level(ms)) {
+                Signal.Level.GOOD -> R.string.signal_good
+                Signal.Level.FAIR -> R.string.signal_fair
+                else -> R.string.signal_poor
+            }, ms,
+        )
+    }
+
+    /** Big buttons for everything that is not the picture itself. */
+    private fun openMenu() {
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(pad, pad / 2, pad, 0) }
+        box.addView(TextView(this).apply {
+            text = device.name; textSize = 18f; setTypeface(typeface, Typeface.BOLD)
+            setTextColor(ContextCompat.getColor(context, R.color.text))
+        })
+        box.addView(TextView(this).apply {
+            text = signalText()
+            setTextColor(ContextCompat.getColor(context, signalColor()))
+            setPadding(0, pad / 4, 0, if (device.canControl) pad / 2 else 0)
+        })
+        if (!device.canControl) box.addView(TextView(this).apply {
+            text = getString(R.string.st_view_only)
+            setTextColor(ContextCompat.getColor(context, R.color.text_muted))
+            setPadding(0, pad / 4, 0, pad / 2)
+        })
+        val grid = GridLayout(this).apply { columnCount = 3 }
+        box.addView(grid)
+        lateinit var dialog: AlertDialog
+        fun item(icon: Int, label: String, danger: Boolean = false, action: () -> Unit) {
+            val b = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                text = label
+                setIconResource(icon)
+                iconGravity = MaterialButton.ICON_GRAVITY_TOP
+                iconSize = (26 * resources.displayMetrics.density).toInt()
+                isAllCaps = false
+                textSize = 13f
+                maxLines = 2
+                val tint = ContextCompat.getColor(context, if (danger) R.color.danger else R.color.accent)
+                iconTint = ColorStateList.valueOf(tint)
+                setTextColor(if (danger) tint else ContextCompat.getColor(context, R.color.text))
+                cornerRadius = (14 * resources.displayMetrics.density).toInt()
+                setOnClickListener { dialog.dismiss(); action() }
+            }
+            grid.addView(b, GridLayout.LayoutParams(GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(GridLayout.UNDEFINED, 1f)).apply {
+                width = 0; height = (92 * resources.displayMetrics.density).toInt()
+                setMargins(pad / 4, pad / 4, pad / 4, pad / 4)
+            })
+        }
+        if (device.canControl) {
+            item(R.drawable.ic_keyboard, getString(R.string.keyboard_short)) { keyBar?.showKeyboard() }
+            item(if (touchpadMode) R.drawable.ic_mouse else R.drawable.ic_touch, getString(if (touchpadMode) R.string.mode_touchpad else R.string.mode_direct)) { switchMode() }
+        }
+        item(R.drawable.ic_image, QualityPicker.names(this)[prefs.quality]) {
+            QualityPicker.pickQuality(this, prefs.quality) { i -> prefs.quality = i; session?.setQuality(Quality.LADDER[i]) }
+        }
+        if (displays.size > 1) item(R.drawable.ic_monitor, QualityPicker.displayName(this, selectedDisplay)) {
+            QualityPicker.pickDisplay(this, displays, selectedDisplay) { n -> selectedDisplay = n; session?.selectDisplay(n) }
+        }
+        if (device.canControl) item(R.drawable.ic_lock, "Ctrl+Alt+Del") { keys?.special(SpecialKey.CTRL_ALT_DEL) }
+        item(R.drawable.ic_help, getString(R.string.help)) { showGuide() }
+        item(R.drawable.ic_close, getString(R.string.disconnect), danger = true) { leave() }
+        dialog = MaterialAlertDialogBuilder(this).setView(box).setNegativeButton(R.string.close, null).create()
+        dialog.show()
+    }
+
+    private fun switchMode() {
+        output(if (touchpadMode) touchpad?.cancel().orEmpty() else direct.cancel())
+        touchpadMode = !touchpadMode
+        prefs.touchpadMode = touchpadMode
+        canvas.invalidate()
+        Toast.makeText(this, if (touchpadMode) R.string.mode_touchpad_on else R.string.mode_direct_on, Toast.LENGTH_SHORT).show()
+        if (!prefs.guideSeen(touchpadMode)) showGuide()
+    }
+
+    /** How to use the screen, for the current mouse mode. */
+    private fun showGuide() {
+        val lines = when {
+            !device.canControl -> R.string.guide_view_only
+            touchpadMode -> R.string.guide_touchpad
+            else -> R.string.guide_direct
+        }
+        if (device.canControl) prefs.setGuideSeen(touchpadMode)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(if (touchpadMode) R.string.guide_title_touchpad else R.string.guide_title_direct)
+            .setMessage(lines)
+            .setPositiveButton(R.string.got_it, null)
+            .show()
+    }
+
+    // --- Touch -----------------------------------------------------------------------------------
 
     /**
      * Touch: in touchpad mode one finger drives the cursor and two fingers scroll; in direct mode a
@@ -282,29 +405,10 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
     private var touchpad: TouchpadController? = null
     private val direct by lazy { DirectTouchController { x, y -> canvas.viewToRemote(x, y).let { RemotePoint(it.x, it.y) } } }
 
-    private fun setUpModeToggle() {
-        val b = findViewById<Button>(R.id.mode)
-        fun label() {
-            b.text = getString(if (touchpadMode) R.string.mode_touchpad else R.string.mode_direct)
-            b.setCompoundDrawablesRelativeWithIntrinsicBounds(if (touchpadMode) R.drawable.ic_mouse else R.drawable.ic_touch, 0, 0, 0)
-        }
-        touchpadMode = prefs.touchpadMode
-        label()
-        b.setOnClickListener {
-            pokeBar()
-            output(if (touchpadMode) touchpad?.cancel().orEmpty() else direct.cancel())
-            touchpadMode = !touchpadMode
-            prefs.touchpadMode = touchpadMode
-            label(); canvas.invalidate()
-        }
-        b.visibility = if (device.canControl) View.VISIBLE else View.GONE
-        findViewById<View>(R.id.viewOnly).visibility = if (device.canControl) View.GONE else View.VISIBLE
-        if (!device.canControl) touchpadMode = false
-    }
-
     /** Every input message goes through here; a view-only account's input never leaves the phone. */
     private val gate by lazy { InputGate(device.canControl) { session?.send(it) } }
     private var keys: KeyboardBridge? = null
+    private var keyBar: KeyBar? = null
 
     private fun setUpKeyboard() {
         val root = findViewById<View>(R.id.root)
@@ -318,17 +422,20 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         keys = k
         canvas.keyboard = k
         val host = findViewById<android.widget.FrameLayout>(R.id.keybarHost)
-        host.addView(KeyBar(this, host, k, canvas).view)
+        keyBar = KeyBar(this, host, k, canvas).also { host.addView(it.view) }
     }
 
-    /** Mouse output → desktop-channel messages; nothing leaves a view-only session. */
+    /** Mouse output → desktop-channel messages; a click is felt as a light tap. */
     private fun output(events: List<PointerOut>) {
         if (events.isEmpty()) return
         var moved = false
         for (ev in events) {
             val bytes = when (ev) {
                 is PointerOut.Move -> { moved = true; KvmMessages.mouse(MouseAction.MOVE, 0, ev.x, ev.y) }
-                is PointerOut.Down -> KvmMessages.mouse(MouseAction.DOWN, ev.button, ev.x, ev.y)
+                is PointerOut.Down -> {
+                    if (device.canControl) canvas.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    KvmMessages.mouse(MouseAction.DOWN, ev.button, ev.x, ev.y)
+                }
                 is PointerOut.Up -> KvmMessages.mouse(MouseAction.UP, ev.button, ev.x, ev.y)
                 is PointerOut.Scroll -> KvmMessages.scroll(ev.x, ev.y, ev.delta)
             }
@@ -361,6 +468,5 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         const val EXTRA_DEVICE_ID = "deviceId"
         /** How far two fingers must spread or pinch (dp) before it counts as zooming, not scrolling. */
         private const val PINCH_SLOP_PX = 24f
-        private const val BAR_HIDE_MS = 4000L
     }
 }

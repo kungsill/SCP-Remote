@@ -2,6 +2,8 @@
 <resources>
     <color name="accent">#B02A72</color>
     <color name="accent_dark">#8A1F59</color>
+    <color name="accent_container">#F8DCEB</color>
+    <color name="header_bg">#B02A72</color>
     <color name="background">#FAF3F6</color>
     <color name="card">#FFFFFF</color>
     <color name="card_border">#EBD9E2</color>
@@ -12,4 +14,16 @@
     <color name="danger">#C62828</color>
     <color name="remote_bg">#101014</color>
     <color name="bar_bg">#E6202026</color>
+    <!-- Printer-fix status chips. -->
+    <color name="fix_busy_bg">#FFF4D6</color>
+    <color name="fix_busy_fg">#7A5600</color>
+    <color name="fix_ok_bg">#E3F4E8</color>
+    <color name="fix_ok_fg">#1E6B37</color>
+    <color name="fix_fail_bg">#FDE8E8</color>
+    <color name="fix_fail_fg">#A12424</color>
+    <!-- Connection signal light. -->
+    <color name="signal_good">#34C26A</color>
+    <color name="signal_fair">#F2B32A</color>
+    <color name="signal_poor">#E5484D</color>
+    <color name="signal_unknown">#8E8E93</color>
 </resources>

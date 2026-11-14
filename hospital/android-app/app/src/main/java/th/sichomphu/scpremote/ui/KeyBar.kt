@@ -3,6 +3,7 @@ package th.sichomphu.scpremote.ui
 import android.content.Context
 import android.graphics.Color
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -15,46 +16,72 @@ import th.sichomphu.scpremote.input.Modifier
 import th.sichomphu.scpremote.input.SpecialKey
 
 /**
- * The row of keys under the remote picture: ⌨ opens the phone keyboard, then modifiers (toggles),
- * Esc Tab Enter ⌫ Del, arrows, Home End, F1–F12 and Ctrl+Alt+Del.
+ * Keys a phone keyboard lacks, shown just above it while it is open (like AnyDesk). One row of
+ * equal-width keys that always fits the screen; ⋯ turns to the next page:
+ * modifiers and editing keys → arrows → F1–F6 → F7–F12. Ctrl+Alt+Del is in the floating menu.
  */
 class KeyBar(context: Context, parent: ViewGroup, private val keys: KeyboardBridge, private val target: View) {
     val view: View = LayoutInflater.from(context).inflate(R.layout.view_keybar, parent, false)
     private val row: LinearLayout = view.findViewById(R.id.keys)
     private val modifierViews = mutableMapOf<Modifier, TextView>()
-    private val density = context.resources.displayMetrics.density
+    private var page = 0
+
+    private sealed class Key(val label: String) {
+        class Mod(label: String, val m: Modifier) : Key(label)
+        class Special(label: String, val k: SpecialKey) : Key(label)
+    }
+
+    private val pages: List<List<Key>> = listOf(
+        listOf(
+            Key.Mod("Ctrl", Modifier.CTRL), Key.Mod("Alt", Modifier.ALT), Key.Mod("Shift", Modifier.SHIFT), Key.Mod("Win", Modifier.WIN),
+            Key.Special("Esc", SpecialKey.ESC), Key.Special("Tab", SpecialKey.TAB), Key.Special("⏎", SpecialKey.ENTER), Key.Special("⌫", SpecialKey.BACKSPACE),
+        ),
+        listOf(
+            Key.Special("←", SpecialKey.LEFT), Key.Special("↑", SpecialKey.UP), Key.Special("↓", SpecialKey.DOWN), Key.Special("→", SpecialKey.RIGHT),
+            Key.Special("Home", SpecialKey.HOME), Key.Special("End", SpecialKey.END), Key.Special("Del", SpecialKey.DELETE),
+        ),
+        (1..6).map { Key.Special("F$it", SpecialKey.valueOf("F$it")) },
+        (7..12).map { Key.Special("F$it", SpecialKey.valueOf("F$it")) },
+    )
 
     init {
-        add("") { showKeyboard() }.apply {
-            setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_keyboard, 0, 0, 0)
-            contentDescription = context.getString(R.string.keyboard)
-        }
-        for ((m, label) in listOf(Modifier.CTRL to "Ctrl", Modifier.ALT to "Alt", Modifier.SHIFT to "Shift", Modifier.WIN to "⊞ Win")) {
-            modifierViews[m] = add(label) { keys.setModifier(m, !keys.isHeld(m)); paint() }
-        }
-        val specials = listOf(
-            SpecialKey.ESC to "Esc", SpecialKey.TAB to "Tab", SpecialKey.ENTER to "Enter", SpecialKey.BACKSPACE to "⌫",
-            SpecialKey.DELETE to "Del", SpecialKey.LEFT to "←", SpecialKey.UP to "↑", SpecialKey.DOWN to "↓", SpecialKey.RIGHT to "→",
-            SpecialKey.HOME to "Home", SpecialKey.END to "End",
-        ) + (1..12).map { SpecialKey.valueOf("F$it") to "F$it" } + listOf(SpecialKey.CTRL_ALT_DEL to "Ctrl+Alt+Del")
-        for ((k, label) in specials) add(label) { keys.special(k) }
         // One key with a modifier, then the modifiers let go (as a phone keyboard's Shift does).
         keys.afterModifiedKey = { keys.releaseAll(); paint() }
+        show(0)
+    }
+
+    private fun show(p: Int) {
+        page = p
+        row.removeAllViews()
+        modifierViews.clear()
+        for (k in pages[p]) {
+            val v = add(k.label) {
+                when (k) {
+                    is Key.Mod -> { keys.setModifier(k.m, !keys.isHeld(k.m)); paint() }
+                    is Key.Special -> keys.special(k.k)
+                }
+            }
+            if (k is Key.Mod) modifierViews[k.m] = v
+        }
+        // ⋯ shows which page is next.
+        add("⋯ " + (p + 2).let { if (it > pages.size) 1 else it } + "/" + pages.size) { show((page + 1) % pages.size) }
+            .apply { setTextColor(0xFFE8A9C9.toInt()) }
+        paint()
     }
 
     private fun add(label: String, onTap: () -> Unit): TextView {
         val v = TextView(view.context).apply {
             text = label
             setTextColor(Color.WHITE)
-            textSize = 14f
+            textSize = 15f
             gravity = Gravity.CENTER
-            minWidth = (44 * density).toInt()
-            setPadding((10 * density).toInt(), 0, (10 * density).toInt(), 0)
+            maxLines = 1
             setBackgroundResource(android.R.drawable.list_selector_background)
             isClickable = true
-            setOnClickListener { performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP); onTap() }
+            setOnClickListener { performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); onTap() }
         }
-        row.addView(v, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // Equal widths that always fit: no scrolling, no key cut in half at the edge.
+        row.addView(v, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
         return v
     }
 
@@ -62,10 +89,20 @@ class KeyBar(context: Context, parent: ViewGroup, private val keys: KeyboardBrid
         for ((m, v) in modifierViews) v.setBackgroundColor(if (keys.isHeld(m)) 0xFFB02A72.toInt() else Color.TRANSPARENT)
     }
 
+    /** The keyboard went away: let go of held modifiers and start from the first page next time. */
+    fun hidden() {
+        keys.releaseAll()
+        if (page != 0) show(0) else paint()
+    }
+
+    /** Opens the phone keyboard on the remote picture (a moment after a menu closes, so focus is back). */
     fun showKeyboard() {
-        target.requestFocus()
-        val imm = view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-        imm.restartInput(target)
-        imm.showSoftInput(target, InputMethodManager.SHOW_IMPLICIT)
+        target.postDelayed({
+            target.requestFocus()
+            val imm = view.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.restartInput(target)
+            androidx.core.view.ViewCompat.getWindowInsetsController(target)?.show(androidx.core.view.WindowInsetsCompat.Type.ime())
+                ?: imm.showSoftInput(target, InputMethodManager.SHOW_IMPLICIT)
+        }, 250)
     }
 }

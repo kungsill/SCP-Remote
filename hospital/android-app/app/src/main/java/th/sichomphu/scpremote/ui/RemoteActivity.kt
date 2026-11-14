@@ -458,16 +458,24 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
 
     private fun setUpKeyboard() {
         val root = findViewById<View>(R.id.root)
-        // Edge-to-edge: make room for the phone keyboard ourselves, so the picture and key bar sit above it.
+        val host = findViewById<android.widget.FrameLayout>(R.id.keybarHost)
+        host.visibility = View.GONE
+        // Edge-to-edge: make room for the phone keyboard ourselves, so the picture and key bar sit
+        // above it. The key bar shows only while the phone keyboard is open (like AnyDesk).
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
-            v.setPadding(0, 0, 0, insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            // Above the keyboard, and above the gesture bar Android shows while the keyboard is up.
+            v.setPadding(0, 0, 0, maxOf(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom, insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom))
+            val open = insets.isVisible(WindowInsetsCompat.Type.ime())
+            if (keyBar != null && open != (host.visibility == View.VISIBLE)) {
+                host.visibility = if (open) View.VISIBLE else View.GONE
+                if (!open) keyBar?.hidden()
+            }
             insets
         }
         if (!device.canControl) return
         val k = KeyboardBridge(gate::send)
         keys = k
         canvas.keyboard = k
-        val host = findViewById<android.widget.FrameLayout>(R.id.keybarHost)
         keyBar = KeyBar(this, host, k, canvas).also { host.addView(it.view) }
     }
 

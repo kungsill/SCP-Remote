@@ -354,3 +354,5 @@ hospital/native-agent/release/
 /hospital/android-app/local.properties
 /hospital/android-app/*.jks
 /hospital/android-app/keystore.properties
+# Android debug-only sources (the design preview) are code, not build output.
+!/hospital/android-app/app/src/debug/

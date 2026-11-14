@@ -7,11 +7,12 @@
     <meta name="viewport" content="user-scalable=1.0,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="robots" content="noindex,nofollow">
-    <link rel="manifest" href="{{{domainurl}}}manifest.json">
-    <link rel="shortcut icon" href="{{{domainurl}}}favicon.ico" />
-    <link rel="icon" type="image/png" sizes="16x16" href="{{{domainurl}}}favicon-16x16.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{{domainurl}}}favicon-32x32.png">
-    <link rel="apple-touch-icon" href="/favicon-303x303.png" />
+    <!-- SCP-Remote: the installed phone app uses the hospital name, logo and colour (public/scp-app.json, public/images/app/). -->
+    <link rel="manifest" href="{{{domainurl}}}scp-app.json">
+    <link rel="shortcut icon" href="{{{domainurl}}}images/app/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="{{{domainurl}}}images/app/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{{domainurl}}}images/app/favicon-32.png">
+    <link rel="apple-touch-icon" href="{{{domainurl}}}images/app/apple-touch-icon.png" />
     {{{customCSSTags}}}
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="#ffffff">
@@ -20,7 +21,7 @@
     {{{customJSTags}}}
     <script type="text/javascript" src="scripts/u2f-api{{min}}.js"></script>
     <meta name="msapplication-TileColor" content="#00aba9">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#b02a72">
     <title>{{{title}}}</title>
     <style>
         a {
@@ -42,7 +43,7 @@
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-remote.css" />
     <script defer src="{{{domainurl}}}scripts/scp-language.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-ui.css?v=20261013-contrast" />
-    <script defer src="{{{domainurl}}}scripts/scp-ui.js"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-ui.js?v=20261113-cert"></script>
 </head>
 <body onload="if (typeof(startup) !== 'undefined') startup();" style="overflow-y:hidden;margin:0;padding:0;border:0;color:black;font-size:13px;font-family:\'Trebuchet MS\', Arial, Helvetica, sans-serif">
     <div id=container>

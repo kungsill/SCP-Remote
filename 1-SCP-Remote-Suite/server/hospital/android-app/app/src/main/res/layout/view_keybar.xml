@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keys a phone keyboard lacks. Ctrl/Alt/Shift/Win stay on until tapped again or one key is sent. -->
+<HorizontalScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="44dp"
+    android:background="@color/bar_bg"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:id="@+id/keys"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp" />
+</HorizontalScrollView>

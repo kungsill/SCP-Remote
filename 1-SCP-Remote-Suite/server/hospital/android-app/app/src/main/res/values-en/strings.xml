@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="login_title">Sichomphu Hospital IT</string>
+    <string name="login_subtitle">Sign in with your SCP-Remote account</string>
+    <string name="server">Server address</string>
+    <string name="user">User name</string>
+    <string name="password">Password</string>
+    <string name="remember">Remember this account on this phone (encrypted)</string>
+    <string name="sign_in">Sign in</string>
+    <string name="signing_in">Signing in…</string>
+    <string name="err_BAD_LOGIN">Wrong user name or password</string>
+    <string name="err_CERT_MISMATCH">The server\'s certificate is not the one this app knows, so the password was not sent</string>
+    <string name="err_UNREACHABLE">Cannot reach the server, neither in the hospital nor over the internet. Check the phone\'s connection.</string>
+    <string name="trying_internet">Hospital network not reachable; trying over the internet…</string>
+    <string name="trying_hospital">Internet address not reachable; trying the hospital network…</string>
+    <string name="who_internet">%1$s · over the internet</string>
+    <string name="err_DISCONNECTED">The connection to the server dropped</string>
+    <string name="err_TIMEOUT">The server did not answer in time</string>
+    <string name="err_UNKNOWN_OPERATION">The server does not support this app yet; update the server first</string>
+    <string name="err_other">Failed (%1$s)</string>
+    <string name="fill_in">Enter your user name and password</string>
+
+    <string name="devices_title">Computers</string>
+    <string name="search_hint">Search name, IP, user, department</string>
+    <string name="all_groups">All departments</string>
+    <string name="refresh">Refresh</string>
+    <string name="menu">Menu</string>
+    <string name="clear_search">Clear search</string>
+    <string name="show_password">Show password</string>
+    <string name="chip_label">%1$s (%2$d)</string>
+    <string name="section_recent">Recent (%1$d)</string>
+    <string name="section_online">On (%1$d)</string>
+    <string name="section_offline">Off (%1$d)</string>
+    <string name="sign_out">Sign out</string>
+    <string name="sign_out_confirm">Sign out and forget the account saved on this phone?</string>
+    <string name="loading">Loading…</string>
+    <string name="no_devices">No computer matches the search</string>
+    <string name="count">%1$d computers · %2$d on</string>
+    <string name="online">On</string>
+    <string name="offline">Off</string>
+    <string name="connect">Connect</string>
+    <string name="view_only">View only</string>
+    <string name="fix_printer">Fix printing</string>
+    <string name="update">Update app</string>
+    <string name="version">Version %1$s</string>
+    <string name="later">Later</string>
+    <string name="update_none">You have the latest version</string>
+    <string name="update_available">New version %1$s available</string>
+    <string name="update_message">Downloaded from the hospital server and checked; Android then asks you to confirm the install.</string>
+    <string name="update_allow">Allow SCP-Remote to install apps, then tap Update again</string>
+    <string name="update_downloading">Downloading the new version…</string>
+    <string name="update_failed">The download failed or the file does not match what was published, so it was not installed</string>
+
+    <string name="disconnect">Disconnect</string>
+    <string name="toolbar">Toolbar</string>
+    <string name="keyboard">Show keyboard</string>
+    <string name="keyboard_short">Keyboard</string>
+    <string name="back">Back</string>
+    <string name="files">Files</string>
+    <string name="files_title">Files · %1$s</string>
+    <string name="files_opening">Opening the file channel… (someone may need to allow it on the computer)</string>
+    <string name="files_refused">The person at the computer declined, or the file channel could not open</string>
+    <string name="files_failed">Could not read the computer\'s files. Try again.</string>
+    <string name="files_empty">This folder is empty</string>
+    <string name="files_count">%1$d items · tap a file to save it on the phone</string>
+    <string name="files_up">Up one level</string>
+    <string name="upload_here">Send a file from the phone to this folder</string>
+    <string name="files_downloading">Receiving %1$s</string>
+    <string name="files_downloaded">Saved %1$s on the phone</string>
+    <string name="files_uploading">Sending %1$s</string>
+    <string name="files_uploaded">Sent %1$s to %2$s</string>
+    <string name="files_transfer_failed">The transfer failed. Try again.</string>
+    <string name="place_desktop">Desktop</string>
+    <string name="place_downloads">Downloads</string>
+    <string name="place_documents">Documents</string>
+    <string name="place_drives">All drives</string>
+    <string name="paste_to_pc">Paste phone text</string>
+    <string name="copy_from_pc">Copy computer text</string>
+    <string name="phone_clipboard_empty">Nothing copied on the phone yet</string>
+    <string name="pasted_to_pc">Pasted on the computer: %1$s</string>
+    <string name="pc_clipboard_empty">The computer\'s clipboard is empty (select text there and press Ctrl+C first)</string>
+    <string name="copied_from_pc">Copied to the phone: %1$s</string>
+    <string name="restart">Restart</string>
+    <string name="shutdown">Shut down</string>
+    <string name="wake">Wake up</string>
+    <string name="restart_title">Restart this computer?</string>
+    <string name="shutdown_title">Shut down this computer?</string>
+    <string name="power_warning">Unsaved work on this computer will be lost. If someone is using it, tell them first.</string>
+    <string name="restart_sent">Restart sent to %1$s; it should be back online in a few minutes</string>
+    <string name="shutdown_sent">Shut down sent to %1$s</string>
+    <string name="power_critical">This computer is marked critical: restart / shut down it through the maintenance steps on the web</string>
+    <string name="wake_sending">Waking %1$s…</string>
+    <string name="wake_sent">Wake signal sent to %1$s; if it supports it, it will start in a few minutes</string>
+    <string name="wake_no_mac">Cannot wake: this computer\'s network card address is not known yet</string>
+    <string name="wake_no_answer">The server did not answer. Try again.</string>
+    <string name="help">How to use</string>
+    <string name="close">Close</string>
+    <string name="got_it">Got it</string>
+    <string name="mode_touchpad_on">Touchpad mouse: drag a finger to move the pointer</string>
+    <string name="mode_direct_on">Direct touch: tap where you want to click</string>
+    <string name="signal_unknown">● Measuring the connection…</string>
+    <string name="signal_good">● Good connection · %1$d ms</string>
+    <string name="signal_fair">● Fair connection · %1$d ms</string>
+    <string name="signal_poor">● Slow connection · %1$d ms (try "Low bandwidth")</string>
+    <string name="signal_slow_hint">Slow connection. Try: round button → quality → Low bandwidth</string>
+    <string name="guide_title_touchpad">How to use · Touchpad</string>
+    <string name="guide_title_direct">How to use · Direct touch</string>
+    <string name="guide_touchpad">• Drag one finger = move the pointer\n• Tap = left click\n• Tap with two fingers = right click\n• Drag two fingers up/down = scroll\n• Tap, then touch and drag = drag and drop\n• Spread / pinch two fingers = zoom\n\nRound pink button = menu (keyboard, mouse mode, picture quality, Ctrl+Alt+Del, disconnect); drag it to move it\nDot on the button: green = good, amber = fair, red = slow</string>
+    <string name="guide_direct">• Tap = click there\n• Hold half a second, then let go = right click\n• Drag one finger = drag and drop\n• Spread / pinch two fingers = zoom\n• Drag two fingers = move the zoomed picture\n\nRound pink button = menu (keyboard, mouse mode, picture quality, Ctrl+Alt+Del, disconnect); drag it to move it\nDot on the button: green = good, amber = fair, red = slow</string>
+    <string name="guide_view_only">This account can only view this screen; mouse and keyboard are off.\n\n• Spread / pinch two fingers = zoom\n• Drag two fingers = move the zoomed picture\n\nRound pink button = menu (picture quality, disconnect)</string>
+    <string name="quality">Picture quality</string>
+    <string-array name="quality_names">
+        <item>Sharpest</item>
+        <item>Sharp</item>
+        <item>Balanced</item>
+        <item>Low bandwidth</item>
+    </string-array>
+    <string name="quality_button">%1$s</string>
+    <string name="display">Choose display</string>
+    <string name="all_displays">All displays</string>
+    <string name="display_n">Display %1$d</string>
+    <string name="display_button">%1$s</string>
+    <string name="mode_touchpad">Touchpad</string>
+    <string name="mode_direct">Direct touch</string>
+    <string name="retry">Retry</string>
+    <string name="st_connecting">Connecting…</string>
+    <string name="st_consent">Waiting for the person at the computer to allow access…</string>
+    <string name="st_image">Connected; waiting for the first picture…</string>
+    <string name="st_refused">The person at the computer declined, or the session could not open</string>
+    <string name="st_closed">Session ended. Tap Retry to connect again</string>
+    <string name="st_reconnecting">Connection lost. Reconnecting (%1$d/3)…</string>
+    <string name="st_view_only">View only · mouse and keyboard are off</string>
+
+    <string name="fix_title">Fix printing on this computer?</string>
+    <string name="fix_warning">Every job waiting in this computer\'s print queue is deleted and the print spooler restarts (a few seconds). If it shares printers with other computers, their waiting jobs are deleted too.\n\nThis cannot be undone. Deleted jobs have to be printed again.</string>
+    <string name="fix_go">Fix printing</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="fix_working">Working… (waiting for the computer)</string>
+    <string name="fix_done">✓ Done · jobs waiting %1$s → %2$s · Spooler %3$s</string>
+    <string name="fix_spooler_down">✗ Spooler not running (%1$s)</string>
+    <string name="fix_ACCESS_DENIED">✗ No permission on this computer</string>
+    <string name="fix_NOT_ONLINE">✗ The computer is not on, or is not Windows</string>
+    <string name="fix_NO_ANSWER">✗ No answer in 90 seconds</string>
+    <string name="fix_COMMAND_BUSY">✗ Busy with another command; try again</string>
+    <string name="fix_failed">✗ Failed (%1$s)</string>
+</resources>

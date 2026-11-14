@@ -24,10 +24,41 @@
 
  function layout(){const canvas=document.getElementById('deskarea3x');if(!canvas||canvas.offsetParent===null)return;const height=id=>{const n=document.getElementById(id);return n&&n.offsetParent!==null?n.getBoundingClientRect().height:0;};const bottom=height('deskarea4')+(document.body.classList.contains('fulldesk')?0:height('footer'))+12;const value=Math.max(120,root.innerHeight-canvas.getBoundingClientRect().top-bottom)+'px';if(canvas.style.getPropertyValue('--scp-canvas-height')!==value)canvas.style.setProperty('--scp-canvas-height',value);if(typeof root.deskAdjust==='function')root.deskAdjust();}
 
+ // The tools panel beside the remote picture (Connect, quality, recording) starts folded away so
+ // the picture has the whole window, and one small button brings it back. It is only ever
+ // folded while a screen is connected: Connect, the reason a session failed and Retry all live
+ // in that panel, so with nothing connected it is shown whatever was chosen.
+ let sideOpen=false,sideBtn=null;
+ function sideWanted(){try{return root.localStorage.getItem('scpRemoteSide')==='open';}catch(e){return false;}}
+ function sideApply(){
+  if(!sideBtn)return;
+  const th=document.documentElement.lang==='th';
+  const connected=!!(root.desktop&&root.desktop.State===3);
+  const fold=!sideOpen&&connected;
+  if(document.body.classList.contains('scp-side-collapsed')!==fold){document.body.classList.toggle('scp-side-collapsed',fold);layout();}
+  sideBtn.hidden=!connected;
+  sideBtn.textContent=fold?'\u203A':'\u2039';
+  sideBtn.title=fold?(th?'แสดงแผงเครื่องมือ':'Show the tools panel'):(th?'ซ่อนแผงเครื่องมือ ให้ภาพเต็มจอ':'Hide the tools panel');
+  sideBtn.setAttribute('aria-label',sideBtn.title);
+  sideBtn.setAttribute('aria-expanded',String(!fold));
+ }
+ function sidePanel(host){
+  if(sideBtn||!host||!host.parentElement)return;
+  // Not inside the SCP-Remote program, nor on the sharing page it shows: there the tools panel
+  // is not drawn at all, so the button would fold nothing.
+  if(root.scpClipboard||root.scpSessionAPI||document.getElementById('LeftMenuDesktop'))return;
+  sideOpen=sideWanted();
+  sideBtn=document.createElement('button');sideBtn.type='button';sideBtn.id='scp-side-toggle';sideBtn.hidden=true;
+  sideBtn.onclick=function(){const open=!sideOpen;sideOpen=open;try{root.localStorage.setItem('scpRemoteSide',open?'open':'closed');}catch(e){}sideApply();};
+  host.parentElement.appendChild(sideBtn);
+  sideApply();
+  setInterval(sideApply,400);
+ }
+
  function ensure(){if(dock)return;const th=document.documentElement.lang==='th';dock=document.createElement('aside');dock.id='scp-remote-dock';dock.hidden=true;
   const head=document.createElement('header'),brand=document.createElement('span');brand.className='scp-dock-brand';brand.textContent='SCP';const title=document.createElement('div');const name=document.createElement('strong');name.textContent=th?'เครื่องมือรีโมต':'Remote tools';const hint=document.createElement('small');hint.textContent='SCP-Remote · Hospital IT';title.append(name,hint);
   toggle=document.createElement('button');toggle.type='button';toggle.textContent='−';toggle.setAttribute('aria-label',th?'ย่อหรือขยายเครื่องมือรีโมต':'Collapse or expand remote tools');toggle.setAttribute('aria-expanded','true');toggle.onclick=()=>{body.hidden=!body.hidden;toggle.textContent=body.hidden?'+':'−';toggle.setAttribute('aria-expanded',String(!body.hidden));};head.append(brand,title,toggle);
-  body=document.createElement('div');body.className='scp-dock-content';dock.append(head,body);const host=document.getElementById('deskarea1');(host||document.body).append(dock);if(host){dock.classList.add('scp-inline');document.body.classList.add('scp-inline-tools');if(root.ResizeObserver){const resize=new ResizeObserver(layout);resize.observe(host);const viewport=document.getElementById('deskarea3x');if(viewport)resize.observe(viewport);}watchViewport();}
+  body=document.createElement('div');body.className='scp-dock-content';dock.append(head,body);const host=document.getElementById('deskarea1');(host||document.body).append(dock);if(host){dock.classList.add('scp-inline');document.body.classList.add('scp-inline-tools');sidePanel(host);if(root.ResizeObserver){const resize=new ResizeObserver(layout);resize.observe(host);const viewport=document.getElementById('deskarea3x');if(viewport)resize.observe(viewport);}watchViewport();}
   const observer=new MutationObserver(()=>{const visible=Array.from(body.children).some(n=>!n.hidden);if(dock.hidden===visible)dock.hidden=!visible;document.body.classList.toggle('scp-dock-visible',visible);layout();});observer.observe(body,{attributes:true,attributeFilter:['hidden'],subtree:true,childList:true});
  }
  // /m sends someone straight to one computer's screen. Everything the site puts around that -
@@ -63,6 +94,12 @@
   const bar=document.createElement('header');bar.id='scp-app-bar';bar.hidden=true;
   const back=document.createElement(fromList?'a':'button');back.className='scp-app-back';
   if(fromList){back.href='m';}else{back.type='button';back.onclick=function(){
+   // Back to the page Remote was pressed on (the Remote page unless it was the dashboard), and
+   // end the session, since nobody is looking at that screen once the list is showing.
+   if(root.ScpDashboard&&root.ScpDashboard.returnFromRemote){
+    if(root.desktop&&typeof root.connectDesktop==='function'){try{root.connectDesktop(null,0);}catch(e){}}
+    root.ScpDashboard.returnFromRemote();return;
+   }
    // Back to the device, not out of it: whoever came this way was already looking at the
    // machine and wants the tabs again, not the list.
    if(typeof root.gotoDevice==='function'&&root.currentNode){root.gotoDevice(root.currentNode._id,10);}
@@ -79,7 +116,13 @@
   // shown only while the picture is zoomed in: one tap back to the whole screen
   fitBtn=document.createElement('button');fitBtn.type='button';fitBtn.className='scp-app-fit';fitBtn.hidden=true;
   fitBtn.onclick=function(){zoomTo(1);};
-  bar.append(back,name,state,fitBtn);
+  // Shown while the whole remote screen is shrunk to fit: one press enlarges it so one remote
+  // pixel is one pixel of this screen - readable on any phone, whatever its size - and a finger
+  // then slides it about. The size comes from this device, so no phone is guessed at.
+  readBtn=document.createElement('button');readBtn.type='button';readBtn.className='scp-app-fit scp-app-read';readBtn.hidden=true;
+  readBtn.textContent=th?'ขยายให้อ่านได้':'Readable size';
+  readBtn.onclick=function(){const z=readableZoom();if(z<=1)return;const parent=document.getElementById('DeskParent'),desk=document.getElementById('Desk');const r=desk.getBoundingClientRect();fit={w:r.width,h:r.height};zoomTo(z);if(parent){parent.scrollLeft=Math.max(0,(parent.scrollWidth-parent.clientWidth)/2);parent.scrollTop=0;}};
+  bar.append(back,name,readBtn,fitBtn,state);
   document.body.insertBefore(bar,document.body.firstChild);
 
   // The view, the machine and the connection all change while the page stays put, so all three
@@ -99,6 +142,7 @@
    if(node&&node.name&&node.name!==shown){shown=node.name;name.textContent=node.name;}
    // 3 is connected, the same test the page makes on itself.
    const connected=!!(root.desktop&&root.desktop.State===3);
+   if(readBtn){const want=connected&&zoom===1&&readableZoom()>1.15;if(readBtn.hidden===want)readBtn.hidden=!want;}
    if(connected!==live){
     live=connected;
     state.textContent=connected?(th?'เชื่อมต่อแล้ว':'Connected'):(th?'ยังไม่เชื่อมต่อ':'Not connected');
@@ -117,13 +161,16 @@
  // The remote mouse is placed from where the tap lands on the picture (offsetX against the
  // picture's displayed width), which stays right however large the picture is drawn or far it
  // is scrolled. Two-finger touches never become clicks, so pinching presses nothing remotely.
- let zoom=1,fit=null,fitBtn=null;
+ let zoom=1,fit=null,fitBtn=null,readBtn=null;
+ // How much to enlarge a shrunk picture so each remote pixel takes one CSS pixel of this screen.
+ function readableZoom(){const desk=document.getElementById('Desk');if(!desk||!desk.width)return 1;const r=desk.getBoundingClientRect();if(!(r.width>0))return 1;return Math.max(1,Math.min(4,desk.width/r.width));}
  function zoomTo(z){
   const parent=document.getElementById('DeskParent'),desk=document.getElementById('Desk');
   if(!parent||!desk)return;
   zoom=Math.max(1,Math.min(4,z));
   if(zoom<1.04){zoom=1;parent.classList.remove('scp-zoomed');if(typeof root.deskAdjust==='function')root.deskAdjust();}
   else if(fit){desk.style.width=Math.round(fit.w*zoom)+'px';desk.style.height=Math.round(fit.h*zoom)+'px';desk.style.marginTop='0px';parent.style.overflow='auto';parent.classList.add('scp-zoomed');}
+  if(readBtn&&zoom!==1)readBtn.hidden=true;
   if(fitBtn){fitBtn.hidden=zoom===1;fitBtn.textContent=(document.documentElement.lang==='th'?'พอดีจอ':'Fit')+' · '+Math.round(zoom*100)+'%';}
  }
  function pinchZoom(){

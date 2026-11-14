@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SCP-Remote</string>
+    <string name="login_title">IT รพ.สีชมพู</string>
+    <string name="login_subtitle">เข้าสู่ระบบด้วยบัญชี SCP-Remote</string>
+    <string name="server">ที่อยู่เซิร์ฟเวอร์</string>
+    <string name="user">ชื่อผู้ใช้</string>
+    <string name="password">รหัสผ่าน</string>
+    <string name="remember">จำบัญชีไว้ในเครื่องนี้ (เข้ารหัส)</string>
+    <string name="sign_in">เข้าสู่ระบบ</string>
+    <string name="signing_in">กำลังเข้าสู่ระบบ…</string>
+    <string name="err_BAD_LOGIN">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</string>
+    <string name="err_CERT_MISMATCH">ใบรับรองของเซิร์ฟเวอร์ไม่ตรงกับที่แอปรู้จัก จึงไม่ได้ส่งรหัสผ่าน</string>
+    <string name="err_UNREACHABLE">ติดต่อเซิร์ฟเวอร์ไม่ได้ ทั้งในโรงพยาบาลและผ่านอินเทอร์เน็ต ตรวจว่ามือถือต่อเน็ตอยู่</string>
+    <string name="trying_internet">ติดต่อในโรงพยาบาลไม่ได้ กำลังลองผ่านอินเทอร์เน็ต…</string>
+    <string name="trying_hospital">ติดต่อผ่านอินเทอร์เน็ตไม่ได้ กำลังลองในโรงพยาบาล…</string>
+    <string name="who_internet">%1$s · ผ่านอินเทอร์เน็ต</string>
+    <string name="err_DISCONNECTED">การเชื่อมต่อกับเซิร์ฟเวอร์หลุด</string>
+    <string name="err_TIMEOUT">เซิร์ฟเวอร์ไม่ตอบในเวลาที่กำหนด</string>
+    <string name="err_UNKNOWN_OPERATION">เซิร์ฟเวอร์ยังไม่รองรับแอปนี้ ต้องอัปเดตเซิร์ฟเวอร์ก่อน</string>
+    <string name="err_other">ทำไม่สำเร็จ (%1$s)</string>
+    <string name="fill_in">กรอกชื่อผู้ใช้และรหัสผ่าน</string>
+
+    <string name="devices_title">เครื่องคอมพิวเตอร์</string>
+    <string name="search_hint">ค้นหาชื่อ IP ผู้ใช้ หน่วยงาน</string>
+    <string name="all_groups">ทุกหน่วยงาน</string>
+    <string name="refresh">รีเฟรช</string>
+    <string name="menu">เมนู</string>
+    <string name="clear_search">ล้างคำค้นหา</string>
+    <string name="show_password">แสดงรหัสผ่าน</string>
+    <string name="chip_label">%1$s (%2$d)</string>
+    <string name="section_recent">ใช้ล่าสุด (%1$d)</string>
+    <string name="section_online">เปิดอยู่ (%1$d)</string>
+    <string name="section_offline">ปิดอยู่ (%1$d)</string>
+    <string name="sign_out">ออกจากระบบ</string>
+    <string name="sign_out_confirm">ออกจากระบบและลืมบัญชีที่จำไว้ในเครื่องนี้?</string>
+    <string name="loading">กำลังโหลด…</string>
+    <string name="no_devices">ไม่พบเครื่องที่ตรงกับการค้นหา</string>
+    <string name="count">%1$d เครื่อง · เปิดอยู่ %2$d</string>
+    <string name="online">เปิดอยู่</string>
+    <string name="offline">ปิดอยู่</string>
+    <string name="connect">เชื่อมต่อ</string>
+    <string name="view_only">ดูอย่างเดียว</string>
+    <string name="fix_printer">แก้ปริ้น</string>
+    <string name="update">อัปเดตแอป</string>
+    <string name="version">เวอร์ชัน %1$s</string>
+    <string name="later">ภายหลัง</string>
+    <string name="update_none">ใช้รุ่นล่าสุดอยู่แล้ว</string>
+    <string name="update_available">มีแอปรุ่นใหม่ %1$s</string>
+    <string name="update_message">ดาวน์โหลดจากเซิร์ฟเวอร์ของโรงพยาบาล ตรวจลายเซ็นไฟล์ แล้ว Android จะถามยืนยันการติดตั้ง</string>
+    <string name="update_allow">อนุญาตให้ SCP-Remote ติดตั้งแอป แล้วกดอัปเดตอีกครั้ง</string>
+    <string name="update_downloading">กำลังดาวน์โหลดรุ่นใหม่…</string>
+    <string name="update_failed">ดาวน์โหลดรุ่นใหม่ไม่สำเร็จ หรือไฟล์ไม่ตรงกับที่ประกาศ จึงไม่ติดตั้ง</string>
+
+    <string name="disconnect">ตัดการเชื่อมต่อ</string>
+    <string name="toolbar">แถบเครื่องมือ</string>
+    <string name="keyboard">เปิดคีย์บอร์ด</string>
+    <string name="keyboard_short">คีย์บอร์ด</string>
+    <string name="back">กลับ</string>
+    <string name="files">ไฟล์</string>
+    <string name="files_title">ไฟล์ · %1$s</string>
+    <string name="files_opening">กำลังเปิดช่องไฟล์… (ถ้าเครื่องตั้งให้ถามก่อน ต้องมีคนกดอนุญาต)</string>
+    <string name="files_refused">ผู้ใช้เครื่องปลายทางไม่อนุญาต หรือเปิดช่องไฟล์ไม่ได้</string>
+    <string name="files_failed">อ่านไฟล์จากเครื่องไม่ได้ ลองใหม่อีกครั้ง</string>
+    <string name="files_empty">โฟลเดอร์นี้ว่าง</string>
+    <string name="files_count">%1$d รายการ · แตะไฟล์เพื่อบันทึกลงมือถือ</string>
+    <string name="files_up">ขึ้นไปหนึ่งระดับ</string>
+    <string name="upload_here">ส่งไฟล์จากมือถือมาที่โฟลเดอร์นี้</string>
+    <string name="files_downloading">กำลังรับ %1$s</string>
+    <string name="files_downloaded">บันทึก %1$s ลงมือถือแล้ว</string>
+    <string name="files_uploading">กำลังส่ง %1$s</string>
+    <string name="files_uploaded">ส่ง %1$s ไปที่ %2$s แล้ว</string>
+    <string name="files_transfer_failed">โอนไฟล์ไม่สำเร็จ ลองใหม่อีกครั้ง</string>
+    <string name="place_desktop">เดสก์ท็อป</string>
+    <string name="place_downloads">ดาวน์โหลด</string>
+    <string name="place_documents">เอกสาร</string>
+    <string name="place_drives">ไดรฟ์ทั้งหมด</string>
+    <string name="paste_to_pc">วางข้อความจากมือถือ</string>
+    <string name="copy_from_pc">เอาข้อความจากคอม</string>
+    <string name="phone_clipboard_empty">ยังไม่มีข้อความที่คัดลอกไว้ในมือถือ</string>
+    <string name="pasted_to_pc">วางที่คอมแล้ว: %1$s</string>
+    <string name="pc_clipboard_empty">คลิปบอร์ดของคอมว่าง (เลือกข้อความบนคอมแล้วกด Ctrl+C ก่อน)</string>
+    <string name="copied_from_pc">คัดลอกมาที่มือถือแล้ว: %1$s</string>
+    <string name="restart">รีสตาร์ตเครื่อง</string>
+    <string name="shutdown">ปิดเครื่อง</string>
+    <string name="wake">ปลุกเครื่อง</string>
+    <string name="restart_title">รีสตาร์ตเครื่องนี้ใช่หรือไม่</string>
+    <string name="shutdown_title">ปิดเครื่องนี้ใช่หรือไม่</string>
+    <string name="power_warning">งานที่ยังไม่ได้บันทึกบนเครื่องนี้จะหายไป ถ้ามีคนใช้อยู่ควรบอกก่อน</string>
+    <string name="restart_sent">ส่งคำสั่งรีสตาร์ต %1$s แล้ว เครื่องจะกลับมาออนไลน์ในไม่กี่นาที</string>
+    <string name="shutdown_sent">ส่งคำสั่งปิด %1$s แล้ว</string>
+    <string name="power_critical">เครื่องนี้ถูกตั้งเป็นเครื่องสำคัญ ต้องปิด/รีสตาร์ตผ่านขั้นตอนบำรุงรักษาบนเว็บ</string>
+    <string name="wake_sending">กำลังปลุก %1$s…</string>
+    <string name="wake_sent">ส่งสัญญาณปลุก %1$s แล้ว ถ้าเครื่องรองรับจะเปิดในไม่กี่นาที</string>
+    <string name="wake_no_mac">ปลุกไม่ได้: ยังไม่รู้ที่อยู่การ์ดแลนของเครื่องนี้</string>
+    <string name="wake_no_answer">เซิร์ฟเวอร์ไม่ตอบ ลองใหม่อีกครั้ง</string>
+    <string name="help">วิธีใช้</string>
+    <string name="close">ปิด</string>
+    <string name="got_it">เข้าใจแล้ว</string>
+    <string name="mode_touchpad_on">เมาส์แบบทัชแพด: ลากนิ้วเพื่อเลื่อนเมาส์</string>
+    <string name="mode_direct_on">เมาส์แบบแตะตรง: แตะตรงไหนคลิกตรงนั้น</string>
+    <string name="signal_unknown">● กำลังวัดสัญญาณ…</string>
+    <string name="signal_good">● สัญญาณดี · %1$d ms</string>
+    <string name="signal_fair">● สัญญาณพอใช้ · %1$d ms</string>
+    <string name="signal_poor">● สัญญาณช้า · %1$d ms (ลองคุณภาพ "ประหยัดเน็ต")</string>
+    <string name="signal_slow_hint">สัญญาณช้า แนะนำ: แตะปุ่มกลม → คุณภาพ → ประหยัดเน็ต</string>
+    <string name="guide_title_touchpad">วิธีใช้ · แบบทัชแพด</string>
+    <string name="guide_title_direct">วิธีใช้ · แบบแตะตรง</string>
+    <string name="guide_touchpad">• ลากนิ้วเดียว = เลื่อนเมาส์\n• แตะ 1 ครั้ง = คลิกซ้าย\n• แตะสองนิ้วพร้อมกัน = คลิกขวา\n• ลากสองนิ้วขึ้น-ลง = เลื่อนหน้า\n• แตะแล้วแตะค้างลาก = ลากวาง\n• ถ่าง / บีบสองนิ้ว = ซูม\n\nปุ่มกลมสีชมพู = เมนู (คีย์บอร์ด, เปลี่ยนแบบเมาส์, คุณภาพภาพ, Ctrl+Alt+Del, ตัดการเชื่อมต่อ) ลากย้ายได้\nจุดสีบนปุ่ม: เขียว = เน็ตดี, เหลือง = พอใช้, แดง = ช้า</string>
+    <string name="guide_direct">• แตะตรงไหน = คลิกตรงนั้น\n• กดค้างครึ่งวินาทีแล้วปล่อย = คลิกขวา\n• ลากนิ้วเดียว = ลากวาง\n• ถ่าง / บีบสองนิ้ว = ซูม\n• ลากสองนิ้ว = เลื่อนภาพตอนซูม\n\nปุ่มกลมสีชมพู = เมนู (คีย์บอร์ด, เปลี่ยนแบบเมาส์, คุณภาพภาพ, Ctrl+Alt+Del, ตัดการเชื่อมต่อ) ลากย้ายได้\nจุดสีบนปุ่ม: เขียว = เน็ตดี, เหลือง = พอใช้, แดง = ช้า</string>
+    <string name="guide_view_only">บัญชีนี้ดูหน้าจอได้อย่างเดียว เมาส์และคีย์บอร์ดปิดอยู่\n\n• ถ่าง / บีบสองนิ้ว = ซูม\n• ลากสองนิ้ว = เลื่อนภาพตอนซูม\n\nปุ่มกลมสีชมพู = เมนู (คุณภาพภาพ, ตัดการเชื่อมต่อ)</string>
+    <string name="quality">คุณภาพภาพ</string>
+    <string-array name="quality_names">
+        <item>คมชัดสูงสุด</item>
+        <item>คมชัด</item>
+        <item>สมดุล</item>
+        <item>ประหยัดเน็ต</item>
+    </string-array>
+    <string name="quality_button">%1$s</string>
+    <string name="display">เลือกจอ</string>
+    <string name="all_displays">ทุกจอ</string>
+    <string name="display_n">จอ %1$d</string>
+    <string name="display_button">%1$s</string>
+    <string name="mode_touchpad">ทัชแพด</string>
+    <string name="mode_direct">แตะตรง</string>
+    <string name="retry">ลองใหม่</string>
+    <string name="st_connecting">กำลังเชื่อมต่อ…</string>
+    <string name="st_consent">รอผู้ใช้เครื่องปลายทางกดอนุญาต…</string>
+    <string name="st_image">เชื่อมต่อแล้ว กำลังรอภาพแรก…</string>
+    <string name="st_refused">ผู้ใช้เครื่องปลายทางปฏิเสธ หรือเปิดเซสชันไม่ได้</string>
+    <string name="st_closed">การเชื่อมต่อสิ้นสุด กดลองใหม่เพื่อขอเชื่อมต่ออีกครั้ง</string>
+    <string name="st_reconnecting">การเชื่อมต่อหลุด กำลังต่อใหม่ (ครั้งที่ %1$d/3)…</string>
+    <string name="st_view_only">ดูอย่างเดียว · เมาส์และคีย์บอร์ดปิดอยู่</string>
+
+    <string name="fix_title">แก้ปริ้นไม่ออกที่เครื่องนี้ใช่หรือไม่</string>
+    <string name="fix_warning">งานพิมพ์ที่ค้างในคิวของเครื่องนี้จะถูกลบทั้งหมด แล้ว Print Spooler จะเริ่มใหม่ (ไม่กี่วินาที) ถ้าเครื่องนี้แชร์เครื่องพิมพ์ให้เครื่องอื่น งานที่ค้างของเครื่องอื่นจะถูกลบด้วย\n\nย้อนกลับไม่ได้ งานที่ถูกลบต้องสั่งพิมพ์ใหม่</string>
+    <string name="fix_go">แก้ปริ้นเครื่องนี้</string>
+    <string name="cancel">ยกเลิก</string>
+    <string name="ok">ตกลง</string>
+    <string name="fix_working">กำลังแก้… (รอเครื่องตอบ)</string>
+    <string name="fix_done">✓ แก้แล้ว · งานค้าง %1$s → %2$s · Spooler %3$s</string>
+    <string name="fix_spooler_down">✗ Spooler ยังไม่ทำงาน (%1$s)</string>
+    <string name="fix_ACCESS_DENIED">✗ ไม่มีสิทธิ์สั่งงานเครื่องนี้</string>
+    <string name="fix_NOT_ONLINE">✗ เครื่องไม่ได้เปิดอยู่ หรือไม่ใช่ Windows</string>
+    <string name="fix_NO_ANSWER">✗ เครื่องไม่ตอบใน 90 วินาที</string>
+    <string name="fix_COMMAND_BUSY">✗ เครื่องกำลังทำคำสั่งอื่น ลองใหม่อีกครั้ง</string>
+    <string name="fix_failed">✗ ทำไม่สำเร็จ (%1$s)</string>
+</resources>

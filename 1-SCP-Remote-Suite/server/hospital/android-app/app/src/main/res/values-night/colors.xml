@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark mode (phone set to dark): same pink, darker surfaces, lighter text. -->
+<resources>
+    <color name="accent">#E0629F</color>
+    <color name="accent_dark">#6E1847</color>
+    <color name="accent_container">#4A1F35</color>
+    <color name="header_bg">#7E2457</color>
+    <color name="background">#151116</color>
+    <color name="card">#211A22</color>
+    <color name="card_border">#3A2E38</color>
+    <color name="text">#F3E9EF</color>
+    <color name="text_muted">#B9AAB3</color>
+    <color name="offline">#6D6268</color>
+    <color name="fix_busy_bg">#3A2F12</color>
+    <color name="fix_busy_fg">#F5D27A</color>
+    <color name="fix_ok_bg">#16301F</color>
+    <color name="fix_ok_fg">#8FDCA8</color>
+    <color name="fix_fail_bg">#3A1818</color>
+    <color name="fix_fail_fg">#F4A3A3</color>
+</resources>

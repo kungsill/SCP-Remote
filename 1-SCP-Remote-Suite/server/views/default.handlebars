@@ -7,15 +7,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="robots" content="noindex,nofollow">
-    <link rel="manifest" href="{{{domainurl}}}manifest.json">
-    <link type="image/x-icon" href="{{{domainurl}}}favicon.ico" rel="shortcut icon" />
+    <!-- SCP-Remote: the installed phone app uses the hospital name, logo and colour (public/scp-app.json, public/images/app/). -->
+    <link rel="manifest" href="{{{domainurl}}}scp-app.json">
+    <link type="image/png" href="{{{domainurl}}}images/app/favicon-32.png" rel="shortcut icon" />
     <link keeplink=1 type="text/css" href="styles/style.css" media="screen" rel="stylesheet" title="CSS" />
     <link type="text/css" href="styles/ol.css" media="screen" rel="stylesheet" title="CSS" />
     <link type="text/css" href="styles/ol3-contextmenu.min.css" media="screen" rel="stylesheet" title="CSS" />
     <link type="text/css" href="styles/xterm.css" media="screen" rel="stylesheet" title="CSS" />
     <link type="text/css" href="styles/flatpickr.min.css" media="screen" rel="stylesheet" title="CSS">
     {{{customCSSTags}}}
-    <link rel="apple-touch-icon" href="/favicon-303x303.png" />
+    <link rel="apple-touch-icon" href="{{{domainurl}}}images/app/apple-touch-icon.png" />
     <script type="text/javascript" src="scripts/common-0.0.1{{{min}}}.js"></script>
     <script type="text/javascript" src="scripts/meshcentral{{{min}}}.js"></script>
     <script type="text/javascript" src="scripts/amt-0.2.0{{{min}}}.js"></script>
@@ -28,7 +29,7 @@
     <script type="text/javascript" src="scripts/zlib-crc32{{{min}}}.js"></script>
     <script type="text/javascript" src="scripts/amt-redir-ws-0.1.0{{{min}}}.js"></script>
     <script type="text/javascript" src="scripts/amt-wsman-ws-0.2.0{{{min}}}.js"></script>
-    <script type="text/javascript" src="scripts/agent-redir-ws-0.1.1{{{min}}}.js"></script>
+    <script type="text/javascript" src="scripts/agent-redir-ws-0.1.1{{{min}}}.js?v=20261113-keepalive"></script>
     <script type="text/javascript" src="scripts/agent-redir-rtc-0.1.0{{{min}}}.js"></script>
     <script type="text/javascript" src="scripts/agent-desktop-0.0.2{{{min}}}.js"></script>
     <script type="text/javascript" src="scripts/agent-rdp-0.0.1{{{min}}}.js"></script>
@@ -54,38 +55,62 @@
     {{{customJSTags}}}
     <title>{{{title}}}</title>
     <!-- SCP-Remote: local hospital fonts and theme. -->
-    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-remote.css?v=20261013-pinch" />
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-remote.css?v=20261114-landscape" />
     <script defer src="{{{domainurl}}}scripts/scp-files.js"></script>
-    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-ui.css?v=20261013-contrast" />
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-ui.css?v=20261114-phone" />
     <script defer src="{{{domainurl}}}scripts/scp-ui.js?v=20261013-drawer"></script>
-    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-dashboard.css?v=20261014-addpc" />
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-dashboard.css?v=20261112-phone" />
+    <!-- SCP-Remote: My Account page laid out as cards; unused controls (delete account, login tokens, 2FA) hidden. -->
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-account.css?v=20261113-1" />
+    <script defer src="{{{domainurl}}}scripts/scp-account.js?v=20261113-1"></script>
+    <!-- SCP-Remote: device group page laid out as cards; Remote on each computer that is on; Intel AMT hidden. -->
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-group.css?v=20261114-1" />
+    <script defer src="{{{domainurl}}}scripts/scp-group.js?v=20261114-1"></script>
+    <!-- SCP-Remote: a computer's General page regrouped into cards with Remote and Files on top. -->
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-device.css?v=20261113-1" />
+    <script defer src="{{{domainurl}}}scripts/scp-device.js?v=20261113-1"></script>
+    <!-- SCP-Remote: My Events as what happened: one line per remote session, failures in red, detailed log one press away. -->
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-events.css?v=20261113-1" />
+    <script defer src="{{{domainurl}}}scripts/scp-events.js?v=20261113-1"></script>
+    <!-- SCP-Remote: readable event summaries with the original detailed log available. -->
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-events.css?v=20261113-2" />
+    <script defer src="{{{domainurl}}}scripts/scp-events.js?v=20261113-2"></script>
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-server.css?v=20261113-1" />
+    <script defer src="{{{domainurl}}}scripts/scp-server.js?v=20261113-1"></script>
     <script defer src="{{{domainurl}}}scripts/scp-progress.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-monitor.js"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-monitor.css" />
     <script defer src="{{{domainurl}}}scripts/scp-cleanup.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-connection.js"></script>
-    <script defer src="{{{domainurl}}}scripts/scp-session.js?v=20260923-webp"></script>
-    <script defer src="{{{domainurl}}}scripts/scp-operations.js?v=20261013-estimates"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-session.js?v=20261114-phone"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-ticket-presets.js?v=20261014-print2"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-operations.js?v=20261113-ce"></script>
     <script defer src="{{{domainurl}}}scripts/scp-power.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-programs.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-services.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-report.js?v=20261012-fiscal"></script>
     <script defer src="{{{domainurl}}}scripts/scp-care-center.js"></script>
     <script defer src="{{{domainurl}}}scripts/scp-care.js"></script>
-    <script defer src="{{{domainurl}}}scripts/scp-health.js?v=20261014-simple"></script>
-    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-operations.css" />
+    <script defer src="{{{domainurl}}}scripts/scp-health.js?v=20261018-fixprog"></script>
+    <!-- SCP-Remote: SCPclear technician tools (blue screens, RAM, batteries, SFC/DISM, winget, LAN scan, send SCPclear). -->
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-tech.css?v=20261018-notinst" />
+    <script defer src="{{{domainurl}}}scripts/scp-tech.js?v=20261113-ce"></script>
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-operations.css?v=20261015-dept" />
+    <script defer src="{{{domainurl}}}scripts/scp-ticket-form.js?v=20261015-qr"></script>
     <script defer src="{{{domainurl}}}scripts/scp-price-reference.js?v=20261012-fiscal"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-price-archive.css?v=20261013-central" />
     <script defer src="{{{domainurl}}}scripts/scp-price-archive.js?v=20261013-central"></script>
     <script defer src="{{{domainurl}}}scripts/scp-assess.js?v=20261013-ryzen"></script>
     <script defer src="{{{domainurl}}}scripts/scp-map.js?v=20261013-sign"></script>
     <script defer src="{{{domainurl}}}scripts/scp-map-anime.js?v=20261013-sign"></script>
-    <script defer src="{{{domainurl}}}scripts/scp-dashboard.js?v=20261014-addpc"></script>
+    <script defer src="{{{domainurl}}}scripts/scp-dashboard.js?v=20261113-ce"></script>
     <link rel="stylesheet" href="{{{domainurl}}}styles/scp-transfer.css" />
     <script defer src="{{{domainurl}}}scripts/scp-transfer.js"></script>
 <script defer src="{{{domainurl}}}scripts/scp-recording.js?v=20260922-2"></script>
 <script defer src="{{{domainurl}}}scripts/scp-lan.js?v=20260922-relay"></script>
-<script defer src="{{{domainurl}}}scripts/scp-remote-ui.js?v=20261013-pinch"></script>
+<!-- SCP-Remote: draws the remote picture on whole pixels (must load before scp-remote-ui.js). -->
+<script defer src="{{{domainurl}}}scripts/scp-remote-fit.js?v=20261112-fit"></script>
+<script defer src="{{{domainurl}}}scripts/scp-remote-ui.js?v=20261114-phonebar"></script>
 </head>
 <body id="body" oncontextmenu="handleContextMenu(event)" style="display:none;min-width:495px" onload="if (typeof(startup) !== 'undefined') startup();">
     <!-- right click menu -->
@@ -838,10 +863,6 @@
                                 <img src="images/vnc/icn_key_combo.svg" alt="" />
                                 <span>Ctrl+Alt+Del</span>
                             </button>
-                            <button type="button" class="vnc-tb-btn" onclick="deskToggleFull(event)" title="Full Screen">
-                                <img src="images/vnc/da_summary_general.svg" alt="" />
-                                <span>Full Screen</span>
-                            </button>
                             <button type="button" class="vnc-tb-btn" onclick="toggleAspectRatio(1)" title="Scaling / View Mode">
                                 <img src="images/vnc/icn_manage.svg" alt="" />
                                 <span>Scale</span>
@@ -854,7 +875,7 @@
                                 <img src="images/vnc/icn_reboot.svg" alt="" />
                                 <span>Reboot</span>
                             </button>
-                            <button type="button" class="vnc-tb-btn disconnect" onclick="connectDesktop(event, 0)" title="Disconnect Remote Session">
+                            <button type="button" class="vnc-tb-btn disconnect" onclick="connectDesktop(event, 0); if (window.ScpDashboard && window.ScpDashboard.returnFromRemote) { window.ScpDashboard.returnFromRemote(); }" title="Disconnect Remote Session">
                                 <img src="images/vnc/icn_end_conn.svg" alt="" />
                                 <span>Disconnect</span>
                             </button>
@@ -1716,7 +1737,7 @@
         var stars = {}; // Devices that have been "stared" by the user.
         var nodeShortIdent = 0;
         var desktop;
-        var desktopsettings = { encoding: 2, showfocus: false, showmouse: true, showcad: true, quality: 100, scaling: 1024, framerate: 50, localkeymap: false, swapmouse: false, remotekeymap: false, autoclipboard: false, autolock: false, agentencoding: 4 }; // SCP-Remote: WEBP at full quality stays sharp without the traffic PNG needs
+        var desktopsettings = { encoding: 2, showfocus: false, showmouse: true, showcad: true, quality: 100, scaling: 1024, framerate: 50, localkeymap: false, swapmouse: false, remotekeymap: false, autoclipboard: true, autolock: false, agentencoding: 2 }; // SCP-Remote: lossless PNG by default (chosen 12 Nov 2026: WEBP left text soft); matches the top rung in scp-session.js
         var multidesktopsettings = { quality: 60, scaling: 512, framerate: 400, agentencoding: 4 }; // SCP-Remote: an eighth of the screen is too coarse to read
         var terminal;
         var files;
@@ -1973,8 +1994,12 @@
             // SCP-Remote: Hospital LAN - Always force 100% full quality & 1024 full scaling from the start
             if (!desktopsettings.quality || parseInt(desktopsettings.quality) < 100) { desktopsettings.quality = 100; }
             if (!desktopsettings.scaling || parseInt(desktopsettings.scaling) < 1024) { desktopsettings.scaling = 1024; }
-            desktopsettings.agentencoding = 4;
+            desktopsettings.agentencoding = 2; // SCP-Remote: lossless PNG, the top rung of the ladder in scp-session.js
             desktopsettings.framerate = 50;
+            // SCP-Remote: copy on one computer and paste on the other without pressing a button.
+            // Browsers that saved settings before this default are switched on once; a technician
+            // who then turns it off in Settings keeps that choice.
+            try { if (localStorage.getItem('scpAutoClipboard1') == null) { desktopsettings.autoclipboard = true; localStorage.setItem('scpAutoClipboard1', '1'); } } catch (ex) { }
             try { localStorage.setItem('desktopsettings', JSON.stringify(desktopsettings)); } catch (ex) { }
             try {
                 if (localStorage.getItem('scpMultiDesktopSharp1') == null) {
@@ -2686,6 +2711,7 @@
             if (window.ScpMonitor && ScpMonitor.receive(message)) return;
             if (window.ScpCleanup && ScpCleanup.receive(message)) return;
             if (window.ScpHealth && ScpHealth.receive(message)) return;
+            if (window.ScpTech && ScpTech.receive(message)) return; // SCP-Remote: SCPclear technician tools
             switch (message.action) {
                 case 'scpops': if(window.ScpOperations) ScpOperations.receive(message); break;
                 case 'trace': {
@@ -4506,6 +4532,7 @@
         }
 
         function ondockeypress(e) {
+            if (e.target && e.target.closest && e.target.closest('dialog[open]')) { setSessionActivity(); return; } // SCP-Remote: typing inside a native <dialog> belongs to that dialog, not page shortcuts
             setSessionActivity();
             if (!xxdialogMode && (xxcurrentView == 11) && desktop && Q('DeskControl').checked) {
                 // Check what keys we are allows to send
@@ -4565,6 +4592,7 @@
         }
 
         function ondockeydown(e) {
+            if (e.target && e.target.closest && e.target.closest('dialog[open]')) { setSessionActivity(); return; } // SCP-Remote: typing inside a native <dialog> belongs to that dialog, not page shortcuts
             setSessionActivity();
             if (!xxdialogMode && (xxcurrentView == 11) && desktop && Q('DeskControl').checked) {
                 // Check what keys we are allows to send
@@ -4599,6 +4627,7 @@
         }
 
         function ondockeyup(e) {
+            if (e.target && e.target.closest && e.target.closest('dialog[open]')) { setSessionActivity(); return; } // SCP-Remote: typing inside a native <dialog> belongs to that dialog, not page shortcuts
             setSessionActivity();
             if (!xxdialogMode && (xxcurrentView == 11) && desktop && Q('DeskControl').checked) {
                 // Check what keys we are allows to send
@@ -10123,6 +10152,19 @@
             updateVncToolbarInfo();
         }
 
+        // SCP-Remote: the clipboard follows a session by itself only when that session controls
+        // the computer and its picture has arrived, which means the person there was asked and
+        // allowed it. Looking at a screen without asking (live tiles, view only, an account that
+        // may only watch) never reads or writes that computer's clipboard.
+        function scpClipboardAllowed(d) {
+            if ((d == null) || (d.viewonly === true) || (d.State != 3) || (currentNode == null)) return false;
+            // SCP-Remote: not on a touch screen, where reading the clipboard each second raises a permission dialog over the remote screen.
+            try { if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return false; } catch (ex) { }
+            if ((d.contype != 4) && !(d.m && d.m.scpStats && (d.m.scpStats.tiles > 0))) return false;
+            var meshrights = GetNodeRights(currentNode);
+            return ((features2 & 0x2000) == 0) && ((meshrights == 0xFFFFFFFF) || (((meshrights & 8) != 0) && ((meshrights & 256) == 0)));
+        }
+
         function updateSessionTime() {
             // Desktop
             var latencyStr = '', seconds = 0;
@@ -10133,7 +10175,7 @@
                 QH('DeskLatency', latencyStr);
                 // Auto-clipboard
                 var autoClipEnabled = ((desktop.contype != 4) && (desktopsettings.autoclipboard === true)) || ((desktop.contype == 4) && (desktopsettings.rdpautoclipboard === true));
-                if (autoClipEnabled && (navigator.clipboard != null)) {
+                if (autoClipEnabled && scpClipboardAllowed(desktop) && (navigator.clipboard != null)) {
                     // Local -> Remote: skip on Firefox as readText triggers an annoying paste popup every second
                     if ((Mstsc.browser() != 'firefox') && (navigator.clipboard.readText != null)) {
                         try {

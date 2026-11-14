@@ -708,3 +708,17 @@ body {
   padding: 8px !important;
 }
 
+
+/* Connect and Fix printing side by side on each card */
+.vnc-card-actions { display: flex; gap: 6px; margin-top: 6px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.vnc-card-actions .vnc-connect-btn { margin-top: 0; }
+.vnc-card .vnc-fix-btn, .device button.vnc-fix-btn {
+  margin-top: 0; padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 4px; cursor: pointer;
+  border: 1px solid #c9ccd6; background-color: #ffffff; color: #b02a72; transition: background-color 0.15s;
+}
+.vnc-card .vnc-fix-btn:hover, .device button.vnc-fix-btn:hover { background-color: #fce9f3; }
+.vnc-card .vnc-fix-btn:disabled, .device button.vnc-fix-btn:disabled { opacity: 0.45; cursor: not-allowed; background-color: #ffffff; }
+.vnc-fix-note { display: block; margin-top: 4px; max-width: 190px; font-size: 10.5px; line-height: 1.35; color: #555555; text-align: center; overflow-wrap: anywhere; }
+
+/* Running version, in the status bar */
+.vnc-status-version { color: #555555; font-weight: 600; margin-right: 14px; white-space: nowrap; }

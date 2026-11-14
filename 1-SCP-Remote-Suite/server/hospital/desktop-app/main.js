@@ -1,14 +1,14 @@
 'use strict';
-const {app,BrowserWindow,ipcMain,safeStorage,session}=require('electron');
+const {app,BrowserWindow,ipcMain,safeStorage,session,dialog}=require('electron');
 const fs=require('fs'),path=require('path'),https=require('https'),crypto=require('crypto'),os=require('os');
 const config=require('./server.json');let home,remote,token;
 const ClipboardHost=require('./clipboard/local-host');
 const origin=new URL(config.url).origin,pin=config.certificateSha256.replace(/:/g,'').toUpperCase();
 function certMatches(cert){try{return new crypto.X509Certificate(cert).fingerprint256.replace(/:/g,'')===pin;}catch{return false;}}
-function request(input){return new Promise((resolve,reject)=>{
+function request(input,timeout){return new Promise((resolve,reject)=>{
  const req=https.request(origin+'/scp-client-api',{method:'POST',agent:false,rejectUnauthorized:false,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}},res=>{let body='';res.on('data',c=>{body+=c;if(body.length>2*1024*1024)req.destroy(Error('RESPONSE_TOO_LARGE'));});res.on('end',()=>{try{const data=JSON.parse(body);data.error?reject(Error(data.error)):resolve(data);}catch(e){reject(e);}});});
  req.on('socket',socket=>socket.once('secureConnect',()=>{const cert=socket.getPeerCertificate();if(!cert.raw||!certMatches(cert.raw)){req.destroy(Error('SERVER_CERTIFICATE_CHANGED'));return;}req.end(JSON.stringify(input));}));
- req.setTimeout(15000,()=>req.destroy(Error('SERVER_TIMEOUT')));req.on('error',reject);
+ req.setTimeout(timeout||15000,()=>req.destroy(Error('SERVER_TIMEOUT')));req.on('error',reject);
  });}
 function secureWindow(win){win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',(e,url)=>{if(win===home||new URL(url).origin!==origin)e.preventDefault();});}
 app.on('certificate-error',(event,contents,url,error,certificate,callback)=>{if(new URL(url).origin===origin&&certMatches(certificate.data)){event.preventDefault();callback(true);}else callback(false);});
@@ -23,9 +23,11 @@ app.whenReady().then(()=>{
   if((verify.hostname===pinnedHost)&&certMatches(verify.certificate.data)){callback(0);}else{callback(-3);}
  });
  home=new BrowserWindow({width:1180,height:820,minWidth:820,minHeight:600,title:'SCP-Remote',autoHideMenuBar:true,icon:path.join(__dirname,'scp-logo.ico'),backgroundColor:'#faf3f6',webPreferences:{preload:path.join(__dirname,'preload.js'),nodeIntegration:false,contextIsolation:true,sandbox:true}});
- secureWindow(home);home.loadFile('index.html');
+ secureWindow(home);home.loadFile(path.join(__dirname,'index.html'));
  function handle(name,fn){ipcMain.handle(name,async(event,...args)=>{if(event.sender!==home.webContents||!event.senderFrame.url.startsWith('file://'))throw Error('ACCESS_DENIED');try{return {ok:true,result:await fn(...args)};}catch(e){return {ok:false,error:e.message};}});}
  handle('scp:init',()=>request({op:'register',name:os.hostname(),autoApprove:true}));
+ // Which version is running: boot.js sets it (the installed copy, or a newer one it downloaded).
+ handle('scp:version',()=>{const a=global.scpApp||{},v=a.version||require('./package.json').version;return {version:v,installed:a.installedVersion||v,updated:a.updated===true};});
  handle('scp:devices',()=>request({op:'devices'}));
  ipcMain.handle('scp:session-status',async(event)=>{const current=remote;if(!current||current.isDestroyed()||event.sender!==current.webContents||event.senderFrame!==current.webContents.mainFrame)throw Error('ACCESS_DENIED');const u=new URL(event.senderFrame.url);if(u.origin!==origin||u.pathname!=='/sharing')throw Error('ACCESS_DENIED');try{return {ok:true,result:await request({op:'connectionStatus',nodeid:current.scpNodeId})};}catch(e){return {ok:false,error:e.message};}});
  ipcMain.handle('scp:clipboard',async(event,command)=>{
@@ -33,6 +35,21 @@ app.whenReady().then(()=>{
   if(!current||current.isDestroyed()||event.sender!==current.webContents||event.senderFrame!==current.webContents.mainFrame)throw Error('ACCESS_DENIED');
   const frameUrl=new URL(event.senderFrame.url);if(frameUrl.origin!==origin||frameUrl.pathname!=='/sharing')throw Error('ACCESS_DENIED');
   try{if(!current.clipboardHost||current.clipboardHost.closed)current.clipboardHost=new ClipboardHost();return {ok:true,result:await current.clipboardHost.request(command)};}catch(e){return {ok:false,error:e.message};}
+ });
+ // Fix printing on one computer: clears the jobs stuck in its queue and restarts the print
+ // spooler. It cannot be undone, so it is asked here, in the main process, naming the
+ // computer; the page cannot skip the question, and Cancel is what Enter or Escape gives.
+ handle('scp:fix-printer',async(nodeid,name,ip,room)=>{
+  if(typeof nodeid!=='string'||nodeid.length>180)throw Error('INVALID_NODE');
+  const clean=v=>String(v||'').replace(/[\r\n]+/g,' ').slice(0,120);
+  const th=!/^en/i.test(app.getLocale()||'');
+  const where=[clean(name),clean(ip),clean(room)].filter(Boolean).join(' · ');
+  const answer=await dialog.showMessageBox(home,{type:'warning',title:'SCP-Remote',noLink:true,defaultId:1,cancelId:1,
+   message:(th?'แก้ปริ้นไม่ออกที่เครื่องนี้ใช่หรือไม่':'Fix printing on this computer?')+'\n\n'+where,
+   detail:th?'งานพิมพ์ที่ค้างในคิวของเครื่องนี้จะถูกลบทั้งหมด แล้ว Print Spooler จะเริ่มใหม่ (ไม่กี่วินาที) ถ้าเครื่องนี้แชร์เครื่องพิมพ์ให้เครื่องอื่น งานที่ค้างของเครื่องอื่นจะถูกลบด้วย\n\nย้อนกลับไม่ได้ งานที่ถูกลบต้องสั่งพิมพ์ใหม่':'Every job waiting in this computer\'s print queue is deleted and the print spooler restarts (a few seconds). If it shares printers with other computers, their waiting jobs are deleted too.\n\nThis cannot be undone. Deleted jobs have to be printed again.',
+   buttons:[th?'แก้ปริ้นเครื่องนี้':'Fix printing',th?'ยกเลิก':'Cancel']});
+  if(answer.response!==0)return {cancelled:true};
+  return request({op:'fixPrinter',nodeid},100000);
  });
  handle('scp:connect',async(nodeid,language,name,ip)=>{
   if(typeof nodeid!=='string'||nodeid.length>180)throw Error('INVALID_NODE');
@@ -56,7 +73,7 @@ app.whenReady().then(()=>{
    var tb=document.createElement('div');
    tb.className='vnc-float-toolbar';
    tb.id='vncToolbar';
-   tb.innerHTML='<button class="vnc-tool-btn" id="vncFs" title="เต็มหน้าจอ (Fullscreen)">⛶</button><button class="vnc-tool-btn" id="vncFit" title="ขนาดจริง / พอดีหน้าต่าง (1:1 / Fit)">1:1</button><button class="vnc-tool-btn" id="vncMaxQ" title="ความคมชัดสูงสุด (HQ 100% WebP)" style="color:#34d399;font-weight:600">HQ 100%</button><button class="vnc-tool-btn" id="vncCad" title="ส่งคำสั่ง Ctrl+Alt+Del">CAD</button><div class="vnc-tool-sep"></div><button class="vnc-tool-btn" id="vncPin" title="ตรึงแถบเครื่องมือ">📌</button><button class="vnc-tool-btn" id="vncHide" title="ซ่อนแถบเครื่องมือ">▲</button><button class="vnc-tool-btn danger" id="vncClose" title="ปิดหน้าต่างรีโมท">✕</button>';
+   tb.innerHTML='<button class="vnc-tool-btn" id="vncFs" title="เต็มหน้าจอ (Fullscreen)">⛶</button><button class="vnc-tool-btn" id="vncFit" title="ขนาดจริง / พอดีหน้าต่าง (1:1 / Fit)">1:1</button><button class="vnc-tool-btn" id="vncMaxQ" title="คมชัดสูงสุด: ภาพไม่เสียรายละเอียด (PNG)" style="color:#34d399;font-weight:600">HQ</button><button class="vnc-tool-btn" id="vncCad" title="ส่งคำสั่ง Ctrl+Alt+Del">CAD</button><div class="vnc-tool-sep"></div><button class="vnc-tool-btn" id="vncPin" title="ตรึงแถบเครื่องมือ">📌</button><button class="vnc-tool-btn" id="vncHide" title="ซ่อนแถบเครื่องมือ">▲</button><button class="vnc-tool-btn danger" id="vncClose" title="ปิดหน้าต่างรีโมท">✕</button>';
    document.body.appendChild(tb);
 
    var tab=document.createElement('div');
@@ -115,27 +132,26 @@ app.whenReady().then(()=>{
 
    document.getElementById('vncFs').onclick=function(){ if(!document.fullscreenElement){document.documentElement.requestFullscreen();}else{document.exitFullscreen();} };
    document.getElementById('vncFit').onclick=function(){ window.deskAspectRatio = (window.deskAspectRatio === 1 ? 0 : 1); this.textContent = (window.deskAspectRatio === 1 ? 'Fit' : '1:1'); if(window.deskAdjust) deskAdjust(); };
-   document.getElementById('vncMaxQ').onclick=function(){ if(window.desktop && window.desktop.m && window.desktop.m.SendCompressionLevel){ window.desktop.m.SendCompressionLevel(4, 100, 1024, 50); if(window.desktop.m.SendRefresh) window.desktop.m.SendRefresh(); } };
+   document.getElementById('vncMaxQ').onclick=function(){ var sel=document.querySelector('#scp-session-health select'); if(sel){ sel.value='0'; sel.onchange(); } else if(window.desktop && window.desktop.m && window.desktop.m.SendCompressionLevel){ window.desktop.m.SendCompressionLevel(2, 100, 1024, 50); } if(window.desktop && window.desktop.m && window.desktop.m.SendRefresh) window.desktop.m.SendRefresh(); };
    document.getElementById('vncCad').onclick=function(){ if(window.sendCAD) sendCAD(); else if(window.meshserver) meshserver.send({action:'msg',type:'cad'}); };
    document.getElementById('vncClose').onclick=function(){ window.close(); };
 
    window.scpLanReady=${config.directLan!==false&&data.lan===true};
-   desktopsettings.agentencoding=4;desktopsettings.quality=100;desktopsettings.scaling=1024;desktopsettings.framerate=50;
+   window.scpAppQualityChooser=true;
+   desktopsettings.agentencoding=2;desktopsettings.quality=100;desktopsettings.scaling=1024;desktopsettings.framerate=50;
    try{localStorage.setItem('desktopsettings',JSON.stringify(desktopsettings));}catch(e){}
    var original=CreateAgentRemoteDesktop;CreateAgentRemoteDesktop=function(){
     var m=original.apply(this,arguments);
-    m.ImageType=4;m.CompressionLevel=100;m.ScalingLevel=1024;m.FrameRateTimer=50;
-    var origSendComp=m.SendCompressionLevel;
-    m.SendCompressionLevel=function(type,level,scaling,frametimer){return origSendComp.call(m,4,100,1024,50);};
+    // The first frames ask for the top rung; after that the quality chooser (session-health.js) decides.
+    m.ImageType=2;m.CompressionLevel=100;m.ScalingLevel=1024;m.FrameRateTimer=50;
     return m;
    };
-   var tries=0,timer=setInterval(function(){var b=document.getElementById('connectbutton1');if(b&&!b.disabled){clearInterval(timer);connectDesktop(null,3);if(window.deskAdjust)setTimeout(deskAdjust,200);setTimeout(function(){if(window.desktop&&window.desktop.m&&window.desktop.m.SendCompressionLevel){window.desktop.m.SendCompressionLevel(4,100,1024,50);if(window.desktop.m.SendRefresh)window.desktop.m.SendRefresh();}},600);setTimeout(function(){if(window.desktop&&window.desktop.m&&window.desktop.m.SendCompressionLevel){window.desktop.m.SendCompressionLevel(4,100,1024,50);if(window.desktop.m.SendRefresh)window.desktop.m.SendRefresh();}},1800);}else if(++tries>=60){clearInterval(timer);}},500);
+   var tries=0,timer=setInterval(function(){var b=document.getElementById('connectbutton1');if(b&&!b.disabled){clearInterval(timer);connectDesktop(null,3);if(window.deskAdjust)setTimeout(deskAdjust,200);}else if(++tries>=60){clearInterval(timer);}},500);
    window.addEventListener('resize',function(){if(window.deskAdjust)deskAdjust();});
   })()`);
   try { await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'inject-filedrop.js'),'utf8')); } catch (e) { }
   await current.webContents.executeJavaScript('window.scpClipboardLanguage='+JSON.stringify(language==='en'?'en':'th')+';window.scpClipboardReady='+(data.clipboard===true)+';'+fs.readFileSync(path.join(__dirname,'clipboard-transfer.js'),'utf8')+'\n'+fs.readFileSync(path.join(__dirname,'inject-clipboard.js'),'utf8'));
   await current.webContents.executeJavaScript(fs.readFileSync(path.join(__dirname,'session-health.js'),'utf8'));
-  await current.webContents.executeJavaScript('try{var sel=document.querySelector("#scp-session-health select");if(sel){sel.value="0";}}catch(e){}');
   return {opened:true};
  });
  home.on('closed',()=>{if(remote&&!remote.isDestroyed())remote.close();home=null;});

@@ -1,0 +1,8 @@
+{
+    "name":  "SCPclear",
+    "version":  "2.3.0",
+    "file":  "SCPclear.exe",
+    "size":  1336320,
+    "sha256":  "B904B5A32B5E35FB12515A56254F27D5C2680FC5CD67D5E524081A7F9895E46C",
+    "source":  "scripts/update-scpclear.ps1"
+}

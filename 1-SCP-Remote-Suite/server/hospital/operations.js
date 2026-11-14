@@ -344,11 +344,117 @@ exports.handle = async function (ctx, cmd) {
   if (care && care.updated) out.push({ at: care.updated, kind: 'care', state: care.state, result: care.result, by: who(care.by) });
   const healthLog = await one('scphealthlog/' + id);
   for (const h of ((healthLog && healthLog.entries) || [])) out.push({ at: h.at, kind: 'health', action: h.action, ok: h.ok, result: h.result, by: who(h.by) });
+  const sessions = await one('scpsessionlog/' + id);
+  for (const s of ((sessions && sessions.entries) || [])) out.push({ at: s.at, kind: 'session', outcome: s.outcome, ms: s.ms, by: who(s.by) });
+  const tech = await one('scptech/' + id);
+  for (const [task, v] of Object.entries((tech && tech.tasks) || {})) if (v && typeof v.at === 'number') out.push({ at: v.at, kind: 'tech', task, by: who(v.by) });
   const place = await one('scpmappos/' + domain.id + '/' + id);
   if (place && place.updated) out.push({ at: place.updated, kind: 'moved', floor: place.floor, by: who(place.updatedBy) });
   const asset = await one('scpasset/' + domain.id + '/' + id);
   if (asset && asset.updated) out.push({ at: asset.updated, kind: 'asset', note: [asset.assetNumber, asset.fiscalYear].filter(Boolean).join(' · '), by: who(asset.updatedBy) });
   return out.filter(e => typeof e.at === 'number').sort((a, b) => b.at - a.at).slice(0, 200);
+ }
+ if (cmd.op === 'sessionLog') {
+  // How a remote session went wrong, as the page diagnosed it. Kept so "remote is unreliable"
+  // becomes "these computers, for this reason". Only failures are recorded; the last 50 each.
+  const OUTCOMES = ['offline', 'serverTimeout', 'agentTimeout', 'consentTimeout', 'denied', 'refused', 'imageTimeout', 'dropped'];
+  if (typeof cmd.nodeid !== 'string' || !await access(cmd.nodeid)) throw Error('ACCESS_DENIED');
+  if (OUTCOMES.indexOf(cmd.outcome) < 0) throw Error('INVALID_INPUT');
+  const key = 'scpsessionlog/' + cmd.nodeid;
+  const before = await get(key).catch(() => null);
+  const ms = Math.max(0, Math.min(86400000, Math.round(Number(cmd.ms) || 0)));
+  const entries = ((before && before.entries) || []).concat([{ at: Date.now(), outcome: cmd.outcome, ms, by: user._id }]).slice(-50);
+  await save({ _id: key, type: 'scpsessionlog', domain: domain.id, nodeid: cmd.nodeid, entries, updated: Date.now() });
+  return { saved: 1 };
+ }
+ if (cmd.op === 'sessionFailures') {
+  // The last 30 days of those, per computer: how many, for which reasons, and the latest.
+  const since = Date.now() - 30 * 86400000;
+  const rows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scpsessionlog', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const out = [];
+  for (const row of rows) {
+   if (!row || typeof row.nodeid !== 'string' || !await access(row.nodeid)) continue;
+   const recent = (row.entries || []).filter(e => e && typeof e.at === 'number' && e.at >= since);
+   if (!recent.length) continue;
+   const reasons = {};
+   for (const e of recent) reasons[e.outcome] = (reasons[e.outcome] || 0) + 1;
+   const last = recent[recent.length - 1];
+   out.push({ nodeid: row.nodeid, total: recent.length, reasons, last: { at: last.at, outcome: last.outcome } });
+  }
+  return out.sort((a, b) => b.last.at - a.last.at);
+ }
+ if (cmd.op === 'techSave') {
+  // What the technician tools found on each computer (blue screens, disk speed, SFC, antivirus).
+  // The latest result of each task, so it can be read from any browser and after the computer
+  // is off. A newer result replaces an older one; nothing else is touched.
+  const TASKS = ['inventory', 'bench', 'sfc', 'dism', 'deploy', 'lan', 'avscan', 'avremove', 'wurepair', 'wuinstall'];
+  if (!Array.isArray(cmd.items) || cmd.items.length > 2000) throw Error('INVALID_INPUT');
+  const byNode = new Map();
+  for (const it of cmd.items) {
+   if (!it || typeof it.nodeid !== 'string' || TASKS.indexOf(it.task) < 0 || !it.data || typeof it.data !== 'object' || Array.isArray(it.data)) continue;
+   const text = JSON.stringify(it.data);
+   if (text.length > 60000) continue;
+   const at = Number(it.at);
+   if (!Number.isFinite(at) || at <= 0 || at > Date.now() + 86400000) continue;
+   if (!byNode.has(it.nodeid)) byNode.set(it.nodeid, []);
+   byNode.get(it.nodeid).push({ task: it.task, at, data: JSON.parse(text) });
+  }
+  let saved = 0;
+  for (const [nodeid, list] of byNode) {
+   if (!await access(nodeid)) continue;
+   const key = 'scptech/' + nodeid;
+   const before = await get(key).catch(() => null);
+   const tasks = Object.assign({}, (before && before.tasks) || {});
+   let changed = false;
+   for (const it of list) {
+    if (tasks[it.task] && tasks[it.task].at >= it.at) continue;
+    tasks[it.task] = { data: it.data, at: it.at, by: user._id }; changed = true; saved++;
+   }
+   if (changed) await save({ _id: key, type: 'scptech', domain: domain.id, nodeid, tasks, updated: Date.now() });
+  }
+  return { saved };
+ }
+ if (cmd.op === 'techList') {
+  const rows = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('scptech', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const map = {};
+  for (const row of rows) {
+   if (!row || typeof row.nodeid !== 'string' || !row.tasks || !await access(row.nodeid)) continue;
+   const tasks = {};
+   for (const [task, v] of Object.entries(row.tasks)) if (v && v.data) tasks[task] = { data: v.data, at: v.at };
+   map[row.nodeid] = tasks;
+  }
+  return map;
+ }
+ if (cmd.op === 'appDevices') {
+  // For the SCP-Remote Android app: the computers this account may see and what it may do on
+  // each, decided here (GetNodeWithRights) so the app never works out rights for itself.
+  const FULL = 0xFFFFFFFF, CONTROL = 0x8, VIEWONLY = 0x100, NODESKTOP = 0x10000, COMMAND = 0x20000;
+  const nodes = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('node', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const meshes = await new Promise((resolve, reject) => db.GetAllTypeNoTypeField('mesh', domain.id, (e, r) => e ? reject(e) : resolve(r || [])));
+  const meshName = {}; for (const m of meshes) if (m && m._id) meshName[m._id] = m.name || '';
+  const devices = [], groups = {};
+  for (const n of nodes) {
+   if (!n || typeof n._id !== 'string') continue;
+   const r = await new Promise(resolve => parent.GetNodeWithRights(domain, user, n._id, (node, rights, visible) => resolve((node && visible) ? (rights >>> 0) : null)));
+   if (r == null) continue;
+   const full = r === FULL;
+   const canView = full || ((r & CONTROL) !== 0 && (r & NODESKTOP) === 0);
+   const viewOnly = !full && (r & VIEWONLY) !== 0;
+   const agent = parent.wsagents && parent.wsagents[n._id];
+   devices.push({ id: n._id, name: n.name || '', groupId: n.meshid || '', ip: n.host || n.ip || '', online: !!(agent && agent.authenticated === 2),
+    users: Array.isArray(n.users) ? n.users.filter(u => typeof u === 'string').slice(0, 5) : [], rights: r,
+    canView, canControl: canView && !viewOnly, viewOnly, canFixPrinter: full || (r & COMMAND) !== 0 });
+   if (n.meshid) groups[n.meshid] = meshName[n.meshid] || '';
+  }
+  return { user: { name: user.realname || user.name || '', siteadmin: user.siteadmin || 0 }, groups: Object.keys(groups).map(id => ({ id, name: groups[id] })), devices };
+ }
+ if (cmd.op === 'fixPrinter') {
+  // The printer fix for the Android app. The app names a computer and nothing else: the command
+  // is the server's own (hospital/mobile.js), and the account must hold the right to run commands.
+  if (typeof cmd.nodeid !== 'string') throw Error('ACCESS_DENIED');
+  const allowed = await new Promise(resolve => parent.GetNodeWithRights(domain, user, cmd.nodeid, (node, rights, visible) => resolve(!!(node && visible && (((rights >>> 0) === 0xFFFFFFFF) || ((rights & 0x20000) !== 0))))));
+  if (!allowed) throw Error('ACCESS_DENIED');
+  return require('./mobile').run(parent, cmd.nodeid, user._id, 'app');
  }
  if (cmd.op === 'mapPlacements') {
   // Where each computer was dragged to on the hospital map. Shared by everyone, so the map

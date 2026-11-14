@@ -92,7 +92,7 @@
 
     <div class="vnc-user-profile" id="userProfileBtn" title="บัญชีผู้ใช้งาน SCP-Remote">
       <span class="vnc-status-check">✓</span>
-      <span class="vnc-user-name" id="userName">ชัยรัตน์ ประภัศรังษ์</span>
+      <span class="vnc-user-name" id="userName">IT รพ.สีชมพู</span>
       <span class="vnc-user-arrow">▾</span>
     </div>
   </header>
@@ -130,6 +130,7 @@
   <footer class="vnc-status-bar">
     <div id="statusCount" class="vnc-status-text">กำลังโหลดรายชื่อเครื่อง...</div>
     <div class="vnc-status-right">
+      <span id="statusVersion" class="vnc-status-version"></span>
       <span id="statusSync" class="vnc-status-sync">● เชื่อมต่อเซิร์ฟเวอร์เรียบร้อย</span>
       <span id="status" class="vnc-status-msg"></span>
       <button id="refresh" class="vnc-btn-refresh" title="รีเฟรช">⟳</button>
@@ -146,8 +147,8 @@
       <div class="scp-modal-body">
         <div class="scp-setting-row">
           <label><strong>ระดับความคมชัด (Remote Quality):</strong></label>
-          <div class="scp-badge-green">WebP 100% (High Fidelity / ไม่บีบอัด)</div>
-          <small>เซิร์ฟเวอร์ล็อคการส่งภาพที่ความละเอียด 1:1 ระดับสูงสุด อัตโนมัติทุกเซสชัน</small>
+          <div class="scp-badge-green">คมชัดสูงสุด (PNG ไม่เสียรายละเอียด)</div>
+          <small>ค่าเริ่มต้นทุกเซสชัน เปลี่ยนได้ที่แถบสถานะในหน้าต่างรีโมต (คมชัด / สมดุล / ประหยัดเน็ต) และโปรแกรมจำค่าที่เลือกไว้</small>
         </div>
         <div class="scp-setting-row">
           <label><strong>การปรับขนาดหน้าจอเริ่มต้น:</strong></label>
@@ -186,8 +187,8 @@
           <span>สลับระหว่างโหมดย่อพอดีหน้าต่าง และโหมด 1:1 พิกเซลแท้ คมชัด 100%</span>
         </div>
         <div class="scp-guide-item">
-          <span class="scp-key">HQ 100%</span>
-          <span>กดเพื่อบังคับรีเฟรชภาพความคมชัดสูงสุด WebP 100% ทันที</span>
+          <span class="scp-key">HQ</span>
+          <span>กลับไปใช้ภาพคมชัดสูงสุด (PNG) และขอภาพใหม่ทั้งจอทันที</span>
         </div>
         <div class="scp-guide-item">
           <span class="scp-key">CAD</span>
@@ -242,11 +243,11 @@
         <div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px">
           SCP-Remote Viewer
         </div>
-        <p style="font-size:13px;color:#64748b;margin-bottom:8px">เวอร์ชัน 0.4.3 (Hospital Edition)</p>
+        <p style="font-size:13px;color:#64748b;margin-bottom:8px" id="aboutVersion">เวอร์ชัน – (Hospital Edition)</p>
         <p style="font-size:13px;color:#334155;line-height:1.6">
           โปรแกรมรีโมตสนับสนุนและช่วยเหลือทางไกล<br>
           กลุ่มงานเทคโนโลยีสารสนเทศ <strong>โรงพยาบาลสีชมพู</strong><br>
-          ความคมชัดสูงสุด WebP 100% · คีย์บอร์ดไทยครบถ้วน
+          ภาพคมชัดสูงสุดแบบไม่เสียรายละเอียด · คัดลอก/วางข้อความและไฟล์สองทาง · อัปเดตอัตโนมัติ
         </p>
       </div>
       <div class="scp-modal-footer" style="justify-content:center">

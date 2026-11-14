@@ -1,0 +1,61 @@
+/* SCP-Remote: My Account page (p2). Laid out by scp-account.js. */
+.scp-acct-hidden { display: none !important; }
+body.scp-account-page #p2info { padding: 8px 28px 32px; box-sizing: border-box; }
+body.scp-account-page #p2title h1 { font-size: 24px; }
+
+.scp-acct-top { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; margin: 6px 0 18px; }
+.scp-acct-card { border: 1px solid var(--scp-line, #f0dbe6); border-radius: 14px; background: var(--scp-surface, #fff); box-shadow: 0 2px 10px rgba(70, 22, 46, .06); padding: 18px 20px; box-sizing: border-box; }
+.scp-acct-card h3 { margin: 0 0 10px; font-size: 15px; font-weight: 700; color: var(--scp-ink, #2a1520); }
+
+.scp-acct-me { display: flex; gap: 20px; align-items: center; }
+.scp-acct-me #p2AccountImageFrame { float: none !important; position: static !important; margin: 0 !important; width: auto !important; text-align: center; flex: none; }
+.scp-acct-me #p2AccountImage { width: 112px !important; height: 112px !important; border-radius: 50%; object-fit: cover; border: 3px solid var(--scp-soft, #fce9f3); box-shadow: 0 2px 8px rgba(70, 22, 46, .12); cursor: pointer; }
+.scp-acct-me #p2AccountImageFrame a { font-size: 12px; }
+.scp-acct-who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.scp-acct-who h2 { margin: 0; font-size: 22px; font-weight: 700; color: var(--scp-ink, #2a1520); overflow-wrap: anywhere; }
+.scp-acct-email { font-size: 13px; color: var(--scp-muted, #6d5560); overflow-wrap: anywhere; }
+.scp-acct-role { align-self: flex-start; margin-top: 2px; padding: 3px 10px; border-radius: 999px; background: var(--scp-soft, #fce9f3); color: var(--scp-accent, #b02a72); font-size: 12px; font-weight: 700; }
+.scp-acct-quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+.scp-acct-btn { padding: 9px 16px; border: 1px solid var(--scp-line, #f0dbe6); border-radius: 10px; background: var(--scp-surface, #fff); color: var(--scp-accent, #b02a72); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.scp-acct-btn:hover { background: var(--scp-soft, #fce9f3); border-color: var(--scp-accent, #b02a72); }
+.scp-acct-btn.primary { background: var(--scp-accent, #b02a72); border-color: var(--scp-accent, #b02a72); color: #fff; }
+.scp-acct-btn.primary:hover { filter: brightness(1.08); }
+
+/* The page's own list of account links, as a tidy list of rows */
+.scp-acct-more #p2AccountActions { float: none !important; width: auto !important; margin: 0 !important; }
+.scp-acct-more #p2AccountActions > p:first-child, .scp-acct-more #p2AccountActions > br { display: none; }
+.scp-acct-more #p2AccountActions .mL { margin: 0 !important; display: flex; flex-direction: column; }
+.scp-acct-more #p2AccountActions .mL br { display: none; }
+.scp-acct-more #p2AccountActions .mL a { display: block; padding: 9px 10px; border-radius: 8px; color: var(--scp-ink, #2a1520) !important; text-decoration: none !important; font-size: 14px; }
+.scp-acct-more #p2AccountActions .mL a:hover { background: var(--scp-soft, #fce9f3); color: var(--scp-accent, #b02a72) !important; }
+.scp-acct-more #p2AccountActions .mL a::after { content: '›'; float: right; color: var(--scp-muted, #6d5560); }
+.scp-acct-more #p2AccountPassActions, .scp-acct-more #viewPreviousLogins { display: contents; }
+.scp-acct-more #p2nextPasswordUpdateTime { display: block; padding: 0 10px 6px; font-size: 12px; color: var(--scp-muted, #6d5560); }
+
+.scp-acct-groups-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 14px; }
+.scp-acct-groups-head h3 { margin: 0; }
+.scp-acct-muted { font-size: 13px; color: var(--scp-muted, #6d5560); }
+.scp-acct-find { margin-left: auto; min-width: 200px; padding: 9px 12px; border: 1px solid var(--scp-line, #f0dbe6); border-radius: 10px; background: var(--scp-surface, #fff); color: var(--scp-ink, #2a1520); font: inherit; font-size: 14px; }
+.scp-acct-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.scp-acct-group { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; border: 1px solid var(--scp-line, #f0dbe6); border-radius: 12px; background: var(--scp-surface, #fff); color: var(--scp-ink, #2a1520); font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background-color .15s, transform .15s; }
+.scp-acct-group:hover { border-color: var(--scp-accent, #b02a72); background: var(--scp-soft, #fce9f3); transform: translateY(-1px); }
+.scp-acct-group strong { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.scp-acct-group-count { font-size: 12.5px; color: var(--scp-muted, #6d5560); }
+.scp-acct-group-count b.on { color: #17704a; }
+.scp-acct-group-count b.off { color: var(--scp-muted, #6d5560); }
+.scp-acct-group small { font-size: 11.5px; color: #8a6410; }
+.scp-acct-empty { margin: 4px 2px; color: var(--scp-muted, #6d5560); }
+
+@media (max-width: 900px) {
+  .scp-acct-top { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  body.scp-account-page #p2info { padding: 8px 12px 24px; }
+  .scp-acct-me { flex-direction: column; text-align: center; }
+  .scp-acct-who { align-items: center; }
+  .scp-acct-role { align-self: center; }
+  .scp-acct-quick { justify-content: center; }
+  .scp-acct-find { margin-left: 0; width: 100%; }
+  .scp-acct-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

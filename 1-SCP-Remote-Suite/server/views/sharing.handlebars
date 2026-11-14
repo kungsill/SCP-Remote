@@ -15,7 +15,7 @@
     <script type="text/javascript" src="scripts/common-0.0.1{{min}}.js"></script>
     <script type="text/javascript" src="scripts/amt-redir-ws-0.1.0{{{min}}}.js"></script>
     <script type="text/javascript" src="scripts/amt-wsman-ws-0.2.0{{{min}}}.js"></script>
-    <script type="text/javascript" src="scripts/agent-redir-ws-0.1.1{{{min}}}.js"></script>
+    <script type="text/javascript" src="scripts/agent-redir-ws-0.1.1{{{min}}}.js?v=20261113-keepalive"></script>
     <script type="text/javascript" src="scripts/agent-redir-rtc-0.1.0{{{min}}}.js"></script>
     <script type="text/javascript" src="scripts/agent-desktop-0.0.2{{min}}.js?v=20260922-cursor"></script>
     <script type="text/javascript" src="scripts/amt-desktop-0.0.2{{min}}.js"></script>
@@ -32,10 +32,14 @@
     {{{customJSTags}}}
     <title>{{{title}}}</title>
     <!-- SCP-Remote: local hospital fonts and theme. -->
-    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-remote.css?v=20260922-sidebar" />
+    <link rel="stylesheet" href="{{{domainurl}}}styles/scp-remote.css?v=20261114-landscape" />
 <script defer src="{{{domainurl}}}scripts/scp-recording.js?v=20260922-2"></script>
 <script defer src="{{{domainurl}}}scripts/scp-lan.js?v=20260922-relay"></script>
-<script defer src="{{{domainurl}}}scripts/scp-remote-ui.js?v=20260922-fit"></script>
+<!-- SCP-Remote: lossless picture for copies of the SCP-Remote program installed before 12 Nov 2026 (they cannot update themselves). -->
+<script defer src="{{{domainurl}}}scripts/scp-app-compat.js?v=20261112-1"></script>
+<!-- SCP-Remote: draws the remote picture on whole pixels (must load before scp-remote-ui.js). -->
+<script defer src="{{{domainurl}}}scripts/scp-remote-fit.js?v=20261112-fit"></script>
+<script defer src="{{{domainurl}}}scripts/scp-remote-ui.js?v=20261114-phonebar"></script>
 </head>
 <body style="overflow:hidden;background-color:black">
     <div id=LeftSideToolBar style="display:none;position:absolute;left:0;bottom:0;width:52px;top:0;background:#113962;background:linear-gradient(to bottom, #104893 0%,#113962 100%);color:white;border-right: 5px solid #BBB;">
@@ -304,7 +308,7 @@
         var agentPresent = true;
         var intelAmtPresent = false;
         var deskAspectRatio = 0;
-        var desktopsettings = { encoding: 2, showfocus: false, showmouse: true, showcad: true, quality: 100, scaling: 1024, framerate: 50, localkeymap: false, swapmouse: false, remotekeymap: false, autoclipboard: false, autolock: false, agentencoding: 4 }; // SCP-Remote: WEBP at full quality stays sharp
+        var desktopsettings = { encoding: 2, showfocus: false, showmouse: true, showcad: true, quality: 100, scaling: 1024, framerate: 50, localkeymap: false, swapmouse: false, remotekeymap: false, autoclipboard: false, autolock: false, agentencoding: 2 }; // SCP-Remote: lossless PNG by default (chosen 12 Nov 2026: WEBP left text soft)
         var serverPublicNamePort = '{{{serverDnsName}}}:{{{serverPublicPort}}}';
         var domain = '{{{domain}}}';
         var domainUrl = '{{{domainurl}}}';
@@ -334,7 +338,7 @@
         // SCP-Remote: Hospital LAN - Always force 100% full quality & 1024 full scaling from the start
         desktopsettings.quality = 100;
         desktopsettings.scaling = 1024;
-        desktopsettings.agentencoding = 4;
+        desktopsettings.agentencoding = 2; // SCP-Remote: lossless PNG
         desktopsettings.framerate = 50;
         try { localStorage.setItem('desktopsettings', JSON.stringify(desktopsettings)); } catch (ex) { }
 
@@ -656,7 +660,7 @@
                         }
                     }
                     desktop.onMetadataChange = function (metadata) { updateMetadata(desktop, 'deskmetadata'); }
-                    desktop.m.ImageType = desktopsettings.agentencoding; // SCP-Remote: WEBP at full quality
+                    desktop.m.ImageType = desktopsettings.agentencoding; // SCP-Remote: lossless PNG at full size
                     desktop.m.CompressionLevel = desktopsettings.quality;
                     desktop.m.ScalingLevel = desktopsettings.scaling;
                     if (desktopsettings.framerate) { desktop.m.FrameRateTimer = desktopsettings.framerate; }
@@ -760,7 +764,7 @@
                     if (desktop && (desktop.serverIsRecording == true)) { QV('deskRecordIcon', true); }
                     desktop.startTime = new Date();
                     if (desktop && desktop.m && desktop.m.SendCompressionLevel) {
-                        desktop.m.SendCompressionLevel(4, 100, 1024, 50);
+                        desktop.m.SendCompressionLevel(desktopsettings.agentencoding || 2, 100, 1024, 50); // SCP-Remote: lossless PNG at full size
                         if (desktop.m.SendRefresh) { desktop.m.SendRefresh(); }
                     }
                     if (updateSessionTimer == null) { updateSessionTimer = setInterval(updateSessionTime, 1000); }
@@ -825,7 +829,7 @@
                     desktop.m.SwapMouse = desktopsettings.swapmouse;
                     desktop.m.remoteKeyMap = desktopsettings.remotekeymap;
                     if (desktop.State != 0) {
-                        desktop.m.SendCompressionLevel(desktopsettings.agentencoding || 4, desktopsettings.quality, desktopsettings.scaling, desktopsettings.framerate); // SCP-Remote: WEBP at full quality
+                        desktop.m.SendCompressionLevel(desktopsettings.agentencoding || 2, desktopsettings.quality, desktopsettings.scaling, desktopsettings.framerate); // SCP-Remote: lossless PNG unless chosen otherwise
                     }
                 }
                 if (desktop.contype == 2) {

@@ -89,11 +89,18 @@ var CreateAgentRedirect = function (meshserver, module, serverPublicNamePort, au
         if (obj.debugmode == 1) { console.log('onSocketConnected'); }
         //obj.debug('Agent Redir Socket Connected');
         if (!obj.latency.lastSend){ 
+            // SCP-Remote: keep the session alive for as long as it is open. This message is the only
+            // traffic on a screen where nothing is changing, so it is what keeps the connection open
+            // through the hospital's routers. Upstream stopped the timer for good when no answer had
+            // come by the first tick (latency.current == -1); in the SCP-Remote program the person at
+            // the other computer is still reading the Allow prompt by then, so the timer died before
+            // the session began and a quiet session was cut a few minutes later. It now runs until
+            // the socket is closed. The agent's answer still sets latency.current as before.
             obj.latency.lastSend = setInterval(function(){
-                if (obj.latency.current == -1) {
+                if ((obj.socket == null) || (obj.socket.readyState > 1)) {
                     clearInterval(obj.latency.lastSend);
                     obj.latency.lastSend = null;
-                } else {
+                } else if (obj.socket.readyState == 1) {
                     obj.sendCtrlMsg(JSON.stringify({ctrlChannel:102938,type:"rtt",time:(new Date().getTime())}));
                 }
             }, 10000);

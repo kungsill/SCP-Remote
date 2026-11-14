@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: the design preview with made-up data (never in the published release). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".demo.DemoActivity"
+            android:exported="true" />
+    </application>
+</manifest>

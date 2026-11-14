@@ -11,7 +11,7 @@ test('session diagnosis separates offline, server, agent, permission and image f
  assert.equal(health.diagnose({state:3,age:31000,tiles:0}),'imageTimeout');
  assert.equal(health.diagnose({state:3,age:60000,tiles:1}),'ready');
 });
-test('adaptive quality uses latency or decoder backlog, never treats an idle screen as slow',()=>{assert.equal(health.quality({rtt:450,backlog:0},0),2);assert.equal(health.quality({rtt:200,backlog:0},0),1);assert.equal(health.quality({rtt:40,backlog:25},0),2);assert.equal(health.quality({rtt:20,backlog:0},2),1);assert.equal(health.quality({rtt:null,backlog:0},0),0);});
+test('adaptive quality uses latency or decoder backlog, never treats an idle screen as slow',()=>{assert.equal(health.quality({rtt:450,backlog:0},0),3);assert.equal(health.quality({rtt:200,backlog:0},0),2);assert.equal(health.quality({rtt:200,backlog:0},3),3);assert.equal(health.quality({rtt:40,backlog:25},0),3);assert.equal(health.quality({rtt:20,backlog:0},2),1);assert.equal(health.quality({rtt:20,backlog:0},1),0);assert.equal(health.quality({rtt:null,backlog:0},0),0);});
 
 // The quality ladder is applied on every session, so what it holds is what a technician
 // actually sees. It lives in module scope and is not exported, so read it from the source.
@@ -25,27 +25,35 @@ function ladder(){
 // SendCompressionLevel(agentencoding, quality, scaling, framerate); 1 JPEG, 2 PNG, 3 TIFF, 4 WEBP.
 const WEBP=4,PNG=2;
 
-test('every rung of the quality ladder stays on WEBP, the encoding the hospital chose',()=>{
- // A previous ladder opened every session on PNG, undoing the deliberate WEBP decision
- // recorded beside scpDesktopQuality3 in views/default.handlebars a few tiles into the
- // session, where nobody would connect the two.
- for(const [encoding,,,] of ladder()){
-  assert.notEqual(encoding,PNG,'PNG is the traffic the WEBP decision was made to avoid');
-  assert.equal(encoding,WEBP,'the ladder trades quality and size, not the encoding');
- }
+test('the top rung is lossless PNG and every rung below it is WEBP',()=>{
+ // 23 Sep 2026: the hospital chose WEBP over PNG to save traffic, and a ladder that opened on
+ // PNG by accident was corrected. 12 Nov 2026: the administrator reported remote text too
+ // blurred to read and chose, deliberately this time, a lossless top rung as the default.
+ // WEBP stays one step down for links that cannot carry PNG. Do not "fix" this back.
+ const rungs=ladder();
+ assert.equal(rungs[0][0],PNG,'Sharpest is lossless');
+ for(const [encoding] of rungs.slice(1))assert.equal(encoding,WEBP,'the rungs below trade quality, on WEBP');
 });
 
-test('the ladder gives up quality first and size only at the bottom',()=>{
+test('the ladder gives up quality and frame rate, never the size of the picture',()=>{
  const rungs=ladder();
- assert.equal(rungs.length,3,'Sharp, Balanced, Low bandwidth');
+ assert.equal(rungs.length,4,'Sharpest, Sharp, Balanced, Low bandwidth');
  const quality=rungs.map(r=>r[1]),scaling=rungs.map(r=>r[2]),framerate=rungs.map(r=>r[3]);
  for(let i=1;i<rungs.length;i++){
-  assert.ok(quality[i]<quality[i-1],'each rung asks for less quality than the one above');
-  assert.ok(scaling[i]<=scaling[i-1],'and never a larger image');
-  assert.ok(framerate[i]>framerate[i-1],'and a longer gap between frames');
+  assert.ok(quality[i]<=quality[i-1],'no rung asks for more quality than the one above');
+  assert.ok(framerate[i]>=framerate[i-1],'nor a shorter gap between frames');
  }
- assert.equal(scaling[0],1024,'Sharp is full size');
- assert.equal(quality[0],100,'Sharp matches the quality the hospital settled on');
+ assert.ok(quality[3]<quality[2]&&quality[2]<quality[1],'the WEBP rungs each give up quality');
+ // A picture sent smaller is stretched back up by the browser, which blurs every letter.
+ for(const s of scaling)assert.equal(s,1024,'every rung sends the picture at full size');
+ assert.equal(quality[0],100);
+});
+
+test('the choice of picture quality is remembered, and the app does not overrule it',()=>{
+ assert.match(source,/scpQualityChoice/,'the chosen rung is kept for the next session');
+ const main=fs.readFileSync(path.join(__dirname,'../desktop-app/main.js'),'utf8');
+ assert.doesNotMatch(main,/origSendComp/,'main.js must not pin SendCompressionLevel: the chooser would do nothing');
+ assert.doesNotMatch(main,/sel\.value="0"/,'main.js must not reset the remembered choice');
 });
 
 test('Sharp agrees with the desktop defaults the page sets, rather than silently overriding them',()=>{

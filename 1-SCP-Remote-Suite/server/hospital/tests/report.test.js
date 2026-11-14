@@ -167,3 +167,24 @@ test('printing copies the report into a print-only root, then cleans it up after
     assert.ok(!w.document.querySelector('.scp-print-root'), 'the print copy is removed afterwards');
     assert.ok(!w.document.documentElement.classList.contains('scp-printing'), 'the print mark is cleared');
 });
+
+test('printing device fact sheet adds scp-assessment-report class and renders the selected device specs cleanly', (t) => {
+    const w = load(t);
+    const base = { nodeid: 'er_doctor', name: 'ER หมอ', room: 'ER', os: 'Microsoft Windows 10 Pro', ramGb: 4,
+        healthScore: 27, healthStatus: 'critical', cpu: 'AMD Ryzen 5 2400G', win11Status: 'ineligible',
+        win11Blockers: ['CPU ไม่ผ่านเกณฑ์'], upgradeActions: ['เพิ่ม RAM เป็น 8 GB'], survival: {}, replacementYear: 2027 };
+    w.ScpCachedFleetAssessment = { devices: [base] };
+    w.ScpReport.open('device', 'er_doctor');
+    const printBtn = w.document.querySelector('#scpReport .scp-report-print-btn');
+    printBtn.onclick();
+    assert.equal(w.__printed, 1);
+    const printRoot = w.document.querySelector('.scp-print-root');
+    assert.ok(printRoot, 'printRoot was added');
+    assert.ok(printRoot.classList.contains('scp-assessment-report'), 'device mode has scp-assessment-report class');
+    assert.ok(printRoot.querySelector('.scp-device-sheet'));
+    assert.match(printRoot.textContent, /ER หมอ/);
+    assert.match(printRoot.textContent, /AMD Ryzen 5 2400G/);
+    w.dispatchEvent(new w.Event('afterprint'));
+    assert.ok(!w.document.querySelector('.scp-print-root'));
+});
+

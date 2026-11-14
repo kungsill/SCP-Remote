@@ -147,11 +147,18 @@
     function out(action, body) { return "Write-Output ('SCP_FIX:' + (@{ action = '" + action + "'; " + body + " } | ConvertTo-Json -Compress))"; }
     var FIX = {
         printer_fix: function () {
+            // Each step announces itself first: the agent forwards SCP_PROGRAM_STEP lines to the page
+            // (the ticket starts with "scpprog"), which turns them into 0-100%.
             return ["$ErrorActionPreference = 'SilentlyContinue'",
+                "Write-Output 'SCP_PROGRAM_STEP:{\"n\":1,\"of\":5,\"what\":\"count\"}'",
                 "$before = @(Get-CimInstance Win32_PrintJob).Count",
+                "Write-Output 'SCP_PROGRAM_STEP:{\"n\":2,\"of\":5,\"what\":\"stop\"}'",
                 "Stop-Service Spooler -Force; Start-Sleep -Seconds 2",
+                "Write-Output 'SCP_PROGRAM_STEP:{\"n\":3,\"of\":5,\"what\":\"clear\"}'",
                 "$files = @(Get-ChildItem ($env:SystemRoot + '\\System32\\spool\\PRINTERS') -File -Force); $files | Remove-Item -Force",
+                "Write-Output 'SCP_PROGRAM_STEP:{\"n\":4,\"of\":5,\"what\":\"start\"}'",
                 "Start-Service Spooler; Start-Sleep -Seconds 3",
+                "Write-Output 'SCP_PROGRAM_STEP:{\"n\":5,\"of\":5,\"what\":\"verify\"}'",
                 "$after = @(Get-CimInstance Win32_PrintJob).Count; $st = [string](Get-Service Spooler).Status",
                 out('printer_fix', "ok = ($st -eq 'Running'); before = $before; removed = $files.Count; after = $after; spooler = $st")].join('\r\n');
         },
@@ -299,6 +306,67 @@
         startup: t('change the start-up program', 'เปลี่ยนการเปิดพร้อมเครื่อง'),
         fonts: t('install Thai fonts', 'ติดตั้งฟอนต์ไทย')
     };
+    /* ---------- progress of a fix, 0-100% by step ---------- */
+    // Only fixes whose script announces its steps. The card sits at the corner of the screen, so
+    // it shows from any window (the work list, a computer's window, the printers page).
+    var STEPPED = { printer_fix: true };
+    var STEP_TEXT = {
+        count: [t('counting the jobs waiting', 'นับงานพิมพ์ที่ค้างอยู่')],
+        stop: [t('stopping the print spooler', 'หยุด Print Spooler')],
+        clear: [t('deleting the jobs in the queue', 'ลบงานที่ค้างในคิว')],
+        start: [t('starting the print spooler again', 'เปิด Print Spooler ใหม่')],
+        verify: [t('checking the spooler is running', 'ตรวจว่า Spooler กลับมาทำงาน')]
+    };
+    var progCards = {}, progTimer = null;
+    function progBox() {
+        var box = document.getElementById('scpFixProgress');
+        if (!box) { box = el('div', null, 'scp-fixprog'); box.id = 'scpFixProgress'; box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box); }
+        return box;
+    }
+    function progStart(ticket, node, label) {
+        progCards[ticket] = { nodeid: node._id, name: node.name || '', label: label, state: 'working', step: 0, of: 5, what: '', started: Date.now() };
+        progDraw(ticket);
+        if (!progTimer) progTimer = setInterval(function () {
+            var any = false;
+            Object.keys(progCards).forEach(function (k) { if (progCards[k].state === 'working') { any = true; progDraw(k); } });
+            if (!any) { clearInterval(progTimer); progTimer = null; }
+        }, 1000);
+    }
+    function progStep(m) {
+        var c = progCards[m.responseid];
+        if (!c || c.state !== 'working') return false;
+        var s = String(m.result || '').match(/SCP_PROGRAM_STEP:(\{[^\r\n]*\})/);
+        if (s) { try { var at = JSON.parse(s[1]); c.step = +at.n || c.step; c.of = +at.of || c.of; c.what = String(at.what || ''); } catch (e) { /* a step line we cannot read changes nothing */ } progDraw(m.responseid); }
+        return true;
+    }
+    function progFinish(ticket, tone, text) {
+        var c = progCards[ticket];
+        if (!c || c.state !== 'working') return;
+        c.state = tone === 'ok' ? 'done' : (tone === 'warn' ? 'unknown' : 'failed'); c.text = text; c.at = Date.now();
+        progDraw(ticket);
+        if (tone === 'ok') setTimeout(function () { progRemove(ticket); }, 30000);
+    }
+    function progRemove(ticket) { var c = progCards[ticket]; if (c && c.el) c.el.remove(); delete progCards[ticket]; }
+    function progDraw(ticket) {
+        var c = progCards[ticket];
+        if (!c) return;
+        if (!c.el) { c.el = el('div', null, 'scp-fixprog-card'); progBox().appendChild(c.el); }
+        var pct = c.state === 'done' ? 100 : (c.state === 'working' ? (c.step ? Math.round((c.step - 1) / c.of * 100) : 0) : Math.max(0, c.step ? Math.round((c.step - 1) / c.of * 100) : 0));
+        c.el.className = 'scp-fixprog-card ' + c.state;
+        c.el.textContent = '';
+        var head = el('div', null, 'scp-fixprog-head');
+        head.appendChild(el('strong', '🖨️ ' + c.label + (c.name ? ' · ' + c.name : '')));
+        head.appendChild(btn('✕', 'scp-fixprog-x', function () { progRemove(ticket); }));
+        c.el.appendChild(head);
+        var bar = el('div', null, 'scp-fixprog-bar'); bar.setAttribute('role', 'progressbar'); bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', '100'); bar.setAttribute('aria-valuenow', String(pct));
+        var fill = el('i'); fill.style.width = pct + '%'; bar.appendChild(fill); c.el.appendChild(bar);
+        var line;
+        if (c.state === 'working') {
+            var secs = Math.max(0, Math.round((Date.now() - c.started) / 1000));
+            line = pct + '% · ' + (c.step ? t('step ', 'ขั้นที่ ') + c.step + '/' + c.of + ' · ' + ((STEP_TEXT[c.what] || [c.what])[0] || '') : t('sent, waiting for the computer', 'ส่งคำสั่งแล้ว รอเครื่องตอบ')) + ' · ' + secs + t(' s', ' วิ');
+        } else line = (c.state === 'done' ? '100% · ' : pct + '% · ') + (c.text || '');
+        c.el.appendChild(el('small', line));
+    }
     function fix(node, action, arg, opts) {
         opts = opts || {};
         if (!online(node)) return;
@@ -309,13 +377,15 @@
             var label = opts.label || FIX_LABEL[action];
             if (waiting(node._id)) note(node._id, t('Queued (the computer is busy): ', 'รอคิว (เครื่องกำลังทำคำสั่งก่อนหน้า): ') + label, 'busy');
             enqueue(node._id, function () {
-                var ticket = 'scphfix' + Date.now() + '_' + (++seq);
+                // "scpprog" is the prefix the agent forwards step lines for; only a fix that reports steps uses it
+                var ticket = (STEPPED[action] ? 'scpprogfix' : 'scphfix') + Date.now() + '_' + (++seq);
                 fixes[ticket] = { nodeid: node._id, action: action, arg: arg, label: label, timer: setTimeout(function () {
                     var f = fixes[ticket];
-                    if (f) { delete fixes[ticket]; note(node._id, t('No answer yet: ', 'ยังไม่ได้คำตอบ: ') + f.label, 'warn'); finished(node._id); }
+                    if (f) { delete fixes[ticket]; progFinish(ticket, 'warn', t('No answer yet', 'ยังไม่ได้คำตอบ')); note(node._id, t('No answer yet: ', 'ยังไม่ได้คำตอบ: ') + f.label, 'warn'); finished(node._id); }
                 }, 180000) };
+                if (STEPPED[action]) progStart(ticket, node, label);
                 note(node._id, t('Working: ', 'กำลังทำ: ') + label + '…', 'busy');
-                try { send([node._id], ticket, cmds); } catch (e) { delete fixes[ticket]; note(node._id, t('Could not send', 'ส่งคำสั่งไม่ได้'), 'bad'); finished(node._id); }
+                try { send([node._id], ticket, cmds); } catch (e) { delete fixes[ticket]; progFinish(ticket, 'bad', t('Could not send', 'ส่งคำสั่งไม่ได้')); note(node._id, t('Could not send', 'ส่งคำสั่งไม่ได้'), 'bad'); finished(node._id); }
             });
         };
         if (action === 'fonts' && !arg) {
@@ -343,7 +413,8 @@
 
     /* ---------- answers from the computers ---------- */
     function receive(m) {
-        if (!m || m.action !== 'msg' || m.type !== 'runcommands' || typeof m.responseid !== 'string' || m.progress === true) return false;
+        if (!m || m.action !== 'msg' || m.type !== 'runcommands' || typeof m.responseid !== 'string') return false;
+        if (m.progress === true) return progStep(m);
         var id = m.responseid, text = String(m.result || '');
         if (id.indexOf('scphealth') === 0) {
             var job = jobs[m.nodeid];
@@ -371,7 +442,7 @@
             paint(m.nodeid);
             return true;
         }
-        if (id.indexOf('scphfix') === 0) {
+        if (id.indexOf('scphfix') === 0 || id.indexOf('scpprogfix') === 0) {
             var f = fixes[id];
             if (!f) return true;
             var fm = text.match(/SCP_FIX:(\{[^\r\n]*\})/), r = null;
@@ -388,6 +459,7 @@
             }
             clearTimeout(f.timer);
             delete fixes[id];
+            progFinish(id, r && r.ok ? 'ok' : 'bad', describe(f, r, text));
             note(f.nodeid, describe(f, r, text), r && r.ok ? 'ok' : 'bad');
             log(f.nodeid, f.action, r);
             // look again, so the list shows what the fix changed (queued behind any fix still waiting)

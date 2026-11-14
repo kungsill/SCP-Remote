@@ -15,7 +15,10 @@ const MARKER = /(\/\/|\/\*|<!--)\s*SCP-Remote/;
 const ours = [
     /^hospital[\\/]/, /^scp-[^\\/]+\.js$/, /^public[\\/]scripts[\\/]scp-/, /^public[\\/]styles[\\/]scp-/,
     /^agents[\\/]modules_meshcore[\\/]scp-/, /^agents[\\/]modules_meshcore[\\/]win-scp-/,
-    /^scripts[\\/]/, /^views[\\/]translations[\\/]/
+    /^scripts[\\/]/, /^views[\\/]translations[\\/]/,
+    // published copies of hospital/desktop-app, written by its publish-update.js for the
+    // program's self-update; nothing of MeshCentral's is in there
+    /^public[\\/]app-update[\\/]/
 ];
 
 // Upstream files known to carry edits, as recorded in the document. The view templates
@@ -35,7 +38,8 @@ const themeIncludeOnly = /^views[\\/][^\\/]+\.handlebars$/;
 
 function walk(dir, found) {
     for (const name of fs.readdirSync(dir)) {
-        if (['node_modules', '.local', '.git', '.vscode'].includes(name)) { continue; }
+        // .claude holds Claude Code worktrees (whole copies of the repo); .superpowers is plan scratch.
+        if (['node_modules', '.local', '.git', '.vscode', '.claude', '.superpowers'].includes(name)) { continue; }
         const full = path.join(dir, name);
         if (fs.statSync(full).isDirectory()) { walk(full, found); continue; }
         if (!/\.(js|handlebars)$/.test(name)) { continue; }

@@ -37,7 +37,9 @@ exports.handle=async function(ctx,cmd){
 exports.api=async function(web,input,token){
  if(typeof token!=='string'||! /^[a-f0-9]{64}$/.test(token))throw Error('INVALID_TOKEN');
  const id='scpclient/'+digest(token),db=web.db;
- return serial(id,async()=>{
+ // Fix printing waits for the computer to answer. That wait happens after the checks, outside
+ // the per-program queue, so the program's other requests are not held up behind it.
+ const result=await serial(id,async()=>{
   let client=await get(db,id);
   const defaultOwner = (web.users && web.users['user//admin']) ? 'user//admin' : (Object.keys(web.users||{}).find(u => web.users[u] && web.users[u].siteadmin === 0xFFFFFFFF) || 'user//admin');
   if(input.op==='register'){
@@ -69,6 +71,17 @@ exports.api=async function(web,input,token){
    return {rooms:roomIds.map(id=>({id,name:web.meshes[id].name})),nodes:(await all(db,'node')).filter(scope).map(n=>({id:n._id,name:n.name,room:n.meshid,ip:n.host||'',online:!!(web.wsagents[n._id]&&web.wsagents[n._id].authenticated===2),ready:consentReady(n),position:positions.find(p=>p.nodeid===n._id)||null}))};
   }
   if(input.op==='disconnect'){await endShares(web,id);return {ok:true};}
+  // SCP-Remote: fix printing from the program. It names a computer and nothing else; the
+  // command is the server's own (hospital/mobile.js). The program must be approved for that
+  // computer's room, and the account it acts for must hold the right to run commands there.
+  if(input.op==='fixPrinter'){
+   const node=await get(db,input.nodeid);if(!scope(node))throw Error('ACCESS_DENIED');
+   if(typeof web.GetNodeWithRights!=='function')throw Error('ACCESS_DENIED');
+   const domain=(web.parent&&web.parent.config&&web.parent.config.domains&&web.parent.config.domains[''])||{id:''};
+   const allowed=await new Promise(resolve=>web.GetNodeWithRights(domain,owner,node._id,(n,rights,visible)=>resolve(!!(n&&visible&&((rights&0x00020000)!==0)))));
+   if(!allowed)throw Error('ACCESS_DENIED');
+   return {scpFixPrinter:node._id,by:owner._id,from:'app: '+(client.label||client.name)};
+  }
   if(input.op==='connect'){
    const node=await get(db,input.nodeid);if(!scope(node))throw Error('ACCESS_DENIED');if(!web.wsagents[node._id]||web.wsagents[node._id].authenticated!==2)throw Error('OFFLINE');
    if(!consentReady(node))throw Error('AGENT_UPDATE_REQUIRED');
@@ -86,6 +99,8 @@ exports.api=async function(web,input,token){
   }
   throw Error('UNKNOWN_OPERATION');
  });
+ if(result&&result.scpFixPrinter)return require('./mobile').run(web,result.scpFixPrinter,result.by,result.from);
+ return result;
 };
 exports.route=function(web,req,res){
  if(req.headers.origin){res.status(403).json({error:'ORIGIN_DENIED'});return;}

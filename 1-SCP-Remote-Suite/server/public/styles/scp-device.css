@@ -1,0 +1,44 @@
+/* SCP-Remote: a computer's General page (p10). Laid out by scp-device.js. */
+.scp-dev-hidden { display: none !important; }
+body.scp-device-page #p10info { padding: 4px 24px 28px; box-sizing: border-box; }
+body.scp-device-page #MainComputerImage { width: 120px !important; height: auto !important; }
+body.scp-device-page #MainComputerState { font-size: 13px; font-weight: 600; text-align: center; color: var(--scp-muted, #6d5560); }
+
+.scp-dev-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 4px 0 16px; }
+.scp-dev-state { padding: 6px 13px; border-radius: 999px; font-size: 13.5px; font-weight: 700; }
+.scp-dev-state.on { background: #e2f6ef; color: #17704a; }
+.scp-dev-state.on::before { content: '● '; }
+.scp-dev-state.off { background: rgba(0, 0, 0, .06); color: var(--scp-muted, #6d5560); }
+.scp-dev-fact { padding: 6px 12px; border-radius: 999px; background: var(--scp-soft, #fce9f3); color: var(--scp-ink, #2a1520); font-size: 13px; font-weight: 600; }
+.scp-dev-fact.warn { background: #fdecea; color: #b42318; }
+.scp-dev-go { display: flex; gap: 8px; margin-left: auto; }
+.scp-dev-btn { padding: 9px 20px; border: 1px solid var(--scp-line, #f0dbe6); border-radius: 10px; background: var(--scp-surface, #fff); color: var(--scp-accent, #b02a72); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.scp-dev-btn:hover { background: var(--scp-soft, #fce9f3); border-color: var(--scp-accent, #b02a72); }
+.scp-dev-btn.primary { background: var(--scp-accent, #b02a72); border-color: var(--scp-accent, #b02a72); color: #fff; }
+.scp-dev-btn.primary:hover { filter: brightness(1.08); }
+
+.scp-dev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+.scp-dev-card { border: 1px solid var(--scp-line, #f0dbe6); border-radius: 14px; background: var(--scp-surface, #fff); box-shadow: 0 2px 10px rgba(70, 22, 46, .06); padding: 14px 18px; box-sizing: border-box; min-width: 0; }
+.scp-dev-card h3 { margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--scp-ink, #2a1520); }
+table.scp-dev-rows { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.scp-dev-rows td { padding: 8px 0 !important; border-bottom: 1px solid var(--scp-line, #f0dbe6); vertical-align: top; font-size: 13.5px !important; line-height: 1.5; color: var(--scp-ink, #2a1520); overflow-wrap: anywhere; }
+table.scp-dev-rows tr:last-child td { border-bottom: 0; }
+table.scp-dev-rows td.style7, table.scp-dev-rows td:first-child { width: 38%; padding-right: 12px !important; color: var(--scp-muted, #6d5560) !important; font-size: 13px !important; font-weight: 500; }
+table.scp-dev-rows tr.scp-dev-warn td { background: #fdecea; }
+table.scp-dev-rows tr.scp-dev-warn td:first-child { box-shadow: inset 3px 0 0 #b42318; padding-left: 8px !important; color: #b42318 !important; }
+
+.scp-dev-actions { margin-top: 14px; }
+.scp-dev-actrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.scp-dev-actrow input[type=button], .scp-dev-actrow button { margin: 0 !important; padding: 7px 14px !important; border: 1px solid var(--scp-line, #f0dbe6) !important; border-radius: 10px !important; background: var(--scp-surface, #fff) !important; color: var(--scp-ink, #2a1520) !important; font: inherit; font-size: 13px !important; cursor: pointer; }
+.scp-dev-actrow input[type=button]:hover, .scp-dev-actrow button:hover { background: var(--scp-soft, #fce9f3) !important; border-color: var(--scp-accent, #b02a72) !important; color: var(--scp-accent, #b02a72) !important; }
+
+/* the 7-day power timeline under the cards */
+body.scp-device-page #p10html2 table { margin-top: 16px; border: 1px solid var(--scp-line, #f0dbe6); border-radius: 12px; overflow: hidden; border-collapse: separate; border-spacing: 0; background: var(--scp-surface, #fff); }
+body.scp-device-page #p10html2 th { background: var(--scp-soft, #fce9f3) !important; color: var(--scp-ink, #2a1520) !important; padding: 8px !important; }
+
+@media (max-width: 700px) {
+  body.scp-device-page #p10info { padding: 4px 10px 20px; }
+  .scp-dev-grid { grid-template-columns: minmax(0, 1fr); }
+  .scp-dev-go { margin-left: 0; width: 100%; }
+  .scp-dev-go .scp-dev-btn { flex: 1; }
+}

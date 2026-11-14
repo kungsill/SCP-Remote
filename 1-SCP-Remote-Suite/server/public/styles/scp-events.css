@@ -1,0 +1,64 @@
+/* SCP-Remote: My Events page (p3). Laid out by scp-events.js. */
+.scp-ev-hidden { display: none !important; }
+body.scp-events-page #p3 { padding: 0 24px 28px; box-sizing: border-box; }
+body.scp-events-page #p3 .pTable { background: transparent !important; border-radius: 12px; }
+
+.scp-ev-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0 14px; }
+.scp-ev-filter { padding: 7px 15px; border: 1px solid var(--scp-line, #f0dbe6); border-radius: 999px; background: var(--scp-surface, #fff); color: var(--scp-ink, #2a1520); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.scp-ev-filter:hover { border-color: var(--scp-accent, #b02a72); }
+.scp-ev-filter.on { background: var(--scp-accent, #b02a72); border-color: var(--scp-accent, #b02a72); color: #fff; }
+.scp-ev-find { flex: 1; min-width: 220px; padding: 9px 13px; border: 1px solid var(--scp-line, #f0dbe6); border-radius: 10px; background: var(--scp-surface, #fff); color: var(--scp-ink, #2a1520); font: inherit; font-size: 14px; }
+.scp-ev-raw { margin-left: auto; color: var(--scp-muted, #6d5560); font-weight: 500; }
+
+.scp-ev-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.scp-ev-stat { padding: 6px 13px; border-radius: 999px; background: var(--scp-soft, #fce9f3); color: var(--scp-ink, #2a1520); font-size: 13px; font-weight: 600; }
+.scp-ev-stat.warn { background: #fdecea; color: #b42318; }
+
+.scp-ev-day { margin: 18px 0 8px; font-size: 14px; font-weight: 700; color: var(--scp-muted, #6d5560); }
+.scp-ev-list { border: 1px solid var(--scp-line, #f0dbe6); border-radius: 14px; background: var(--scp-surface, #fff); overflow: hidden; }
+.scp-ev-row + .scp-ev-row { border-top: 1px solid var(--scp-line, #f0dbe6); }
+.scp-ev-line { display: grid; grid-template-columns: 50px 26px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; border: 0; background: transparent; color: var(--scp-ink, #2a1520); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.scp-ev-line:hover { background: var(--scp-soft, #fce9f3); }
+.scp-ev-time { font-variant-numeric: tabular-nums; color: var(--scp-muted, #6d5560); font-size: 13px; }
+.scp-ev-icon { width: 26px; height: 26px; border-radius: 8px; background: var(--scp-soft, #fce9f3); display: grid; place-items: center; font-size: 13px; }
+.scp-ev-remote .scp-ev-icon::before { content: '🖥'; }
+.scp-ev-files .scp-ev-icon::before { content: '📁'; }
+.scp-ev-login .scp-ev-icon::before { content: '🔑'; }
+.scp-ev-logout .scp-ev-icon::before { content: '↩'; }
+.scp-ev-fail .scp-ev-icon::before { content: '⚠'; }
+.scp-ev-power .scp-ev-icon::before { content: '⏻'; }
+.scp-ev-other .scp-ev-icon::before { content: '•'; }
+.scp-ev-text { min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+.scp-ev-text strong { font-weight: 700; }
+.scp-ev-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 4px; vertical-align: middle; }
+.scp-ev-chip { padding: 1px 8px; border-radius: 999px; background: rgba(0, 0, 0, .05); color: var(--scp-muted, #6d5560); font-size: 12px; }
+.scp-ev-more { color: var(--scp-muted, #6d5560); font-size: 12px; white-space: nowrap; }
+.scp-ev-row.warn { background: #fdecea; }
+.scp-ev-row.warn .scp-ev-line { box-shadow: inset 3px 0 0 #b42318; }
+.scp-ev-row.warn .scp-ev-icon { background: #f9d3cf; color: #b42318; }
+.scp-ev-row.warn .scp-ev-chip { background: rgba(180, 35, 24, .1); color: #b42318; }
+.scp-ev-power .scp-ev-text, .scp-ev-other .scp-ev-text { color: var(--scp-muted, #6d5560); }
+
+.scp-ev-detail { padding: 4px 14px 12px 100px; }
+.scp-ev-rec { padding: 3px 0; font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--scp-muted, #6d5560); overflow-wrap: anywhere; cursor: pointer; }
+.scp-ev-rec:hover { color: var(--scp-ink, #2a1520); }
+.scp-ev-go { margin-top: 8px; padding: 6px 14px; border: 1px solid var(--scp-line, #f0dbe6); border-radius: 8px; background: var(--scp-surface, #fff); color: var(--scp-accent, #b02a72); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.scp-ev-empty, .scp-ev-hint { margin: 14px 2px; color: var(--scp-muted, #6d5560); font-size: 13px; }
+
+@media (max-width: 700px) {
+  body.scp-events-page #p3 { padding: 0 10px 20px; }
+  .scp-ev-line { grid-template-columns: 44px 22px minmax(0, 1fr); }
+  .scp-ev-more { display: none; }
+  .scp-ev-detail { padding-left: 14px; }
+  .scp-ev-raw { margin-left: 0; }
+}
+
+/* Keyboard-accessible detail rows and narrow screens. */
+.scp-ev-rec { display: block; width: 100%; border: 0; background: transparent; text-align: left; }
+.scp-ev-row.warn .scp-ev-text, .scp-ev-row.warn .scp-ev-time,
+.scp-ev-row.warn .scp-ev-more, .scp-ev-row.warn .scp-ev-rec { color: #66251e; }
+.scp-ev-line:focus-visible, .scp-ev-rec:focus-visible, .scp-ev-filter:focus-visible { outline: 2px solid var(--scp-accent, #b02a72); outline-offset: -2px; }
+@media (max-width: 400px) { .scp-ev-find { min-width: 0; width: 100%; flex-basis: 100%; box-sizing: border-box; } }
+
+.scp-ev-chips { max-width: 100%; box-sizing: border-box; }
+.scp-ev-chip { overflow-wrap: anywhere; }

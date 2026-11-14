@@ -38,6 +38,10 @@ class LoginActivity : AppCompatActivity() {
         window.statusBarColor = androidx.core.content.ContextCompat.getColor(this, R.color.background)
         androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
         findViewById<View>(R.id.loginRoot).padForSystemBars(top = true, bottom = true)
+        // On a tablet the form stays a comfortable 480 dp wide instead of spanning the screen.
+        if (resources.configuration.screenWidthDp > 560) {
+            findViewById<View>(R.id.loginCard).layoutParams.width = (480 * resources.displayMetrics.density).toInt()
+        }
         server = findViewById(R.id.server); user = findViewById(R.id.user); pass = findViewById(R.id.pass)
         remember = findViewById(R.id.remember); error = findViewById(R.id.error); button = findViewById(R.id.signIn)
         config = ServerConfig.load(this)

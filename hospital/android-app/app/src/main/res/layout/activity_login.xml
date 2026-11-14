@@ -36,6 +36,7 @@
             android:textColor="@color/text_muted" />
 
         <LinearLayout
+            android:id="@+id/loginCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@drawable/card"

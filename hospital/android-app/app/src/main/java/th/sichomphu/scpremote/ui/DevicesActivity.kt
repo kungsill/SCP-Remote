@@ -16,6 +16,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.launch
@@ -45,7 +46,12 @@ class DevicesActivity : AppCompatActivity() {
         findViewById<View>(R.id.root).padForSystemBars(top = false, bottom = true)
         search = findViewById(R.id.search); group = findViewById(R.id.group); status = findViewById(R.id.status)
         adapter = DeviceAdapter(onConnect = ::openRemote, onFix = ::confirmFix)
-        findViewById<RecyclerView>(R.id.list).apply { layoutManager = LinearLayoutManager(this@DevicesActivity); adapter = this@DevicesActivity.adapter }
+        // One column on a phone; on a tablet or a phone held sideways, as many ~400 dp columns as fit.
+        val columns = (resources.configuration.screenWidthDp / 400).coerceIn(1, 3)
+        findViewById<RecyclerView>(R.id.list).apply {
+            layoutManager = if (columns == 1) LinearLayoutManager(this@DevicesActivity) else GridLayoutManager(this@DevicesActivity, columns)
+            adapter = this@DevicesActivity.adapter
+        }
         findViewById<Button>(R.id.refresh).setOnClickListener { load() }
         findViewById<Button>(R.id.more).setOnClickListener { menu(it) }
         search.addTextChangedListener(object : TextWatcher {

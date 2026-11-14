@@ -125,6 +125,46 @@ class ControlChannelTest {
         assertEquals("fixPrinter", req.getString("op")); assertEquals("node//x", req.getString("nodeid"))
     }
 
+    @Test fun clipboardTextComesBackForThatComputer() = runBlocking {
+        val fake = FakeServer(welcome) { m ->
+            if (m.optString("type") == "getclip")
+                """{"action":"msg","type":"getclip","nodeid":"${m.getString("nodeid")}","tag":${m.getInt("tag")},"data":"ข้อความจากคอม"}"""
+            else null
+        }
+        val ch = ControlChannel("https://h:1", trust, fake)
+        ch.signIn("a", "b")
+        assertEquals("ข้อความจากคอม", ch.getClipboard("node//x"))
+    }
+
+    // The hospital blocks restarting computers marked critical (meshuser.js MAINTENANCE_WORKFLOW_REQUIRED).
+    @Test fun powerActionReportsTheServersRefusal() = runBlocking {
+        val fake = FakeServer(welcome) { m ->
+            if (m.optString("action") == "poweraction")
+                """{"action":"poweraction","responseid":"${m.getString("responseid")}","nodeid":"node//x","result":"MAINTENANCE_WORKFLOW_REQUIRED"}"""
+            else null
+        }
+        val ch = ControlChannel("https://h:1", trust, fake)
+        ch.signIn("a", "b")
+        assertEquals("MAINTENANCE_WORKFLOW_REQUIRED", ch.power("node//x", 3, quietMs = 2000))
+    }
+
+    @Test fun powerActionWithNoReplyCountsAsSent() = runBlocking {
+        val fake = FakeServer(welcome)
+        val ch = ControlChannel("https://h:1", trust, fake)
+        ch.signIn("a", "b")
+        assertEquals(null, ch.power("node//x", 3, quietMs = 50))
+        assertEquals("poweraction", JSONObject(fake.sent.last()).getString("action"))
+    }
+
+    @Test fun wakeReturnsTheServersAnswer() = runBlocking {
+        val fake = FakeServer(welcome) { m ->
+            if (m.optString("action") == "wakedevices") """{"action":"wakedevices","responseid":"${m.getString("responseid")}","result":"Used 2 device(s) to send wake packets."}""" else null
+        }
+        val ch = ControlChannel("https://h:1", trust, fake)
+        ch.signIn("a", "b")
+        assertEquals("Used 2 device(s) to send wake packets.", ch.wake("node//x"))
+    }
+
     @Test fun authCookieReturnsBothCookies() = runBlocking {
         val fake = FakeServer(welcome) { m ->
             if (m.getString("action") == "authcookie") """{"action":"authcookie","cookie":"C","rcookie":"RC"}""" else null

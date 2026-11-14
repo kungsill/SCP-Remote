@@ -37,6 +37,12 @@
             android:theme="@style/Theme.ScpRemote.Remote"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
+        <!-- Rotation keeps the same file channel open. -->
+        <activity
+            android:name=".ui.FilesActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

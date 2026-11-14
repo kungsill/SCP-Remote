@@ -59,7 +59,11 @@ class DevicesActivity : AppCompatActivity() {
         swipe = findViewById(R.id.swipe)
         swipe.setColorSchemeColors(ContextCompat.getColor(this, R.color.accent))
         swipe.setOnRefreshListener { load(quiet = false) }
-        adapter = DeviceAdapter(onConnect = ::openRemote, onFix = ::confirmFix)
+        adapter = DeviceAdapter(
+            onConnect = ::openRemote, onFix = ::confirmFix,
+            onMore = { d -> DeviceActions.menu(this, d, ::openRemote, ::confirmFix) },
+            onWake = { d -> DeviceActions.wake(this, d) },
+        )
         // One column on a phone; on a tablet or a phone held sideways, as many ~400 dp columns as fit.
         val columns = (resources.configuration.screenWidthDp / 400).coerceIn(1, 3)
         findViewById<RecyclerView>(R.id.list).apply {

@@ -20,6 +20,9 @@ import th.sichomphu.scpremote.ui.DeviceSections.Row
 class DeviceAdapter(
     private val onConnect: (Device) -> Unit,
     private val onFix: (Device) -> Unit,
+    /** Long-press: every action for this computer. */
+    private val onMore: (Device) -> Unit = {},
+    private val onWake: (Device) -> Unit = {},
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     enum class FixState { BUSY, OK, FAILED }
 
@@ -79,16 +82,19 @@ class DeviceAdapter(
             state.text = ctx.getString(if (d.online) R.string.online else R.string.offline)
             state.setTextColor(color)
             details.text = listOf(d.ip, d.groupName, d.users.joinToString(", ")).filter { it.isNotBlank() }.joinToString(" · ")
-            // A computer that is off is shown faded: nothing on it can be done now.
-            itemView.alpha = if (d.online) 1f else 0.6f
 
             val canOpen = d.canView && d.online
-            connect.visibility = if (d.canView) View.VISIBLE else View.GONE
-            connect.text = ctx.getString(if (d.viewOnly) R.string.view_only else R.string.connect)
-            connect.isEnabled = d.online
-            connect.setOnClickListener { onConnect(d) }
+            // An offline computer that can be woken offers "Wake" where Connect would be.
+            val wakeInstead = !d.online && d.canWake
+            connect.visibility = if (d.canView || wakeInstead) View.VISIBLE else View.GONE
+            connect.text = ctx.getString(if (wakeInstead) R.string.wake else if (d.viewOnly) R.string.view_only else R.string.connect)
+            connect.isEnabled = d.online || wakeInstead
+            connect.setOnClickListener { if (wakeInstead) onWake(d) else onConnect(d) }
             itemView.setOnClickListener(if (canOpen) View.OnClickListener { onConnect(d) } else null)
             itemView.isClickable = canOpen
+            itemView.setOnLongClickListener { onMore(d); true }
+            // A computer that can be woken stays fully visible so the button reads as usable.
+            itemView.alpha = if (d.online || wakeInstead) 1f else 0.6f
 
             val fixState = fixText[d.id]
             fix.visibility = if (d.canFixPrinter) View.VISIBLE else View.GONE

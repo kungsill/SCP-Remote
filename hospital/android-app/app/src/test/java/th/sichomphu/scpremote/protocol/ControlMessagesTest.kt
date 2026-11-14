@@ -48,6 +48,28 @@ class ControlMessagesTest {
         assertTrue(ControlMessages.relayUrl("https://h", "n", "i", "c", viewOnly = true).endsWith("&viewonly=1"))
     }
 
+    // Same messages as the web page (default.handlebars) and meshuser.js expect.
+    @Test fun clipboardPowerAndWakeMessages() {
+        val get = JSONObject(ControlMessages.getClipboard("node//a", 7))
+        assertEquals("msg", get.getString("action")); assertEquals("getclip", get.getString("type")); assertEquals("node//a", get.getString("nodeid")); assertEquals(7, get.getInt("tag"))
+        val set = JSONObject(ControlMessages.setClipboard("node//a", "สวัสดี"))
+        assertEquals("setclip", set.getString("type")); assertEquals("สวัสดี", set.getString("data"))
+        val power = JSONObject(ControlMessages.power("node//a", ControlMessages.RESTART, "r1"))
+        assertEquals("poweraction", power.getString("action")); assertEquals(3, power.getInt("actiontype")); assertEquals("node//a", power.getJSONArray("nodeids").getString(0)); assertEquals("r1", power.getString("responseid"))
+        assertEquals(2, ControlMessages.SHUTDOWN)
+        val wake = JSONObject(ControlMessages.wake("node//a", "w1"))
+        assertEquals("wakedevices", wake.getString("action")); assertEquals("node//a", wake.getJSONArray("nodeids").getString(0))
+    }
+
+    @Test fun filesTunnelUsesProtocol5() {
+        val j = JSONObject(ControlMessages.tunnelRequest("n", "i", "R", viewOnly = false, protocol = 5))
+        assertEquals(5, j.getInt("usage")); assertTrue(j.getString("value").contains("p=5&"))
+        assertTrue(ControlMessages.relayUrl("https://h", "n", "i", "c", viewOnly = false, protocol = 5).contains("&p=5&"))
+    }
+
+    @Test fun parseDevicesKeepsTheRightsNumber() =
+        assertEquals(0xFFFFFFFFL, ControlMessages.parseDevices("""{"devices":[{"id":"a","rights":4294967295}]}""").devices[0].rights)
+
     @Test fun parseDevicesMapsServerShape() {
         val json = """{"user":{"name":"nurse1","siteadmin":0},
             "groups":[{"id":"mesh//g1","name":"ER"}],
@@ -59,7 +81,7 @@ class ControlMessagesTest {
         assertEquals("nurse1", list.userName)
         assertEquals(listOf(Group("mesh//g1", "ER")), list.groups)
         assertEquals(
-            Device("node//a", "ER-PC1", "mesh//g1", "ER", "192.168.2.40", true, listOf("ER\\nurse"), true, true, false, true),
+            Device("node//a", "ER-PC1", "mesh//g1", "ER", "192.168.2.40", true, listOf("ER\\nurse"), true, true, false, true, rights = 131080),
             list.devices[0]
         )
         val b = list.devices[1]

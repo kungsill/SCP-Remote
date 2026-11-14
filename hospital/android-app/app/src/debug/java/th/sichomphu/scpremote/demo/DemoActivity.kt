@@ -63,12 +63,12 @@ class DemoActivity : AppCompatActivity() {
         val DEVICES = """{"user":{"name":"it-somchai"},"groups":[
             {"id":"g1","name":"ห้องฉุกเฉิน (ER)"},{"id":"g2","name":"ห้องยา"},{"id":"g3","name":"OPD"},{"id":"g4","name":"การเงิน"}],
           "devices":[
-            {"id":"n1","name":"ER-PC01","groupId":"g1","ip":"192.168.2.41","online":true,"users":["ER\\nurse1"],"canView":true,"canControl":true,"viewOnly":false,"canFixPrinter":true},
-            {"id":"n2","name":"ER-PC02","groupId":"g1","ip":"192.168.2.42","online":true,"users":[],"canView":true,"canControl":true,"viewOnly":false,"canFixPrinter":true},
+            {"id":"n1","name":"ER-PC01","groupId":"g1","ip":"192.168.2.41","online":true,"users":["ER\\nurse1"],"canView":true,"canControl":true,"viewOnly":false,"canFixPrinter":true,"rights":4294967295},
+            {"id":"n2","name":"ER-PC02","groupId":"g1","ip":"192.168.2.42","online":true,"users":[],"canView":true,"canControl":true,"viewOnly":false,"canFixPrinter":true,"rights":4294967295},
             {"id":"n3","name":"ห้องยา-เครื่อง1","groupId":"g2","ip":"192.168.2.50","online":true,"users":["PHAR\\pharm01"],"canView":true,"canControl":false,"viewOnly":true,"canFixPrinter":false},
-            {"id":"n4","name":"OPD-จุดซักประวัติ","groupId":"g3","ip":"192.168.3.12","online":false,"users":[],"canView":true,"canControl":true,"viewOnly":false,"canFixPrinter":true},
+            {"id":"n4","name":"OPD-จุดซักประวัติ","groupId":"g3","ip":"192.168.3.12","online":false,"users":[],"canView":true,"canControl":true,"viewOnly":false,"canFixPrinter":true,"rights":4294967295},
             {"id":"n5","name":"FIN-PC03","groupId":"g4","ip":"192.168.4.20","online":true,"users":["FIN\\acc2"],"canView":false,"canControl":false,"viewOnly":false,"canFixPrinter":true},
-            {"id":"n6","name":"test01","groupId":"g3","ip":"192.168.2.99","online":true,"users":["test"],"canView":true,"canControl":true,"viewOnly":false,"canFixPrinter":true}]}"""
+            {"id":"n6","name":"test01","groupId":"g3","ip":"192.168.2.99","online":true,"users":["test"],"canView":true,"canControl":true,"viewOnly":false,"canFixPrinter":true,"rights":4294967295}]}"""
     }
 }
 
@@ -87,6 +87,14 @@ private class FakeSocket(private val request: Request, private val listener: Web
 
     companion object {
         fun opener(reply: (JSONObject) -> String?, welcome: Boolean, relay: Boolean = false) = SocketOpener { r, l ->
+            // The file channel (p=5): answer folder listings like an agent would.
+            if (relay && r.url.queryParameter("p") == "5") {
+                val s = FakeSocket(r, l) { m ->
+                    if (m.optString("action") == "ls") JSONObject().put("path", m.optString("path")).put("reqid", m.optInt("reqid")).put("dir", org.json.JSONArray(FILES)).toString() else null
+                }
+                Thread { Thread.sleep(300); l.onMessage(s, "c") }.start()
+                return@SocketOpener s
+            }
             val s = FakeSocket(r, l, reply)
             if (welcome) l.onMessage(s, """{"action":"serverinfo"}""")
             if (relay) Thread {
@@ -100,6 +108,10 @@ private class FakeSocket(private val request: Request, private val listener: Web
             }.start()
             s
         }
+
+        const val FILES = """[{"n":"แบบฟอร์ม","t":2,"d":"2026-11-12T08:00:00.000Z"},{"n":"รูปภาพ","t":2,"d":"2026-11-10T08:00:00.000Z"},
+            {"n":"ใบสั่งยา-14-11.pdf","t":3,"s":284512,"d":"2026-11-14T02:15:00.000Z"},{"n":"รายงานเวร.xlsx","t":3,"s":48210,"d":"2026-11-13T09:30:00.000Z"},
+            {"n":"HOSxP.lnk","t":3,"s":1342,"d":"2026-10-01T01:00:00.000Z"}]"""
 
         fun jumboTile(png: ByteArray): ByteArray {
             val size = 8 + png.size

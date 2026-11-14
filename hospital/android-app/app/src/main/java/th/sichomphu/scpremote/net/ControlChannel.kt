@@ -91,6 +91,48 @@ class ControlChannel(
 
     fun send(json: String) { socket?.send(json) }
 
+    /** Replies the app is waiting for that are not scpops/authcookie (clipboard, power, wake). */
+    private val waiters = java.util.concurrent.CopyOnWriteArrayList<Pair<(JSONObject) -> Boolean, CompletableDeferred<JSONObject>>>()
+
+    /** Sends [json] and waits up to [timeoutMs] for the first message [match] accepts; null if none came. */
+    private suspend fun ask(json: String, timeoutMs: Long, match: (JSONObject) -> Boolean): JSONObject? {
+        val w = match to CompletableDeferred<JSONObject>()
+        waiters.add(w)
+        try {
+            sendOrFail(json) { }
+            return kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { w.second.await() }
+        } finally { waiters.remove(w) }
+    }
+
+    /** The computer's clipboard text, or null if it did not answer. */
+    suspend fun getClipboard(nodeId: String): String? {
+        val tag = tags.incrementAndGet()
+        return ask(ControlMessages.getClipboard(nodeId, tag), OP_TIMEOUT_MS) {
+            it.optString("action") == "msg" && it.optString("type") == "getclip" && it.optString("nodeid") == nodeId
+        }?.optString("data")
+    }
+
+    fun setClipboard(nodeId: String, text: String) = sendOrFail(ControlMessages.setClipboard(nodeId, text)) { }
+
+    /**
+     * Restart (3) or shut down (2). The server answers only when it refuses (e.g. a computer the
+     * hospital marked critical), so silence for [quietMs] means it was sent. Returns the refusal or null.
+     */
+    suspend fun power(nodeId: String, actionType: Int, quietMs: Long = 3000): String? {
+        val id = "app-power-" + tags.incrementAndGet()
+        return ask(ControlMessages.power(nodeId, actionType, id), quietMs) {
+            it.optString("action") == "poweraction" && it.optString("responseid") == id
+        }?.optString("result")?.ifEmpty { null }
+    }
+
+    /** Wake-on-LAN through other computers on the network; the server's answer, or null. */
+    suspend fun wake(nodeId: String): String? {
+        val id = "app-wake-" + tags.incrementAndGet()
+        return ask(ControlMessages.wake(nodeId, id), OP_TIMEOUT_MS) {
+            it.optString("action") == "wakedevices" && it.optString("responseid") == id
+        }?.optString("result")
+    }
+
     fun close() {
         val s = socket
         socket = null
@@ -136,6 +178,7 @@ class ControlChannel(
         override fun onMessage(webSocket: WebSocket, text: String) {
             if (!current()) return
             val m = try { JSONObject(text) } catch (e: Exception) { return }
+            for (w in waiters) if (w.first(m)) { w.second.complete(m); welcome(); return }
             when (m.optString("action")) {
                 "close" -> ready.completeExceptionally(ControlError("BAD_LOGIN"))
                 "scpops" -> { welcome(); m.optString("tag").toIntOrNull()?.let { pending.remove(it) }?.complete(m) }

@@ -27,6 +27,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import th.sichomphu.scpremote.R
@@ -293,7 +295,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
             setTextColor(ContextCompat.getColor(context, R.color.text_muted))
             setPadding(0, pad / 4, 0, pad / 2)
         })
-        val grid = GridLayout(this).apply { columnCount = 3 }
+        val grid = GridLayout(this).apply { columnCount = 3; alignmentMode = GridLayout.ALIGN_BOUNDS }
         box.addView(grid)
         lateinit var dialog: AlertDialog
         fun item(icon: Int, label: String, danger: Boolean = false, action: () -> Unit) {
@@ -309,9 +311,14 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
                 iconTint = ColorStateList.valueOf(tint)
                 setTextColor(if (danger) tint else ContextCompat.getColor(context, R.color.text))
                 cornerRadius = (14 * resources.displayMetrics.density).toInt()
+                // Same box for every button, little side padding so Thai words fit on one line.
+                insetTop = 0; insetBottom = 0
+                val side = (6 * resources.displayMetrics.density).toInt()
+                setPadding(side, side, side, side)
                 setOnClickListener { dialog.dismiss(); action() }
             }
-            grid.addView(b, GridLayout.LayoutParams(GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(GridLayout.UNDEFINED, 1f)).apply {
+            // FILL (not baseline) rows, so buttons with one- and two-line labels line up.
+            grid.addView(b, GridLayout.LayoutParams(GridLayout.spec(GridLayout.UNDEFINED, GridLayout.FILL), GridLayout.spec(GridLayout.UNDEFINED, GridLayout.FILL, 1f)).apply {
                 width = 0; height = (92 * resources.displayMetrics.density).toInt()
                 setMargins(pad / 4, pad / 4, pad / 4, pad / 4)
             })
@@ -326,11 +333,50 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         if (displays.size > 1) item(R.drawable.ic_monitor, QualityPicker.displayName(this, selectedDisplay)) {
             QualityPicker.pickDisplay(this, displays, selectedDisplay) { n -> selectedDisplay = n; session?.selectDisplay(n) }
         }
+        if (device.canClipboard) {
+            item(R.drawable.ic_paste, getString(R.string.paste_to_pc)) { pasteToComputer() }
+            item(R.drawable.ic_copy, getString(R.string.copy_from_pc)) { copyFromComputer() }
+        }
+        if (device.canFiles) item(R.drawable.ic_folder, getString(R.string.files)) {
+            startActivity(android.content.Intent(this, FilesActivity::class.java).putExtra(FilesActivity.EXTRA_DEVICE_ID, device.id))
+        }
         if (device.canControl) item(R.drawable.ic_lock, "Ctrl+Alt+Del") { keys?.special(SpecialKey.CTRL_ALT_DEL) }
+        if (device.canPower) item(R.drawable.ic_restart, getString(R.string.restart), danger = true) {
+            DeviceActions.confirmPower(this, device, th.sichomphu.scpremote.protocol.ControlMessages.RESTART)
+        }
         item(R.drawable.ic_help, getString(R.string.help)) { showGuide() }
         item(R.drawable.ic_close, getString(R.string.disconnect), danger = true) { leave() }
         dialog = MaterialAlertDialogBuilder(this).setView(box).setNegativeButton(R.string.close, null).create()
         dialog.show()
+    }
+
+    /**
+     * The phone's copied text goes to the computer's clipboard and is pasted where the cursor is
+     * (Ctrl+V), like copy/paste between two computers.
+     */
+    private fun pasteToComputer() {
+        val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val text = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
+        if (text.isNullOrEmpty()) { Toast.makeText(this, R.string.phone_clipboard_empty, Toast.LENGTH_SHORT).show(); return }
+        try { AppSession.channel?.setClipboard(device.id, text) } catch (e: Exception) { Toast.makeText(this, errorText(e), Toast.LENGTH_SHORT).show(); return }
+        // Give the agent a moment to set the clipboard before the paste keys arrive.
+        ui.postDelayed({
+            gate.send(KvmMessages.key(true, 0x11)); gate.send(KvmMessages.key(true, 0x56))
+            gate.send(KvmMessages.key(false, 0x56)); gate.send(KvmMessages.key(false, 0x11))
+        }, 300)
+        Toast.makeText(this, getString(R.string.pasted_to_pc, text.take(40)), Toast.LENGTH_SHORT).show()
+    }
+
+    /** The computer's clipboard text onto the phone's clipboard (copy it on the computer first). */
+    private fun copyFromComputer() {
+        val channel = AppSession.channel ?: return
+        lifecycleScope.launch {
+            val text = try { channel.getClipboard(device.id) } catch (e: Exception) { null }
+            if (text.isNullOrEmpty()) { Toast.makeText(this@RemoteActivity, R.string.pc_clipboard_empty, Toast.LENGTH_LONG).show(); return@launch }
+            val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("SCP-Remote", text))
+            Toast.makeText(this@RemoteActivity, getString(R.string.copied_from_pc, text.take(40)), Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun switchMode() {

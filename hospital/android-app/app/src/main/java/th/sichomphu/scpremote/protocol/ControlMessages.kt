@@ -25,20 +25,39 @@ object ControlMessages {
 
     fun authCookieRequest() = JSONObject().put("action", "authcookie").toString()
 
-    /** Asks the agent on [nodeId] to open a desktop tunnel to the relay (usage 2 = desktop). */
-    fun tunnelRequest(nodeId: String, tunnelId: String, rauth: String, viewOnly: Boolean): String {
-        val j = JSONObject().put("action", "msg").put("type", "tunnel").put("nodeid", nodeId).put("usage", 2)
-            .put("value", "*/meshrelay.ashx?p=2&nodeid=$nodeId&id=$tunnelId&rauth=$rauth")
+    /** Asks the agent on [nodeId] to open a tunnel to the relay: protocol 2 = desktop, 5 = files. */
+    fun tunnelRequest(nodeId: String, tunnelId: String, rauth: String, viewOnly: Boolean, protocol: Int = 2): String {
+        val j = JSONObject().put("action", "msg").put("type", "tunnel").put("nodeid", nodeId).put("usage", protocol)
+            .put("value", "*/meshrelay.ashx?p=$protocol&nodeid=$nodeId&id=$tunnelId&rauth=$rauth")
         if (viewOnly) j.put("viewonly", true)
         return j.toString()
     }
 
     /** The phone's side of the relay; [base] is the server URL (https://host:port). */
-    fun relayUrl(base: String, nodeId: String, tunnelId: String, auth: String, viewOnly: Boolean): String {
+    fun relayUrl(base: String, nodeId: String, tunnelId: String, auth: String, viewOnly: Boolean, protocol: Int = 2): String {
         val ws = base.trimEnd('/').replaceFirst(Regex("^http"), "ws")
-        return "$ws/meshrelay.ashx?browser=1&p=2&nodeid=${enc(nodeId)}&id=${enc(tunnelId)}&auth=${enc(auth)}" +
+        return "$ws/meshrelay.ashx?browser=1&p=$protocol&nodeid=${enc(nodeId)}&id=${enc(tunnelId)}&auth=${enc(auth)}" +
             if (viewOnly) "&viewonly=1" else ""
     }
+
+    // Power action types (meshuser.js poweraction): 2 = power off, 3 = reset.
+    const val SHUTDOWN = 2
+    const val RESTART = 3
+
+    /** The computer's clipboard text; the agent answers {action:'msg', type:'getclip', nodeid, tag, data}. */
+    fun getClipboard(nodeId: String, tag: Int) =
+        JSONObject().put("action", "msg").put("type", "getclip").put("nodeid", nodeId).put("tag", tag).toString()
+
+    fun setClipboard(nodeId: String, text: String) =
+        JSONObject().put("action", "msg").put("type", "setclip").put("nodeid", nodeId).put("data", text).toString()
+
+    fun power(nodeId: String, actionType: Int, responseId: String) =
+        JSONObject().put("action", "poweraction").put("nodeids", JSONArray().put(nodeId)).put("actiontype", actionType)
+            .put("responseid", responseId).toString()
+
+    /** Wake-on-LAN, sent by other computers on the same network (needs a known MAC address). */
+    fun wake(nodeId: String, responseId: String) =
+        JSONObject().put("action", "wakedevices").put("nodeids", JSONArray().put(nodeId)).put("responseid", responseId).toString()
 
     /** The `result` object of the appDevices operation. Group names come from groups[] by groupId. */
     fun parseDevices(json: String): DeviceList {
@@ -53,6 +72,7 @@ object ControlMessages {
                 users = it.optJSONArray("users")?.let { a -> (0 until a.length()).map { i -> a.optString(i) } } ?: emptyList(),
                 canView = it.optBoolean("canView"), canControl = it.optBoolean("canControl"),
                 viewOnly = it.optBoolean("viewOnly"), canFixPrinter = it.optBoolean("canFixPrinter"),
+                rights = it.optLong("rights", 0L),
             )
         }
         return DeviceList(r.optJSONObject("user")?.optString("name") ?: "", groups, devices)

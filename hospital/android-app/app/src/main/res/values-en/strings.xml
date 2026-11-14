@@ -10,7 +10,10 @@
     <string name="signing_in">Signing in…</string>
     <string name="err_BAD_LOGIN">Wrong user name or password</string>
     <string name="err_CERT_MISMATCH">The server\'s certificate is not the one this app knows, so the password was not sent</string>
-    <string name="err_UNREACHABLE">Cannot reach the server (you must be on the hospital network)</string>
+    <string name="err_UNREACHABLE">Cannot reach the server, neither in the hospital nor over the internet. Check the phone\'s connection.</string>
+    <string name="trying_internet">Hospital network not reachable; trying over the internet…</string>
+    <string name="trying_hospital">Internet address not reachable; trying the hospital network…</string>
+    <string name="who_internet">%1$s · over the internet</string>
     <string name="err_DISCONNECTED">The connection to the server dropped</string>
     <string name="err_TIMEOUT">The server did not answer in time</string>
     <string name="err_UNKNOWN_OPERATION">The server does not support this app yet; update the server first</string>

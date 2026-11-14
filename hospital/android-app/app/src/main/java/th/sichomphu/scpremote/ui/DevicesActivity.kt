@@ -127,7 +127,8 @@ class DevicesActivity : AppCompatActivity() {
     }
 
     private fun show(list: DeviceList) {
-        findViewById<TextView>(R.id.who).text = list.userName
+        findViewById<TextView>(R.id.who).text =
+            if (AppSession.viaInternet) getString(R.string.who_internet, list.userName) else list.userName
         val present = list.groups.filter { g -> list.devices.any { it.groupId == g.id } }
         if (groupId != null && present.none { it.id == groupId }) groupId = null
         groups.setOnCheckedStateChangeListener(null)

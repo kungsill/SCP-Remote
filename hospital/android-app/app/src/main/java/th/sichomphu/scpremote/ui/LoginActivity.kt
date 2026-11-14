@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import th.sichomphu.scpremote.R
 import th.sichomphu.scpremote.data.AppSession
 import th.sichomphu.scpremote.data.SecureStore
+import th.sichomphu.scpremote.data.ServerChoice
 import th.sichomphu.scpremote.data.ServerConfig
 import th.sichomphu.scpremote.net.ControlChannel
 import th.sichomphu.scpremote.net.PinnedTrust
@@ -75,20 +76,29 @@ class LoginActivity : AppCompatActivity() {
         val u = user.text.toString().trim()
         val p = pass.text.toString()
         if (u.isEmpty() || p.isEmpty()) { show(getString(R.string.fill_in)); return }
-        val url = normalized()
+        val typed = normalized()
         busy(true)
         lifecycleScope.launch {
             val trust = PinnedTrust(config.certificateSha256)
-            val channel = ControlChannel(url, trust)
-            val result = channel.signIn(u, p)
-            if (result.isSuccess) {
-                if (remember.isChecked) store.save(url, u, p) else store.clear()
-                AppSession.server = url; AppSession.trust = trust; AppSession.channel = channel
-                openDevices()
-            } else {
-                busy(false)
-                show(errorText(result.exceptionOrNull()))
+            // The typed (or last working) address first; if it cannot be reached — e.g. the phone
+            // is not on the hospital Wi-Fi — the other known address (internet / hospital).
+            var last: Throwable? = null
+            for ((i, url) in ServerChoice.candidates(typed, config).withIndex()) {
+                if (i > 0) show(getString(if (ServerChoice.isInternet(url, config)) R.string.trying_internet else R.string.trying_hospital))
+                val channel = ControlChannel(url, trust)
+                val result = channel.signIn(u, p)
+                if (result.isSuccess) {
+                    if (remember.isChecked) store.save(url, u, p) else store.clear()
+                    AppSession.server = url; AppSession.trust = trust; AppSession.channel = channel
+                    AppSession.viaInternet = ServerChoice.isInternet(url, config)
+                    openDevices()
+                    return@launch
+                }
+                last = result.exceptionOrNull()
+                if (!ServerChoice.tryNext((last as? th.sichomphu.scpremote.net.ControlError)?.code)) break
             }
+            busy(false)
+            show(errorText(last))
         }
     }
 

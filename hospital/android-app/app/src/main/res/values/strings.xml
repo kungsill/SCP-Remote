@@ -11,7 +11,10 @@
     <string name="signing_in">กำลังเข้าสู่ระบบ…</string>
     <string name="err_BAD_LOGIN">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</string>
     <string name="err_CERT_MISMATCH">ใบรับรองของเซิร์ฟเวอร์ไม่ตรงกับที่แอปรู้จัก จึงไม่ได้ส่งรหัสผ่าน</string>
-    <string name="err_UNREACHABLE">ติดต่อเซิร์ฟเวอร์ไม่ได้ (ต้องอยู่ในเครือข่ายของโรงพยาบาล)</string>
+    <string name="err_UNREACHABLE">ติดต่อเซิร์ฟเวอร์ไม่ได้ ทั้งในโรงพยาบาลและผ่านอินเทอร์เน็ต ตรวจว่ามือถือต่อเน็ตอยู่</string>
+    <string name="trying_internet">ติดต่อในโรงพยาบาลไม่ได้ กำลังลองผ่านอินเทอร์เน็ต…</string>
+    <string name="trying_hospital">ติดต่อผ่านอินเทอร์เน็ตไม่ได้ กำลังลองในโรงพยาบาล…</string>
+    <string name="who_internet">%1$s · ผ่านอินเทอร์เน็ต</string>
     <string name="err_DISCONNECTED">การเชื่อมต่อกับเซิร์ฟเวอร์หลุด</string>
     <string name="err_TIMEOUT">เซิร์ฟเวอร์ไม่ตอบในเวลาที่กำหนด</string>
     <string name="err_UNKNOWN_OPERATION">เซิร์ฟเวอร์ยังไม่รองรับแอปนี้ ต้องอัปเดตเซิร์ฟเวอร์ก่อน</string>

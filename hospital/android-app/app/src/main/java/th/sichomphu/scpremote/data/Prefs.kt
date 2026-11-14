@@ -24,6 +24,20 @@ class Prefs(context: Context) {
         get() = p.getString("recent", "")!!.split('\n').filter { it.isNotEmpty() }
         set(v) { p.edit().putString("recent", v.joinToString("\n")).apply() }
 
+    /** Sign-in connection setting (automatic unless changed) and the address typed for "custom". */
+    var connectionMode: ServerChoice.Mode
+        get() = runCatching { ServerChoice.Mode.valueOf(p.getString("connection", "AUTO")!!) }.getOrDefault(ServerChoice.Mode.AUTO)
+        set(v) { p.edit().putString("connection", v.name).apply() }
+
+    /** The address the last successful sign-in used (automatic mode tries it first). */
+    var lastServer: String
+        get() = p.getString("lastServer", "")!!
+        set(v) { p.edit().putString("lastServer", v).apply() }
+
+    var customServer: String
+        get() = p.getString("customServer", "")!!
+        set(v) { p.edit().putString("customServer", v).apply() }
+
     /** Gesture guide already shown for this mouse mode. */
     fun guideSeen(touchpad: Boolean) = p.getBoolean(if (touchpad) "guide_touchpad" else "guide_direct", false)
     fun setGuideSeen(touchpad: Boolean) { p.edit().putBoolean(if (touchpad) "guide_touchpad" else "guide_direct", true).apply() }

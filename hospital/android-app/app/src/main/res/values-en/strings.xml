@@ -13,6 +13,16 @@
     <string name="err_UNREACHABLE">Cannot reach the server, neither in the hospital nor over the internet. Check the phone\'s connection.</string>
     <string name="trying_internet">Hospital network not reachable; trying over the internet…</string>
     <string name="trying_hospital">Internet address not reachable; trying the hospital network…</string>
+    <string name="conn_line">Connection: %1$s</string>
+    <string name="conn_title">Connection</string>
+    <string name="conn_auto">Automatic (recommended)</string>
+    <string name="conn_hospital">Hospital network only</string>
+    <string name="conn_internet">Internet only</string>
+    <string name="conn_custom">Enter an address</string>
+    <string name="conn_auto_detail">Hospital first, then over the internet</string>
+    <string name="conn_hospital_detail">%1$s</string>
+    <string name="conn_internet_detail">%2$s</string>
+    <string name="conn_custom_detail">Type the server address</string>
     <string name="who_internet">%1$s · over the internet</string>
     <string name="err_DISCONNECTED">The connection to the server dropped</string>
     <string name="err_TIMEOUT">The server did not answer in time</string>

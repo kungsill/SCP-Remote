@@ -21,7 +21,8 @@ import th.sichomphu.scpremote.net.PinnedTrust
 
 /** Sign-in with an SCP-Remote account; signs in by itself when an account is remembered. */
 class LoginActivity : AppCompatActivity() {
-    private lateinit var server: EditText
+    private lateinit var connection: TextView
+    private val prefs by lazy { th.sichomphu.scpremote.data.Prefs(this) }
     private lateinit var user: EditText
     private lateinit var pass: EditText
     private lateinit var remember: CheckBox
@@ -44,13 +45,14 @@ class LoginActivity : AppCompatActivity() {
         if (resources.configuration.screenWidthDp > 560) {
             findViewById<View>(R.id.loginCard).layoutParams.width = (480 * resources.displayMetrics.density).toInt()
         }
-        server = findViewById(R.id.server); user = findViewById(R.id.user); pass = findViewById(R.id.pass)
+        connection = findViewById(R.id.connection); user = findViewById(R.id.user); pass = findViewById(R.id.pass)
         remember = findViewById(R.id.remember); error = findViewById(R.id.error); button = findViewById(R.id.signIn)
         config = ServerConfig.load(this)
         store = SecureStore(this)
 
         val saved = store.load()
-        server.setText(saved?.server?.ifEmpty { null } ?: config.url)
+        showConnection()
+        connection.setOnClickListener { chooseConnection() }
         intent.getStringExtra(EXTRA_MESSAGE)?.let { show(it) }
         if (saved != null) {
             user.setText(saved.user); pass.setText(saved.pass)
@@ -66,29 +68,74 @@ class LoginActivity : AppCompatActivity() {
         pass.setOnEditorActionListener { _, id, _ -> if (id == EditorInfo.IME_ACTION_DONE) { signIn(); true } else false }
     }
 
-    private fun normalized(): String {
-        var s = server.text.toString().trim().trimEnd('/')
-        if (!s.startsWith("https://") && !s.startsWith("http://")) s = "https://$s"
-        return s.replaceFirst("http://", "https://")
+    private fun modeLabel(m: ServerChoice.Mode) = getString(when (m) {
+        ServerChoice.Mode.AUTO -> R.string.conn_auto
+        ServerChoice.Mode.HOSPITAL -> R.string.conn_hospital
+        ServerChoice.Mode.INTERNET -> R.string.conn_internet
+        ServerChoice.Mode.CUSTOM -> R.string.conn_custom
+    })
+
+    /** One quiet line under the button: how the app will connect. */
+    private fun showConnection() {
+        val m = prefs.connectionMode
+        val label = if (m == ServerChoice.Mode.CUSTOM && prefs.customServer.isNotBlank()) prefs.customServer else modeLabel(m)
+        connection.text = getString(R.string.conn_line, label)
+    }
+
+    /** Connection setting: automatic (recommended), hospital only, internet only, or an address. */
+    private fun chooseConnection() {
+        val modes = ServerChoice.Mode.values()
+        val labels = modes.map { modeLabel(it) + "\n" + getString(when (it) {
+            ServerChoice.Mode.AUTO -> R.string.conn_auto_detail
+            ServerChoice.Mode.HOSPITAL -> R.string.conn_hospital_detail
+            ServerChoice.Mode.INTERNET -> R.string.conn_internet_detail
+            ServerChoice.Mode.CUSTOM -> R.string.conn_custom_detail
+        }, config.url.removePrefix("https://"), config.internetUrl.removePrefix("https://")) }.toTypedArray()
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.conn_title)
+            .setSingleChoiceItems(labels, modes.indexOf(prefs.connectionMode)) { d, i ->
+                d.dismiss()
+                if (modes[i] == ServerChoice.Mode.CUSTOM) askCustom() else { prefs.connectionMode = modes[i]; showConnection() }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun askCustom() {
+        val input = EditText(this).apply {
+            setText(prefs.customServer); hint = "https://"; inputType = android.text.InputType.TYPE_TEXT_VARIATION_URI or android.text.InputType.TYPE_CLASS_TEXT
+        }
+        val pad = (20 * resources.displayMetrics.density).toInt()
+        val box = android.widget.FrameLayout(this).apply { setPadding(pad, pad / 2, pad, 0); addView(input) }
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.conn_custom)
+            .setView(box)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.ok) { _, _ ->
+                val url = ServerChoice.normalize(input.text.toString())
+                if (url != null) { prefs.customServer = url; prefs.connectionMode = ServerChoice.Mode.CUSTOM }
+                showConnection()
+            }
+            .show()
     }
 
     private fun signIn() {
         val u = user.text.toString().trim()
         val p = pass.text.toString()
         if (u.isEmpty() || p.isEmpty()) { show(getString(R.string.fill_in)); return }
-        val typed = normalized()
         busy(true)
         lifecycleScope.launch {
             val trust = PinnedTrust(config.certificateSha256)
-            // The typed (or last working) address first; if it cannot be reached — e.g. the phone
+            // Automatic: the last address that worked first; if it cannot be reached — e.g. the phone
             // is not on the hospital Wi-Fi — the other known address (internet / hospital).
             var last: Throwable? = null
-            for ((i, url) in ServerChoice.candidates(typed, config).withIndex()) {
+            for ((i, url) in ServerChoice.forMode(prefs.connectionMode, prefs.lastServer.ifEmpty { null }, prefs.customServer, config).withIndex()) {
                 if (i > 0) show(getString(if (ServerChoice.isInternet(url, config)) R.string.trying_internet else R.string.trying_hospital))
                 val channel = ControlChannel(url, trust)
                 val result = channel.signIn(u, p)
                 if (result.isSuccess) {
                     if (remember.isChecked) store.save(url, u, p) else store.clear()
+                    prefs.lastServer = url
                     AppSession.server = url; AppSession.trust = trust; AppSession.channel = channel
                     AppSession.viaInternet = ServerChoice.isInternet(url, config)
                     openDevices()

@@ -14,6 +14,16 @@
     <string name="err_UNREACHABLE">ติดต่อเซิร์ฟเวอร์ไม่ได้ ทั้งในโรงพยาบาลและผ่านอินเทอร์เน็ต ตรวจว่ามือถือต่อเน็ตอยู่</string>
     <string name="trying_internet">ติดต่อในโรงพยาบาลไม่ได้ กำลังลองผ่านอินเทอร์เน็ต…</string>
     <string name="trying_hospital">ติดต่อผ่านอินเทอร์เน็ตไม่ได้ กำลังลองในโรงพยาบาล…</string>
+    <string name="conn_line">การเชื่อมต่อ: %1$s</string>
+    <string name="conn_title">การเชื่อมต่อ</string>
+    <string name="conn_auto">อัตโนมัติ (แนะนำ)</string>
+    <string name="conn_hospital">ในโรงพยาบาลเท่านั้น</string>
+    <string name="conn_internet">ผ่านอินเทอร์เน็ตเท่านั้น</string>
+    <string name="conn_custom">กำหนดที่อยู่เอง</string>
+    <string name="conn_auto_detail">ในโรงพยาบาลก่อน ถ้าไม่ได้ลองผ่านอินเทอร์เน็ต</string>
+    <string name="conn_hospital_detail">%1$s</string>
+    <string name="conn_internet_detail">%2$s</string>
+    <string name="conn_custom_detail">พิมพ์ที่อยู่เซิร์ฟเวอร์เอง</string>
     <string name="who_internet">%1$s · ผ่านอินเทอร์เน็ต</string>
     <string name="err_DISCONNECTED">การเชื่อมต่อกับเซิร์ฟเวอร์หลุด</string>
     <string name="err_TIMEOUT">เซิร์ฟเวอร์ไม่ตอบในเวลาที่กำหนด</string>

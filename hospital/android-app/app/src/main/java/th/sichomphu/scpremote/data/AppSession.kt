@@ -36,6 +36,28 @@ object ServerChoice {
         return listOfNotNull(t, other?.trimEnd('/'))
     }
 
+    /** The connection setting on the sign-in screen. */
+    enum class Mode { AUTO, HOSPITAL, INTERNET, CUSTOM }
+
+    /** Addresses to try, in order, for the chosen [mode]; automatic starts with the last one that worked. */
+    fun forMode(mode: Mode, lastUsed: String?, custom: String, config: ServerConfig): List<String> = when (mode) {
+        Mode.HOSPITAL -> listOf(config.url.trimEnd('/'))
+        Mode.INTERNET -> listOf(config.internetUrl.trimEnd('/'))
+        Mode.CUSTOM -> normalize(custom)?.let { listOf(it) } ?: forMode(Mode.AUTO, lastUsed, "", config)
+        Mode.AUTO -> {
+            val first = lastUsed?.takeIf { same(it, config.url) || same(it, config.internetUrl) } ?: config.url
+            candidates(first, config)
+        }
+    }
+
+    /** "10.0.0.5:8443/" → "https://10.0.0.5:8443"; blank → null. */
+    fun normalize(input: String): String? {
+        var s = input.trim().trimEnd('/')
+        if (s.isEmpty()) return null
+        if (!s.startsWith("https://") && !s.startsWith("http://")) s = "https://$s"
+        return s.replaceFirst("http://", "https://")
+    }
+
     /** Only "cannot reach" means the other address may work; a wrong password or certificate will not. */
     fun tryNext(code: String?) = code == "UNREACHABLE"
 

@@ -41,8 +41,9 @@
     <string name="update_downloading">Downloading the new version…</string>
     <string name="update_failed">The download failed or the file does not match what was published, so it was not installed</string>
 
-    <string name="disconnect">✕ Disconnect</string>
+    <string name="disconnect">Disconnect</string>
     <string name="toolbar">Toolbar</string>
+    <string name="keyboard">Show keyboard</string>
     <string name="quality">Picture quality</string>
     <string-array name="quality_names">
         <item>Sharpest</item>
@@ -50,13 +51,13 @@
         <item>Balanced</item>
         <item>Low bandwidth</item>
     </string-array>
-    <string name="quality_button">🖼 %1$s</string>
+    <string name="quality_button">%1$s</string>
     <string name="display">Choose display</string>
     <string name="all_displays">All displays</string>
     <string name="display_n">Display %1$d</string>
-    <string name="display_button">🖥 %1$s</string>
-    <string name="mode_touchpad">🖱 Touchpad</string>
-    <string name="mode_direct">👆 Direct touch</string>
+    <string name="display_button">%1$s</string>
+    <string name="mode_touchpad">Touchpad</string>
+    <string name="mode_direct">Direct touch</string>
     <string name="retry">Retry</string>
     <string name="st_connecting">Connecting…</string>
     <string name="st_consent">Waiting for the person at the computer to allow access…</string>

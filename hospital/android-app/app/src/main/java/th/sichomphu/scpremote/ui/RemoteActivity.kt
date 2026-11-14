@@ -50,6 +50,22 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
     private lateinit var spinner: ProgressBar
     private lateinit var retry: Button
     private lateinit var barScroll: View
+    private lateinit var barToggle: android.widget.ImageButton
+
+    /** The toolbar hides itself 4 s after it was last used, once there is a picture to look at. */
+    private val hideBar = Runnable { if (session?.hadImage == true) setBar(false) }
+
+    private fun setBar(show: Boolean) {
+        barScroll.visibility = if (show) View.VISIBLE else View.GONE
+        barToggle.setImageResource(if (show) R.drawable.ic_expand_less else R.drawable.ic_expand_more)
+        if (show) pokeBar() else ui.removeCallbacks(hideBar)
+    }
+
+    /** The toolbar was just used: start its 4-second hide timer again. */
+    private fun pokeBar() {
+        ui.removeCallbacks(hideBar)
+        if (barScroll.visibility == View.VISIBLE) ui.postDelayed(hideBar, BAR_HIDE_MS)
+    }
     private val ui = Handler(Looper.getMainLooper())
     @Volatile private var session: RelaySession? = null
     private var attempts = 0
@@ -73,12 +89,10 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         barScroll = findViewById(R.id.barScroll)
         findViewById<TextView>(R.id.title).text = device.name
         findViewById<Button>(R.id.disconnect).setOnClickListener { leave() }
-        val toggle = findViewById<Button>(R.id.barToggle)
-        toggle.setOnClickListener {
-            val show = barScroll.visibility != View.VISIBLE
-            barScroll.visibility = if (show) View.VISIBLE else View.GONE
-            toggle.text = if (show) "▴" else "▾"
-        }
+        barToggle = findViewById(R.id.barToggle)
+        barToggle.setOnClickListener { setBar(barScroll.visibility != View.VISIBLE) }
+        // In portrait there is room above the picture: keep it clear of the toolbar.
+        canvas.topInset = 48 * resources.displayMetrics.density
         retry.setOnClickListener { attempts = 0; connect() }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = leave()
@@ -120,13 +134,17 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         fun label() { q.text = getString(R.string.quality_button, QualityPicker.names(this)[prefs.quality]) }
         label()
         q.setOnClickListener {
+            ui.removeCallbacks(hideBar)
             QualityPicker.pickQuality(this, prefs.quality) { i ->
+                pokeBar()
                 prefs.quality = i; label()
                 session?.setQuality(Quality.LADDER[i])
             }
         }
         findViewById<Button>(R.id.display).setOnClickListener {
+            ui.removeCallbacks(hideBar)
             QualityPicker.pickDisplay(this, displays, selectedDisplay) { n ->
+                pokeBar()
                 selectedDisplay = n; showDisplays()
                 session?.selectDisplay(n)
             }
@@ -185,7 +203,7 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
             is KvmCommand.Displays -> ui.post { displays = cmd.list; selectedDisplay = cmd.selected; showDisplays() }
             is KvmCommand.Tile -> {
                 canvas.drawTile(cmd.x, cmd.y, cmd.image)
-                ui.post { if (overlay.visibility == View.VISIBLE && session?.state == State.CONNECTED) { attempts = 0; overlay.visibility = View.GONE } }
+                ui.post { if (overlay.visibility == View.VISIBLE && session?.state == State.CONNECTED) { attempts = 0; overlay.visibility = View.GONE; pokeBar() } }
             }
             else -> {}
         }
@@ -266,11 +284,14 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
 
     private fun setUpModeToggle() {
         val b = findViewById<Button>(R.id.mode)
-        fun label() { b.text = getString(if (touchpadMode) R.string.mode_touchpad else R.string.mode_direct) }
-        label()
+        fun label() {
+            b.text = getString(if (touchpadMode) R.string.mode_touchpad else R.string.mode_direct)
+            b.setCompoundDrawablesRelativeWithIntrinsicBounds(if (touchpadMode) R.drawable.ic_mouse else R.drawable.ic_touch, 0, 0, 0)
+        }
         touchpadMode = prefs.touchpadMode
         label()
         b.setOnClickListener {
+            pokeBar()
             output(if (touchpadMode) touchpad?.cancel().orEmpty() else direct.cancel())
             touchpadMode = !touchpadMode
             prefs.touchpadMode = touchpadMode
@@ -339,5 +360,6 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         const val EXTRA_DEVICE_ID = "deviceId"
         /** How far two fingers must spread or pinch (dp) before it counts as zooming, not scrolling. */
         private const val PINCH_SLOP_PX = 24f
+        private const val BAR_HIDE_MS = 4000L
     }
 }

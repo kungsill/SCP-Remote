@@ -75,9 +75,15 @@ class RemoteCanvas @JvmOverloads constructor(context: Context, attrs: AttributeS
         val s = scale()
         val w = b.width * s; val h = b.height * s
         val x = if (w <= width) (width - w) / 2 else panX
-        val y = if (h <= height) (height - h) / 2 else panY
+        // Spare height (a phone held upright): the picture sits just under the toolbar, leaving the
+        // room below for the key bar and the phone keyboard. Otherwise it is centred.
+        val y = if (h > height) panY else if (height - h >= topInset) topInset else (height - h) / 2
         return x to y
     }
+
+    /** Space kept free above the picture when there is room for it (the toolbar's height). */
+    var topInset = 0f
+        set(v) { field = v; invalidate() }
 
     private fun clampPan() {
         val b = screen ?: return

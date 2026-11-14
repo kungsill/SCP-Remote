@@ -52,6 +52,7 @@ class DeviceAdapter(
 
         h.fix.visibility = if (d.canFixPrinter) View.VISIBLE else View.GONE
         h.fix.isEnabled = d.online && d.id !in fixBusy
+        h.fix.alpha = if (h.fix.isEnabled) 1f else 0.45f
         h.fix.setOnClickListener { onFix(d) }
 
         val text = fixText[d.id]

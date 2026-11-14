@@ -16,6 +16,16 @@ object DeviceFilter {
                 q.isEmpty() || d.name.lowercase().contains(q) || d.ip.contains(q) ||
                     d.groupName.lowercase().contains(q) || d.users.any { it.lowercase().contains(q) }
             }
-            .sortedWith(compareBy<Device> { !it.online }.thenComparator { a, b -> collator.compare(a.name, b.name) })
+            .sortedWith(
+                compareBy<Device> { !it.online }
+                    .thenBy { startsThai(it.name) }
+                    .thenComparator { a, b -> collator.compare(a.name, b.name) }
+            )
     }
+
+    /**
+     * English names first, then Thai, as on the web. Spelled out because the phone's own Thai
+     * sorting (ICU) puts Thai first while the desktop Java one puts it last.
+     */
+    private fun startsThai(name: String) = name.firstOrNull()?.let { it in '฀'..'๿' } ?: false
 }

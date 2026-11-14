@@ -85,6 +85,7 @@
             <Button
                 android:id="@+id/disconnect"
                 style="@style/BarButton"
+                android:drawableStart="@drawable/ic_close"
                 android:text="@string/disconnect" />
 
             <TextView
@@ -115,22 +116,24 @@
 
             <Button
                 android:id="@+id/quality"
-                style="@style/BarButton" />
+                style="@style/BarButton"
+                android:drawableStart="@drawable/ic_image" />
 
             <Button
                 android:id="@+id/display"
                 style="@style/BarButton"
+                android:drawableStart="@drawable/ic_monitor"
                 android:visibility="gone" />
         </LinearLayout>
     </HorizontalScrollView>
 
-    <Button
+    <!-- Shows / hides the toolbar; the toolbar also hides itself after a few seconds untouched. -->
+    <ImageButton
         android:id="@+id/barToggle"
-        style="@style/BarButton"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="top|end"
         android:background="@color/bar_bg"
         android:contentDescription="@string/toolbar"
-        android:text="▴" />
+        android:src="@drawable/ic_expand_less" />
 </FrameLayout>

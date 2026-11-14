@@ -42,8 +42,9 @@
     <string name="update_downloading">กำลังดาวน์โหลดรุ่นใหม่…</string>
     <string name="update_failed">ดาวน์โหลดรุ่นใหม่ไม่สำเร็จ หรือไฟล์ไม่ตรงกับที่ประกาศ จึงไม่ติดตั้ง</string>
 
-    <string name="disconnect">✕ ตัดการเชื่อมต่อ</string>
+    <string name="disconnect">ตัดการเชื่อมต่อ</string>
     <string name="toolbar">แถบเครื่องมือ</string>
+    <string name="keyboard">เปิดคีย์บอร์ด</string>
     <string name="quality">คุณภาพภาพ</string>
     <string-array name="quality_names">
         <item>คมชัดสูงสุด</item>
@@ -51,13 +52,13 @@
         <item>สมดุล</item>
         <item>ประหยัดเน็ต</item>
     </string-array>
-    <string name="quality_button">🖼 %1$s</string>
+    <string name="quality_button">%1$s</string>
     <string name="display">เลือกจอ</string>
     <string name="all_displays">ทุกจอ</string>
     <string name="display_n">จอ %1$d</string>
-    <string name="display_button">🖥 %1$s</string>
-    <string name="mode_touchpad">🖱 ทัชแพด</string>
-    <string name="mode_direct">👆 แตะตรง</string>
+    <string name="display_button">%1$s</string>
+    <string name="mode_touchpad">ทัชแพด</string>
+    <string name="mode_direct">แตะตรง</string>
     <string name="retry">ลองใหม่</string>
     <string name="st_connecting">กำลังเชื่อมต่อ…</string>
     <string name="st_consent">รอผู้ใช้เครื่องปลายทางกดอนุญาต…</string>

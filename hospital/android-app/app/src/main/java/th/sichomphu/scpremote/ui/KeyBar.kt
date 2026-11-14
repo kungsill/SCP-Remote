@@ -25,7 +25,10 @@ class KeyBar(context: Context, parent: ViewGroup, private val keys: KeyboardBrid
     private val density = context.resources.displayMetrics.density
 
     init {
-        add("⌨") { showKeyboard() }
+        add("") { showKeyboard() }.apply {
+            setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_keyboard, 0, 0, 0)
+            contentDescription = context.getString(R.string.keyboard)
+        }
         for ((m, label) in listOf(Modifier.CTRL to "Ctrl", Modifier.ALT to "Alt", Modifier.SHIFT to "Shift", Modifier.WIN to "⊞ Win")) {
             modifierViews[m] = add(label) { keys.setModifier(m, !keys.isHeld(m)); paint() }
         }

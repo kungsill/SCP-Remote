@@ -50,15 +50,22 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
-        android:gravity="end"
+        android:gravity="end|center_vertical"
         android:orientation="horizontal">
 
+        <!-- 36dp: the same visible height as the Connect button (AppCompat insets it within 44dp). -->
         <Button
             android:id="@+id/fix"
             style="@style/Button.Plain"
             android:layout_width="wrap_content"
-            android:layout_height="44dp"
-            android:text="@string/fix_printer" />
+            android:layout_height="36dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/button_outline"
+            android:minWidth="96dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="@string/fix_printer"
+            android:textColor="@color/accent" />
 
         <Button
             android:id="@+id/connect"

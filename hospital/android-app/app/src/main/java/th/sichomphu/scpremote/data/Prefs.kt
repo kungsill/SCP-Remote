@@ -21,6 +21,7 @@ class Prefs(context: Context) {
 
     private fun dataSaver(): Boolean {
         val cm = app.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
-        return cm.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
+        // Never let a settings lookup stop the remote screen from opening.
+        return try { cm.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED } catch (e: Exception) { false }
     }
 }

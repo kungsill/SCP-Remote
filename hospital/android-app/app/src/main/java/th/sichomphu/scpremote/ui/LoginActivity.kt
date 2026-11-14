@@ -33,6 +33,9 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         if (AppSession.channel != null) { openDevices(); return }
         setContentView(R.layout.activity_login)
+        // Light page: dark status-bar icons, and keep the form clear of the bars and the keyboard.
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
+        findViewById<View>(R.id.loginRoot).padForSystemBars(top = true, bottom = true)
         server = findViewById(R.id.server); user = findViewById(R.id.user); pass = findViewById(R.id.pass)
         remember = findViewById(R.id.remember); error = findViewById(R.id.error); button = findViewById(R.id.signIn)
         config = ServerConfig.load(this)

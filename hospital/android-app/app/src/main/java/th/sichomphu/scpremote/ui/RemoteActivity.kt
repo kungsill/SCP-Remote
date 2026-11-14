@@ -104,7 +104,9 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         session?.close(userInitiated = true)
         // Assigned before start(): start() reports CONNECTING at once, and a fast failure reports
         // CLOSED from another thread; onState only shows states from the current session.
-        val s = RelaySession(channel, trust, device, this, AppSession.server, Quality.LADDER[prefs.quality])
+        val q = Quality.LADDER[prefs.quality]
+        val s = AppSession.relayOpener?.let { RelaySession(channel, trust, device, this, AppSession.server, q, it) }
+            ?: RelaySession(channel, trust, device, this, AppSession.server, q)
         session = s
         s.start()
     }

@@ -6,6 +6,7 @@ import th.sichomphu.scpremote.R
 import th.sichomphu.scpremote.model.DeviceList
 import th.sichomphu.scpremote.net.ControlChannel
 import th.sichomphu.scpremote.net.PinnedTrust
+import th.sichomphu.scpremote.net.SocketOpener
 
 /** The server the app was built for (res/raw/server.json, a copy of the desktop program's). */
 data class ServerConfig(val url: String, val certificateSha256: String) {
@@ -23,6 +24,8 @@ object AppSession {
     @Volatile var trust: PinnedTrust? = null
     @Volatile var channel: ControlChannel? = null
     @Volatile var devices: DeviceList? = null
+    /** Debug builds' preview mode only: a stand-in relay. Always null in the published app. */
+    @Volatile var relayOpener: SocketOpener? = null
     /** The app looked for a newer version after this sign-in. */
     @Volatile var updateChecked = false
 

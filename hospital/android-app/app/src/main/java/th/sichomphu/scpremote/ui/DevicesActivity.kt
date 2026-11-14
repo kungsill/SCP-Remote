@@ -40,6 +40,9 @@ class DevicesActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         if (AppSession.channel == null) { backToLogin(null); return }
         setContentView(R.layout.activity_devices)
+        // The pink header runs up under the status bar; the list stops above the navigation bar.
+        findViewById<View>(R.id.header).padForSystemBars(top = true, bottom = false)
+        findViewById<View>(R.id.root).padForSystemBars(top = false, bottom = true)
         search = findViewById(R.id.search); group = findViewById(R.id.group); status = findViewById(R.id.status)
         adapter = DeviceAdapter(onConnect = ::openRemote, onFix = ::confirmFix)
         findViewById<RecyclerView>(R.id.list).apply { layoutManager = LinearLayoutManager(this@DevicesActivity); adapter = this@DevicesActivity.adapter }

@@ -22,7 +22,12 @@
   }
  }
 
- function layout(){const canvas=document.getElementById('deskarea3x');if(!canvas||canvas.offsetParent===null)return;const height=id=>{const n=document.getElementById(id);return n&&n.offsetParent!==null?n.getBoundingClientRect().height:0;};const bottom=height('deskarea4')+(document.body.classList.contains('fulldesk')?0:height('footer'))+12;const value=Math.max(120,root.innerHeight-canvas.getBoundingClientRect().top-bottom)+'px';if(canvas.style.getPropertyValue('--scp-canvas-height')!==value)canvas.style.setProperty('--scp-canvas-height',value);if(typeof root.deskAdjust==='function')root.deskAdjust();}
+ // While the on-screen keyboard (scp-softkeys.js) is open, the keyboard covers the lower part of
+ // the window: the picture is fitted into what is still visible (visualViewport) above its key bar,
+ // otherwise the line being typed is hidden under the keyboard.
+ function layout(){const canvas=document.getElementById('deskarea3x');if(!canvas||canvas.offsetParent===null)return;const height=id=>{const n=document.getElementById(id);return n&&n.offsetParent!==null?n.getBoundingClientRect().height:0;};const vv=root.visualViewport;let value;
+  if(vv&&document.body.classList.contains('scp-softkeys-open')){const top=Math.max(0,canvas.getBoundingClientRect().top-(vv.offsetTop||0));value=Math.max(120,Math.round(vv.height-top-height('scp-softkeys-bar')-6))+'px';}
+  else{const bottom=height('deskarea4')+(document.body.classList.contains('fulldesk')?0:height('footer'))+12;value=Math.max(120,root.innerHeight-canvas.getBoundingClientRect().top-bottom)+'px';}if(canvas.style.getPropertyValue('--scp-canvas-height')!==value)canvas.style.setProperty('--scp-canvas-height',value);if(typeof root.deskAdjust==='function')root.deskAdjust();}
 
  // The tools panel beside the remote picture (Connect, quality, recording) starts folded away so
  // the picture has the whole window, and one small button brings it back. It is only ever
@@ -215,7 +220,7 @@
   parent.addEventListener('touchcancel',end,{capture:true});
  }
 
- root.ScpRemoteUI={mount(node){ensure();node.hidden=true;body.append(node);},zoomTo:zoomTo};
+ root.ScpRemoteUI={mount(node){ensure();node.hidden=true;body.append(node);},zoomTo:zoomTo,layout:layout};
  // DeskParent is part of the page from the start; wait for it rather than assume the order.
  (function waitDesk(n){if(document.getElementById('DeskParent'))pinchZoom();else if(n<120)setTimeout(function(){waitDesk(n+1);},500);})(0);
  appView();

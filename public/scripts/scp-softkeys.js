@@ -80,22 +80,45 @@
         var vv = root.visualViewport;
         var keyboardHeight = vv ? Math.max(0, root.innerHeight - vv.height - vv.offsetTop) : 0;
         bar.style.bottom = keyboardHeight + 'px';
+        fitPicture();
+    }
+
+    // The keyboard covers the lower part of the window. Bring the remote picture to the top of what
+    // is still visible and fit it there (scp-remote-ui.js sizes it to the visible area while the
+    // page is marked scp-softkeys-open), so the line being typed stays in sight.
+    function fitPicture() {
+        if (!open) return;
+        var area = root.document.getElementById('deskarea3x');
+        var vv = root.visualViewport;
+        if (area && vv) {
+            var off = area.getBoundingClientRect().top - (vv.offsetTop || 0);
+            if (Math.abs(off) > 4 && typeof root.scrollBy === 'function') { try { root.scrollBy(0, off); } catch (e) {} }
+        }
+        if (root.ScpRemoteUI && typeof root.ScpRemoteUI.layout === 'function') root.ScpRemoteUI.layout();
+    }
+    function refit() {
+        // The keyboard slides in (or out) over a moment; fit again as it settles.
+        [0, 150, 400, 800].forEach(function (ms) { root.setTimeout(function () { placeBar(); if (!open && root.ScpRemoteUI && root.ScpRemoteUI.layout) root.ScpRemoteUI.layout(); }, ms); });
     }
 
     function show() {
         open = true;
+        root.document.body.classList.add('scp-softkeys-open');
         bar.hidden = false;
         if (input.value.indexOf(SENTINEL) !== 0) reset();
         try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
         try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
         button.setAttribute('aria-pressed', 'true');
         placeBar();
+        refit();
     }
     function hide() {
         open = false;
+        root.document.body.classList.remove('scp-softkeys-open');
         bar.hidden = true;
         input.blur();
         button.setAttribute('aria-pressed', 'false');
+        refit();
     }
 
     var KEYS = [
@@ -110,7 +133,7 @@
             '#scp-softkeys-btn{position:fixed;right:16px;bottom:84px;z-index:10050;display:flex;align-items:center;gap:6px;padding:10px 16px;border:0;border-radius:999px;' +
             'background:linear-gradient(90deg,#b02a72,#e2559c);color:#ffffff;font:600 14px Sarabun,"IBM Plex Sans Thai",sans-serif;box-shadow:0 8px 22px rgba(176,42,114,.35);cursor:pointer}' +
             '#scp-softkeys-btn[hidden],#scp-softkeys-bar[hidden]{display:none!important}' +
-            '#scp-softkeys-input{position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0;resize:none;z-index:-1}' +
+            '#scp-softkeys-input{position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;font-size:16px;border:0;padding:0;resize:none;z-index:-1}' +
             '#scp-softkeys-bar{position:fixed;left:0;right:0;bottom:0;z-index:10060;display:flex;gap:4px;padding:6px;background:#ffffff;border-top:1px solid #f0e6ec;box-shadow:0 -4px 16px rgba(42,21,32,.08)}' +
             '#scp-softkeys-bar button{flex:1;min-width:0;height:40px;border:1px solid #f0e6ec;border-radius:10px;background:#f8f3f6;color:#2a1520;font:600 14px Sarabun,sans-serif;cursor:pointer}' +
             '#scp-softkeys-bar button[data-key=hide]{flex:1.4;background:#fce9f2;color:#b02a72;border-color:#f3c4db}';
@@ -136,6 +159,11 @@
         input.addEventListener('input', onInput);
         input.addEventListener('compositionstart', function () { composing = true; });
         input.addEventListener('compositionend', function () { composing = false; onInput(); });
+        // The device's own keyboard closed (its hide or back key): take the bar away too. A tap on
+        // the picture gives focus straight back (below), so wait a moment before deciding.
+        input.addEventListener('blur', function () {
+            root.setTimeout(function () { if (open && root.document.activeElement !== input) hide(); }, 350);
+        });
 
         bar = d.createElement('div');
         bar.id = 'scp-softkeys-bar';

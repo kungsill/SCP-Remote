@@ -9,6 +9,20 @@ test('toolbar resize recomputes both canvas dimensions using the real sharing as
  const first=parseFloat(canvas.style.width);assert.ok(Math.abs(first/parent.clientHeight-1366/768)<0.001);
  w.innerHeight=650;w.dispatchEvent(new w.Event('resize'));assert.ok(parseFloat(canvas.style.width)<first);assert.ok(Math.abs(parseFloat(canvas.style.width)/parent.clientHeight-1366/768)<0.001);
 });
+test('while the on-screen keyboard is open the picture fits between its top and the key bar',async t=>{
+ // The keyboard covers the lower part of the window; sized for the whole window, the line being
+ // typed was hidden under it. The visible area (visualViewport) is what is left above it.
+ const dom=new JSDOM('<html><body class="scp-softkeys-open"><div id="deskarea3x"><div id="DeskParent"><canvas id="Desk"></canvas></div></div><div id="deskarea4"></div><div id="scp-softkeys-bar"></div></body></html>',{runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window,d=w.document,viewport=d.getElementById('deskarea3x');
+ Object.defineProperty(viewport,'offsetParent',{get:()=>d.body});viewport.getBoundingClientRect=()=>({top:300});
+ const bar=d.getElementById('scp-softkeys-bar');Object.defineProperty(bar,'offsetParent',{get:()=>d.body});bar.getBoundingClientRect=()=>({height:52});
+ w.innerHeight=1200;w.visualViewport={height:620,offsetTop:280,addEventListener(){}};
+ w.eval(fs.readFileSync('public/scripts/scp-remote-ui.js','utf8'));
+ w.ScpRemoteUI.layout();
+ // visible top of the picture = 300 - 280 = 20; 620 - 20 - 52 bar - 6 gap = 542
+ assert.equal(viewport.style.getPropertyValue('--scp-canvas-height'),'542px');
+ d.body.classList.remove('scp-softkeys-open');w.ScpRemoteUI.layout();
+ assert.notEqual(viewport.style.getPropertyValue('--scp-canvas-height'),'542px','closed again: the usual whole-window size');
+});
 test('remote dock follows visible sections and supports collapse',async t=>{
  const dom=new JSDOM('<html lang="th"><body></body></html>',{runScripts:'outside-only'});t.after(()=>dom.window.close());const w=dom.window;
  w.eval(fs.readFileSync('public/scripts/scp-remote-ui.js','utf8'));

@@ -114,6 +114,20 @@ test('the key bar sends Esc, Tab and arrows, and an arrow forgets the text befor
     assert.equal(p.input.value, p.S, 'the computer cursor moved, so the old text is no longer before it');
 });
 
+test('the hidden box sits at the top, so focusing it does not scroll the page down', t => {
+    const p = page(t);
+    const css = p.d.querySelector('style').textContent;
+    assert.match(css, /#scp-softkeys-input\{position:fixed;left:0;top:0;/);
+});
+
+test('while typing the page is marked, so the picture is fitted above the keyboard', t => {
+    const p = page(t);
+    p.button.click();
+    assert.ok(p.d.body.classList.contains('scp-softkeys-open'));
+    p.bar.querySelector('[data-key="hide"]').click();
+    assert.ok(!p.d.body.classList.contains('scp-softkeys-open'));
+});
+
 test('hide closes the keyboard and the bar', t => {
     const p = page(t);
     p.button.click();

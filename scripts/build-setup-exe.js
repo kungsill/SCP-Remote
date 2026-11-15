@@ -12,6 +12,9 @@ const root = path.resolve(__dirname, '..');
 const setupDir = path.join(root, 'hospital', 'client-setup');
 const srcDir = path.join(setupDir, 'src');
 const logo = path.join(root, 'hospital', 'brand', 'logo.png');
+// The file icon uses the emblem (heart + SCP) when there is one: the full logo's wordmark is
+// unreadable at the 16-32 px Windows shows it at. The window still shows the full logo.
+const iconSource = fs.existsSync(path.join(root, 'hospital', 'brand', 'icon.png')) ? path.join(root, 'hospital', 'brand', 'icon.png') : logo;
 const output = path.join(setupDir, 'SCP-Remote-Setup.exe');
 
 if (process.platform !== 'win32') {
@@ -41,7 +44,7 @@ const iconFile = path.join(work, 'setup.ico');
 // carry a PNG as-is, which keeps the transparent edges clean at every size Windows asks for.
 const resize = [
     'Add-Type -AssemblyName System.Drawing',
-    '$src = [System.Drawing.Image]::FromFile(' + JSON.stringify(logo) + ')',
+    '$src = [System.Drawing.Image]::FromFile(' + JSON.stringify(iconSource) + ')',
     '$bmp = New-Object System.Drawing.Bitmap 256, 256',
     '$g = [System.Drawing.Graphics]::FromImage($bmp)',
     '$g.InterpolationMode = "HighQualityBicubic"',

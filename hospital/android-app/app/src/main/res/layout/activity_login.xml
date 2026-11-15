@@ -19,41 +19,28 @@
             android:background="@drawable/hero_gradient"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:paddingTop="36dp"
+            android:paddingTop="28dp"
             android:paddingBottom="84dp">
 
+            <!-- The SCP Remote logo (it carries the name and the hospital) on a white card. -->
             <FrameLayout
-                android:layout_width="104dp"
-                android:layout_height="104dp"
-                android:background="@drawable/logo_circle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_plain"
                 android:elevation="10dp"
-                android:outlineSpotShadowColor="#802A0A1E">
+                android:outlineSpotShadowColor="#802A0A1E"
+                android:paddingStart="22dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="22dp"
+                android:paddingBottom="14dp">
 
                 <ImageView
-                    android:layout_width="96dp"
-                    android:layout_height="96dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@null"
-                    android:src="@mipmap/ic_launcher" />
+                    android:layout_width="190dp"
+                    android:layout_height="173dp"
+                    android:contentDescription="@string/login_logo"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/logo_full" />
             </FrameLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:fontFamily="@font/prompt"
-                android:text="@string/app_name"
-                android:textColor="@android:color/white"
-                android:textSize="28sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/login_hospital"
-                android:textColor="#F6DCEA"
-                android:textSize="14sp" />
         </LinearLayout>
 
         <LinearLayout

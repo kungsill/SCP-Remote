@@ -2629,32 +2629,38 @@ body.scp-map-full-open {
 .scp-remote-head { padding: 26px 0 14px; }
 .scp-remote-head h2 { margin: 8px 0 6px; font-size: 26px; font-weight: 600; }
 .scp-remote-head p { margin: 0 0 14px; color: var(--scp-muted); font-size: 14px; }
-.scp-remote-search { font-size: 17px; padding: 14px 16px; }
+/* Light, clean cards (same look as the Android app 1.3.0): white rounded card, soft pastel
+   picture of a screen, green status pill, pink gradient Connect. */
+.scp-remote-search { font-size: 17px; padding: 14px 18px; border-radius: 18px !important; background: #ffffff; border: 1px solid #eee6f0;
+  box-shadow: 0 6px 20px rgba(120, 40, 90, .06); }
+.scp-remote-search:focus { border-color: #e2559c; box-shadow: 0 0 0 3px rgba(176, 42, 114, .12); outline: none; }
 .scp-remote-count { margin: 12px 2px 10px; font-size: 13px; color: var(--scp-muted); }
-.scp-remote-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 22px 18px; padding-bottom: 28px; }
-.scp-remote-row { display: flex; flex-direction: column; align-items: center; padding: 10px; border-radius: 10px; text-align: center;
-  border: 1px solid transparent; transition: background-color .15s ease, border-color .15s ease; min-width: 0; }
-.scp-remote-row:hover { background: var(--scp-surface); border-color: var(--scp-line); }
-.scp-remote-thumb { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; color: #fff; border: 1px solid #00000022; box-shadow: 0 1px 3px #0000001a;
-  background: linear-gradient(135deg, #183bb5 0%, #3257e8 100%); }
-.scp-remote-thumb.windows { background: linear-gradient(135deg, #122ea0 0%, #2450e5 100%); }
-.scp-remote-thumb.sunset { background: linear-gradient(135deg, #b02a72 0%, #6366f1 100%); }
-.scp-remote-thumb.dark { background: linear-gradient(135deg, #1e243b 0%, #312e81 100%); }
-.scp-remote-thumb svg { width: 34px; height: 34px; fill: currentColor; opacity: .88; }
-.scp-remote-row.off .scp-remote-thumb { cursor: default; }
-.scp-remote-thumb-off { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  background: rgba(15, 19, 42, .68); color: #fff; font-size: 12px; font-weight: 600; letter-spacing: .4px; }
-.scp-remote-ip { margin-top: 9px; font-size: 14px; font-weight: 600; letter-spacing: .2px; }
-.scp-remote-row strong { margin-top: 2px; max-width: 100%; font-size: 12.5px; font-weight: 500; cursor: pointer;
+.scp-remote-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; padding-bottom: 28px; }
+.scp-remote-row { display: flex; flex-direction: column; align-items: center; padding: 12px 12px 14px; border-radius: 20px; text-align: center;
+  background: #ffffff; color: #211a26; border: 1px solid #eee6f0; box-shadow: 0 8px 26px rgba(120, 40, 90, .07);
+  transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease; min-width: 0; }
+.scp-remote-row:hover { border-color: #f3c4db; box-shadow: 0 12px 32px rgba(120, 40, 90, .12); transform: translateY(-1px); }
+.scp-remote-thumb { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #b02a72; border: 0;
+  background: linear-gradient(135deg, #fce9f2 0%, #f8d6e7 100%); }
+.scp-remote-thumb.windows { background: linear-gradient(135deg, #eef2fd 0%, #dde5fb 100%); color: #3b6fe0; }
+.scp-remote-thumb.sunset { background: linear-gradient(135deg, #fce9f2 0%, #f8d6e7 100%); color: #b02a72; }
+.scp-remote-thumb.dark { background: linear-gradient(135deg, #f1edfd 0%, #e3dcfb 100%); color: #7c5ce0; }
+.scp-remote-thumb.plain { background: linear-gradient(135deg, #fef5e6 0%, #fde8c6 100%); color: #d98a1c; }
+.scp-remote-thumb svg { width: 36px; height: 36px; fill: currentColor; opacity: .95; }
+.scp-remote-row.off .scp-remote-thumb { cursor: default; color: #a39aab; background: linear-gradient(135deg, #f4f1f5 0%, #ebe6ee 100%); }
+.scp-remote-thumb-off { position: absolute; inset: auto 8px 8px auto; display: flex; align-items: center; justify-content: center;
+  padding: 2px 9px; border-radius: 999px; background: #ffffff; color: #7d7387; font-size: 11.5px; font-weight: 600; letter-spacing: .2px; }
+.scp-remote-ip { margin-top: 10px; font-size: 14px; font-weight: 700; letter-spacing: .2px; color: #211a26; }
+.scp-remote-row strong { margin-top: 1px; max-width: 100%; font-size: 13px; font-weight: 500; cursor: pointer;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scp-remote-row small { max-width: 100%; font-size: 11.5px; color: var(--scp-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scp-remote-state { margin-top: 2px; font-size: 11.5px; color: var(--scp-muted); }
-.scp-remote-row:not(.off) .scp-remote-state { color: #17704a; font-weight: 600; }
-.scp-remote-go { margin-top: 7px; padding: 6px 18px; border: 0; border-radius: 6px; background: var(--scp-accent, #b02a72); color: #fff;
-  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.scp-remote-go:hover:not(:disabled) { filter: brightness(1.08); }
-.scp-remote-go:disabled { opacity: .45; cursor: not-allowed; }
+.scp-remote-row small { max-width: 100%; font-size: 11.5px; color: #7d7387; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scp-remote-state { margin-top: 6px; padding: 2px 10px; border-radius: 999px; font-size: 11.5px; color: #7d7387; background: #f1eef3; }
+.scp-remote-row:not(.off) .scp-remote-state { color: #17704a; background: #e4f6ec; font-weight: 600; }
+.scp-remote-go { margin-top: 7px; padding: 8px 18px; border: 0; border-radius: 12px; background: linear-gradient(90deg, #b02a72, #e2559c); color: #fff;
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 6px 16px rgba(176, 42, 114, .22); }
+.scp-remote-go:hover:not(:disabled) { filter: brightness(1.06); }
+.scp-remote-go:disabled { opacity: 1; background: #ece6ee; color: #a39aab; box-shadow: none; cursor: not-allowed; }
 @media (max-width: 700px) {
   .scp-remote-list { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px 10px; }
 }
@@ -2662,11 +2668,11 @@ body.scp-map-full-open {
 /* Remote page cards: Connect and Fix printing side by side, and what the fix reported */
 .scp-remote-acts { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; justify-content: center; }
 .scp-remote-acts .scp-remote-go { margin-top: 0; }
-.scp-remote-fix { padding: 6px 12px; border: 1px solid var(--scp-line); border-radius: 6px; background: var(--scp-surface); color: var(--scp-accent, #b02a72);
-  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.scp-remote-fix { padding: 8px 12px; border: 1.5px solid #f3c4db; border-radius: 12px; background: #ffffff; color: var(--scp-accent, #b02a72);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .scp-remote-fix:hover:not(:disabled) { background: var(--scp-soft, #fce9f3); }
-.scp-remote-fix:disabled { opacity: .45; cursor: not-allowed; }
-.scp-remote-fix-note { margin-top: 6px; max-width: 100%; font-size: 11.5px; color: var(--scp-muted); overflow-wrap: anywhere; }
+.scp-remote-fix:disabled { opacity: .5; border-color: #eee6f0; cursor: not-allowed; }
+.scp-remote-fix-note { margin-top: 8px; max-width: 100%; padding: 6px 10px; border-radius: 12px; background: #f7f3f8; font-size: 11.5px; color: #7d7387; overflow-wrap: anywhere; }
 
 /* Remote page on a phone: lift the site's 495px minimum width (wider than a phone, so the page
    ran off the right edge), two cards across, and Connect / Fix printing full width. */

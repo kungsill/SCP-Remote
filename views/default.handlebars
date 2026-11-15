@@ -4531,8 +4531,19 @@
             mainUpdate(4);
         }
 
+        // SCP-Remote: a focused text field keeps its own typing (forms in SCP windows, the remote page's text boxes).
+        // MeshCentral's own search boxes keep their handling (they are typed into through the page shortcuts).
+        function scpTypingTarget(t) {
+            if (!t || !t.tagName) return false;
+            if (t.isContentEditable) return true;
+            if ((t.id === 'SearchInput') || (t.id === 'KvmSearchInput') || (t.id === 'UserSearchInput') || (t.id === 'mapSearchLocation')) return false;
+            if ((t.tagName === 'TEXTAREA') || (t.tagName === 'SELECT')) return true;
+            if (t.tagName === 'INPUT') return !/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(t.type || 'text');
+            return false;
+        }
+
         function ondockeypress(e) {
-            if (e.target && e.target.closest && e.target.closest('dialog[open]')) { setSessionActivity(); return; } // SCP-Remote: typing inside a native <dialog> belongs to that dialog, not page shortcuts
+            if (e.target && e.target.closest && (e.target.closest('dialog[open]') || scpTypingTarget(e.target))) { setSessionActivity(); return; } // SCP-Remote: typing inside a native <dialog> belongs to that dialog, not page shortcuts
             setSessionActivity();
             if (!xxdialogMode && (xxcurrentView == 11) && desktop && Q('DeskControl').checked) {
                 // Check what keys we are allows to send
@@ -4592,7 +4603,7 @@
         }
 
         function ondockeydown(e) {
-            if (e.target && e.target.closest && e.target.closest('dialog[open]')) { setSessionActivity(); return; } // SCP-Remote: typing inside a native <dialog> belongs to that dialog, not page shortcuts
+            if (e.target && e.target.closest && (e.target.closest('dialog[open]') || scpTypingTarget(e.target))) { setSessionActivity(); return; } // SCP-Remote: typing inside a native <dialog> belongs to that dialog, not page shortcuts
             setSessionActivity();
             if (!xxdialogMode && (xxcurrentView == 11) && desktop && Q('DeskControl').checked) {
                 // Check what keys we are allows to send
@@ -4627,7 +4638,7 @@
         }
 
         function ondockeyup(e) {
-            if (e.target && e.target.closest && e.target.closest('dialog[open]')) { setSessionActivity(); return; } // SCP-Remote: typing inside a native <dialog> belongs to that dialog, not page shortcuts
+            if (e.target && e.target.closest && (e.target.closest('dialog[open]') || scpTypingTarget(e.target))) { setSessionActivity(); return; } // SCP-Remote: typing inside a native <dialog> belongs to that dialog, not page shortcuts
             setSessionActivity();
             if (!xxdialogMode && (xxcurrentView == 11) && desktop && Q('DeskControl').checked) {
                 // Check what keys we are allows to send

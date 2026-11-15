@@ -2685,3 +2685,29 @@ body.scp-map-full-open {
   .scp-remote-head h2 { font-size: 21px; }
   .scp-remote-search { font-size: 16px; }
 }
+
+/* Pinned top of the dashboard (scp-dashboard.js .scp-dash-top): title, search, departments,
+   numbers and tabs stay in view while the page below scrolls. The departments are one line
+   that scrolls sideways, and once the block is pinned (.scp-dash-stuck) it turns compact:
+   no intro text, a smaller title and one short line of numbers. */
+.scp-dash-top { position: sticky; top: 0; z-index: 30; background: var(--scp-bg); margin: 0 -24px; padding: 0 24px; transition: box-shadow .2s ease; }
+.scp-dash-top-sentinel { height: 1px; margin-bottom: -1px; }
+.scp-dash-stuck .scp-dash-top { box-shadow: 0 10px 24px rgba(74, 17, 52, .10); border-bottom: 1px solid var(--scp-line); }
+.scp-dash-top .scp-dash-rooms { flex-wrap: nowrap; overflow-x: auto; gap: 6px; margin-bottom: 12px; padding: 2px 0 6px; scrollbar-width: thin; overscroll-behavior-x: contain; }
+.scp-dash-top .scp-dash-rooms-label { flex: none; }
+.scp-dash-top .scp-dash-chip { flex: none; padding: 4px 11px; }
+.scp-dash-top .scp-dash-tabs { margin-bottom: 12px; }
+.scp-dash-stuck .scp-dash-heading > .scp-eyebrow, .scp-dash-stuck .scp-dash-heading > p { display: none; }
+.scp-dash-stuck .scp-dash-heading { padding: 10px 0 8px; }
+.scp-dash-stuck .scp-dash-heading h2 { font-size: 19px; }
+.scp-dash-stuck .scp-dash-top .scp-dash-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
+.scp-dash-stuck .scp-dash-top .scp-dash-stat { display: flex; align-items: baseline; gap: 8px; padding: 6px 12px; min-height: 0; }
+.scp-dash-stuck .scp-dash-top .scp-dash-stat-value { font-size: 18px; }
+.scp-dash-stuck .scp-dash-top .scp-dash-stat-label { margin-top: 0; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scp-dash-stuck .scp-dash-top .scp-dash-tabs { margin-bottom: 8px; }
+.scp-dash-stuck .scp-dash-top .scp-dash-tab { padding-top: 6px; padding-bottom: 6px; }
+.scp-dash-expanded .scp-dash-top-slot > .scp-dash-stats { display: none !important; }
+@media (max-width: 760px) {
+  .scp-dash-top { margin: 0 -12px; padding: 0 12px; }
+  .scp-dash-stuck .scp-dash-top .scp-dash-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

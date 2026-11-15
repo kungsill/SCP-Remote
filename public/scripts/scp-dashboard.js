@@ -186,6 +186,9 @@
         try { return window.localStorage.getItem('scpMapTraffic') !== '0'; } catch (e) { return true; }
     }
     var panel, mapPanel, body, scanState = {}, pending = null, timer = null;
+    // The pinned top block: the heading stays in it; departments, numbers and tabs are redrawn
+    // into topSlot on every render. roomsScroll keeps the department row where it was scrolled.
+    var topSlot = null, roomsScroll = 0;
 
     /* Driver installs in flight, keyed by the id we sent with the command so a reply can
        never be credited to the wrong computer. Unlike the software scan these may run on
@@ -504,6 +507,10 @@
 
     function roomChips(everyRoom, counts) {
         var bar = element('div', 'scp-dash-rooms');
+        // One line that scrolls sideways (CSS); a mouse wheel scrolls it sideways too.
+        bar.addEventListener('wheel', function (e) {
+            if (bar.scrollWidth > bar.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { bar.scrollLeft += e.deltaY; e.preventDefault(); }
+        }, { passive: false });
         bar.appendChild(element('span', 'scp-dash-rooms-label', t('pickRooms')));
         var all = button(t('everyRoom'), 'scp-dash-chip' + ((roomFilter == null) ? ' on' : ''), function () {
             roomFilter = null; saveRoomFilter(); render();
@@ -1774,6 +1781,12 @@
         // Clearing the page takes the search box out with it, so note first whether it was being typed in.
         var remoteCaret = (remoteFind && document.activeElement === remoteFind) ? remoteFind.selectionStart : -1;
         body.textContent = '';
+        if (topSlot) {
+            var oldRooms = topSlot.querySelector('.scp-dash-rooms');
+            if (oldRooms) roomsScroll = oldRooms.scrollLeft;
+            topSlot.textContent = '';
+        }
+        var top = topSlot || body;
         liveSkipped = 0;
         var list = allNodes();
 
@@ -1814,7 +1827,7 @@
         askForLastSeen();
         var counts = {};
         everyRoom.forEach(function (name) { counts[name] = rooms[name].length; });
-        if (everyRoom.length > 1) { body.appendChild(roomChips(everyRoom, counts)); }
+        if (everyRoom.length > 1) { var roomBar = top.appendChild(roomChips(everyRoom, counts)); roomBar.scrollLeft = roomsScroll; }
 
         // Everything below counts only what is being shown, so the numbers and the list
         // never disagree.
@@ -1832,7 +1845,7 @@
         stats.appendChild(stat(t('idle'), online.length - busy.length, 'idle'));
         stats.appendChild(stat(t('offline'), list.length - online.length, 'off'));
         stats.appendChild(stat(t('risky'), needing.length, needing.length ? 'risk' : 'ok'));
-        body.appendChild(stats);
+        top.appendChild(stats);
         var tabs = element('nav', 'scp-dash-tabs');
         tabs.setAttribute('aria-label', thai ? 'มุมมองแดชบอร์ด' : 'Dashboard views');
         var sections = {};
@@ -1862,7 +1875,7 @@
             section.id = 'scp-dash-view-' + entry[0]; section.hidden = activeView !== entry[0];
             sections[entry[0]] = section;
         });
-        body.appendChild(tabs);
+        top.appendChild(tabs);
         Object.keys(sections).forEach(function (key) { body.appendChild(sections[key]); });
 
         var fleetAssess = cachedFleetAssessment || ((window.ScpFleetAssess && window.ScpFleetAssess.assessFleet) ? window.ScpFleetAssess.assessFleet(list) : { win11: {}, health: {}, forecast: {}, budget: {}, devices: [] });
@@ -4840,7 +4853,40 @@
         find.addEventListener('input', function () { searchText = find.value.trim().toLowerCase(); if (searchText) activeView = 'devices'; render(); });
         heading.appendChild(find);
         updateLiveControls();
-        panel.appendChild(heading);
+        // Title, search, departments, numbers and tabs stay in view while the page below scrolls
+        // (CSS: .scp-dash-top is sticky). Once the marker above it has scrolled away the block is
+        // pinned, and the page is marked scp-dash-stuck so the block turns compact.
+        var sentinel = element('div', 'scp-dash-top-sentinel');
+        sentinel.setAttribute('aria-hidden', 'true');
+        panel.appendChild(sentinel);
+        var topBlock = element('div', 'scp-dash-top');
+        topBlock.appendChild(heading);
+        topSlot = element('div', 'scp-dash-top-slot');
+        topBlock.appendChild(topSlot);
+        panel.appendChild(topBlock);
+        // Compact only when there is room to scroll well past what compact saves (about 220 px):
+        // on a short page the smaller block would shorten the page, pull the scroll back and
+        // flip it to full size again, over and over.
+        function roomToScroll(scroller) {
+            var s = scroller || panel;
+            return !s || typeof s.scrollHeight !== 'number' || !s.clientHeight || (s.scrollHeight - s.clientHeight) > 480;
+        }
+        function setStuck(stuck, scroller) {
+            stuck = stuck && !panel.hidden && (panel.classList.contains('scp-dash-stuck') || roomToScroll(scroller));
+            if (panel.classList.contains('scp-dash-stuck') !== stuck) panel.classList.toggle('scp-dash-stuck', stuck);
+        }
+        if (typeof window.IntersectionObserver === 'function') {
+            new window.IntersectionObserver(function (entries) {
+                entries.forEach(function (entry) { setStuck(!entry.isIntersecting); });
+            }, { threshold: 0 }).observe(sentinel);
+        }
+        // And on every scroll, whatever element scrolls: pinned means the block has been held
+        // below where it would sit (right under the marker). Cheap: two rectangles.
+        document.addEventListener('scroll', function (e) {
+            if (panel.hidden) return;
+            var scroller = (e.target === document || !e.target || !e.target.getBoundingClientRect) ? document.scrollingElement : e.target;
+            setStuck(topBlock.getBoundingClientRect().top - sentinel.getBoundingClientRect().top > 2, scroller);
+        }, true);
         body = element('div', 'scp-dash-body');
         panel.appendChild(body);
         devices.parentElement.insertBefore(panel, devices);

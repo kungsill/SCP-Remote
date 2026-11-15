@@ -1025,3 +1025,7 @@ body.scp-signin { background: var(--scp-bg) !important; overflow-y: auto !import
   body#body { min-width: 0 !important; }
   html, body#body { max-width: 100vw; overflow-x: hidden; }
 }
+
+/* The hospital's pages are on the classic UI only: no "Try the new UI" link, no Modern button
+   (views/default3.handlebars sends anyone there back; see hospital/tests/classic-ui-only.test.js). */
+#textnewui, #uiViewButton7 { display: none !important; }

@@ -293,3 +293,17 @@
     window.ScpUiRootCertByAddress = byAddress;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { init(); rootCertLink(); }); else { init(); rootCertLink(); }
 }());
+
+// SCP-Remote: the hospital's pages (dashboard, remote page, menus) are on the classic UI only.
+// A "Modern" choice saved earlier opened MeshCentral's other UI on every visit; once this page is
+// connected (the choice is kept on the server) it is put back to Classic.
+(function resetUiChoice(tries) {
+    try {
+        var server = window.meshserver;
+        if (typeof window.getstore === 'function' && typeof window.putstore === 'function' && server && (server.State === 2 || server.connectstate === 2)) {
+            if (String(window.getstore('uiViewMode', 2)) === '3') window.putstore('uiViewMode', 2);
+            return;
+        }
+    } catch (e) { /* page without MeshCentral's store */ }
+    if (tries < 120) setTimeout(function () { resetUiChoice(tries + 1); }, 1000);
+}(0));

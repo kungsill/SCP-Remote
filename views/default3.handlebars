@@ -2,6 +2,12 @@
 <html lang="en" dir="ltr" xmlns="http://www.w3.org/1999/xhtml">
 
 <head>
+    <!-- SCP-Remote: classic UI only -->
+    <script>
+    // The hospital pages are on the classic UI; this one has none of them. Go there unless the address asks for this one (?sitestyle=3).
+    (function () { var p = new URLSearchParams(location.search); if (p.get("sitestyle") === "3") return; p.set("sitestyle", "1"); location.replace(location.pathname + "?" + p.toString() + location.hash); })();
+    </script>
+
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
     <meta name="viewport" content="user-scalable=yes,initial-scale=1.0,minimum-scale=1.0" />

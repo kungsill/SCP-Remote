@@ -43,6 +43,29 @@ exports.handle = async function (ctx, cmd) {
   else { await new Promise((resolve,reject)=>db.Remove(id,e=>e?reject(e):resolve())); }
   return {watch:cmd.watch===true};
  }
+ // The repair form's own lists: symptoms and departments IT staff add themselves, on top of the
+ // built-in ones in public/scripts/scp-ticket-presets.js. One record per domain, shared by all.
+ if (cmd.op==='ticketLists' || cmd.op==='ticketListsSave') {
+  const id='scpticketlists/'+domain.id;
+  const row=(await get(id))||{_id:id,type:'scpticketlists',domain:domain.id,symptoms:[],departments:[]};
+  const view=()=>({symptoms:Array.isArray(row.symptoms)?row.symptoms:[],departments:Array.isArray(row.departments)?row.departments:[]});
+  if (cmd.op==='ticketLists') return view();
+  if (cmd.kind!=='symptoms' && cmd.kind!=='departments') throw Error('INVALID_INPUT');
+  if (cmd.action!=='add' && cmd.action!=='remove') throw Error('INVALID_INPUT');
+  const symptoms=cmd.kind==='symptoms';
+  const key=text(symptoms?cmd.title:cmd.name, symptoms?200:120, true);
+  const same=item=>String(symptoms?item.title:item.name).trim().toLowerCase()===key.toLowerCase();
+  let list=view()[cmd.kind].filter(item=>!same(item));
+  if (cmd.action==='add') {
+   const item=symptoms?{title:key,description:text(cmd.description||'',4000),icon:text(cmd.icon||'',8)||'📝'}:{name:key};
+   item.by=user.name||user._id; item.at=Date.now();
+   list.push(item);
+   if (list.length>200) list=list.slice(-200);
+  }
+  row[cmd.kind]=list; row.updated=Date.now();
+  await save(row);
+  return view();
+ }
  if (cmd.op==='tickets') {
   const rows=await new Promise((resolve,reject)=>db.GetAllTypeNoTypeField('scpticket',domain.id,(e,r)=>e?reject(e):resolve(r)));
   const out=[]; for(const row of rows) if(await access(row.nodeid)) out.push(row);

@@ -16,6 +16,53 @@ class KeyboardBridgeTest {
         expected.forEachIndexed { i, b -> assertArrayEquals("message $i", b, sent[i]) }
     }
 
+    // Samsung Keyboard checks Thai order (WTT): an above/below vowel or tone mark is only allowed
+    // after a consonant, which it looks for with getTextBeforeCursor. With nothing reported, "ทำ"
+    // and "งั้น" lost their marks. The bridge remembers what it typed so it can answer.
+    @Test fun remembersWhatWasTypedForTheKeyboardToCheck() {
+        k.commitText("ง")
+        assertEquals("ง", k.textBeforeCursor(10))
+        k.setComposingText("ั")
+        assertEquals("งั", k.textBeforeCursor(10))
+        k.commitText("ั")
+        k.commitText("้")
+        assertEquals("งั้", k.textBeforeCursor(10))
+        assertEquals("ั้", k.textBeforeCursor(2))
+    }
+
+    @Test fun backspaceAndDeleteForgetTheLastLetters() {
+        k.commitText("งาน")
+        k.delete(1)
+        assertEquals("งา", k.textBeforeCursor(10))
+        k.backspaceKey()
+        assertEquals("ง", k.textBeforeCursor(10))
+    }
+
+    // Samsung Keyboard can re-open the letter before the cursor (setComposingRegion) and then send
+    // it again with the mark added. Only the mark may go to the computer, not the letter twice.
+    @Test fun reopenedLetterGetsOnlyTheMarkAdded() {
+        k.commitText("ท")
+        sent.clear()
+        k.setComposingRegion(0, 1)
+        k.setComposingText("ทำ")
+        k.finishComposing()
+        assertSent(typed("ำ"))
+        assertEquals("ทำ", k.textBeforeCursor(10))
+    }
+
+    @Test fun reopenedRegionOutsideWhatWasTypedIsIgnored() {
+        k.commitText("ก")
+        sent.clear()
+        k.setComposingRegion(0, 5)
+        k.setComposingText("ข")
+        assertSent(typed("ข"))
+    }
+
+    @Test fun rememberedTextStaysShort() {
+        repeat(600) { k.commitText("ก") }
+        assertEquals(KeyboardBridge.MEMORY, k.textBeforeCursor(10_000).length)
+    }
+
     @Test fun thaiTextIsSentAsUnicodeDownUpPerCodeUnit() {
         k.commitText("สวัสดี")
         assertEquals(12, sent.size)

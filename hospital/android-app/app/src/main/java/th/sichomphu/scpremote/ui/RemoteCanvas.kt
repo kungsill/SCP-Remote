@@ -171,17 +171,46 @@ class RemoteCanvas @JvmOverloads constructor(context: Context, attrs: AttributeS
         val k = keyboard ?: return null
         outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN or EditorInfo.IME_ACTION_NONE
+        outAttrs.initialSelStart = k.cursor
+        outAttrs.initialSelEnd = k.cursor
+        // The keyboard sees the text this app typed (KeyboardBridge remembers it): Samsung Keyboard
+        // checks Thai order against it and drops an above/below mark when it sees no consonant.
         return object : BaseInputConnection(this, false) {
-            override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean { text?.let(k::commitText); return true }
-            override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean { k.setComposingText(text ?: ""); return true }
-            override fun finishComposingText(): Boolean { k.finishComposing(); return true }
+            override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean { text?.let(k::commitText); report(k); return true }
+            override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean { k.setComposingText(text ?: ""); report(k); return true }
+            override fun setComposingRegion(start: Int, end: Int): Boolean { k.setComposingRegion(minOf(start, end), maxOf(start, end)); report(k); return true }
+            override fun finishComposingText(): Boolean { k.finishComposing(); report(k); return true }
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
                 k.delete(beforeLength)
                 repeat(afterLength) { k.special(SpecialKey.DELETE) }
+                report(k)
                 return true
             }
-            override fun sendKeyEvent(event: KeyEvent): Boolean { if (event.action == KeyEvent.ACTION_DOWN) keyDown(k, event); return true }
+            override fun getTextBeforeCursor(n: Int, flags: Int): CharSequence = k.textBeforeCursor(n)
+            override fun getTextAfterCursor(n: Int, flags: Int): CharSequence = ""
+            override fun getSelectedText(flags: Int): CharSequence? = null
+            override fun getExtractedText(request: android.view.inputmethod.ExtractedTextRequest?, flags: Int) =
+                android.view.inputmethod.ExtractedText().apply {
+                    text = k.textBeforeCursor(k.cursor); startOffset = 0; selectionStart = k.cursor; selectionEnd = k.cursor
+                }
+            override fun sendKeyEvent(event: KeyEvent): Boolean { if (event.action == KeyEvent.ACTION_DOWN) keyDown(k, event); report(k); return true }
         }
+    }
+
+    /** Tells the keyboard where the cursor and the composing text are now. */
+    private fun report(k: KeyboardBridge) {
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager ?: return
+        val c = k.cursor
+        val composing = k.composingLength
+        imm.updateSelection(this, c, c, if (composing > 0) c - composing else -1, if (composing > 0) c else -1)
+    }
+
+    /** A click moved the computer's cursor: the keyboard starts from an empty line again. */
+    fun keyboardContextMoved() {
+        val k = keyboard ?: return
+        if (k.cursor == 0) return
+        k.clearContext()
+        (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager)?.restartInput(this)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {

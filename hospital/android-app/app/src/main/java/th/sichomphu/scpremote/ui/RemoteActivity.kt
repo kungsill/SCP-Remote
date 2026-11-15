@@ -479,6 +479,8 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
                 is PointerOut.Move -> { moved = true; KvmMessages.mouse(MouseAction.MOVE, 0, ev.x, ev.y) }
                 is PointerOut.Down -> {
                     if (device.canControl) canvas.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    // A click puts the computer's cursor somewhere else: the keyboard's view starts over.
+                    canvas.keyboardContextMoved()
                     KvmMessages.mouse(MouseAction.DOWN, ev.button, ev.x, ev.y)
                 }
                 is PointerOut.Up -> KvmMessages.mouse(MouseAction.UP, ev.button, ev.x, ev.y)

@@ -277,76 +277,67 @@ class RemoteActivity : AppCompatActivity(), RelaySession.Listener {
         )
     }
 
-    /** Big buttons for everything that is not the picture itself. */
+    /** Signal pill: soft colour by level, e.g. "ดี · 47 ms". */
+    private fun paintSignal(pill: TextView) {
+        val ms = latency
+        val (fg, bg) = when (Signal.level(ms)) {
+            Signal.Level.GOOD -> R.color.tint_green to R.color.tint_green_bg
+            Signal.Level.FAIR -> R.color.fix_busy_fg to R.color.tint_amber_bg
+            Signal.Level.POOR -> R.color.tint_red to R.color.tint_red_bg
+            Signal.Level.UNKNOWN -> R.color.tint_gray to R.color.tint_gray_bg
+        }
+        pill.text = if (ms == null) getString(R.string.sig_unknown) else getString(
+            when (Signal.level(ms)) { Signal.Level.GOOD -> R.string.sig_good; Signal.Level.FAIR -> R.string.sig_fair; else -> R.string.sig_poor }, ms,
+        )
+        pill.contentDescription = signalText()
+        val c = ContextCompat.getColor(this, fg)
+        pill.setTextColor(c)
+        pill.compoundDrawableTintList = ColorStateList.valueOf(c)
+        pill.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this, bg))
+    }
+
+    /** Bottom sheet with big coloured buttons for everything that is not the picture itself. */
     private fun openMenu() {
-        val pad = (16 * resources.displayMetrics.density).toInt()
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(pad, pad / 2, pad, 0) }
-        box.addView(TextView(this).apply {
-            text = device.name; textSize = 18f; setTypeface(typeface, Typeface.BOLD)
-            setTextColor(ContextCompat.getColor(context, R.color.text))
-        })
-        box.addView(TextView(this).apply {
-            text = signalText()
-            setTextColor(ContextCompat.getColor(context, signalColor()))
-            setPadding(0, pad / 4, 0, if (device.canControl) pad / 2 else 0)
-        })
-        if (!device.canControl) box.addView(TextView(this).apply {
-            text = getString(R.string.st_view_only)
-            setTextColor(ContextCompat.getColor(context, R.color.text_muted))
-            setPadding(0, pad / 4, 0, pad / 2)
-        })
-        val grid = GridLayout(this).apply { columnCount = 3; alignmentMode = GridLayout.ALIGN_BOUNDS }
-        box.addView(grid)
-        lateinit var dialog: AlertDialog
-        fun item(icon: Int, label: String, danger: Boolean = false, action: () -> Unit) {
-            val b = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                text = label
-                setIconResource(icon)
-                iconGravity = MaterialButton.ICON_GRAVITY_TOP
-                iconSize = (26 * resources.displayMetrics.density).toInt()
-                isAllCaps = false
-                textSize = 13f
-                maxLines = 2
-                val tint = ContextCompat.getColor(context, if (danger) R.color.danger else R.color.accent)
-                iconTint = ColorStateList.valueOf(tint)
-                setTextColor(if (danger) tint else ContextCompat.getColor(context, R.color.text))
-                cornerRadius = (14 * resources.displayMetrics.density).toInt()
-                // Same box for every button, little side padding so Thai words fit on one line.
-                insetTop = 0; insetBottom = 0
-                val side = (6 * resources.displayMetrics.density).toInt()
-                setPadding(side, side, side, side)
-                setOnClickListener { dialog.dismiss(); action() }
-            }
-            // FILL (not baseline) rows, so buttons with one- and two-line labels line up.
-            grid.addView(b, GridLayout.LayoutParams(GridLayout.spec(GridLayout.UNDEFINED, GridLayout.FILL), GridLayout.spec(GridLayout.UNDEFINED, GridLayout.FILL, 1f)).apply {
-                width = 0; height = (92 * resources.displayMetrics.density).toInt()
-                setMargins(pad / 4, pad / 4, pad / 4, pad / 4)
-            })
+        val v = layoutInflater.inflate(R.layout.sheet_remote_menu, null)
+        Sheets.tint(v.findViewById(R.id.menuTile), R.drawable.ic_monitor, Look.tileTint(device.groupId, true))
+        v.findViewById<TextView>(R.id.menuName).text = device.name
+        v.findViewById<TextView>(R.id.menuWhere).text = listOf(device.ip, device.groupName).filter { it.isNotBlank() }.joinToString(" · ")
+        paintSignal(v.findViewById(R.id.menuSignal))
+        v.findViewById<View>(R.id.menuViewOnly).visibility = if (device.canControl) View.GONE else View.VISIBLE
+        val grid = v.findViewById<GridLayout>(R.id.menuGrid)
+        val dialog = Sheets.open(this, v)
+        fun item(icon: Int, tint: Look.Tint, label: String, action: () -> Unit) {
+            val cell = layoutInflater.inflate(R.layout.item_menu_cell, grid, false)
+            Sheets.tint(cell.findViewById(R.id.cellIcon), icon, tint)
+            cell.findViewById<TextView>(R.id.cellLabel).text = label
+            cell.contentDescription = label
+            cell.setOnClickListener { cell.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); dialog.dismiss(); action() }
+            // Four equal columns; FILL rows so one- and two-line labels line up.
+            grid.addView(cell, GridLayout.LayoutParams(GridLayout.spec(GridLayout.UNDEFINED, GridLayout.FILL), GridLayout.spec(GridLayout.UNDEFINED, GridLayout.FILL, 1f)).apply { width = 0 })
         }
         if (device.canControl) {
-            item(R.drawable.ic_keyboard, getString(R.string.keyboard_short)) { keyBar?.showKeyboard() }
-            item(if (touchpadMode) R.drawable.ic_mouse else R.drawable.ic_touch, getString(if (touchpadMode) R.string.mode_touchpad else R.string.mode_direct)) { switchMode() }
+            item(R.drawable.ic_keyboard, Look.Tint.PINK, getString(R.string.keyboard_short)) { keyBar?.showKeyboard() }
+            item(if (touchpadMode) R.drawable.ic_mouse else R.drawable.ic_touch, Look.Tint.CYAN, getString(if (touchpadMode) R.string.mode_touchpad else R.string.mode_direct)) { switchMode() }
         }
-        item(R.drawable.ic_image, QualityPicker.names(this)[prefs.quality]) {
+        item(R.drawable.ic_image, Look.Tint.VIOLET, QualityPicker.names(this)[prefs.quality]) {
             QualityPicker.pickQuality(this, prefs.quality) { i -> prefs.quality = i; session?.setQuality(Quality.LADDER[i]) }
         }
-        if (displays.size > 1) item(R.drawable.ic_monitor, QualityPicker.displayName(this, selectedDisplay)) {
+        if (displays.size > 1) item(R.drawable.ic_monitor, Look.Tint.BLUE, QualityPicker.displayName(this, selectedDisplay)) {
             QualityPicker.pickDisplay(this, displays, selectedDisplay) { n -> selectedDisplay = n; session?.selectDisplay(n) }
         }
-        if (device.canClipboard) {
-            item(R.drawable.ic_paste, getString(R.string.paste_to_pc)) { pasteToComputer() }
-            item(R.drawable.ic_copy, getString(R.string.copy_from_pc)) { copyFromComputer() }
-        }
-        if (device.canFiles) item(R.drawable.ic_folder, getString(R.string.files)) {
+        if (device.canFiles) item(R.drawable.ic_folder, Look.Tint.AMBER, getString(R.string.files)) {
             startActivity(android.content.Intent(this, FilesActivity::class.java).putExtra(FilesActivity.EXTRA_DEVICE_ID, device.id))
         }
-        if (device.canControl) item(R.drawable.ic_lock, "Ctrl+Alt+Del") { keys?.special(SpecialKey.CTRL_ALT_DEL) }
-        if (device.canPower) item(R.drawable.ic_restart, getString(R.string.restart), danger = true) {
+        if (device.canClipboard) {
+            item(R.drawable.ic_paste, Look.Tint.GREEN, getString(R.string.paste_short)) { pasteToComputer() }
+            item(R.drawable.ic_copy, Look.Tint.GREEN, getString(R.string.copy_short)) { copyFromComputer() }
+        }
+        if (device.canControl) item(R.drawable.ic_key, Look.Tint.GRAY, "Ctrl+Alt+Del") { keys?.special(SpecialKey.CTRL_ALT_DEL) }
+        if (device.canPower) item(R.drawable.ic_restart, Look.Tint.RED, getString(R.string.restart_short)) {
             DeviceActions.confirmPower(this, device, th.sichomphu.scpremote.protocol.ControlMessages.RESTART)
         }
-        item(R.drawable.ic_help, getString(R.string.help)) { showGuide() }
-        item(R.drawable.ic_close, getString(R.string.disconnect), danger = true) { leave() }
-        dialog = MaterialAlertDialogBuilder(this).setView(box).setNegativeButton(R.string.close, null).create()
+        item(R.drawable.ic_help, Look.Tint.BLUE, getString(R.string.help)) { showGuide() }
+        v.findViewById<View>(R.id.menuDisconnect).setOnClickListener { dialog.dismiss(); leave() }
         dialog.show()
     }
 

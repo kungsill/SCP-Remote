@@ -2,11 +2,8 @@ package th.sichomphu.scpremote.ui
 
 import android.content.Intent
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 import th.sichomphu.scpremote.R
 import th.sichomphu.scpremote.data.AppSession
@@ -18,18 +15,12 @@ object DeviceActions {
     /** Asks first (Cancel is the focused, safe choice): unsaved work on the computer is lost. */
     fun confirmPower(activity: AppCompatActivity, d: Device, actionType: Int) {
         val restart = actionType == ControlMessages.RESTART
-        val where = listOf(d.name, d.ip, d.groupName).filter { it.isNotBlank() }.joinToString(" · ")
-        val dialog = MaterialAlertDialogBuilder(activity)
-            .setTitle(if (restart) R.string.restart_title else R.string.shutdown_title)
-            .setMessage(where + "\n\n" + activity.getString(R.string.power_warning))
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(if (restart) R.string.restart else R.string.shutdown) { _, _ -> power(activity, d, actionType) }
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ContextCompat.getColor(activity, R.color.danger))
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus()
-        }
-        dialog.show()
+        Sheets.confirm(
+            activity, icon = if (restart) R.drawable.ic_restart else R.drawable.ic_power, tint = Look.Tint.RED,
+            title = activity.getString(if (restart) R.string.restart_title else R.string.shutdown_title),
+            subtitle = Sheets.where(d), warning = activity.getString(R.string.power_warning),
+            confirm = activity.getString(if (restart) R.string.restart else R.string.shutdown),
+        ) { power(activity, d, actionType) }
     }
 
     private fun power(activity: AppCompatActivity, d: Device, actionType: Int) {
@@ -61,24 +52,22 @@ object DeviceActions {
         }
     }
 
-    /** Long-press on a card: everything that can be done to this computer, as a list. */
+    /** ⋮ or long-press on a card: everything that can be done to this computer, as a sheet. */
     fun menu(activity: AppCompatActivity, d: Device, onConnect: (Device) -> Unit, onFix: (Device) -> Unit) {
-        val items = mutableListOf<Pair<String, () -> Unit>>()
-        if (d.online && d.canView) items += activity.getString(if (d.viewOnly) R.string.view_only else R.string.connect) to { onConnect(d) }
-        if (d.online && d.canFiles) items += activity.getString(R.string.files) to {
+        val items = mutableListOf<Sheets.Action>()
+        fun add(icon: Int, tint: Look.Tint, label: Int, run: () -> Unit) { items += Sheets.Action(icon, tint, activity.getString(label), run) }
+        if (d.online && d.canView) add(if (d.viewOnly) R.drawable.ic_visibility else R.drawable.ic_monitor, Look.Tint.PINK,
+            if (d.viewOnly) R.string.view_only else R.string.connect) { onConnect(d) }
+        if (d.online && d.canFiles) add(R.drawable.ic_folder, Look.Tint.AMBER, R.string.files) {
             activity.startActivity(Intent(activity, FilesActivity::class.java).putExtra(FilesActivity.EXTRA_DEVICE_ID, d.id))
         }
-        if (d.online && d.canFixPrinter) items += activity.getString(R.string.fix_printer) to { onFix(d) }
+        if (d.online && d.canFixPrinter) add(R.drawable.ic_print, Look.Tint.CYAN, R.string.fix_printer) { onFix(d) }
         if (d.online && d.canPower) {
-            items += activity.getString(R.string.restart) to { confirmPower(activity, d, ControlMessages.RESTART) }
-            items += activity.getString(R.string.shutdown) to { confirmPower(activity, d, ControlMessages.SHUTDOWN) }
+            add(R.drawable.ic_restart, Look.Tint.RED, R.string.restart) { confirmPower(activity, d, ControlMessages.RESTART) }
+            add(R.drawable.ic_power, Look.Tint.RED, R.string.shutdown) { confirmPower(activity, d, ControlMessages.SHUTDOWN) }
         }
-        if (!d.online && d.canWake) items += activity.getString(R.string.wake) to { wake(activity, d) }
+        if (!d.online && d.canWake) add(R.drawable.ic_wake, Look.Tint.GREEN, R.string.wake) { wake(activity, d) }
         if (items.isEmpty()) return
-        MaterialAlertDialogBuilder(activity)
-            .setTitle(d.name)
-            .setItems(items.map { it.first }.toTypedArray()) { _, i -> items[i].second() }
-            .setNegativeButton(R.string.close, null)
-            .show()
+        Sheets.actions(activity, d, items)
     }
 }

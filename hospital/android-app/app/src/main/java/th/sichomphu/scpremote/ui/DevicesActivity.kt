@@ -52,8 +52,19 @@ class DevicesActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         if (AppSession.channel == null) { backToLogin(null); return }
         setContentView(R.layout.activity_devices)
-        // The pink header runs up under the status bar; the list stops above the navigation bar.
-        findViewById<View>(R.id.header).padForSystemBars(top = true, bottom = false)
+        // The pink header runs up under the status bar (white icons) and, when scrolled away, leaves
+        // a strip of itself there so the pinned search never sits under the clock. The list stops
+        // above the navigation bar.
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = false
+        val header = findViewById<View>(R.id.header)
+        val headerBlock = findViewById<View>(R.id.headerBlock)
+        val headerTop = header.paddingTop
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(header) { v, insets ->
+            val top = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() or androidx.core.view.WindowInsetsCompat.Type.displayCutout()).top
+            v.setPadding(v.paddingLeft, headerTop + top, v.paddingRight, v.paddingBottom)
+            headerBlock.minimumHeight = top
+            insets
+        }
         findViewById<View>(R.id.root).padForSystemBars(top = false, bottom = true)
         search = findViewById(R.id.search); groups = findViewById(R.id.groups); status = findViewById(R.id.status)
         swipe = findViewById(R.id.swipe)
@@ -111,14 +122,14 @@ class DevicesActivity : AppCompatActivity() {
         val channel = AppSession.channel ?: return
         if (loading) { swipe.isRefreshing = false; return }
         loading = true
-        if (!quiet && AppSession.devices == null) status.text = getString(R.string.loading)
+        if (!quiet && AppSession.devices == null) setStatus(getString(R.string.loading))
         lifecycleScope.launch {
             try {
                 val list = channel.devices()
                 if (list != AppSession.devices) { AppSession.devices = list; show(list) }
                 checkUpdate(manual = false)
             } catch (e: Exception) {
-                if (!quiet) status.text = errorText(e)
+                if (!quiet) setStatus(errorText(e))
             } finally {
                 loading = false
                 swipe.isRefreshing = false
@@ -127,16 +138,34 @@ class DevicesActivity : AppCompatActivity() {
     }
 
     private fun show(list: DeviceList) {
-        findViewById<TextView>(R.id.who).text =
-            if (AppSession.viaInternet) getString(R.string.who_internet, list.userName) else list.userName
+        findViewById<TextView>(R.id.greeting).text = getString(when (Look.greeting(java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY))) {
+            Look.Greeting.MORNING -> R.string.greet_morning
+            Look.Greeting.AFTERNOON -> R.string.greet_afternoon
+            Look.Greeting.EVENING -> R.string.greet_evening
+        })
+        findViewById<TextView>(R.id.who).text = list.userName
+        findViewById<TextView>(R.id.more).text = Look.initial(list.userName)
+        findViewById<View>(R.id.via).visibility = if (AppSession.viaInternet) View.VISIBLE else View.GONE
+        val stats = DeviceSections.stats(list.devices)
+        findViewById<TextView>(R.id.statTotal).text = stats.total.toString()
+        findViewById<TextView>(R.id.statOnline).text = stats.online.toString()
+        findViewById<TextView>(R.id.statOffline).text = stats.offline.toString()
         val present = list.groups.filter { g -> list.devices.any { it.groupId == g.id } }
         if (groupId != null && present.none { it.id == groupId }) groupId = null
         groups.setOnCheckedStateChangeListener(null)
         groups.removeAllViews()
+        val density = resources.displayMetrics.density
         fun chip(id: String?, label: String, count: Int) = Chip(this).apply {
             text = getString(R.string.chip_label, label, count)
             isCheckable = true
             isCheckedIconVisible = false
+            chipBackgroundColor = ContextCompat.getColorStateList(context, R.color.chip_bg)
+            setTextColor(ContextCompat.getColorStateList(context, R.color.chip_text))
+            chipStrokeColor = ContextCompat.getColorStateList(context, R.color.chip_stroke)
+            chipStrokeWidth = 1 * density
+            shapeAppearanceModel = shapeAppearanceModel.withCornerSize(100 * density)
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.prompt)
+            textSize = 13f
             tag = id
             this.id = View.generateViewId()
             groups.addView(this)
@@ -155,9 +184,19 @@ class DevicesActivity : AppCompatActivity() {
         val list = AppSession.devices ?: return
         val query = search.text.toString()
         val shown = DeviceFilter.apply(list.devices, query, groupId)
-        adapter.submit(DeviceSections.build(shown, prefs.recent, showRecent = query.isBlank() && groupId == null))
-        status.text = if (shown.isEmpty()) getString(R.string.no_devices)
-        else getString(R.string.count, shown.size, shown.count { it.online })
+        val filtering = query.isNotBlank() || groupId != null
+        adapter.submit(DeviceSections.build(shown, prefs.recent, showRecent = !filtering))
+        // The stats card already counts everything; a count line only while searching or filtering.
+        setStatus(when {
+            shown.isEmpty() -> getString(R.string.no_devices)
+            filtering -> getString(R.string.count, shown.size, shown.count { it.online })
+            else -> null
+        })
+    }
+
+    private fun setStatus(text: String?) {
+        status.text = text.orEmpty()
+        status.visibility = if (text.isNullOrEmpty()) View.GONE else View.VISIBLE
     }
 
     private fun openRemote(d: Device) {
@@ -167,18 +206,11 @@ class DevicesActivity : AppCompatActivity() {
 
     /** Asks first (Cancel is the safe, focused choice): the fix deletes waiting print jobs. */
     private fun confirmFix(d: Device) {
-        val where = listOf(d.name, d.ip, d.groupName).filter { it.isNotBlank() }.joinToString(" · ")
-        val dialog = MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.fix_title)
-            .setMessage(where + "\n\n" + getString(R.string.fix_warning))
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.fix_go) { _, _ -> runFix(d) }
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(ContextCompat.getColor(this, R.color.danger))
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus()
-        }
-        dialog.show()
+        Sheets.confirm(
+            this, icon = R.drawable.ic_print, tint = Look.Tint.AMBER,
+            title = getString(R.string.fix_title_short), subtitle = Sheets.where(d),
+            warning = getString(R.string.fix_warning), confirm = getString(R.string.fix_go),
+        ) { runFix(d) }
     }
 
     private fun runFix(d: Device) {
@@ -238,10 +270,10 @@ class DevicesActivity : AppCompatActivity() {
             u.openInstallPermission()
             return
         }
-        status.text = getString(R.string.update_downloading)
+        setStatus(getString(R.string.update_downloading))
         lifecycleScope.launch {
             val apk = u.download(m)
-            if (apk == null) { status.text = getString(R.string.update_failed); return@launch }
+            if (apk == null) { setStatus(getString(R.string.update_failed)); return@launch }
             render()
             u.install(apk)
         }

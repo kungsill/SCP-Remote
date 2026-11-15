@@ -9,12 +9,12 @@ import th.sichomphu.scpremote.ui.DeviceSections.Row
 class DeviceSectionsTest {
     private fun d(id: String, online: Boolean = true) = Device(id, id, "g", "G", "", online, emptyList(), true, true, false, true)
 
-    @Test fun recentGoesFirstMostRecentFirstNotRepeatedBelow() {
+    @Test fun recentIsOneStripFirstMostRecentFirstNotRepeatedBelow() {
         val shown = listOf(d("a"), d("b"), d("c"), d("x", online = false))
         val rows = DeviceSections.build(shown, recentIds = listOf("c", "x", "gone"), showRecent = true)
         assertEquals(
             listOf(
-                Row.Header(Kind.RECENT, 2), Row.Item(d("c")), Row.Item(d("x", online = false)),
+                Row.Recent(listOf(d("c"), d("x", online = false))),
                 Row.Header(Kind.ONLINE, 2), Row.Item(d("a")), Row.Item(d("b")),
             ),
             rows,
@@ -26,7 +26,7 @@ class DeviceSectionsTest {
         assertEquals(listOf(Row.Header(Kind.ONLINE, 1), Row.Item(d("a")), Row.Header(Kind.OFFLINE, 1), Row.Item(d("x", online = false))), rows)
     }
 
-    @Test fun noRecentSectionWhileSearchingOrFiltering() {
+    @Test fun noRecentStripWhileSearchingOrFiltering() {
         val rows = DeviceSections.build(listOf(d("a"), d("b")), listOf("b"), showRecent = false)
         assertEquals(listOf(Row.Header(Kind.ONLINE, 2), Row.Item(d("a")), Row.Item(d("b"))), rows)
     }
@@ -38,4 +38,9 @@ class DeviceSectionsTest {
         for (id in listOf("a", "b", "c", "d", "e", "f", "b")) r = DeviceSections.pushRecent(r, id)
         assertEquals(listOf("b", "f", "e", "d", "c"), r)
     }
+
+    @Test fun statsCountAllOnAndOff() =
+        assertEquals(DeviceSections.Stats(total = 3, online = 2, offline = 1), DeviceSections.stats(listOf(d("a"), d("b"), d("x", online = false))))
+
+    @Test fun statsOfNothingAreZero() = assertEquals(DeviceSections.Stats(0, 0, 0), DeviceSections.stats(emptyList()))
 }

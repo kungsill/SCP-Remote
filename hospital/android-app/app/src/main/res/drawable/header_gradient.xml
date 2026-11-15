@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Device-list header: the hero gradient, rounded at the bottom. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="315" android:startColor="@color/accent_dark" android:centerColor="@color/accent_mid" android:endColor="@color/accent_glow" android:type="linear" />
+            <corners android:bottomLeftRadius="30dp" android:bottomRightRadius="30dp" />
+        </shape>
+    </item>
+    <item android:width="220dp" android:height="220dp" android:gravity="top|end" android:top="-100dp" android:right="-70dp">
+        <shape android:shape="oval"><solid android:color="#14FFFFFF" /></shape>
+    </item>
+</layer-list>

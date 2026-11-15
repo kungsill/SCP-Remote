@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- White circle behind the logo on the hero, with a faint white ring. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="@color/card" />
+    <stroke android:width="5dp" android:color="#33FFFFFF" />
+</shape>

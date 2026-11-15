@@ -18,10 +18,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.button.MaterialButton
+import android.widget.Button
+import android.widget.ProgressBar
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
-import com.google.android.material.progressindicator.LinearProgressIndicator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,9 +42,10 @@ class FilesActivity : AppCompatActivity() {
     private var busy = false
     private lateinit var status: TextView
     private lateinit var pathText: TextView
-    private lateinit var progress: LinearProgressIndicator
+    private lateinit var progress: ProgressBar
+    private lateinit var progressCard: View
     private lateinit var progressText: TextView
-    private lateinit var upload: MaterialButton
+    private lateinit var upload: Button
     private val adapter = Entries()
     /** The file waiting for the phone to say where to save it. */
     private var pendingDownload: FileTransfer.Entry? = null
@@ -63,10 +64,15 @@ class FilesActivity : AppCompatActivity() {
         if (AppSession.channel == null || found == null) { finish(); return }
         device = found
         setContentView(R.layout.activity_files)
+        // White top bar: dark status-bar icons over it.
+        @Suppress("DEPRECATION") // ignored on Android 15+, where the bar runs under the status bar
+        window.statusBarColor = ContextCompat.getColor(this, R.color.card)
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = true
         findViewById<View>(R.id.header).padForSystemBars(top = true, bottom = false)
         findViewById<View>(R.id.root).padForSystemBars(top = false, bottom = true)
         status = findViewById(R.id.status); pathText = findViewById(R.id.path)
-        progress = findViewById(R.id.progress); progressText = findViewById(R.id.progressText); upload = findViewById(R.id.upload)
+        progress = findViewById(R.id.progress); progressCard = findViewById(R.id.progressCard)
+        progressText = findViewById(R.id.progressText); upload = findViewById(R.id.upload)
         findViewById<TextView>(R.id.title).text = getString(R.string.files_title, device.name)
         findViewById<View>(R.id.back).setOnClickListener { finish() }
         findViewById<RecyclerView>(R.id.list).apply { layoutManager = LinearLayoutManager(this@FilesActivity); adapter = this@FilesActivity.adapter }
@@ -86,13 +92,25 @@ class FilesActivity : AppCompatActivity() {
 
     private fun setUpPlaces() {
         val group = findViewById<ChipGroup>(R.id.places)
-        fun place(label: String, target: String) = group.addView(Chip(this).apply { text = label; setOnClickListener { list(target) } })
+        val density = resources.displayMetrics.density
+        fun place(icon: Int, label: String, target: String) = group.addView(Chip(this).apply {
+            text = label
+            chipIcon = ContextCompat.getDrawable(context, icon)
+            chipIconTint = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.accent))
+            chipIconSize = 18 * density
+            chipBackgroundColor = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.accent_container))
+            chipStrokeWidth = 0f
+            setTextColor(ContextCompat.getColor(context, R.color.accent_dark))
+            shapeAppearanceModel = shapeAppearanceModel.withCornerSize(14 * density)
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.prompt)
+            setOnClickListener { list(target) }
+        })
         home()?.let { h ->
-            place(getString(R.string.place_desktop), "$h\\Desktop")
-            place(getString(R.string.place_downloads), "$h\\Downloads")
-            place(getString(R.string.place_documents), "$h\\Documents")
+            place(R.drawable.ic_monitor, getString(R.string.place_desktop), "$h\\Desktop")
+            place(R.drawable.ic_download, getString(R.string.place_downloads), "$h\\Downloads")
+            place(R.drawable.ic_folder, getString(R.string.place_documents), "$h\\Documents")
         }
-        place(getString(R.string.place_drives), "")
+        place(R.drawable.ic_drive, getString(R.string.place_drives), "")
     }
 
     private fun open() {
@@ -121,7 +139,7 @@ class FilesActivity : AppCompatActivity() {
             try {
                 val l = s.transfer.ls(target)
                 path = l.path
-                pathText.text = if (path.isEmpty()) getString(R.string.place_drives) else path
+                pathText.text = if (path.isEmpty()) getString(R.string.place_drives) else path.trimEnd('\\').replace("\\", "  ›  ")
                 adapter.submit(path.isNotEmpty(), l.entries)
                 status.text = if (l.entries.isEmpty()) getString(R.string.files_empty) else getString(R.string.files_count, l.entries.size)
                 upload.isEnabled = path.isNotEmpty()
@@ -164,13 +182,14 @@ class FilesActivity : AppCompatActivity() {
         if (busy) return
         busy = true
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        progress.visibility = View.VISIBLE; progressText.visibility = View.VISIBLE
+        progressCard.visibility = View.VISIBLE
         progress.isIndeterminate = size <= 0
+        progress.progress = 0
         progressText.text = label
         upload.isEnabled = false
         val report: (Long) -> Unit = { n ->
             runOnUiThread {
-                if (size > 0) progress.setProgressCompat((n * 100 / size).toInt().coerceIn(0, 100), true)
+                if (size > 0) progress.setProgress((n * 100 / size).toInt().coerceIn(0, 100), true)
                 progressText.text = label + " · " + Formatter.formatShortFileSize(this, n) + if (size > 0) " / " + Formatter.formatShortFileSize(this, size) else ""
             }
         }
@@ -178,7 +197,7 @@ class FilesActivity : AppCompatActivity() {
             val message = try { work(report) } catch (e: Exception) { getString(R.string.files_transfer_failed) }
             busy = false
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            progress.visibility = View.GONE; progressText.visibility = View.GONE
+            progressCard.visibility = View.GONE
             upload.isEnabled = path.isNotEmpty()
             Toast.makeText(this@FilesActivity, message, Toast.LENGTH_LONG).show()
         }
@@ -206,10 +225,10 @@ class FilesActivity : AppCompatActivity() {
         override fun onBindViewHolder(h: Row, position: Int) {
             val e = if (up) items.getOrNull(position - 1) else items[position]
             val ctx = h.itemView.context
+            val badge = if (e == null) Look.Badge(null, R.drawable.ic_arrow_back, Look.Tint.GRAY) else Look.fileBadge(e.name, e.isFolder, e.isDrive)
             if (e == null) {
-                h.icon.setImageResource(R.drawable.ic_arrow_back); h.name.text = ctx.getString(R.string.files_up); h.detail.text = FileTransfer.parent(path).ifEmpty { ctx.getString(R.string.place_drives) }
+                h.name.text = ctx.getString(R.string.files_up); h.detail.text = FileTransfer.parent(path).ifEmpty { ctx.getString(R.string.place_drives) }
             } else {
-                h.icon.setImageResource(if (e.isDrive) R.drawable.ic_drive else if (e.isFolder) R.drawable.ic_folder else R.drawable.ic_file)
                 h.name.text = e.name
                 h.detail.text = when {
                     e.isDrive -> ""
@@ -217,14 +236,26 @@ class FilesActivity : AppCompatActivity() {
                     else -> Formatter.formatShortFileSize(ctx, e.size) + " · " + e.modified.take(10)
                 }
             }
-            h.icon.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(ctx, if (e == null || e.isFolder) R.color.accent else R.color.text_muted))
+            // Solid colour tile with white label or icon; the "up" row is a soft grey tile.
+            val up = e == null
+            h.badge.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(ctx, if (up) badge.tint.bg else badge.tint.icon))
+            h.badgeText.visibility = if (badge.label != null) View.VISIBLE else View.GONE
+            h.badgeText.text = badge.label
+            h.icon.visibility = if (badge.icon != null) View.VISIBLE else View.GONE
+            badge.icon?.let { h.icon.setImageResource(it) }
+            h.icon.imageTintList = ColorStateList.valueOf(if (up) ContextCompat.getColor(ctx, badge.tint.icon) else android.graphics.Color.WHITE)
+            h.save.visibility = if (e != null && !e.isFolder && !e.isDrive) View.VISIBLE else View.GONE
+            h.detail.visibility = if (h.detail.text.isNullOrEmpty()) View.GONE else View.VISIBLE
             h.itemView.setOnClickListener { open(e) }
         }
 
         inner class Row(v: View) : RecyclerView.ViewHolder(v) {
+            val badge: View = v.findViewById(R.id.badge)
+            val badgeText: TextView = v.findViewById(R.id.badgeText)
             val icon: ImageView = v.findViewById(R.id.icon)
             val name: TextView = v.findViewById(R.id.name)
             val detail: TextView = v.findViewById(R.id.detail)
+            val save: View = v.findViewById(R.id.save)
         }
     }
 

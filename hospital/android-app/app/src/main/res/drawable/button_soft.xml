@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Square soft button (the card's more button, back, filter). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#22B02A72">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/field_bg" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+</ripple>

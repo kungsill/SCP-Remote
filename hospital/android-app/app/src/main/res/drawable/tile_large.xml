@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bigger icon tile for the remote menu grid; ripples when tapped. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#22211A26">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+</ripple>

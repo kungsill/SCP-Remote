@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Login hero: deep pink to light pink, top-left to bottom-right, with two soft circles. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="315" android:startColor="@color/accent_dark" android:centerColor="@color/accent_mid" android:endColor="@color/accent_glow" android:type="linear" />
+        </shape>
+    </item>
+    <item android:width="260dp" android:height="260dp" android:gravity="top|end" android:top="-90dp" android:right="-80dp">
+        <shape android:shape="oval"><solid android:color="#14FFFFFF" /></shape>
+    </item>
+    <item android:width="180dp" android:height="180dp" android:gravity="bottom|start" android:bottom="-70dp" android:left="-60dp">
+        <shape android:shape="oval"><solid android:color="#10FFFFFF" /></shape>
+    </item>
+</layer-list>

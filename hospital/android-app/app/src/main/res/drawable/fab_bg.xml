@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The floating menu button: hospital pink, slightly see-through so the picture shows behind it. -->
+<!-- The floating menu button: pink gradient, slightly see-through so the picture shows behind it. -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#55FFFFFF">
     <item>
         <shape android:shape="oval">
-            <solid android:color="#E6B02A72" />
+            <gradient android:angle="315" android:startColor="#E69E1F63" android:endColor="#E6E2559C" />
             <stroke android:width="1.5dp" android:color="#66FFFFFF" />
         </shape>
     </item>

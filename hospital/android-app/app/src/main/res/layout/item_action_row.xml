@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One action in a computer's action sheet: coloured tile and label. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="58dp"
+    android:background="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp">
+
+    <ImageView
+        android:id="@+id/rowIcon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/tile"
+        android:contentDescription="@null"
+        android:padding="10dp" />
+
+    <TextView
+        android:id="@+id/rowLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:fontFamily="@font/prompt"
+        android:textColor="@color/text"
+        android:textSize="15sp" />
+</LinearLayout>

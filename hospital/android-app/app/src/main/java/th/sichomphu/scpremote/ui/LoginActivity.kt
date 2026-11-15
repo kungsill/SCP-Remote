@@ -21,7 +21,8 @@ import th.sichomphu.scpremote.net.PinnedTrust
 
 /** Sign-in with an SCP-Remote account; signs in by itself when an account is remembered. */
 class LoginActivity : AppCompatActivity() {
-    private lateinit var connection: TextView
+    private lateinit var connection: View
+    private lateinit var connectionMode: TextView
     private val prefs by lazy { th.sichomphu.scpremote.data.Prefs(this) }
     private lateinit var user: EditText
     private lateinit var pass: EditText
@@ -35,17 +36,17 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         if (AppSession.channel != null) { openDevices(); return }
         setContentView(R.layout.activity_login)
-        // Light page: dark status-bar icons, and keep the form clear of the bars and the keyboard.
-        @Suppress("DEPRECATION") // ignored on Android 15+, where the page already runs under the bar
-        window.statusBarColor = androidx.core.content.ContextCompat.getColor(this, R.color.background)
-        val night = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = !night
-        findViewById<View>(R.id.loginRoot).padForSystemBars(top = true, bottom = true)
+        // The pink hero runs up under the status bar (white icons); the form stays clear of the
+        // navigation bar and the keyboard.
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = false
+        findViewById<View>(R.id.hero).padForSystemBars(top = true, bottom = false)
+        findViewById<View>(R.id.loginRoot).padForSystemBars(top = false, bottom = true)
+        findViewById<TextView>(R.id.footer).text = getString(R.string.footer_version, packageManager.getPackageInfo(packageName, 0).versionName)
         // On a tablet the form stays a comfortable 480 dp wide instead of spanning the screen.
         if (resources.configuration.screenWidthDp > 560) {
             findViewById<View>(R.id.loginCard).layoutParams.width = (480 * resources.displayMetrics.density).toInt()
         }
-        connection = findViewById(R.id.connection); user = findViewById(R.id.user); pass = findViewById(R.id.pass)
+        connection = findViewById(R.id.connection); connectionMode = findViewById(R.id.connectionMode); user = findViewById(R.id.user); pass = findViewById(R.id.pass)
         remember = findViewById(R.id.remember); error = findViewById(R.id.error); button = findViewById(R.id.signIn)
         config = ServerConfig.load(this)
         store = SecureStore(this)
@@ -64,6 +65,8 @@ class LoginActivity : AppCompatActivity() {
             pass.transformationMethod = if (hidden) null else android.text.method.PasswordTransformationMethod.getInstance()
             pass.setSelection(pass.text.length)
             eye.alpha = if (hidden) 1f else 0.6f
+            (eye as android.widget.ImageButton).imageTintList = android.content.res.ColorStateList.valueOf(
+                androidx.core.content.ContextCompat.getColor(this, if (hidden) R.color.accent else R.color.text_muted))
         }
         pass.setOnEditorActionListener { _, id, _ -> if (id == EditorInfo.IME_ACTION_DONE) { signIn(); true } else false }
     }
@@ -75,11 +78,16 @@ class LoginActivity : AppCompatActivity() {
         ServerChoice.Mode.CUSTOM -> R.string.conn_custom
     })
 
-    /** One quiet line under the button: how the app will connect. */
+    /** One quiet line under the button: how the app will connect, as a small pill. */
     private fun showConnection() {
         val m = prefs.connectionMode
-        val label = if (m == ServerChoice.Mode.CUSTOM && prefs.customServer.isNotBlank()) prefs.customServer else modeLabel(m)
-        connection.text = getString(R.string.conn_line, label)
+        connectionMode.text = when (m) {
+            ServerChoice.Mode.AUTO -> getString(R.string.conn_short_auto)
+            ServerChoice.Mode.HOSPITAL -> getString(R.string.conn_short_hospital)
+            ServerChoice.Mode.INTERNET -> getString(R.string.conn_short_internet)
+            ServerChoice.Mode.CUSTOM -> prefs.customServer.removePrefix("https://").ifBlank { getString(R.string.conn_custom) }
+        }
+        connection.contentDescription = getString(R.string.conn_line, connectionMode.text)
     }
 
     /** Connection setting: automatic (recommended), hospital only, internet only, or an address. */

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One button in the remote menu grid: soft coloured tile over a short label. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackgroundBorderless"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <ImageView
+        android:id="@+id/cellIcon"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@drawable/tile_large"
+        android:contentDescription="@null"
+        android:padding="16dp" />
+
+    <TextView
+        android:id="@+id/cellLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="2"
+        android:paddingStart="2dp"
+        android:paddingEnd="2dp"
+        android:textColor="@color/text"
+        android:textSize="12.5sp" />
+</LinearLayout>

@@ -1,23 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Secondary card button (Fix printing): outlined, so it reads as a button even standing alone. -->
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_pressed="true">
-        <shape android:shape="rectangle">
-            <solid android:color="#1AB02A72" />
-            <stroke android:width="1.5dp" android:color="@color/accent" />
-            <corners android:radius="6dp" />
-        </shape>
-    </item>
-    <item android:state_enabled="false">
-        <shape android:shape="rectangle">
-            <stroke android:width="1.5dp" android:color="@color/offline" />
-            <corners android:radius="6dp" />
-        </shape>
-    </item>
+<!-- Secondary card button (Fix printing): white with a soft pink edge. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#22B02A72">
     <item>
-        <shape android:shape="rectangle">
-            <stroke android:width="1.5dp" android:color="@color/accent" />
-            <corners android:radius="6dp" />
-        </shape>
+        <selector>
+            <item android:state_enabled="false">
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/card" />
+                    <stroke android:width="1.5dp" android:color="@color/card_border" />
+                    <corners android:radius="14dp" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/card" />
+                    <stroke android:width="1.5dp" android:color="#F3C4DB" />
+                    <corners android:radius="14dp" />
+                </shape>
+            </item>
+        </selector>
     </item>
-</selector>
+</ripple>

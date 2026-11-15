@@ -14,6 +14,8 @@ function secureWindow(win){win.webContents.setWindowOpenHandler(()=>({action:'de
 app.on('certificate-error',(event,contents,url,error,certificate,callback)=>{if(new URL(url).origin===origin&&certMatches(certificate.data)){event.preventDefault();callback(true);}else callback(false);});
 if(!app.requestSingleInstanceLock())app.quit();else app.on('second-instance',()=>{if(home){home.show();home.focus();}});
 app.whenReady().then(()=>{
+ // Shortcuts show the .exe's built-in picture, which updates never change: point ours at the current logo.
+ if(process.platform==='win32')try{require('./shortcut-icons').refresh({shell:require('electron').shell,dirs:[app.getPath('desktop'),path.join(app.getPath('appData'),'Microsoft','Windows','Start Menu','Programs'),path.join(process.env.PUBLIC||'C:\\Users\\Public','Desktop')],exe:process.execPath,iconSource:path.join(__dirname,'scp-logo.ico'),stableIcon:path.join(app.getPath('userData'),'scp-logo.ico')});}catch{}
  if(!safeStorage.isEncryptionAvailable())throw Error('WINDOWS_CREDENTIAL_ENCRYPTION_UNAVAILABLE');
  const file=path.join(app.getPath('userData'),'device.key');
  if(fs.existsSync(file))token=safeStorage.decryptString(fs.readFileSync(file));else{token=crypto.randomBytes(32).toString('hex');fs.writeFileSync(file,safeStorage.encryptString(token));}
